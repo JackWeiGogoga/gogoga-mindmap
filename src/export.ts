@@ -166,7 +166,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const zoom = (canvas as unknown as { k: number }).k || 1;
     if (h / zoom <= lh * 1.5) cloneLabels[i].style.whiteSpace = "nowrap";
   });
-  clone.querySelectorAll(".mm-toggle:not(.is-folded)").forEach((t) => t.remove());
+  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
     (n as HTMLElement).style.boxShadow = "none";
   });

@@ -906,3 +906,19 @@
 .mm-root:not(.is-embedded)[data-toolbar="top"] .mm-search { bottom: 44px; }
 /* 垂直工具栏靠右时，搜索栏往左让一点，避免高窗口里挨着 */
 .mm-root[data-toolbar="right"] .mm-search { right: 60px; }
+
+/* ---------- 图片缩放手柄 ---------- */
+.mm-img-handle {
+  position: absolute;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--mm-selection);
+  border-radius: 3px;
+  background: var(--mm-bg);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.mm-img-handle:hover { transform: scale(1.2); }
+@media (pointer: coarse) { .mm-img-handle { width: 20px; height: 20px; } }

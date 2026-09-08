@@ -58,7 +58,9 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
     if (m[1] !== undefined) {
       el.appendChild(image(m[1], m[2], m[1], opts));
     } else if (m[3] !== undefined) {
-      el.appendChild(image(m[4], undefined, m[3], opts));
+      // Obsidian 的 Markdown 图片用 ![alt|宽度](url) 表示尺寸
+      const [alt, param] = splitAltParam(m[3]);
+      el.appendChild(image(m[4], param, alt, opts));
     } else if (m[5] !== undefined) {
       el.appendChild(math(m[5], opts));
     } else if (m[6] !== undefined) {
@@ -89,6 +91,35 @@ function math(tex: string, opts: InlineOptions): HTMLElement {
   const code = wrap("code", `$${tex}$`);
   code.className = "mm-math-fallback";
   return code;
+}
+
+function splitAltParam(alt: string): [string, string | undefined] {
+  const i = alt.lastIndexOf("|");
+  return i >= 0 ? [alt.slice(0, i), alt.slice(i + 1)] : [alt, undefined];
+}
+
+const IMG_WIKI_RE = /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/;
+const IMG_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/;
+
+/** 改写标签里第一张图片的宽度参数；width 为 null 则去掉参数 */
+export function setImageWidth(text: string, width: number | null): string {
+  const w = width === null ? null : Math.max(1, Math.round(width));
+  const wiki = IMG_WIKI_RE.exec(text);
+  const md = IMG_MD_RE.exec(text);
+  const first = wiki && md ? (wiki.index <= md.index ? "wiki" : "md") : wiki ? "wiki" : md ? "md" : null;
+  if (first === "wiki" && wiki) {
+    const param = wiki[2];
+    const keep = param && !/^\d+$/.test(param.trim()) ? param : undefined; // 非数字参数（别名）保留
+    const parts = [wiki[1], ...(keep ? [keep] : []), ...(w !== null ? [String(w)] : [])];
+    return text.slice(0, wiki.index) + `![[${parts.join("|")}]]` + text.slice(wiki.index + wiki[0].length);
+  }
+  if (first === "md" && md) {
+    const [alt, param] = splitAltParam(md[1]);
+    const keepAlt = param !== undefined && !/^\d+$/.test(param.trim()) ? md[1] : alt;
+    const newAlt = w !== null ? `${keepAlt}|${w}` : keepAlt;
+    return text.slice(0, md.index) + `![${newAlt}](${md[2]})` + text.slice(md.index + md[0].length);
+  }
+  return text;
 }
 
 /** 图片：`![[文件|宽度]]` 的参数若是数字就当宽度；解析不到就显示文字 */

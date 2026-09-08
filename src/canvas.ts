@@ -30,7 +30,7 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { fromEditableText, plainText, renderInline, toEditableText, wikilinkOf } from "./inline";
+import { fromEditableText, plainText, renderInline, setImageWidth, toEditableText, wikilinkOf } from "./inline";
 import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
 import { COLOR_NAMES, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -189,6 +189,8 @@ export class MindMapCanvas {
   private foldMenu: HTMLElement | null = null;
   private linkMenu: HTMLElement | null = null;
   private linking = false;
+  private imgHandle: HTMLElement | null = null;
+  private imgResize: { node: MindNode; img: HTMLImageElement; startX: number; startW: number; handle: HTMLElement } | null = null;
   private clipboardText = "";
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
@@ -537,7 +539,10 @@ export class MindMapCanvas {
     if (this.reflowTimer !== null) return;
     this.reflowTimer = window.setTimeout(() => {
       this.reflowTimer = null;
-      if (this.doc && this.els.size) this.reflow();
+      if (this.doc && this.els.size) {
+        this.reflow();
+        this.updateImageHandle();
+      }
     }, 30);
   }
 
@@ -808,6 +813,7 @@ export class MindMapCanvas {
   }
 
   private positionNodebar(): void {
+    this.updateImageHandle();
     if (!this.opts.editable) return;
     const show = this.primary && this.selected.size > 0 && !this.editing && !this.drag && !this.marquee && this.els.has(this.primary.id);
     if (!show) {
@@ -1957,6 +1963,70 @@ export class MindMapCanvas {
     if (!this.touchPress) return;
     window.clearTimeout(this.touchPress.timer);
     this.touchPress = null;
+  }
+
+  // ---------- 图片缩放手柄 ----------
+
+  /** 选中含图片的节点时，在图片右下角放一个拖拽手柄 */
+  private updateImageHandle(): void {
+    if (this.imgResize) return;
+    this.imgHandle?.remove();
+    this.imgHandle = null;
+    if (!this.opts.editable || !this.primary || this.editing) return;
+    const el = this.els.get(this.primary.id);
+    const img = el?.querySelector<HTMLImageElement>("img.mm-img");
+    if (!el || !img || !img.complete) return;
+    const handle = document.createElement("div");
+    handle.className = "mm-img-handle";
+    handle.title = "拖动改大小，双击恢复";
+    el.append(handle);
+    this.placeImageHandle(handle, img);
+    const node = this.primary;
+    handle.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      this.imgResize = { node, img, startX: ev.clientX, startW: img.clientWidth, handle };
+      try {
+        handle.setPointerCapture(ev.pointerId);
+      } catch {
+        // 合成事件
+      }
+    });
+    handle.addEventListener("pointermove", (ev) => {
+      const r = this.imgResize;
+      if (!r) return;
+      ev.stopPropagation();
+      const w = Math.max(40, Math.min(800, r.startW + (ev.clientX - r.startX) / this.k));
+      r.img.style.width = `${Math.round(w)}px`;
+      this.reflow();
+      this.placeImageHandle(r.handle, r.img);
+    });
+    const finish = (ev: PointerEvent) => {
+      const r = this.imgResize;
+      if (!r) return;
+      ev.stopPropagation();
+      this.imgResize = null;
+      const w = Math.round(r.img.clientWidth);
+      if (w !== r.startW) {
+        r.node.text = setImageWidth(r.node.text, w);
+        this.render();
+        this.notify();
+      }
+    };
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+    handle.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      node.text = setImageWidth(node.text, null);
+      this.render();
+      this.notify();
+    });
+    this.imgHandle = handle;
+  }
+
+  private placeImageHandle(handle: HTMLElement, img: HTMLImageElement): void {
+    handle.style.left = `${img.offsetLeft + img.offsetWidth - 7}px`;
+    handle.style.top = `${img.offsetTop + img.offsetHeight - 7}px`;
   }
 
   // ---------- 备注弹层 ----------

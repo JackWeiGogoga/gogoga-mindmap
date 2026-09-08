@@ -111,3 +111,15 @@ test("树形图：子节点向右缩进、逐个向下堆叠", () => {
 test("plainText 会把图片语法化成文件名或 alt，供搜索用", () => {
   assert.equal(plainText("看图 ![[a.png|120]] 和 ![封面](https://x/y.png)"), "看图 a.png 和 封面");
 });
+
+import { setImageWidth } from "../../src/inline";
+
+test("改写图片宽度参数：wiki 与 Markdown 两种写法，去参数时恢复", () => {
+  assert.equal(setImageWidth("看 ![[a.png]] 图", 200), "看 ![[a.png|200]] 图");
+  assert.equal(setImageWidth("![[a.png|160]]", 320), "![[a.png|320]]");
+  assert.equal(setImageWidth("![[a.png|160]]", null), "![[a.png]]");
+  assert.equal(setImageWidth("![[a.png|说明]]", 120), "![[a.png|说明|120]]");
+  assert.equal(setImageWidth("![封面](https://x/y.png)", 150), "![封面|150](https://x/y.png)");
+  assert.equal(setImageWidth("![封面|150](https://x/y.png)", null), "![封面](https://x/y.png)");
+  assert.equal(setImageWidth("没有图片", 100), "没有图片");
+});
