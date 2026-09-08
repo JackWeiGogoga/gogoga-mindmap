@@ -124,6 +124,7 @@ export class MindMapCanvas {
   private pan: { x: number; y: number; tx: number; ty: number; moved: boolean } | null = null;
   private pinch: { dist: number; k: number } | null = null;
   private pendingDrag: { node: MindNode; x: number; y: number } | null = null;
+  private lastTap: { node: MindNode; time: number } | null = null;
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
   private popover: HTMLElement | null = null;
@@ -619,7 +620,6 @@ export class MindMapCanvas {
         this.el.focus({ preventScroll: true });
         if (this.opts.editable && node.depth > 0 && ev.button === 0) {
           this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
-          el.setPointerCapture(ev.pointerId);
         }
         return;
       }
@@ -657,6 +657,7 @@ export class MindMapCanvas {
         if (Math.hypot(ev.clientX - this.pendingDrag.x, ev.clientY - this.pendingDrag.y) >= DRAG_THRESHOLD) {
           this.startDrag(this.pendingDrag.node, ev);
           this.pendingDrag = null;
+          if (this.drag) el.setPointerCapture(ev.pointerId);
         }
         return;
       }
@@ -675,7 +676,19 @@ export class MindMapCanvas {
       if (this.pointers.size < 2) this.pinch = null;
       if (this.marquee) this.endMarquee();
       if (this.drag) this.endDrag(ev.type === "pointerup");
+      const tapped = this.pendingDrag?.node ?? null;
       this.pendingDrag = null;
+      if (tapped && ev.type === "pointerup") {
+        const now = performance.now();
+        if (this.lastTap && this.lastTap.node === tapped && now - this.lastTap.time < 400) {
+          this.lastTap = null;
+          if (this.opts.editable) this.startEdit(tapped);
+        } else {
+          this.lastTap = { node: tapped, time: now };
+        }
+      } else if (ev.type === "pointerup") {
+        this.lastTap = null;
+      }
       if (this.pan) {
         if (!this.pan.moved) this.select(null, "replace");
         this.pan = null;
@@ -1130,7 +1143,8 @@ export class MindMapCanvas {
 
   startEdit(node: MindNode, isNew = false): void {
     if (!this.opts.editable) return;
-    if (this.editing && this.editing !== node) this.commitEdit();
+    if (this.editing === node) return;
+    if (this.editing) this.commitEdit();
     const el = this.els.get(node.id);
     const label = el?.querySelector<HTMLElement>(".mm-label");
     if (!el || !label) return;
