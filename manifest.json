@@ -1,7 +1,7 @@
 {
   "id": "obsidian-mindmap",
   "name": "Mind Map",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.5.0",
   "description": "XMind 风格的思维导图：Markdown 与脑图双向互转，标题和列表即节点。",
   "author": "jackwei",

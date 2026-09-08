@@ -29,13 +29,21 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 - 工具栏的层级按钮：展开全部、只显示主主题、显示到第 2 / 3 层。
 - 编辑时 Shift+Enter 换行，多行文本以 `<br>` 存在标题或列表项里，阅读模式照常渲染。
 - 触屏：单指平移、双指缩放、轻点选中、按住 0.4 秒再拖动换父节点，按钮在触屏上自动放大。
+- **大纲面板**：工具栏最左的按钮或命令「切换大纲面板」，左侧出现树形列表，与画布双向联动。
+  面板里 ↑↓ 移动、Tab / Shift+Tab 降级升级、Alt+↑↓ 排序、Enter 加兄弟并就地改名、Delete 删除、Space 折叠。
+  画布上同样支持 Alt+方向键排序与升降级。
+- **节点链接笔记**：⌘K 或工具栏的链接按钮，选一篇已有笔记或直接新建，标签变成 `[[笔记|原文]]`；
+  新建的笔记在右侧分栏打开。已链接的节点再按 ⌘K 可打开或取消链接。按住 ⌘ 悬停有页面预览。
+- **结构**：逻辑图（向右）、思维导图（左右分布）、组织结构图（向下）、树形图，工具栏结构菜单切换。
+- **公式与图片**：标签里写 `$E=mc^2$` 渲染成公式；`![[图片.png|160]]` 或 `![alt](url)` 渲染成缩略图，
+  数字参数是宽度。备注里的代码块带语法高亮，公式照常渲染。导出 PNG/SVG 时公式和图片都会内嵌。
 
 ### Markdown 映射
 
 ```markdown
 ---
 mindmap: true
-mindmap-structure: mindmap   # 可选：logic-right（默认）| mindmap
+mindmap-structure: mindmap   # 可选：logic-right（默认）| mindmap | org-down | tree-right
 mindmap-theme: rainbow       # 可选：snow（默认）| rainbow
 ---
 
@@ -66,6 +74,8 @@ mindmap-theme: rainbow       # 可选：snow（默认）| rainbow
 | ⌘F | 搜索节点，Enter / Shift+Enter 跳转 |
 | ⌘C / ⌘X / ⌘V | 复制 / 剪切 / 粘贴子树 |
 | Shift+Enter（编辑中） | 节点内换行 |
+| ⌘K | 链接到笔记 / 新建笔记 |
+| Alt+↑↓ / Alt+←→ | 兄弟间排序 / 升级降级 |
 | Shift+点击 / ⌘+点击 / Shift+拖拽 / ⌘A | 加选 / 反选 / 框选 / 全选 |
 | 拖拽节点 | 换父节点或调整顺序 |
 | / | 折叠、展开 |
@@ -101,6 +111,8 @@ pnpm harness         # 监听构建 dev/harness.js，然后用任意静态服务
 | `src/export.ts` | SVG / PNG 导出，内嵌字体 |
 | `src/xmind.ts` | .xmind 读取（自带 zip 与 XML 解析）→ Markdown |
 | `src/xmind-view.ts` | .xmind 只读视图与转换 |
+| `src/outline.ts` | 大纲面板 |
+| `src/note-picker.ts` | 链接笔记的选择器弹窗 |
 | `styles.css` | 主题变量，跟随 Obsidian 明暗模式 |
 
 ## 发布
