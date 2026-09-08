@@ -226,8 +226,10 @@ export class MindMapCanvas {
   private zoomLabel!: HTMLButtonElement;
   private toolbar!: HTMLElement;
   private toolbarPos: ToolbarPosition = "bottom";
-  /** 记住每个按钮的提示文案，工具栏换位置时重新按新方向应用 */
-  private tips = new Map<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement }>();
+  /** 记住每个按钮的提示文案；节点上的图标会随渲染反复重建，用 WeakMap 免得越积越多 */
+  private tips = new WeakMap<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement }>();
+  /** 工具栏按钮单独留一份引用，换位置时要重新按新方向应用 */
+  private toolbarTips: HTMLElement[] = [];
   private positionMenu: HTMLElement | null = null;
   private structureButton: HTMLButtonElement | null = null;
   private structureSep: HTMLElement | null = null;
@@ -239,6 +241,12 @@ export class MindMapCanvas {
   private layout: LayoutResult | null = null;
   private els = new Map<string, HTMLElement>();
   private sizes = new Map<string, Size>();
+  /** 节点内容的签名，用来判断能否原样复用元素 */
+  private elSigs = new WeakMap<HTMLElement, string>();
+  /** 上次写进去的位置，避免重复写同样的值 */
+  private lastPos = new WeakMap<HTMLElement, { x: number; y: number }>();
+  /** 连线 path 的复用池 */
+  private edgePaths: SVGPathElement[] = [];
 
   private tx = 0;
   private ty = 0;
@@ -404,7 +412,7 @@ export class MindMapCanvas {
     this.el.dataset.toolbar = pos;
     if (this.toolbar) this.toolbar.dataset.pos = pos;
     // 弹出方向变了，工具栏上的提示要重新应用
-    for (const [el, t] of this.tips) if (t.zone === "toolbar") this.applyTip(el);
+    for (const el of this.toolbarTips) this.applyTip(el);
   }
 
   private structureTipText(): string {
@@ -470,8 +478,9 @@ export class MindMapCanvas {
     this.crumbs = null;
     this.markerPicker = null;
     this.markerPickerCleanup = null;
+    this.edgePaths = [];
     for (const c of [...this.outsideCleanups]) c();
-    this.tips.clear();
+    this.toolbarTips = [];
   }
 
   fit(): void {
@@ -548,23 +557,54 @@ export class MindMapCanvas {
     }, 100);
   }
 
+  /**
+   * 重建可见节点的 DOM。大图上重新创建全部元素会让浏览器重算几千个节点的样式和布局
+   * （3000 节点约 190ms），所以按节点 id 复用：内容签名没变的元素原样留着，只增删改差异部分。
+   */
   private rebuild(): void {
     const doc = this.doc!;
     const theme = THEMES[this.opts.theme];
-    this.nodesEl.replaceChildren();
-    this.els.clear();
     const branchOf = new Map<string, number>();
     doc.root.children.forEach((c, i) => walk(c, (n) => branchOf.set(n.id, i % BRANCH_COLOR_COUNT)));
     const base = this.focusRoot ?? doc.root;
+    const prev = this.els;
+    const next = new Map<string, HTMLElement>();
 
     const visit = (node: MindNode) => {
-      const el = document.createElement("div");
+      const rel = node.depth - base.depth;
+      const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
+      const sig = [
+        node.text,
+        node.note ? "n" : "",
+        node.color ?? "",
+        node.folded ? "f" : "",
+        node.children.length,
+        rel,
+        branch ?? "",
+        theme.name,
+        this.selected.has(node) ? "s" : "",
+        this.search?.matches.has(node) ? (this.search.list[this.search.index] === node ? "M" : "m") : "",
+      ].join("\u0001");
+      const reused = prev.get(node.id);
+      if (reused && this.elSigs.get(reused) === sig) {
+        next.set(node.id, reused);
+        for (const c of visibleChildren(node)) visit(c);
+        return;
+      }
+      const el = reused ?? document.createElement("div");
+      if (reused) {
+        el.replaceChildren();
+        el.removeAttribute("style");
+        el.removeAttribute("data-color");
+        el.removeAttribute("data-branch");
+        // 位置在 reflow 里重写，先清掉缓存免得被当成没变
+        this.lastPos.delete(el);
+      }
+      this.elSigs.set(el, sig);
       el.className = "mm-node";
       el.dataset.id = node.id;
-      const rel = node.depth - base.depth;
       el.dataset.depth = String(Math.min(rel, 3));
-      const branch = branchOf.get(node.id);
-      if (theme.branchColors && branch !== undefined) el.dataset.branch = String(branch);
+      if (branch !== undefined) el.dataset.branch = String(branch);
       if (node.color) {
         if ((COLOR_NAMES as readonly string[]).includes(node.color)) {
           el.dataset.color = node.color;
@@ -604,12 +644,9 @@ export class MindMapCanvas {
       const link = wikilinkOf(node.text);
       if (link) {
         el.classList.add("is-linked");
-        // 整个节点都是链接目标：停在节点任意位置都触发预览（链接文字自己已经会触发）
-        el.addEventListener("mouseover", (ev) => {
-          if ((ev.target as HTMLElement).closest("a.internal-link")) return;
-          // 预览插件会盯着 targetEl 判断鼠标是否还停着，所以要传节点本身而不是里面的链接文字
-          this.opts.host?.hoverLink?.(ev, link.target, el);
-        });
+        el.dataset.link = link.target;
+      } else if (el.dataset.link) {
+        delete el.dataset.link;
       }
       el.append(label);
 
@@ -640,11 +677,18 @@ export class MindMapCanvas {
         el.append(t);
       }
 
-      this.nodesEl.append(el);
-      this.els.set(node.id, el);
+      if (!reused) this.nodesEl.append(el);
+      next.set(node.id, el);
       for (const c of visibleChildren(node)) visit(c);
     };
     visit(base);
+    for (const [id, el] of prev) {
+      if (next.has(id)) continue;
+      this.elSigs.delete(el);
+      this.lastPos.delete(el);
+      el.remove();
+    }
+    this.els = next;
     this.renderCrumbs();
     this.opts.host?.afterRender?.();
   }
@@ -662,12 +706,21 @@ export class MindMapCanvas {
     }, 30);
   }
 
-  /** 测量 → 布局 → 定位 → 画线。编辑中输入文字时也会调用，所以不重建 DOM */
-  private reflow(): void {
+  /**
+   * 测量 → 布局 → 定位 → 画线。编辑中输入文字时也会调用，所以不重建 DOM。
+   * remeasure 传入某个节点时只重新测量它：打字只改变这一个节点的尺寸，
+   * 读全部 3000 个节点的 offsetWidth 会触发整页强制布局（约 30ms）。
+   */
+  private reflow(remeasure?: MindNode): void {
     const doc = this.doc!;
     const theme = THEMES[this.opts.theme];
-    this.sizes.clear();
-    for (const [id, el] of this.els) this.sizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
+    if (remeasure && this.sizes.size === this.els.size) {
+      const el = this.els.get(remeasure.id);
+      if (el) this.sizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
+    } else {
+      this.sizes.clear();
+      for (const [id, el] of this.els) this.sizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
+    }
     const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
     const base = this.focusRoot ?? doc.root;
     this.layout = layoutTree(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts);
@@ -675,12 +728,17 @@ export class MindMapCanvas {
     for (const p of this.layout.placed.values()) {
       const el = this.els.get(p.node.id);
       if (!el) continue;
-      el.style.left = `${p.x}px`;
-      el.style.top = `${p.y}px`;
-      el.dataset.side = p.side;
+      // 只写真正变了的位置，避免无谓的样式失效
+      const last = this.lastPos.get(el);
+      if (!last || last.x !== p.x || last.y !== p.y) {
+        el.style.left = `${p.x}px`;
+        el.style.top = `${p.y}px`;
+        this.lastPos.set(el, { x: p.x, y: p.y });
+      }
+      if (el.dataset.side !== p.side) el.dataset.side = p.side;
     }
 
-    this.svg.replaceChildren();
+    let edgeIndex = 0;
     const underline = theme.underlineFromDepth;
     const anchorBottom = (p: Placed) => underline !== null && p.node.depth - base.depth >= underline && !p.node.color;
     for (const child of this.layout.placed.values()) {
@@ -694,13 +752,26 @@ export class MindMapCanvas {
         if (anchorBottom(child)) g.y2 = child.y + child.h;
       }
       const style = parentNode === base ? theme.rootEdge : theme.edge;
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", edgePath(g, style));
-      path.setAttribute("class", "mm-edge");
-      path.dataset.depth = String(Math.min(child.node.depth, 3));
+      // 复用已有的 path，只改变了的属性；重新创建几千个 SVG 元素会让布局整体失效
+      let path = this.edgePaths[edgeIndex];
+      if (!path) {
+        path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("class", "mm-edge");
+        this.svg.append(path);
+        this.edgePaths.push(path);
+      }
+      edgeIndex += 1;
+      const d = edgePath(g, style);
+      if (path.getAttribute("d") !== d) path.setAttribute("d", d);
+      const depth = String(Math.min(child.node.depth - base.depth, 3));
+      if (path.dataset.depth !== depth) path.dataset.depth = depth;
       const branch = this.els.get(child.node.id)?.dataset.branch;
-      if (branch !== undefined) path.style.stroke = `var(--mm-branch-${branch})`;
-      this.svg.append(path);
+      const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      if (path.style.stroke !== stroke) path.style.stroke = stroke;
+      if (path.style.display) path.style.display = "";
+    }
+    for (let i = edgeIndex; i < this.edgePaths.length; i++) {
+      if (!this.edgePaths[i].style.display) this.edgePaths[i].style.display = "none";
     }
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
@@ -762,6 +833,7 @@ export class MindMapCanvas {
   /** 给按钮加提示。zone 为 toolbar 的会跟随工具栏位置改变弹出方向 */
   private tip(el: HTMLElement, text: string, zone: "toolbar" | "fixed" = "fixed", placement?: TooltipPlacement): void {
     this.tips.set(el, { text, zone, placement });
+    if (zone === "toolbar" && !this.toolbarTips.includes(el)) this.toolbarTips.push(el);
     this.applyTip(el);
   }
 
@@ -1225,6 +1297,16 @@ export class MindMapCanvas {
       }
     });
 
+    // 链接节点的悬停预览：用一个委托监听，元素复用时不会重复绑定
+    this.on(el, "mouseover", (ev) => {
+      const target = ev.target as HTMLElement;
+      if (target.closest("a.internal-link")) return;
+      const nodeEl = target.closest<HTMLElement>(".mm-node.is-linked");
+      const linktext = nodeEl?.dataset.link;
+      // 预览插件会盯着 targetEl 判断鼠标是否还停着，所以传节点本身
+      if (nodeEl && linktext) this.opts.host?.hoverLink?.(ev, linktext, nodeEl);
+    });
+
     this.on(el, "keydown", (ev) => this.onKeyDown(ev));
 
     this.on(el, "contextmenu", (ev) => {
@@ -1287,7 +1369,7 @@ export class MindMapCanvas {
     });
 
     this.on(el, "input", (ev) => {
-      if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) this.reflow();
+      if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) this.reflow(this.editing);
     });
 
     this.on(

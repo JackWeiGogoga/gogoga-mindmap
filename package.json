@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
     "harness": "node esbuild.config.mjs harness",
-    "install-vault": "node scripts/install-vault.mjs"
+    "install-vault": "node scripts/install-vault.mjs",
+    "gen-bench": "node scripts/gen-bench.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

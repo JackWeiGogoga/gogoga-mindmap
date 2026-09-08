@@ -102,7 +102,14 @@ pnpm typecheck
 pnpm build           # 产物在 dist/main.js
 pnpm install-vault   # 复制到 JackWei vault（OBSIDIAN_VAULT=... 可覆盖）
 pnpm harness         # 监听构建 dev/harness.js，然后用任意静态服务器打开 dev/index.html
+pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 ```
+
+### 性能
+
+3000 节点（Obsidian 桌面端实测，优化后）：打开 195ms，单次渲染 11ms，打字时每次重排 7ms，
+平移每帧 0.2ms，折叠到第二层 55ms，导出 PNG 785ms。1000 节点分别是 53ms / 2ms / 1.6ms / 0.2ms / 10ms。
+渲染按节点 id 复用 DOM，只重建内容变了的元素；连线复用 path 只改 `d`；打字时只重新测量正在编辑的节点。
 
 `dev/index.html` 是脱离 Obsidian 的调试页，能切主题、结构、深色模式，并实时打印写回的 Markdown。
 
