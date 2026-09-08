@@ -293,6 +293,9 @@ export class MindMapCanvas {
     this.el.dataset.structure = opts.structure;
     this.el.classList.toggle("is-editable", opts.editable);
     this.el.classList.toggle("is-embedded", !!opts.embedded);
+    // Obsidian 移动端的边缘滑动手势会和单指平移抢事件，把侧边栏划出来。
+    // 它的手势识别器见到祖先带 data-ignore-swipe 就整个跳过，这是官方留的退出口。
+    this.el.dataset.ignoreSwipe = "true";
     this.toolbarPos = opts.toolbarPosition ?? "bottom";
     this.el.dataset.toolbar = this.toolbarPos;
 
