@@ -13,6 +13,58 @@ export interface InlineOptions {
   resolveImage?: (link: string) => string | null;
   /** 图片加载完成（尺寸变了，需要重新布局） */
   onImageLoad?: () => void;
+  /** 点了 #标签 */
+  onTag?: (tag: string, ev: MouseEvent) => void;
+  /** 点了任务复选框 */
+  onTaskToggle?: (ev: MouseEvent) => void;
+}
+
+/** 可加在节点开头的标记（emoji，存在文字里，任何地方都能显示） */
+export const MARKER_GROUPS: { name: string; emojis: string[]; exclusive: boolean }[] = [
+  { name: "优先级", emojis: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"], exclusive: true },
+  { name: "进度", emojis: ["⏳", "✅", "❌"], exclusive: true },
+  { name: "旗帜", emojis: ["🚩", "🟧", "🟨", "🟩", "🟦", "🟪"], exclusive: false },
+  { name: "符号", emojis: ["⭐", "❗", "❓", "💡", "⚠️", "🔥", "❤️", "📌"], exclusive: false },
+];
+const ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+
+/** 标签开头连续的标记 emoji 与其余文字 */
+export function splitMarkers(text: string): { markers: string[]; rest: string } {
+  const markers: string[] = [];
+  let rest = text;
+  for (;;) {
+    const hit = ALL_MARKERS.find((m) => rest.startsWith(m));
+    if (!hit) break;
+    markers.push(hit);
+    rest = rest.slice(hit.length).replace(/^\s+/, "");
+  }
+  return { markers, rest };
+}
+
+/** 切换一个标记：同组互斥的会替换，已有的会移除 */
+export function toggleMarker(text: string, emoji: string): string {
+  const { markers, rest } = splitMarkers(text);
+  const group = MARKER_GROUPS.find((g) => g.emojis.includes(emoji));
+  let next: string[];
+  if (markers.includes(emoji)) next = markers.filter((m) => m !== emoji);
+  else if (group?.exclusive) next = [...markers.filter((m) => !group.emojis.includes(m)), emoji];
+  else next = [...markers, emoji];
+  // 组内顺序固定：优先级、进度、旗帜、符号
+  next.sort((a, b) => ALL_MARKERS.indexOf(a) - ALL_MARKERS.indexOf(b));
+  return [...next, rest].filter(Boolean).join(" ");
+}
+
+const TASK_RE = /^\[( |x|X)\]\s+/;
+
+/** 切换任务复选框：无 → [ ]，[ ] → [x]，[x] → 去掉 */
+export function toggleTask(text: string, mode: "cycle" | "add-remove" = "cycle"): string {
+  const { markers, rest } = splitMarkers(text);
+  const m = TASK_RE.exec(rest);
+  let body: string;
+  if (!m) body = `[ ] ${rest}`;
+  else if (mode === "add-remove" || m[1] !== " ") body = rest.slice(m[0].length);
+  else body = `[x] ${rest.slice(m[0].length)}`;
+  return [...markers, body].join(" ");
 }
 
 const WIKILINK_ONLY = /^\s*\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*$/;
@@ -24,10 +76,10 @@ export function wikilinkOf(text: string): { target: string; alias?: string } | n
 }
 
 const TOKEN_RE =
-  /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|!\[([^\]]*)\]\(([^)\s]+)\)|\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)|\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|\[([^\]]+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_]*?)_(?![\w_])/g;
+  /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|!\[([^\]]*)\]\(([^)\s]+)\)|\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)|\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|\[([^\]]+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_]*?)_(?![\w_])|(?<![\w#&])#([\p{L}\p{N}_\/-]*[\p{L}_\/-][\p{L}\p{N}_\/-]*)/gu;
 
 // 分组含义：1-2 ![[图片|参数]]  3-4 ![alt](url)  5 $公式$  6-7 [[链接|别名]]  8-9 [文字](url)
-// 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体
+// 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签
 
 const BR_RE = /<br\s*\/?>/i;
 
@@ -43,10 +95,26 @@ export function renderInline(el: HTMLElement, text: string, opts: InlineOptions 
 
 function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void {
   let rest = text;
+  if (el.childElementCount === 0) {
+    const { markers, rest: afterMarkers } = splitMarkers(rest);
+    if (markers.length) {
+      const span = document.createElement("span");
+      span.className = "mm-markers";
+      span.textContent = markers.join(" ");
+      el.appendChild(span);
+      rest = afterMarkers;
+    }
+  }
   const task = /^\[( |x|X)\]\s+/.exec(rest);
   if (task) {
     const box = document.createElement("span");
     box.className = "mm-task" + (task[1] === " " ? "" : " is-done");
+    box.title = "点击切换";
+    box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    box.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      opts.onTaskToggle?.(ev);
+    });
     el.appendChild(box);
     rest = rest.slice(task[0].length);
   }
@@ -77,6 +145,8 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       el.appendChild(wrap("mark", m[14]));
     } else if (m[15] !== undefined || m[16] !== undefined) {
       el.appendChild(wrap("em", m[15] ?? m[16]));
+    } else if (m[17] !== undefined) {
+      el.appendChild(tag(m[17], opts));
     }
   }
   if (last < rest.length) el.appendChild(document.createTextNode(rest.slice(last)));
@@ -147,6 +217,20 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
     opts.onImageLoad?.();
   });
   return img;
+}
+
+function tag(name: string, opts: InlineOptions): HTMLElement {
+  const a = document.createElement("a");
+  a.className = "tag mm-tag";
+  a.textContent = `#${name}`;
+  a.href = "#";
+  a.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+  a.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    opts.onTag?.(`#${name}`, ev);
+  });
+  return a;
 }
 
 function wrap(tag: string, text: string): HTMLElement {

@@ -23,6 +23,8 @@ export interface MindNode {
   level: number;
   /** 列表节点的原始项目符号（"-"、"*"、"1." 等），新节点为空则用文档默认值 */
   bullet: string;
+  /** Obsidian 块引用 id（列表项末尾的 ^abc123），用于 [[笔记#^id]] */
+  blockId?: string;
   children: MindNode[];
   parent: MindNode | null;
   depth: number;
@@ -68,6 +70,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
+    blockId: init.blockId,
     children: init.children ?? [],
     parent,
     depth: parent ? parent.depth + 1 : 0,
@@ -233,6 +236,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,
+    blockId: node.blockId,
   });
   copy.children = node.children.map((c) => cloneTree(c, copy));
   return copy;

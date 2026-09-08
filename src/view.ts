@@ -44,6 +44,20 @@ export class MindMapView extends TextFileView {
     this.canvas?.setToolbarPosition(pos);
   }
 
+  focusSelected(): void {
+    const n = this.canvas?.getPrimary();
+    if (n) this.canvas?.focusOn(n);
+  }
+
+  exitFocus(): void {
+    this.canvas?.exitFocus();
+  }
+
+  copySelectedNodeLink(): Promise<void> {
+    const n = this.canvas?.getPrimary();
+    return n ? (this.canvas?.copyNodeLink(n) ?? Promise.resolve()) : Promise.resolve();
+  }
+
   async toggleOutline(): Promise<void> {
     if (this.outline) this.closeOutline();
     else this.openOutline();

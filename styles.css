@@ -924,3 +924,79 @@
 }
 .mm-img-handle:hover { transform: scale(1.2); }
 @media (pointer: coarse) { .mm-img-handle { width: 20px; height: 20px; } }
+
+/* ---------- 聚焦面包屑 ---------- */
+.mm-crumbs {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+}
+.mm-root:not(.is-embedded).has-outline .mm-crumbs { left: 12px; }
+.mm-root button.mm-crumb {
+  height: auto;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-root button.mm-crumb:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
+.mm-root button.mm-crumb.is-current { color: var(--text-normal, #1f1f1f); font-weight: 600; }
+.mm-crumb-sep { color: var(--text-faint, #aaa); }
+.mm-root[data-toolbar="top"] .mm-crumbs { top: auto; bottom: 12px; }
+
+/* ---------- 标签、标记、任务 ---------- */
+.mm-label a.mm-tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
+  color: var(--mm-selection);
+  font-size: 0.85em;
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.mm-label a.mm-tag:hover { background: color-mix(in srgb, var(--mm-selection) 22%, transparent); }
+.mm-node[data-depth="0"] .mm-label a.mm-tag { background: rgba(255, 255, 255, 0.2); color: inherit; }
+.mm-markers { margin-right: 0.35em; font-size: 1.05em; letter-spacing: 0.15em; }
+.mm-task { cursor: pointer; }
+.mm-task:hover { opacity: 1; }
+
+/* ---------- 标记选择器 ---------- */
+.mm-marker-picker { gap: 4px; padding: 8px; }
+.mm-marker-row { display: flex; align-items: center; gap: 3px; }
+.mm-marker-label { width: 44px; color: var(--text-muted, #666); font-size: 11px; }
+.mm-root button.mm-marker-btn {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mm-root button.mm-marker-btn:hover { background: var(--background-modifier-hover, #f0f0f0); }
+.mm-root button.mm-marker-btn.is-active { border-color: var(--mm-selection); background: color-mix(in srgb, var(--mm-selection) 12%, transparent); }
+.mm-marker-picker .mm-menu-item { margin-top: 4px; justify-content: center; font-size: 12px; color: var(--text-muted, #666); }
+.mm-marker-picker .mm-menu-item::before { display: none; }

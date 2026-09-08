@@ -123,3 +123,34 @@ test("改写图片宽度参数：wiki 与 Markdown 两种写法，去参数时�
   assert.equal(setImageWidth("![封面|150](https://x/y.png)", null), "![封面](https://x/y.png)");
   assert.equal(setImageWidth("没有图片", 100), "没有图片");
 });
+
+import { MARKER_GROUPS, splitMarkers, toggleMarker, toggleTask } from "../../src/inline";
+
+test("标记 emoji：同组互斥、再点移除、顺序固定", () => {
+  assert.equal(toggleMarker("任务", "2️⃣"), "2️⃣ 任务");
+  assert.equal(toggleMarker("2️⃣ 任务", "3️⃣"), "3️⃣ 任务", "优先级互斥");
+  assert.equal(toggleMarker("3️⃣ 任务", "3️⃣"), "任务", "再点移除");
+  assert.equal(toggleMarker("🚩 任务", "⭐"), "🚩 ⭐ 任务", "旗帜与符号可并存");
+  assert.equal(toggleMarker("⭐ 任务", "1️⃣"), "1️⃣ ⭐ 任务", "优先级排在前面");
+  assert.deepEqual(splitMarkers("1️⃣ ✅ 完成 [x] 事"), { markers: ["1️⃣", "✅"], rest: "完成 [x] 事" });
+  assert.ok(MARKER_GROUPS.length >= 4);
+});
+
+test("任务复选框切换：无 → 空 → 勾 → 无；标记保留在前面", () => {
+  assert.equal(toggleTask("事项"), "[ ] 事项");
+  assert.equal(toggleTask("[ ] 事项"), "[x] 事项");
+  assert.equal(toggleTask("[x] 事项"), "事项");
+  assert.equal(toggleTask("🚩 [ ] 事项"), "🚩 [x] 事项");
+  assert.equal(toggleTask("[ ] 事项", "add-remove"), "事项");
+});
+
+test("聚焦分支时布局按相对深度算间距", () => {
+  const doc = parseMarkdown(src);
+  const a = findByPath(doc.root, "0")!;
+  const res = layoutTree(a, measure, { ...DEFAULT_LAYOUT, structure: "logic-right" });
+  const pa = res.placed.get(a.id)!;
+  const a1 = res.placed.get(findByPath(doc.root, "0/0")!.id)!;
+  assert.equal(pa.x, -pa.w / 2, "聚焦节点当作根放在原点");
+  assert.equal(a1.x, pa.x + pa.w + DEFAULT_LAYOUT.gapRoot, "它的子节点用根到主主题的间距");
+  assert.equal(res.placed.size, 4);
+});

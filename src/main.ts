@@ -8,6 +8,7 @@ import {
   MarkdownRenderChild,
   MarkdownRenderer,
   MarkdownView,
+  Menu,
   Notice,
   Plugin,
   renderMath,
@@ -16,6 +17,8 @@ import {
   WorkspaceLeaf,
   ViewState,
 } from "obsidian";
+
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
@@ -175,6 +178,9 @@ export default class MindMapPlugin extends Plugin {
       });
     exportCommand("link-note", "链接到笔记 / 新建笔记", (v) => v.linkSelectedToNote());
     exportCommand("toggle-outline", "切换大纲面板", (v) => v.toggleOutline());
+    exportCommand("focus-branch", "聚焦选中分支", async (v) => v.focusSelected());
+    exportCommand("exit-focus", "退出聚焦", async (v) => v.exitFocus());
+    exportCommand("copy-node-link", "复制节点链接", (v) => v.copySelectedNodeLink());
     exportCommand("search", "搜索节点", async (v) => v.openSearch());
     exportCommand("expand-all", "展开全部节点", async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", "折叠全部节点", async (v) => v.setFoldLevel(1));
@@ -346,6 +352,51 @@ export default class MindMapPlugin extends Plugin {
         const file = this.app.metadataCache.getFirstLinkpathDest(link.split("#")[0], sourcePath());
         return file ? this.app.vault.getResourcePath(file) : null;
       },
+      showMenu: (entries, ev) => {
+        const menu = new Menu();
+        for (const e of entries) {
+          if (e.separator) {
+            menu.addSeparator();
+            continue;
+          }
+          menu.addItem((item) => {
+            item.setTitle(e.title ?? "");
+            if (e.icon) item.setIcon(e.icon);
+            if (e.checked) item.setChecked(true);
+            item.setDisabled(!!e.disabled);
+            item.onClick(() => e.run?.());
+          });
+        }
+        menu.showAtMouseEvent(ev);
+      },
+      openTag: (tag) => {
+        const search = (this.app as unknown as { internalPlugins: { getPluginById(id: string): { instance?: { openGlobalSearch?: (q: string) => void } } | null } }).internalPlugins.getPluginById("global-search");
+        search?.instance?.openGlobalSearch?.(`tag:${tag}`);
+      },
+      getDraggedFiles: () => {
+        const d = (this.app as unknown as { dragManager?: { draggable?: { type?: string; file?: TFile; files?: TFile[] } | null } }).dragManager?.draggable;
+        if (!d) return null;
+        const files = d.type === "file" && d.file ? [d.file] : d.type === "files" && d.files ? d.files : [];
+        return files
+          .filter((f): f is TFile => f instanceof TFile)
+          .map((f) => ({
+            name: f.name,
+            basename: f.basename,
+            linktext: this.app.metadataCache.fileToLinktext(f, sourcePath()),
+            isImage: IMAGE_EXTS.has(f.extension.toLowerCase()),
+          }));
+      },
+      saveBinary: async (name, data) => {
+        const path = await this.app.fileManager.getAvailablePathForAttachment(name, sourcePath());
+        const file = await this.app.vault.createBinary(path, data);
+        return this.app.metadataCache.fileToLinktext(file, sourcePath());
+      },
+      fileBasename: () => {
+        const p = sourcePath();
+        const f = this.app.vault.getAbstractFileByPath(p);
+        return f instanceof TFile ? f.basename : p.replace(/\.md$/, "").split("/").pop() ?? p;
+      },
+      notice: (m) => new Notice(m),
       openLink: (href, internal, ev) => {
         if (internal) void this.app.workspace.openLinkText(href, sourcePath(), ev.metaKey || ev.ctrlKey);
         else window.open(href, "_blank");

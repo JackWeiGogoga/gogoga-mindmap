@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { createNode, DocStyle, MindDoc, MindNode } from "./model";
+import { createNode, DocStyle, MindDoc, MindNode, NodeKind } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -21,6 +21,18 @@ const HEADING_RE = /^(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
 const LIST_RE = /^([ \t]*)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
 const FENCE_RE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const MARKER_RE = /[ \t]*%%[ \t]*([^%]*?)[ \t]*%%[ \t]*$/;
+const BLOCK_ID_RE = /[ \t]+\^([A-Za-z0-9-]+)[ \t]*$/;
+
+/** 摘出行尾的 Obsidian 块 id（^abc123） */
+export function splitBlockId(text: string): { text: string; blockId?: string } {
+  const m = BLOCK_ID_RE.exec(text);
+  if (!m) return { text };
+  return { text: text.slice(0, m.index).trimEnd(), blockId: m[1] };
+}
+
+export function newBlockId(): string {
+  return Math.random().toString(36).slice(2, 8);
+}
 const HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export const DEFAULT_STYLE: DocStyle = {
@@ -288,8 +300,9 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const indent = indentWidth(tok.ws);
       while (listStack.length && listStack[listStack.length - 1].indent >= indent) listStack.pop();
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
-      const { text, marker } = splitMarker(tok.text);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, bullet: tok.bullet });
+      const { text: withoutId, blockId } = splitBlockId(tok.text);
+      const { text, marker } = splitMarker(withoutId);
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       target = { node, buf: noteBuf };
@@ -418,7 +431,8 @@ export function serializeMarkdown(doc: MindDoc): string {
 
   const emitList = (node: MindNode, depth: number) => {
     const bullet = node.bullet || style.bullet;
-    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}`.trimEnd());
+    const blockId = node.blockId ? ` ^${node.blockId}` : "";
+    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd());
     if (node.note) {
       for (const l of normalizeNote(node.note).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
     }
@@ -463,6 +477,23 @@ export function normalizeKinds(doc: MindDoc): void {
   const rootLevel = doc.rootFromHeading ? 1 : doc.root.level;
   doc.root.level = rootLevel;
   for (const c of doc.root.children) fix(c, rootLevel, true);
+}
+
+/** 把某个节点的整层兄弟统一改成标题或列表；返回是否可行 */
+export function convertLevelKind(node: MindNode, kind: NodeKind, style: DocStyle): boolean {
+  const parent = node.parent;
+  if (!parent) return false;
+  if (kind === "heading") {
+    if (parent.kind !== "heading" || parent.level + 1 > 6) return false;
+    for (const c of parent.children) {
+      c.kind = "heading";
+      c.level = parent.level + 1;
+    }
+  } else {
+    for (const c of parent.children) c.kind = "list";
+  }
+  void style;
+  return true;
 }
 
 export function frontmatterValue(frontmatter: string, key: string): string | null {

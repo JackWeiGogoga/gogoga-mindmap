@@ -76,6 +76,8 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
   const sizes = new Map<string, Size>();
   const extents = new Map<string, number>();
   const placed = new Map<string, Placed>();
+  /** 相对布局根的深度：聚焦某个分支时它就是根 */
+  const depthOf = (n: MindNode) => n.depth - root.depth;
 
   const sizeOf = (n: MindNode): Size => {
     let s = sizes.get(n.id);
@@ -105,7 +107,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
 
   // ---- 水平结构：子树高度自底向上，子节点垂直堆叠并对父节点居中 ----
   function gapFor(parent: MindNode): number {
-    return parent.depth === 0 ? opts.gapMain : opts.gapSibling;
+    return depthOf(parent) === 0 ? opts.gapMain : opts.gapSibling;
   }
   function extentOfList(nodes: MindNode[], gap: number): number {
     return nodes.reduce((sum, c, i) => sum + extentH(c) + (i > 0 ? gap : 0), 0);
@@ -122,7 +124,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
   function placeColumn(parent: MindNode, list: MindNode[], side: Side, cy: number): void {
     if (!list.length) return;
     const p = placed.get(parent.id)!;
-    const gapH = parent.depth === 0 ? opts.gapRoot : opts.gapLevel;
+    const gapH = depthOf(parent) === 0 ? opts.gapRoot : opts.gapLevel;
     const gapV = gapFor(parent);
     let y = cy - extentOfList(list, gapV) / 2;
     for (const c of list) {
@@ -138,7 +140,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
 
   // ---- 组织结构图：子树宽度自底向上，子节点水平排在父节点下方并居中 ----
   function hGapFor(parent: MindNode): number {
-    return parent.depth === 0 ? opts.gapMain : opts.gapSibling * 2;
+    return depthOf(parent) === 0 ? opts.gapMain : opts.gapSibling * 2;
   }
   function extentW(n: MindNode): number {
     const cached = extents.get(n.id);
@@ -152,7 +154,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
   function layoutDown(parent: MindNode, list: MindNode[]): void {
     if (!list.length) return;
     const p = placed.get(parent.id)!;
-    const gapV = parent.depth === 0 ? Math.round(opts.gapRoot * 0.6) : opts.gapLevel + 8;
+    const gapV = depthOf(parent) === 0 ? Math.round(opts.gapRoot * 0.6) : opts.gapLevel + 8;
     const gapX = hGapFor(parent);
     const total = list.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? gapX : 0), 0);
     let x = p.x + p.w / 2 - total / 2;

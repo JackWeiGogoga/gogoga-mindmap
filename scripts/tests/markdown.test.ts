@@ -324,3 +324,60 @@ test("粘贴纯文本：每行一个节点；带标题的文本按结构解析",
   assert.equal(h1[0].children[0].text, "子");
   assert.deepEqual(parseClipboard("   \n"), []);
 });
+
+import { convertLevelKind, newBlockId, splitBlockId } from "../../src/markdown";
+
+test("列表项末尾的块 id 往返保留，标记与块 id 共存", () => {
+  const src = `# R
+
+## A
+- 甲 ^abc123
+- 乙 %%red%% ^x-9
+- 丙
+`;
+  const doc = parseMarkdown(src);
+  const [a, b, c] = doc.root.children[0].children;
+  assert.equal(a.text, "甲");
+  assert.equal(a.blockId, "abc123");
+  assert.equal(b.text, "乙");
+  assert.equal(b.color, "red");
+  assert.equal(b.blockId, "x-9");
+  assert.equal(c.blockId, undefined);
+  assert.equal(serializeMarkdown(doc), src);
+  c.blockId = newBlockId();
+  assert.match(c.blockId, /^[a-z0-9]{6}$/);
+  assert.ok(serializeMarkdown(doc).includes(`- 丙 ^${c.blockId}\n`));
+  assert.deepEqual(splitBlockId("文字 ^id1"), { text: "文字", blockId: "id1" });
+  assert.deepEqual(splitBlockId("没有 id"), { text: "没有 id" });
+});
+
+test("整层兄弟在标题与列表之间转换", () => {
+  const doc = parseMarkdown(`# R
+
+## A
+- a1
+- a2
+\t- a21
+`);
+  const a1 = findByPath(doc.root, "0/0")!;
+  assert.equal(convertLevelKind(a1, "heading", doc.style), true);
+  assert.equal(serializeMarkdown(doc), `# R
+
+## A
+
+### a1
+
+### a2
+- a21
+`);
+  assert.equal(convertLevelKind(findByPath(doc.root, "0/1/0")!, "heading", doc.style), true, "a21 的父节点是 H3，可以变 H4");
+  assert.equal(convertLevelKind(a1, "list", doc.style), true);
+  assert.equal(serializeMarkdown(doc), `# R
+
+## A
+- a1
+- a2
+\t- a21
+`, "a21 随父节点一起回到列表");
+  assert.equal(convertLevelKind(doc.root, "list", doc.style), false, "根节点不能转");
+});
