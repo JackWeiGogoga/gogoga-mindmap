@@ -10,6 +10,7 @@ import {
   MarkdownView,
   Menu,
   Notice,
+  setTooltip,
   Plugin,
   renderMath,
   TFile,
@@ -397,6 +398,7 @@ export default class MindMapPlugin extends Plugin {
         return f instanceof TFile ? f.basename : p.replace(/\.md$/, "").split("/").pop() ?? p;
       },
       notice: (m) => new Notice(m),
+      setTooltip: (el, text, placement) => setTooltip(el, text, { placement }),
       openLink: (href, internal, ev) => {
         if (internal) void this.app.workspace.openLinkText(href, sourcePath(), ev.metaKey || ev.ctrlKey);
         else window.open(href, "_blank");

@@ -26,7 +26,7 @@ export class OutlinePanel {
     const close = document.createElement("button");
     close.type = "button";
     close.className = "mm-tool mm-outline-close";
-    close.title = "关闭大纲";
+    canvas.tipFor(close, "关闭大纲面板", "left");
     close.textContent = "×";
     close.addEventListener("click", onClose);
     header.append(title, close);

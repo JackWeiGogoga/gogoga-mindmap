@@ -72,7 +72,11 @@ export interface CanvasHost {
   /** 当前文件名（不含扩展名），复制节点链接用 */
   fileBasename?: () => string;
   notice?: (message: string) => void;
+  /** 用宿主的样式显示提示（Obsidian 的 setTooltip）；没有就退回原生 title */
+  setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement) => void;
 }
+
+export type TooltipPlacement = "top" | "right" | "bottom" | "left";
 
 export interface MenuEntry {
   title?: string;
@@ -167,6 +171,28 @@ const ICONS: Record<string, string> = {
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
 };
 
+const IS_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+
+/** 把 Mod/Shift/Alt 写成当前平台的样子：⌘⇧⌥ 或 Ctrl+Shift+Alt+ */
+function sc(...keys: string[]): string {
+  const map: Record<string, string> = IS_APPLE
+    ? { Mod: "⌘", Shift: "⇧", Alt: "⌥", Enter: "↵" }
+    : { Mod: "Ctrl+", Shift: "Shift+", Alt: "Alt+", Enter: "Enter" };
+  return keys.map((k) => map[k] ?? k).join(IS_APPLE ? "" : "");
+}
+
+const COLOR_LABELS: Record<string, string> = {
+  red: "红色",
+  orange: "橙色",
+  yellow: "黄色",
+  green: "绿色",
+  teal: "青色",
+  blue: "蓝色",
+  purple: "紫色",
+  pink: "粉色",
+  gray: "灰色",
+};
+
 function icon(name: string): HTMLElement {
   const span = document.createElement("span");
   span.className = "mm-icon";
@@ -200,6 +226,8 @@ export class MindMapCanvas {
   private zoomLabel!: HTMLButtonElement;
   private toolbar!: HTMLElement;
   private toolbarPos: ToolbarPosition = "bottom";
+  /** 记住每个按钮的提示文案，工具栏换位置时重新按新方向应用 */
+  private tips = new Map<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement }>();
   private positionMenu: HTMLElement | null = null;
   private structureButton: HTMLButtonElement | null = null;
   private structureSep: HTMLElement | null = null;
@@ -315,7 +343,7 @@ export class MindMapCanvas {
     if (this.opts.structure === structure) return;
     this.opts.structure = structure;
     this.el.dataset.structure = structure;
-    if (this.structureButton) this.structureButton.title = `结构：${STRUCTURES.find((s) => s.id === structure)?.label ?? structure}`;
+    if (this.structureButton) this.tip(this.structureButton, this.structureTipText(), "toolbar");
     this.render();
   }
 
@@ -371,6 +399,13 @@ export class MindMapCanvas {
     this.toolbarPos = pos;
     this.el.dataset.toolbar = pos;
     if (this.toolbar) this.toolbar.dataset.pos = pos;
+    // 弹出方向变了，工具栏上的提示要重新应用
+    for (const [el, t] of this.tips) if (t.zone === "toolbar") this.applyTip(el);
+  }
+
+  private structureTipText(): string {
+    const label = STRUCTURES.find((s) => s.id === this.opts.structure)?.label ?? this.opts.structure;
+    return `结构：${label} · 点击切换`;
   }
 
   setEditable(editable: boolean): void {
@@ -382,7 +417,7 @@ export class MindMapCanvas {
     this.structureSep?.classList.toggle("is-hidden", !editable);
     if (this.editToggle) {
       this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
-      this.editToggle.title = editable ? "完成编辑" : "编辑";
+      this.tip(this.editToggle, editable ? "完成编辑，回到只读" : "编辑这张脑图 · 改动写回代码块", "toolbar");
       this.editToggle.classList.toggle("is-active", editable);
     }
     if (!editable) this.select(null);
@@ -430,6 +465,7 @@ export class MindMapCanvas {
     this.el.classList.remove("mm-root");
     this.crumbs = null;
     this.markerPicker = null;
+    this.tips.clear();
   }
 
   fit(): void {
@@ -574,7 +610,7 @@ export class MindMapCanvas {
       if (node.note) {
         const n = icon("note");
         n.classList.add("mm-note-icon");
-        n.title = "查看备注";
+        this.tip(n, "查看备注");
         n.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         n.addEventListener("click", (ev) => {
           ev.stopPropagation();
@@ -589,7 +625,7 @@ export class MindMapCanvas {
         t.type = "button";
         if (node.folded) t.textContent = String(node.children.length);
         else t.append(icon("minus"));
-        t.title = node.folded ? `展开 ${node.children.length} 个子节点` : "折叠";
+        this.tip(t, node.folded ? `展开 ${node.children.length} 个子节点 /` : "折叠这一支 /");
         t.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         t.addEventListener("click", (ev) => {
           ev.stopPropagation();
@@ -691,13 +727,50 @@ export class MindMapCanvas {
 
   // ---------- 工具栏 ----------
 
+  /** 供外部面板（大纲）复用同一套提示 */
+  tipFor(el: HTMLElement, text: string, placement: TooltipPlacement = "top"): void {
+    this.tip(el, text, "fixed", placement);
+  }
+
+  /** 给按钮加提示。zone 为 toolbar 的会跟随工具栏位置改变弹出方向 */
+  private tip(el: HTMLElement, text: string, zone: "toolbar" | "fixed" = "fixed", placement?: TooltipPlacement): void {
+    this.tips.set(el, { text, zone, placement });
+    this.applyTip(el);
+  }
+
+  private applyTip(el: HTMLElement): void {
+    const t = this.tips.get(el);
+    if (!t) return;
+    const placement = t.zone === "toolbar" ? this.toolbarTipPlacement() : (t.placement ?? "top");
+    if (this.opts.host?.setTooltip) {
+      el.removeAttribute("title");
+      this.opts.host.setTooltip(el, t.text, placement);
+    } else {
+      el.title = t.text;
+    }
+  }
+
+  /** 工具栏贴着哪条边，提示就往画布里侧弹 */
+  private toolbarTipPlacement(): TooltipPlacement {
+    switch (this.toolbarPos) {
+      case "top":
+        return "bottom";
+      case "left":
+        return "right";
+      case "right":
+        return "left";
+      default:
+        return "top";
+    }
+  }
+
   private buildToolbar(): void {
     const bar = document.createElement("div");
     bar.className = "mm-toolbar";
     bar.dataset.pos = this.toolbarPos;
     this.toolbar = bar;
     if (this.opts.onToolbarPositionChange) {
-      bar.title = "右键切换工具栏位置";
+      this.tip(bar, "右键可切换工具栏位置", "toolbar");
       bar.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -724,7 +797,8 @@ export class MindMapCanvas {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "mm-tool";
-      b.title = title;
+      b.dataset.tool = name;
+      this.tip(b, title, "toolbar");
       b.append(icon(name));
       b.addEventListener("pointerdown", (ev) => ev.stopPropagation());
       b.addEventListener("click", (ev) => {
@@ -735,20 +809,20 @@ export class MindMapCanvas {
       return b;
     };
     if (this.opts.onToggleOutline) {
-      btn("outline", "大纲面板", () => this.opts.onToggleOutline?.());
+      btn("outline", "大纲面板 · 树形列表，可改名和调层级", () => this.opts.onToggleOutline?.());
       const sep0 = document.createElement("span");
       sep0.className = "mm-tool-sep";
       bar.append(sep0);
     }
     if (this.opts.embedded) {
-      this.editToggle = btn(this.opts.editable ? "check" : "pencil", this.opts.editable ? "完成编辑" : "编辑", () =>
+      this.editToggle = btn(this.opts.editable ? "check" : "pencil", this.opts.editable ? "完成编辑，回到只读" : "编辑这张脑图 · 改动写回代码块", () =>
         this.setEditable(!this.opts.editable),
       );
       this.editToggle.classList.toggle("is-active", this.opts.editable);
     }
     if (this.opts.editable || this.opts.embedded) {
       const sb = btn("structure", "", () => this.toggleStructureMenu(sb));
-      sb.title = `结构：${STRUCTURES.find((s) => s.id === this.opts.structure)?.label ?? this.opts.structure}`;
+      this.tip(sb, this.structureTipText(), "toolbar");
       sb.classList.toggle("is-hidden", !this.opts.editable);
       this.structureButton = sb;
       const sep = document.createElement("span");
@@ -757,29 +831,30 @@ export class MindMapCanvas {
       bar.append(sep);
       this.structureSep = sep;
     }
-    btn("minus", "缩小", () => this.zoomBy(1 / 1.2));
+    btn("minus", `缩小 ${sc("Mod", "-")}`, () => this.zoomBy(1 / 1.2));
     this.zoomLabel = document.createElement("button");
     this.zoomLabel.type = "button";
     this.zoomLabel.className = "mm-tool mm-zoom-label";
-    this.zoomLabel.title = "回到 100%";
+    this.zoomLabel.dataset.tool = "zoom";
+    this.tip(this.zoomLabel, "当前缩放 · 点击回到 100%", "toolbar");
     this.zoomLabel.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     this.zoomLabel.addEventListener("click", () => this.zoomBy(1 / this.k));
     bar.append(this.zoomLabel);
-    btn("plus", "放大", () => this.zoomBy(1.2));
-    btn("fit", "适应画布", () => this.fit());
-    btn("center", "回到中心", () => this.center());
+    btn("plus", `放大 ${sc("Mod", "+")}`, () => this.zoomBy(1.2));
+    btn("fit", `适应画布 · 缩放到看得见全部节点 ${sc("Mod", "0")}`, () => this.fit());
+    btn("center", "回到中心 · 中心主题居中，缩放 100%", () => this.center());
     const sep2 = document.createElement("span");
     sep2.className = "mm-tool-sep";
     bar.append(sep2);
     if (this.opts.onUndo) {
-      btn("undo", "撤销（⌘Z）", () => this.opts.onUndo?.());
-      btn("redo", "重做（⌘⇧Z）", () => this.opts.onRedo?.());
+      btn("undo", `撤销 ${sc("Mod", "Z")}`, () => this.opts.onUndo?.());
+      btn("redo", `重做 ${sc("Mod", "Shift", "Z")}`, () => this.opts.onRedo?.());
       const sep3 = document.createElement("span");
       sep3.className = "mm-tool-sep";
       bar.append(sep3);
     }
-    btn("search", "搜索节点（⌘F）", () => this.openSearch());
-    const layers = btn("layers", "折叠 / 展开", () => this.toggleFoldMenu(layers));
+    btn("search", `搜索节点 ${sc("Mod", "F")}`, () => this.openSearch());
+    const layers = btn("layers", "折叠层级 · 展开全部或只看前几层", () => this.toggleFoldMenu(layers));
     this.el.append(bar);
     this.updateZoomLabel();
   }
@@ -868,7 +943,7 @@ export class MindMapCanvas {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "mm-swatch";
-      b.title = color ?? "清除颜色";
+      this.tip(b, color ? `${COLOR_LABELS[color] ?? color} · 给选中的节点上色` : "清除颜色");
       if (color) b.style.setProperty("--swatch", `var(--mm-c-${color})`);
       else b.append(icon("none"));
       b.addEventListener("click", (ev) => {
@@ -886,7 +961,8 @@ export class MindMapCanvas {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "mm-tool";
-      b.title = title;
+      b.dataset.tool = name;
+      this.tip(b, title);
       b.append(icon(name));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -894,16 +970,16 @@ export class MindMapCanvas {
       });
       bar.append(b);
     };
-    tool("child", "添加子节点（Tab）", () => this.addChildToSelected());
-    tool("sibling", "添加兄弟节点（Enter）", () => this.addSiblingToSelected(false));
-    tool("marker", "标记", () => this.toggleMarkerPicker());
-    tool("note", "编辑备注", () => {
+    tool("child", "添加子节点 Tab", () => this.addChildToSelected());
+    tool("sibling", `添加兄弟节点 ${sc("Enter")}`, () => this.addSiblingToSelected(false));
+    tool("marker", "标记 · 优先级、进度、旗帜、符号", () => this.toggleMarkerPicker());
+    tool("note", "备注 · 支持 Markdown，可写列表", () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
-    if (this.opts.host?.pickNote) tool("link", "链接到笔记 / 新建笔记（⌘K）", () => void this.linkSelectedToNote());
-    tool("copy", "复制（⌘C）", () => this.copySelection());
-    tool("paste", "粘贴为子节点（⌘V）", () => void this.pasteFromClipboard());
-    tool("trash", "删除", () => this.deleteSelected());
+    if (this.opts.host?.pickNote) tool("link", `链接到笔记，或按名字新建 ${sc("Mod", "K")}`, () => void this.linkSelectedToNote());
+    tool("copy", `复制这棵子树 ${sc("Mod", "C")}`, () => this.copySelection());
+    tool("paste", `粘贴为子节点 ${sc("Mod", "V")}`, () => void this.pasteFromClipboard());
+    tool("trash", "删除节点及其子树 Delete", () => this.deleteSelected());
     return bar;
   }
 
@@ -1907,7 +1983,8 @@ export class MindMapCanvas {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "mm-tool";
-      b.title = title;
+      b.dataset.tool = name;
+      this.tip(b, title, "fixed", this.toolbarPos === "top" ? "top" : "bottom");
       b.append(icon(name));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -1915,7 +1992,13 @@ export class MindMapCanvas {
       });
       return b;
     };
-    bar.append(input, count, tool("up", "上一个（Shift+Enter）", () => this.stepMatch(-1)), tool("down", "下一个（Enter）", () => this.stepMatch(1)), tool("close", "关闭（Esc）", () => this.closeSearch()));
+    bar.append(
+      input,
+      count,
+      tool("up", `上一个匹配 ${sc("Shift", "Enter")}`, () => this.stepMatch(-1)),
+      tool("down", `下一个匹配 ${sc("Enter")}`, () => this.stepMatch(1)),
+      tool("close", "关闭搜索 Esc", () => this.closeSearch()),
+    );
     this.el.append(bar);
     this.search = { bar, input, count, matches: new Set(), list: [], index: -1 };
     input.addEventListener("input", () => this.runSearch(input.value));
@@ -2079,7 +2162,7 @@ export class MindMapCanvas {
     if (!node || !this.opts.editable || this.linkMenu || this.linking) return;
     const link = wikilinkOf(node.text);
     if (link) {
-      const anchor = this.nodebar?.querySelector<HTMLElement>('.mm-tool[title^="链接"]') ?? this.els.get(node.id);
+      const anchor = this.nodebar?.querySelector<HTMLElement>('.mm-tool[data-tool="link"]') ?? this.els.get(node.id);
       if (!anchor) return;
       this.linkMenu = this.buildMenu(
         [
@@ -2297,7 +2380,7 @@ export class MindMapCanvas {
     picker.append(clear);
     this.el.append(picker);
     refresh();
-    const anchor = this.nodebar?.querySelector<HTMLElement>('.mm-tool[title="标记"]') ?? this.els.get(node.id) ?? this.el;
+    const anchor = this.nodebar?.querySelector<HTMLElement>('.mm-tool[data-tool="marker"]') ?? this.els.get(node.id) ?? this.el;
     const host = this.el.getBoundingClientRect();
     const r = anchor.getBoundingClientRect();
     picker.style.left = `${Math.max(4, Math.min(r.left - host.left + r.width / 2 - picker.offsetWidth / 2, host.width - picker.offsetWidth - 4))}px`;
@@ -2469,7 +2552,7 @@ export class MindMapCanvas {
     if (!el || !img || !img.complete) return;
     const handle = document.createElement("div");
     handle.className = "mm-img-handle";
-    handle.title = "拖动改大小，双击恢复";
+    this.tip(handle, "拖动改图片大小，双击恢复原始尺寸", "fixed", "right");
     el.append(handle);
     this.placeImageHandle(handle, img);
     const node = this.primary;
