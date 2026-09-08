@@ -28,7 +28,7 @@ import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
 const FRONTMATTER_KEY = "mindmap";
-/** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认不需要按住 ⌘ */
+/** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
 const HOVER_SOURCE = "obsidian-mindmap";
 
 export default class MindMapPlugin extends Plugin {
@@ -43,7 +43,7 @@ export default class MindMapPlugin extends Plugin {
     // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
     void loadPrism().catch(() => undefined);
-    this.registerHoverLinkSource(HOVER_SOURCE, { display: "思维导图", defaultMod: false });
+    this.registerHoverLinkSource(HOVER_SOURCE, { display: "思维导图", defaultMod: true });
     this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
     this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);

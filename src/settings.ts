@@ -117,7 +117,7 @@ export class MindMapSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("链接节点的悬停预览")
-      .setDesc("鼠标停在链接到笔记的节点上会弹出笔记预览，默认不需要按住 ⌘。想改成按住才显示，去核心插件「页面预览」的设置里找「思维导图」那一项。");
+      .setDesc("按住 ⌘ / Ctrl 把鼠标停在链接到笔记的节点上，会弹出笔记预览，和 Obsidian 其他地方一致。想不按键就显示，去核心插件「页面预览」的设置里找「思维导图」那一项。");
 
     new Setting(containerEl)
       .setName("代码块嵌入的最大高度")
