@@ -787,3 +787,19 @@
 /* ---------- 节点 ⇄ 笔记链接 ---------- */
 .mm-node.is-linked .mm-label .mm-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
 .mm-picker-new { color: var(--interactive-accent, #155dff); }
+
+/* ---------- 公式与图片 ---------- */
+.mm-label .mm-math { display: inline-block; vertical-align: middle; }
+.mm-label .mm-math-fallback { opacity: 0.8; }
+.mm-label img.mm-img {
+  display: block;
+  max-width: 240px;
+  max-height: 180px;
+  margin: 2px auto;
+  border-radius: 6px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.mm-node.has-image { align-items: flex-start; }
+.mm-node.has-image .mm-label { display: block; text-align: center; }
+.mm-node[data-depth="0"] img.mm-img { max-width: 320px; }

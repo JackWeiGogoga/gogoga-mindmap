@@ -107,3 +107,7 @@ test("树形图：子节点向右缩进、逐个向下堆叠", () => {
   for (let i = 0; i < all.length; i++)
     for (let j = i + 1; j < all.length; j++) assert.ok(!overlaps(all[i], all[j]), `${all[i].node.text} 与 ${all[j].node.text} 重叠`);
 });
+
+test("plainText 会把图片语法化成文件名或 alt，供搜索用", () => {
+  assert.equal(plainText("看图 ![[a.png|120]] 和 ![封面](https://x/y.png)"), "看图 a.png 和 封面");
+});

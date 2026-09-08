@@ -42,6 +42,12 @@ export interface CanvasHost {
   hoverLink?: (ev: MouseEvent, linktext: string, targetEl: HTMLElement) => void;
   /** 让用户挑一篇笔记（或新建），返回笔记名；取消返回 null */
   pickNote?: (suggested: string) => Promise<string | null>;
+  /** 渲染 $…$ 公式 */
+  renderMath?: (tex: string) => HTMLElement | null;
+  /** 一批节点渲染完之后（Obsidian 用来 finishRenderMath） */
+  afterRender?: () => void;
+  /** 把图片链接解析成 src */
+  resolveImage?: (link: string) => string | null;
 }
 
 export interface CanvasOptions {
@@ -332,6 +338,7 @@ export class MindMapCanvas {
     this.ro?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
+    if (this.reflowTimer !== null) window.clearTimeout(this.reflowTimer);
     if (this.touchPress) window.clearTimeout(this.touchPress.timer);
     for (const d of this.disposers) d();
     this.el.replaceChildren();
@@ -450,7 +457,11 @@ export class MindMapCanvas {
       renderInline(label, node.text || (node.depth === 0 ? "中心主题" : ""), {
         onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
         onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
+        renderMath: this.opts.host?.renderMath,
+        resolveImage: this.opts.host?.resolveImage,
+        onImageLoad: () => this.scheduleReflow(),
       });
+      if (label.querySelector("img")) el.classList.add("has-image");
       if (wikilinkOf(node.text)) el.classList.add("is-linked");
       el.append(label);
 
@@ -486,6 +497,17 @@ export class MindMapCanvas {
       for (const c of visibleChildren(node)) visit(c);
     };
     visit(doc.root);
+    this.opts.host?.afterRender?.();
+  }
+
+  private reflowTimer: number | null = null;
+  /** 图片陆续加载完时合并成一次重排 */
+  private scheduleReflow(): void {
+    if (this.reflowTimer !== null) return;
+    this.reflowTimer = window.setTimeout(() => {
+      this.reflowTimer = null;
+      if (this.doc && this.els.size) this.reflow();
+    }, 30);
   }
 
   /** 测量 → 布局 → 定位 → 画线。编辑中输入文字时也会调用，所以不重建 DOM */

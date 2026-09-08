@@ -107,6 +107,22 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
 
   const clone = nodes.cloneNode(true) as HTMLElement;
   inlineStyles(nodes, clone);
+  // 节点里的图片：SVG 图像不能加载外部资源，转成 data URL 内嵌
+  const origImgs = nodes.querySelectorAll<HTMLImageElement>("img");
+  const cloneImgs = clone.querySelectorAll<HTMLImageElement>("img");
+  await Promise.all(
+    [...origImgs].map(async (img, i) => {
+      try {
+        const blob = await (await fetch(img.src)).blob();
+        cloneImgs[i].src = await blobToDataUrl(blob);
+      } catch {
+        cloneImgs[i].remove();
+      }
+      cloneImgs[i].removeAttribute("srcset");
+      cloneImgs[i].style.width = `${img.clientWidth}px`;
+      cloneImgs[i].style.height = `${img.clientHeight}px`;
+    }),
+  );
   // 单行标签禁止换行：导出环境的字体若略宽，宁可溢出也不要多出一行
   const origLabels = nodes.querySelectorAll<HTMLElement>(".mm-label");
   const cloneLabels = clone.querySelectorAll<HTMLElement>(".mm-label");

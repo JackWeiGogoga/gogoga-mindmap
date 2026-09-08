@@ -1,4 +1,21 @@
-import { Component, HoverParent, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
+import {
+  Component,
+  finishRenderMath,
+  HoverParent,
+  loadMathJax,
+  loadPrism,
+  MarkdownPostProcessorContext,
+  MarkdownRenderChild,
+  MarkdownRenderer,
+  MarkdownView,
+  Notice,
+  Plugin,
+  renderMath,
+  TFile,
+  TFolder,
+  WorkspaceLeaf,
+  ViewState,
+} from "obsidian";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
@@ -17,8 +34,13 @@ export default class MindMapPlugin extends Plugin {
   /** 用户明确要求以 Markdown 打开的文件，跳过一次视图重定向 */
   private markdownOverride = new Set<string>();
 
+  private mathReady = false;
+
   async onload(): Promise<void> {
     await this.loadSettings();
+    // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
+    void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
+    void loadPrism().catch(() => undefined);
     this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
     this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
@@ -289,7 +311,27 @@ export default class MindMapPlugin extends Plugin {
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
       renderNote: (el, markdown) => {
-        void MarkdownRenderer.render(this.app, markdown, el, sourcePath(), component);
+        void MarkdownRenderer.render(this.app, markdown, el, sourcePath(), component).then(() => {
+          // 备注里的代码块：MarkdownRenderer 不一定跑高亮，补一次
+          const prism = (window as unknown as { Prism?: { highlightAllUnder?: (el: Element) => void } }).Prism;
+          if (el.querySelector("pre code[class*=language-]")) prism?.highlightAllUnder?.(el);
+        });
+      },
+      renderMath: (tex) => {
+        if (!this.mathReady) return null;
+        try {
+          return renderMath(tex, false);
+        } catch {
+          return null;
+        }
+      },
+      afterRender: () => {
+        if (this.mathReady) void finishRenderMath();
+      },
+      resolveImage: (link) => {
+        if (/^(https?:|data:|app:)/.test(link)) return link;
+        const file = this.app.metadataCache.getFirstLinkpathDest(link.split("#")[0], sourcePath());
+        return file ? this.app.vault.getResourcePath(file) : null;
       },
       openLink: (href, internal, ev) => {
         if (internal) void this.app.workspace.openLinkText(href, sourcePath(), ev.metaKey || ev.ctrlKey);
