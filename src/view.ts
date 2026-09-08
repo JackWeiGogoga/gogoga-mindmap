@@ -2,7 +2,7 @@ import { Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidia
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
 import { History } from "./history";
-import type { Structure } from "./layout";
+import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import type { MindDoc } from "./model";
 import type { ThemeName } from "./theme";
@@ -176,9 +176,7 @@ export class MindMapView extends TextFileView {
   private applyFrontmatterOptions(doc: MindDoc): void {
     if (!this.canvas) return;
     const structure = frontmatterValue(doc.frontmatter, "mindmap-structure");
-    this.canvas.setStructure(
-      structure === "mindmap" || structure === "logic-right" ? structure : this.plugin.settings.defaultStructure,
-    );
+    this.canvas.setStructure(isStructure(structure) ? structure : this.plugin.settings.defaultStructure);
     const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
     this.canvas.setTheme(theme && theme in THEMES ? (theme as ThemeName) : this.plugin.settings.defaultTheme);
   }

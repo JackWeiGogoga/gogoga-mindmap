@@ -1,5 +1,6 @@
 import { Component, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
 import { locateBlock, replaceBlock } from "./codeblock";
+import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
@@ -200,7 +201,7 @@ export default class MindMapPlugin extends Plugin {
       };
 
       const canvas = new MindMapCanvas(wrap, {
-        structure: structure === "mindmap" || structure === "logic-right" ? structure : this.settings.defaultStructure,
+        structure: isStructure(structure) ? structure : this.settings.defaultStructure,
         theme: theme && theme in THEMES ? (theme as ThemeName) : this.settings.defaultTheme,
         editable: state.editable,
         embedded: true,

@@ -19,16 +19,16 @@ import {
 } from "./model";
 import {
   Bounds,
-  curvePath,
   DEFAULT_LAYOUT,
   edgeGeometry,
-  elbowPath,
+  edgePath,
   layoutTree,
   LayoutOptions,
   LayoutResult,
   Placed,
   Size,
   Structure,
+  STRUCTURES,
 } from "./layout";
 import { fromEditableText, plainText, renderInline, toEditableText } from "./inline";
 import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
@@ -76,6 +76,7 @@ const ICONS: Record<string, string> = {
   fit: '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
   center: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
   logic: '<svg viewBox="0 0 24 24"><path d="M3 12h6M9 12v-6h6M9 12v6h6M9 12h6"/></svg>',
+  structure: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v4M6 17v-3h12v3"/></svg>',
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
@@ -122,8 +123,9 @@ export class MindMapCanvas {
   private nodesEl: HTMLElement;
   private overlay: HTMLElement;
   private zoomLabel!: HTMLButtonElement;
-  private structureButtons = new Map<Structure, HTMLElement>();
+  private structureButton: HTMLButtonElement | null = null;
   private structureSep: HTMLElement | null = null;
+  private structureMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
 
@@ -221,7 +223,7 @@ export class MindMapCanvas {
     if (this.opts.structure === structure) return;
     this.opts.structure = structure;
     this.el.dataset.structure = structure;
-    for (const [s, b] of this.structureButtons) b.classList.toggle("is-active", s === structure);
+    if (this.structureButton) this.structureButton.title = `结构：${STRUCTURES.find((s) => s.id === structure)?.label ?? structure}`;
     this.render();
   }
 
@@ -278,7 +280,7 @@ export class MindMapCanvas {
     if (!editable) this.flush();
     this.opts.editable = editable;
     this.el.classList.toggle("is-editable", editable);
-    for (const b of this.structureButtons.values()) b.classList.toggle("is-hidden", !editable);
+    this.structureButton?.classList.toggle("is-hidden", !editable);
     this.structureSep?.classList.toggle("is-hidden", !editable);
     if (this.editToggle) {
       this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
@@ -503,11 +505,13 @@ export class MindMapCanvas {
       const parent = this.layout.placed.get(parentNode.id);
       if (!parent) continue;
       const g = edgeGeometry(parent, child);
-      if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
-      if (anchorBottom(child)) g.y2 = child.y + child.h;
+      if (child.side === "right" || child.side === "left") {
+        if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
+        if (anchorBottom(child)) g.y2 = child.y + child.h;
+      }
       const style = parentNode.depth === 0 ? theme.rootEdge : theme.edge;
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", style === "curve" ? curvePath(g) : elbowPath(g));
+      path.setAttribute("d", edgePath(g, style));
       path.setAttribute("class", "mm-edge");
       path.dataset.depth = String(Math.min(child.node.depth, 3));
       const branch = this.els.get(child.node.id)?.dataset.branch;
@@ -569,12 +573,10 @@ export class MindMapCanvas {
       this.editToggle.classList.toggle("is-active", this.opts.editable);
     }
     if (this.opts.editable || this.opts.embedded) {
-      this.structureButtons.set("logic-right", btn("logic", "逻辑图（向右）", () => this.changeStructure("logic-right")));
-      this.structureButtons.set("mindmap", btn("mindmap", "思维导图（左右分布）", () => this.changeStructure("mindmap")));
-      for (const [s, b] of this.structureButtons) {
-        b.classList.toggle("is-active", s === this.opts.structure);
-        b.classList.toggle("is-hidden", !this.opts.editable);
-      }
+      const sb = btn("structure", "", () => this.toggleStructureMenu(sb));
+      sb.title = `结构：${STRUCTURES.find((s) => s.id === this.opts.structure)?.label ?? this.opts.structure}`;
+      sb.classList.toggle("is-hidden", !this.opts.editable);
+      this.structureButton = sb;
       const sep = document.createElement("span");
       sep.className = "mm-tool-sep";
       sep.classList.toggle("is-hidden", !this.opts.editable);
@@ -604,6 +606,56 @@ export class MindMapCanvas {
   private changeStructure(s: Structure): void {
     this.setStructure(s);
     this.opts.onStructureChange?.(s);
+  }
+
+  private toggleStructureMenu(anchor: HTMLElement): void {
+    if (this.structureMenu) {
+      this.closeStructureMenu();
+      return;
+    }
+    const menu = this.buildMenu(
+      STRUCTURES.map((s) => ({ label: s.label, active: s.id === this.opts.structure, run: () => this.changeStructure(s.id) })),
+      anchor,
+      () => this.closeStructureMenu(),
+    );
+    this.structureMenu = menu;
+  }
+
+  private closeStructureMenu(): void {
+    this.structureMenu?.remove();
+    this.structureMenu = null;
+  }
+
+  /** 工具栏上方的小菜单，点外面自动关闭 */
+  private buildMenu(items: { label: string; active?: boolean; run: () => void }[], anchor: HTMLElement, close: () => void): HTMLElement {
+    const menu = document.createElement("div");
+    menu.className = "mm-menu";
+    menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    for (const it of items) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mm-menu-item" + (it.active ? " is-active" : "");
+      b.textContent = it.label;
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        close();
+        it.run();
+      });
+      menu.append(b);
+    }
+    this.el.append(menu);
+    const host = this.el.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = `${Math.max(4, Math.min(r.left - host.left + r.width / 2 - menu.offsetWidth / 2, host.width - menu.offsetWidth - 4))}px`;
+    menu.style.top = `${r.top - host.top - menu.offsetHeight - 6}px`;
+    document.addEventListener(
+      "pointerdown",
+      (ev) => {
+        if (!menu.contains(ev.target as Node)) close();
+      },
+      { capture: true, once: true },
+    );
+    return menu;
   }
 
   // ---------- 节点浮动工具栏 ----------
@@ -1082,6 +1134,34 @@ export class MindMapCanvas {
     if (!this.layout) return;
     const p = this.layout.placed.get(node.id);
     if (!p) return;
+    const structure = this.opts.structure;
+    if (structure === "org-down") {
+      // 向下结构：上下是父子，左右在兄弟间找最近的
+      if (key === "ArrowDown") {
+        const kids = visibleChildren(node);
+        if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
+        return;
+      }
+      if (key === "ArrowUp") {
+        if (node.parent) this.select(node.parent);
+        return;
+      }
+      this.selectNearest(p, key === "ArrowLeft" ? "left" : "right");
+      return;
+    }
+    if (structure === "tree-right") {
+      if (key === "ArrowRight") {
+        const kids = visibleChildren(node);
+        if (kids.length) this.select(kids[0]);
+        return;
+      }
+      if (key === "ArrowLeft") {
+        if (node.parent) this.select(node.parent);
+        return;
+      }
+      this.selectNearest(p, key === "ArrowUp" ? "up" : "down");
+      return;
+    }
     const towardChildren = (key === "ArrowRight" && p.side === "right") || (key === "ArrowLeft" && p.side === "left");
     if (key === "ArrowLeft" || key === "ArrowRight") {
       if (node.depth === 0) {
@@ -1097,15 +1177,25 @@ export class MindMapCanvas {
       }
       return;
     }
-    const cy = p.y + p.h / 2;
+    this.selectNearest(p, key === "ArrowUp" ? "up" : "down");
+  }
+
+  /** 朝某个方向找最近的节点（主轴距离为主，侧向偏移加权） */
+  private selectNearest(p: Placed, dir: "up" | "down" | "left" | "right"): void {
+    if (!this.layout) return;
     const cx = p.x + p.w / 2;
+    const cy = p.y + p.h / 2;
     let best: Placed | null = null;
     let bestScore = Infinity;
     for (const q of this.layout.placed.values()) {
       if (q === p) continue;
+      const qx = q.x + q.w / 2;
       const qy = q.y + q.h / 2;
-      if (key === "ArrowUp" ? qy >= cy - 1 : qy <= cy + 1) continue;
-      const score = Math.abs(q.x + q.w / 2 - cx) * 2 + Math.abs(qy - cy);
+      const ahead = dir === "up" ? qy < cy - 1 : dir === "down" ? qy > cy + 1 : dir === "left" ? qx < cx - 1 : qx > cx + 1;
+      if (!ahead) continue;
+      const main = dir === "up" || dir === "down" ? Math.abs(qy - cy) : Math.abs(qx - cx);
+      const cross = dir === "up" || dir === "down" ? Math.abs(qx - cx) : Math.abs(qy - cy);
+      const score = main + cross * 2;
       if (score < bestScore) {
         bestScore = score;
         best = q;
@@ -1204,11 +1294,20 @@ export class MindMapCanvas {
     const gap = target.parent.depth === 0 ? DEFAULT_LAYOUT.gapMain : DEFAULT_LAYOUT.gapSibling;
     const side = kids[0].side;
     const pos = kids.findIndex((k) => target.parent.children.indexOf(k.node) >= target.index);
+    ind.classList.toggle("is-vertical", side === "down");
+    if (side === "down") {
+      let x: number;
+      if (pos === -1) x = kids[kids.length - 1].x + kids[kids.length - 1].w + gap;
+      else if (pos === 0) x = kids[0].x - gap;
+      else x = (kids[pos - 1].x + kids[pos - 1].w + kids[pos].x) / 2;
+      Object.assign(ind.style, { display: "block", left: `${x - 2}px`, top: `${kids[0].y}px` });
+      return;
+    }
     let y: number;
     if (pos === -1) y = kids[kids.length - 1].y + kids[kids.length - 1].h + gap / 2;
     else if (pos === 0) y = kids[0].y - gap / 2;
     else y = (kids[pos - 1].y + kids[pos - 1].h + kids[pos].y) / 2;
-    const x = side === "right" ? kids[0].x : kids[0].x + kids[0].w - 48;
+    const x = side === "left" ? kids[0].x + kids[0].w - 48 : kids[0].x;
     Object.assign(ind.style, { display: "block", left: `${x}px`, top: `${y - 2}px` });
   }
 
@@ -1220,15 +1319,16 @@ export class MindMapCanvas {
       const kids = visibleChildren(p.node).filter((c) => !exclude.has(c)).map((c) => this.layout!.placed.get(c.id)!).filter(Boolean);
       if (!kids.length) continue;
       const gap = p.node.depth === 0 ? DEFAULT_LAYOUT.gapMain : DEFAULT_LAYOUT.gapSibling;
-      const minX = Math.min(...kids.map((k) => k.x)) - 12;
-      const maxX = Math.max(...kids.map((k) => k.x + k.w)) + 12;
-      const minY = kids[0].y - gap;
-      const maxY = kids[kids.length - 1].y + kids[kids.length - 1].h + gap;
+      const horizontal = kids[0].side === "down";
+      const minX = Math.min(...kids.map((k) => k.x)) - (horizontal ? gap : 12);
+      const maxX = Math.max(...kids.map((k) => k.x + k.w)) + (horizontal ? gap : 12);
+      const minY = Math.min(...kids.map((k) => k.y)) - (horizontal ? 12 : gap);
+      const maxY = Math.max(...kids.map((k) => k.y + k.h)) + (horizontal ? 12 : gap);
       if (wx < minX || wx > maxX || wy < minY || wy > maxY) continue;
       // 落在某个子节点自己的盒子里 → 成为它的子节点
-      const hit = kids.find((k) => wx >= k.x && wx <= k.x + k.w && wy >= k.y + 4 && wy <= k.y + k.h - 4);
+      const hit = kids.find((k) => wx >= k.x + 4 && wx <= k.x + k.w - 4 && wy >= k.y + 4 && wy <= k.y + k.h - 4);
       if (hit) return { parent: hit.node, index: hit.node.children.length, kind: "node" };
-      const before = kids.filter((k) => k.y + k.h / 2 < wy).length;
+      const before = horizontal ? kids.filter((k) => k.x + k.w / 2 < wx).length : kids.filter((k) => k.y + k.h / 2 < wy).length;
       const index = before < kids.length ? p.node.children.indexOf(kids[before].node) : p.node.children.length;
       return { parent: p.node, index, kind: "gap" };
     }
@@ -1391,35 +1491,16 @@ export class MindMapCanvas {
       this.closeFoldMenu();
       return;
     }
-    const menu = document.createElement("div");
-    menu.className = "mm-menu";
-    menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    const item = (label: string, fn: () => void) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "mm-menu-item";
-      b.textContent = label;
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        this.closeFoldMenu();
-        fn();
-      });
-      menu.append(b);
-    };
-    item("展开全部", () => this.setFoldLevel(null));
-    item("只显示主主题", () => this.setFoldLevel(1));
-    item("显示到第 2 层", () => this.setFoldLevel(2));
-    item("显示到第 3 层", () => this.setFoldLevel(3));
-    this.el.append(menu);
-    const host = this.el.getBoundingClientRect();
-    const r = anchor.getBoundingClientRect();
-    menu.style.left = `${Math.max(4, Math.min(r.left - host.left + r.width / 2 - menu.offsetWidth / 2, host.width - menu.offsetWidth - 4))}px`;
-    menu.style.top = `${r.top - host.top - menu.offsetHeight - 6}px`;
-    this.foldMenu = menu;
-    const onDoc = (ev: PointerEvent) => {
-      if (!menu.contains(ev.target as Node)) this.closeFoldMenu();
-    };
-    document.addEventListener("pointerdown", onDoc, { capture: true, once: true });
+    this.foldMenu = this.buildMenu(
+      [
+        { label: "展开全部", run: () => this.setFoldLevel(null) },
+        { label: "只显示主主题", run: () => this.setFoldLevel(1) },
+        { label: "显示到第 2 层", run: () => this.setFoldLevel(2) },
+        { label: "显示到第 3 层", run: () => this.setFoldLevel(3) },
+      ],
+      anchor,
+      () => this.closeFoldMenu(),
+    );
   }
 
   private closeFoldMenu(): void {

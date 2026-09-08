@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type { Structure } from "./layout";
+import { STRUCTURES, Structure } from "./layout";
 import type { ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
@@ -40,7 +40,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       .setDesc("新文件的布局。单个文件可在 frontmatter 里用 mindmap-structure 覆盖。")
       .addDropdown((d) =>
         d
-          .addOptions({ "logic-right": "逻辑图（向右）", mindmap: "思维导图（左右分布）" })
+          .addOptions(Object.fromEntries(STRUCTURES.map((s) => [s.id, s.label])))
           .setValue(this.plugin.settings.defaultStructure)
           .onChange(async (v) => {
             this.plugin.settings.defaultStructure = v as Structure;
