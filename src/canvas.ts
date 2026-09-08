@@ -266,6 +266,7 @@ export class MindMapCanvas {
   private focusRoot: MindNode | null = null;
   private crumbs: HTMLElement | null = null;
   private markerPicker: HTMLElement | null = null;
+  private markerPickerCleanup: (() => void) | null = null;
   private dropHover: HTMLElement | null = null;
   private imgHandle: HTMLElement | null = null;
   private imgResize: { node: MindNode; img: HTMLImageElement; startX: number; startW: number; handle: HTMLElement } | null = null;
@@ -465,6 +466,8 @@ export class MindMapCanvas {
     this.el.classList.remove("mm-root");
     this.crumbs = null;
     this.markerPicker = null;
+    this.markerPickerCleanup = null;
+    for (const c of [...this.outsideCleanups]) c();
     this.tips.clear();
   }
 
@@ -727,6 +730,27 @@ export class MindMapCanvas {
 
   // ---------- 工具栏 ----------
 
+  private outsideCleanups = new Set<() => void>();
+
+  /**
+   * 点到 el 外面就关闭。不能用 once：点面板内部时监听器也会被消耗掉，
+   * 之后就再也关不掉了（标记面板最初的 bug）。
+   */
+  private dismissOnOutside(el: HTMLElement, close: () => void): () => void {
+    const onDown = (ev: PointerEvent) => {
+      if (el.contains(ev.target as Node)) return;
+      cleanup();
+      close();
+    };
+    const cleanup = () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      this.outsideCleanups.delete(cleanup);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    this.outsideCleanups.add(cleanup);
+    return cleanup;
+  }
+
   /** 供外部面板（大纲）复用同一套提示 */
   tipFor(el: HTMLElement, text: string, placement: TooltipPlacement = "top"): void {
     this.tip(el, text, "fixed", placement);
@@ -892,6 +916,11 @@ export class MindMapCanvas {
     const menu = document.createElement("div");
     menu.className = "mm-menu";
     menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    let cleanup = () => undefined as void;
+    const closeAll = () => {
+      cleanup();
+      close();
+    };
     for (const it of items) {
       const b = document.createElement("button");
       b.type = "button";
@@ -899,7 +928,7 @@ export class MindMapCanvas {
       b.textContent = it.label;
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        close();
+        closeAll();
         it.run();
       });
       menu.append(b);
@@ -923,13 +952,7 @@ export class MindMapCanvas {
       menu.style.top = `${clampY(pos === "top" ? r.bottom - host.top + 6 : r.top - host.top - menu.offsetHeight - 6)}px`;
     }
     }
-    document.addEventListener(
-      "pointerdown",
-      (ev) => {
-        if (!menu.contains(ev.target as Node)) close();
-      },
-      { capture: true, once: true },
-    );
+    cleanup = this.dismissOnOutside(menu, closeAll);
     return menu;
   }
 
@@ -2358,9 +2381,9 @@ export class MindMapCanvas {
         b.addEventListener("click", (ev) => {
           ev.stopPropagation();
           for (const n of this.selected) n.text = toggleMarker(n.text, emoji);
+          this.closeMarkerPicker();
           this.render();
           this.notify();
-          refresh();
         });
         row.append(b);
       }
@@ -2373,9 +2396,9 @@ export class MindMapCanvas {
     clear.addEventListener("click", (ev) => {
       ev.stopPropagation();
       for (const n of this.selected) n.text = splitMarkers(n.text).rest;
+      this.closeMarkerPicker();
       this.render();
       this.notify();
-      refresh();
     });
     picker.append(clear);
     this.el.append(picker);
@@ -2388,16 +2411,12 @@ export class MindMapCanvas {
     if (top < 4) top = r.bottom - host.top + 6;
     picker.style.top = `${top}px`;
     this.markerPicker = picker;
-    document.addEventListener(
-      "pointerdown",
-      (ev) => {
-        if (!picker.contains(ev.target as Node)) this.closeMarkerPicker();
-      },
-      { capture: true, once: true },
-    );
+    this.markerPickerCleanup = this.dismissOnOutside(picker, () => this.closeMarkerPicker());
   }
 
   private closeMarkerPicker(): void {
+    this.markerPickerCleanup?.();
+    this.markerPickerCleanup = null;
     this.markerPicker?.remove();
     this.markerPicker = null;
   }
