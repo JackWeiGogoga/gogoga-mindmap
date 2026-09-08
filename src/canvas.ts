@@ -30,7 +30,7 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { fromEditableText, plainText, renderInline, toEditableText } from "./inline";
+import { fromEditableText, plainText, renderInline, toEditableText, wikilinkOf } from "./inline";
 import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
 import { COLOR_NAMES, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -38,6 +38,10 @@ export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
   renderNote?: (el: HTMLElement, markdown: string) => void;
   openLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
+  /** 内部链接悬停：Obsidian 用来弹页面预览 */
+  hoverLink?: (ev: MouseEvent, linktext: string, targetEl: HTMLElement) => void;
+  /** 让用户挑一篇笔记（或新建），返回笔记名；取消返回 null */
+  pickNote?: (suggested: string) => Promise<string | null>;
 }
 
 export interface CanvasOptions {
@@ -86,6 +90,7 @@ const ICONS: Record<string, string> = {
   down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
   paste: '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
@@ -155,6 +160,8 @@ export class MindMapCanvas {
   private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
   private search: { bar: HTMLElement; input: HTMLInputElement; count: HTMLElement; matches: Set<MindNode>; list: MindNode[]; index: number } | null = null;
   private foldMenu: HTMLElement | null = null;
+  private linkMenu: HTMLElement | null = null;
+  private linking = false;
   private clipboardText = "";
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
@@ -442,7 +449,9 @@ export class MindMapCanvas {
       label.className = "mm-label";
       renderInline(label, node.text || (node.depth === 0 ? "中心主题" : ""), {
         onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
+        onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
       });
+      if (wikilinkOf(node.text)) el.classList.add("is-linked");
       el.append(label);
 
       if (node.note) {
@@ -697,6 +706,7 @@ export class MindMapCanvas {
     tool("note", "编辑备注", () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
+    if (this.opts.host?.pickNote) tool("link", "链接到笔记 / 新建笔记（⌘K）", () => void this.linkSelectedToNote());
     tool("copy", "复制（⌘C）", () => this.copySelection());
     tool("paste", "粘贴为子节点（⌘V）", () => void this.pasteFromClipboard());
     tool("trash", "删除", () => this.deleteSelected());
@@ -936,8 +946,13 @@ export class MindMapCanvas {
   }
 
   private onKeyDown(ev: KeyboardEvent): void {
-    if (this.opts.embedded) this.handleKeyEmbedded(ev);
-    else this.handleKey(ev);
+    if (this.opts.embedded) {
+      this.handleKeyEmbedded(ev);
+      return;
+    }
+    this.handleKey(ev);
+    // 处理过的快捷键不再交给 Obsidian 的全局热键（否则视图 Scope 里的 ⌘F/⌘K 会再触发一次）
+    if (ev.defaultPrevented) ev.stopPropagation();
   }
 
   /** 嵌入模式：凡是我们处理了（preventDefault）的按键都不再冒泡给外层编辑器 */
@@ -995,6 +1010,13 @@ export class MindMapCanvas {
     if (mod && ev.key.toLowerCase() === "f") {
       ev.preventDefault();
       this.openSearch();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === "k") {
+      if (this.opts.editable && this.opts.host?.pickNote && this.primary) {
+        ev.preventDefault();
+        void this.linkSelectedToNote();
+      }
       return;
     }
     if (mod && ev.key.toLowerCase() === "c") {
@@ -1691,6 +1713,58 @@ export class MindMapCanvas {
     for (const n of nodes) attachSubtree(n, target, this.doc.style);
     this.select(null);
     nodes.forEach((n, i) => this.select(n, i === 0 ? "replace" : "add"));
+    this.render();
+    this.notify();
+  }
+
+  // ---------- 节点 ⇄ 笔记 ----------
+
+  /** 已链接：弹菜单（打开 / 取消链接）；未链接：挑一篇笔记或新建，把标签变成 [[笔记|原文]] */
+  async linkSelectedToNote(): Promise<void> {
+    const node = this.primary;
+    if (!node || !this.opts.editable || this.linkMenu || this.linking) return;
+    const link = wikilinkOf(node.text);
+    if (link) {
+      const anchor = this.nodebar?.querySelector<HTMLElement>('.mm-tool[title^="链接"]') ?? this.els.get(node.id);
+      if (!anchor) return;
+      this.linkMenu = this.buildMenu(
+        [
+          { label: `打开「${link.target}」`, run: () => this.opts.host?.openLink?.(link.target, true, new MouseEvent("click")) },
+          { label: "取消链接", run: () => this.unlinkNote(node) },
+        ],
+        anchor,
+        () => {
+          this.linkMenu?.remove();
+          this.linkMenu = null;
+        },
+      );
+      return;
+    }
+    const suggested = plainText(node.text).replace(/[\\/:*?"<>|#^[\]]/g, " ").trim() || "未命名";
+    this.linking = true;
+    let name: string | null | undefined;
+    try {
+      name = await this.opts.host?.pickNote?.(suggested);
+    } finally {
+      this.linking = false;
+    }
+    if (!name) return;
+    this.applyNoteLink(node, name);
+  }
+
+  applyNoteLink(node: MindNode, basename: string): void {
+    const text = plainText(node.text).trim();
+    node.text = !text || text === basename ? `[[${basename}]]` : `[[${basename}|${text}]]`;
+    this.select(node);
+    this.render();
+    this.notify();
+  }
+
+  unlinkNote(node: MindNode): void {
+    const link = wikilinkOf(node.text);
+    if (!link) return;
+    node.text = link.alias ?? link.target;
+    this.select(node);
     this.render();
     this.notify();
   }

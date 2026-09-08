@@ -5,6 +5,16 @@
 
 export interface InlineOptions {
   onLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
+  /** 鼠标悬停在内部链接上（Obsidian 用来弹页面预览） */
+  onHover?: (href: string, ev: MouseEvent, el: HTMLElement) => void;
+}
+
+const WIKILINK_ONLY = /^\s*\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*$/;
+
+/** 标签整个就是一个 wiki 链接时，返回目标与别名 */
+export function wikilinkOf(text: string): { target: string; alias?: string } | null {
+  const m = WIKILINK_ONLY.exec(text);
+  return m ? { target: m[1].trim(), alias: m[2]?.trim() } : null;
 }
 
 const TOKEN_RE =
@@ -76,6 +86,7 @@ function link(label: string, href: string, internal: boolean, opts: InlineOption
     ev.stopPropagation();
     opts.onLink?.(href, internal, ev);
   });
+  if (internal && opts.onHover) a.addEventListener("mouseover", (ev) => opts.onHover?.(href, ev, a));
   return a;
 }
 

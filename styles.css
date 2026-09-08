@@ -783,3 +783,7 @@
 .mm-drop-indicator.is-vertical { width: 4px; height: 40px; }
 .mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
 .mm-root button.mm-menu-item.is-active::before { content: "✓ "; }
+
+/* ---------- 节点 ⇄ 笔记链接 ---------- */
+.mm-node.is-linked .mm-label .mm-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+.mm-picker-new { color: var(--interactive-accent, #155dff); }

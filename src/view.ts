@@ -1,4 +1,4 @@
-import { Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
 import { History } from "./history";
@@ -13,6 +13,8 @@ import { indentString } from "./settings";
 export const VIEW_TYPE_MINDMAP = "mindmap";
 
 export class MindMapView extends TextFileView {
+  /** 页面预览（hover-link）需要宿主提供这个字段 */
+  hoverPopover: HoverPopover | null = null;
   private canvas: MindMapCanvas | null = null;
   private history = new History();
   private doc: MindDoc | null = null;
@@ -25,6 +27,14 @@ export class MindMapView extends TextFileView {
       this.canvas?.openSearch();
       return false;
     });
+    this.scope.register(["Mod"], "k", () => {
+      void this.canvas?.linkSelectedToNote();
+      return false;
+    });
+  }
+
+  linkSelectedToNote(): Promise<void> {
+    return this.canvas?.linkSelectedToNote() ?? Promise.resolve();
   }
 
   openSearch(): void {
@@ -57,7 +67,7 @@ export class MindMapView extends TextFileView {
       structure: this.plugin.settings.defaultStructure,
       theme: this.plugin.settings.defaultTheme,
       editable: true,
-      host: this.plugin.canvasHost(() => this.file?.path ?? "", this),
+      host: this.plugin.canvasHost(() => this.file?.path ?? "", this, this),
       onChange: (doc) => this.onDocChange(doc),
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),

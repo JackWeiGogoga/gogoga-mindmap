@@ -1,5 +1,6 @@
-import { Component, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
+import { Component, HoverParent, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
 import { locateBlock, replaceBlock } from "./codeblock";
+import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
@@ -139,6 +140,7 @@ export default class MindMapPlugin extends Plugin {
           return true;
         },
       });
+    exportCommand("link-note", "链接到笔记 / 新建笔记", (v) => v.linkSelectedToNote());
     exportCommand("search", "搜索节点", async (v) => v.openSearch());
     exportCommand("expand-all", "展开全部节点", async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", "折叠全部节点", async (v) => v.setFoldLevel(1));
@@ -284,7 +286,7 @@ export default class MindMapPlugin extends Plugin {
     if (failed) throw new Error("在笔记里找不到这个代码块");
   }
 
-  canvasHost(sourcePath: () => string, component: Component): CanvasHost {
+  canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
       renderNote: (el, markdown) => {
         void MarkdownRenderer.render(this.app, markdown, el, sourcePath(), component);
@@ -293,7 +295,41 @@ export default class MindMapPlugin extends Plugin {
         if (internal) void this.app.workspace.openLinkText(href, sourcePath(), ev.metaKey || ev.ctrlKey);
         else window.open(href, "_blank");
       },
+      hoverLink: hoverParent
+        ? (event, linktext, targetEl) => {
+            this.app.workspace.trigger("hover-link", { event, source: "mindmap", hoverParent, targetEl, linktext, sourcePath: sourcePath() });
+          }
+        : undefined,
+      pickNote: (suggested) =>
+        new Promise<string | null>((resolve) => {
+          new NotePickerModal(this.app, suggested, (item) => {
+            if (!item) return resolve(null);
+            if (item.kind === "file") return resolve(item.file.basename);
+            void this.createLinkedNote(item.name, sourcePath()).then((f) => resolve(f ? f.basename : null));
+          }).open();
+        }),
     };
+  }
+
+  /** 从节点新建笔记：放在新文件默认位置，已存在就直接复用，并在右侧分栏打开 */
+  private async createLinkedNote(name: string, sourcePath: string): Promise<TFile | null> {
+    const folder = this.app.fileManager.getNewFileParent(sourcePath);
+    const path = joinPath(folder.path, `${name}.md`);
+    let file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      try {
+        file = await this.app.vault.create(path, "");
+      } catch (e) {
+        new Notice(`新建笔记失败：${(e as Error).message}`);
+        return null;
+      }
+    }
+    const origin = this.app.workspace.activeLeaf;
+    const leaf = this.app.workspace.getLeaf("split", "vertical");
+    await leaf.openFile(file as TFile, { active: false });
+    // 新笔记在右侧打开，焦点留在脑图上，方便继续加节点
+    if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
+    return file as TFile;
   }
 }
 
