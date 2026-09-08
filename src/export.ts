@@ -1,0 +1,166 @@
+/**
+ * 导出：把当前画布序列化成自包含的 SVG（连线用原生 path，节点用 foreignObject 内联样式），
+ * 再按需光栅化成 PNG。不依赖第三方库。
+ */
+
+import type { MindMapCanvas } from "./canvas";
+
+const INLINE_PROPS = [
+  "position", "left", "top", "width", "height", "box-sizing", "display", "align-items", "justify-content", "gap", "flex",
+  "padding", "margin", "border", "border-radius", "border-bottom", "background-color", "color", "opacity",
+  "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-align", "text-decoration",
+  "white-space", "overflow-wrap", "word-break", "max-width", "vertical-align",
+  "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
+];
+
+export interface ExportOptions {
+  padding?: number;
+  /** 传 null 表示透明背景 */
+  background?: string | null;
+  /** 把页面里 @font-face 声明的字体（比如 Obsidian 自带的 Inter）内嵌进 SVG，默认开 */
+  embedFonts?: boolean;
+}
+
+const fontCssCache = new Map<string, Promise<string>>();
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** 收集页面样式表里指定字体族的 @font-face，把字体文件抓下来变成 data URL */
+async function collectFontCss(families: string[]): Promise<string> {
+  const key = families.join("|").toLowerCase();
+  const cached = fontCssCache.get(key);
+  if (cached) return cached;
+  const task = (async () => {
+    const wanted = new Set(families.map((f) => f.toLowerCase()));
+    const parts: string[] = [];
+    for (const sheet of Array.from(document.styleSheets)) {
+      let rules: CSSRuleList;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      for (const rule of Array.from(rules)) {
+        if (!(rule instanceof CSSFontFaceRule)) continue;
+        const fam = rule.style.getPropertyValue("font-family").replace(/["']/g, "").trim();
+        if (!wanted.has(fam.toLowerCase())) continue;
+        const m = /url\(["']?([^"')]+)["']?\)/.exec(rule.style.getPropertyValue("src"));
+        if (!m) continue;
+        try {
+          const url = new URL(m[1], sheet.href ?? location.href).toString();
+          const blob = await (await fetch(url)).blob();
+          const data = await blobToDataUrl(blob);
+          const style = rule.style.getPropertyValue("font-style") || "normal";
+          const weight = rule.style.getPropertyValue("font-weight") || "normal";
+          parts.push(`@font-face{font-family:"${fam}";font-style:${style};font-weight:${weight};src:url(${data})}`);
+        } catch {
+          // 抓不到就退回系统字体
+        }
+      }
+    }
+    return parts.join("");
+  })();
+  fontCssCache.set(key, task);
+  return task;
+}
+
+export interface SvgExport {
+  svg: string;
+  width: number;
+  height: number;
+}
+
+function inlineStyles(orig: Element, clone: Element): void {
+  const cs = getComputedStyle(orig);
+  const target = clone as HTMLElement | SVGElement;
+  for (const prop of INLINE_PROPS) {
+    const v = cs.getPropertyValue(prop);
+    if (v) target.style.setProperty(prop, v);
+  }
+  const oc = orig.children;
+  const cc = clone.children;
+  for (let i = 0; i < oc.length; i++) inlineStyles(oc[i], cc[i]);
+}
+
+export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}): Promise<SvgExport> {
+  const bounds = canvas.getBounds();
+  if (!bounds) throw new Error("没有可导出的内容");
+  const pad = opts.padding ?? 32;
+  const width = Math.ceil(bounds.w + pad * 2);
+  const height = Math.ceil(bounds.h + pad * 2);
+  const ox = -bounds.x + pad;
+  const oy = -bounds.y + pad;
+  const { nodes, edges } = canvas.layers;
+
+  const paths = [...edges.querySelectorAll("path")].map((p) => {
+    const cs = getComputedStyle(p);
+    const d = p.getAttribute("d") ?? "";
+    return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}" stroke-linejoin="${cs.strokeLinejoin}"/>`;
+  });
+
+  const clone = nodes.cloneNode(true) as HTMLElement;
+  inlineStyles(nodes, clone);
+  // 单行标签禁止换行：导出环境的字体若略宽，宁可溢出也不要多出一行
+  const origLabels = nodes.querySelectorAll<HTMLElement>(".mm-label");
+  const cloneLabels = clone.querySelectorAll<HTMLElement>(".mm-label");
+  origLabels.forEach((label, i) => {
+    const lh = parseFloat(getComputedStyle(label).lineHeight) || 20;
+    const scale = canvas.el.getBoundingClientRect().width / Math.max(1, canvas.el.clientWidth);
+    const h = label.getBoundingClientRect().height / (scale || 1);
+    const zoom = (canvas as unknown as { k: number }).k || 1;
+    if (h / zoom <= lh * 1.5) cloneLabels[i].style.whiteSpace = "nowrap";
+  });
+  clone.querySelectorAll(".mm-toggle:not(.is-folded)").forEach((t) => t.remove());
+  clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
+    (n as HTMLElement).style.boxShadow = "none";
+  });
+  clone.querySelectorAll("[class]").forEach((n) => n.removeAttribute("class"));
+  clone.querySelectorAll("[contenteditable]").forEach((n) => n.removeAttribute("contenteditable"));
+  clone.style.position = "absolute";
+  clone.style.left = `${ox}px`;
+  clone.style.top = `${oy}px`;
+  const xhtml = new XMLSerializer().serializeToString(clone);
+
+  const bg = opts.background === undefined ? getComputedStyle(canvas.el).backgroundColor : opts.background;
+  let fontCss = "";
+  if (opts.embedFonts !== false) {
+    const families = getComputedStyle(canvas.el).fontFamily.split(",").map((f) => f.replace(/["']/g, "").trim()).filter(Boolean);
+    fontCss = await collectFontCss(families);
+  }
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    (fontCss ? `<defs><style>${fontCss}</style></defs>` : "") +
+    (bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : "") +
+    `<g transform="translate(${ox} ${oy})">${paths.join("")}</g>` +
+    `<foreignObject x="0" y="0" width="${width}" height="${height}">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${width}px;height:${height}px;overflow:hidden">${xhtml}</div>` +
+    `</foreignObject></svg>`;
+  return { svg, width, height };
+}
+
+export async function svgToPng(exp: SvgExport, scale = 2): Promise<Blob> {
+  const img = new Image();
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exp.svg)}`;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("SVG 渲染失败"));
+    img.src = url;
+  });
+  const c = document.createElement("canvas");
+  c.width = Math.round(exp.width * scale);
+  c.height = Math.round(exp.height * scale);
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("无法创建画布");
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, 0, 0);
+  return new Promise<Blob>((resolve, reject) => {
+    c.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG 编码失败"))), "image/png");
+  });
+}

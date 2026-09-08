@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>mindmap harness</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, "PingFang SC", sans-serif;
+    --background-primary: #ffffff;
+    --text-normal: #1f1f1f;
+    --text-muted: #666;
+    --background-modifier-border: #e3e3e3;
+    --background-modifier-hover: #f0f0f0;
+    --interactive-accent: #155dff;
+    --font-interface: Inter, system-ui, -apple-system, "PingFang SC", sans-serif;
+    background: var(--background-primary);
+    color: var(--text-normal);
+  }
+  body.theme-dark {
+    --background-primary: #1e1e1e;
+    --text-normal: #e6e6e6;
+    --text-muted: #999;
+    --background-modifier-border: #333;
+    --background-modifier-hover: #2a2a2a;
+    --interactive-accent: #78a4ff;
+  }
+  #bar { display: flex; gap: 8px; align-items: center; padding: 8px; font-size: 13px; border-bottom: 1px solid var(--background-modifier-border); }
+  #map { height: calc(100vh - 45px - 150px); }
+  #out { height: 150px; margin: 0; padding: 6px 10px; overflow: auto; font: 12px/1.4 Menlo, monospace; white-space: pre; border-top: 1px solid var(--background-modifier-border); box-sizing: border-box; }
+</style>
+</head>
+<body class="theme-light">
+<div id="bar">
+  <label>主题 <select id="theme"><option value="snow">snow</option><option value="rainbow">rainbow</option></select></label>
+  <label>结构 <select id="structure"><option value="logic-right">logic-right</option><option value="mindmap">mindmap</option></select></label>
+  <label><input type="checkbox" id="dark"> 深色</label>
+  <label><input type="checkbox" id="editable" checked> 可编辑</label>
+  <button id="reload">重新载入样例</button>
+  <button id="exportSvg">导出 SVG</button>
+  <button id="exportPng">导出 PNG</button>
+  <span id="hint" style="color: var(--text-muted)">Tab 子节点 · Enter 兄弟 · 双击编辑 · Delete 删除 · / 折叠 · ⌘+滚轮缩放</span>
+</div>
+<div id="map"></div>
+<pre id="out"></pre>
+<div id="preview" style="display:none;padding:8px;border-top:1px solid var(--background-modifier-border)"></div>
+<script src="harness.js"></script>
+</body>
+</html>

@@ -1,0 +1,677 @@
+/* ==========================================================================
+   Mind Map — XMind 风格思维导图
+   节点是 HTML，连线是 SVG；所有颜色都走 CSS 变量，跟随 Obsidian 主题与深色模式。
+   ========================================================================== */
+
+.mm-view-content {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.mm-root {
+  --mm-font: var(--font-interface, "Inter", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif);
+  --mm-bg: var(--background-primary, #ffffff);
+  --mm-line: #2b2b2b;
+  --mm-root-bg: #3f51b5;
+  --mm-root-fg: #ffffff;
+  --mm-main-bg: #e9e9ef;
+  --mm-main-fg: var(--text-normal, #1f1f1f);
+  --mm-node-bg: #f1f1f4;
+  --mm-node-fg: var(--text-normal, #1f1f1f);
+  --mm-selection: var(--interactive-accent, #155dff);
+  --mm-toggle-bg: var(--mm-bg);
+  --mm-toggle-fg: #555555;
+  --mm-toggle-border: #8a8a8a;
+  --mm-max-width: 300px;
+
+  /* 命名颜色：%%red%% 等 */
+  --mm-c-fg: #1f1f1f;
+  --mm-c-red: #f9a3a3;
+  --mm-c-orange: #fbc98d;
+  --mm-c-yellow: #f7e48e;
+  --mm-c-green: #a3e5a2;
+  --mm-c-teal: #93e3d6;
+  --mm-c-blue: #8edbf7;
+  --mm-c-purple: #d4b5f5;
+  --mm-c-pink: #f8b8da;
+  --mm-c-gray: #dcdce2;
+
+  /* 彩虹分支 */
+  --mm-branch-0: #f76c6c;
+  --mm-branch-1: #ffa36b;
+  --mm-branch-2: #8ccba4;
+  --mm-branch-3: #7fe0d3;
+  --mm-branch-4: #62cff4;
+  --mm-branch-5: #d98cf2;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--mm-bg);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--mm-font);
+  touch-action: none;
+  cursor: grab;
+}
+
+.theme-dark .mm-root {
+  --mm-line: #c9c9d1;
+  --mm-root-bg: #5c6bc0;
+  --mm-main-bg: #30303a;
+  --mm-node-bg: #2a2a31;
+  --mm-toggle-fg: #bbbbbb;
+  --mm-toggle-border: #777777;
+  --mm-c-fg: #f2f2f2;
+  --mm-c-red: #8c3b3b;
+  --mm-c-orange: #8c5a2b;
+  --mm-c-yellow: #7a6a22;
+  --mm-c-green: #2f6b3a;
+  --mm-c-teal: #23615a;
+  --mm-c-blue: #2a5a78;
+  --mm-c-purple: #5a3e82;
+  --mm-c-pink: #7a3860;
+  --mm-c-gray: #45454e;
+  --mm-branch-0: #e26262;
+  --mm-branch-1: #e8955f;
+  --mm-branch-2: #6fb88c;
+  --mm-branch-3: #5fc9bb;
+  --mm-branch-4: #4fb8dd;
+  --mm-branch-5: #c47ee0;
+}
+
+.mm-viewport {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.mm-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mm-edge {
+  fill: none;
+  stroke: var(--mm-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5px;
+}
+.mm-edge[data-depth="1"] { stroke-width: 3px; }
+.mm-edge[data-depth="2"] { stroke-width: 2px; }
+
+.mm-nodes {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* ---------- 节点 ---------- */
+
+.mm-node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: var(--mm-max-width);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--mm-node-bg);
+  color: var(--mm-node-fg);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: default;
+  transition: box-shadow 0.12s ease;
+}
+
+.mm-node[data-depth="1"] {
+  background: var(--mm-main-bg);
+  color: var(--mm-main-fg);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.mm-node[data-depth="0"] {
+  background: var(--mm-root-bg);
+  color: var(--mm-root-fg);
+  padding: 18px 32px;
+  border-radius: 8px;
+  font-size: 26px;
+  font-weight: 600;
+  max-width: 440px;
+}
+
+.mm-node[data-color="red"]    { --mm-node-bg: var(--mm-c-red);    --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="orange"] { --mm-node-bg: var(--mm-c-orange); --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="yellow"] { --mm-node-bg: var(--mm-c-yellow); --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="green"]  { --mm-node-bg: var(--mm-c-green);  --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="teal"]   { --mm-node-bg: var(--mm-c-teal);   --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="blue"]   { --mm-node-bg: var(--mm-c-blue);   --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="purple"] { --mm-node-bg: var(--mm-c-purple); --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="pink"]   { --mm-node-bg: var(--mm-c-pink);   --mm-node-fg: var(--mm-c-fg); }
+.mm-node[data-color="gray"]   { --mm-node-bg: var(--mm-c-gray);   --mm-node-fg: var(--mm-c-fg); }
+.mm-node.has-color {
+  background: var(--mm-node-bg);
+  color: var(--mm-node-fg);
+}
+
+.mm-node:hover:not(.is-selected):not(.is-editing) {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mm-selection) 40%, transparent);
+}
+.mm-node.is-selected {
+  box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
+}
+.mm-node.is-editing {
+  box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
+}
+
+.mm-label {
+  display: inline;
+  min-width: 1ch;
+  outline: none;
+}
+.mm-node.is-editing .mm-label {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  white-space: pre-wrap;
+  min-width: 2em;
+}
+.mm-label strong { font-weight: 700; }
+.mm-label code {
+  font-family: var(--font-monospace, ui-monospace, Menlo, monospace);
+  font-size: 0.9em;
+  padding: 0 0.3em;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.18);
+}
+.mm-label mark {
+  background: rgba(255, 210, 0, 0.45);
+  color: inherit;
+  border-radius: 2px;
+}
+.mm-link {
+  color: var(--link-color, var(--mm-selection));
+  text-decoration: none;
+  cursor: pointer;
+}
+.mm-link:hover { text-decoration: underline; }
+.mm-node[data-depth="0"] .mm-link { color: inherit; text-decoration: underline; }
+
+.mm-task {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.35em;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  vertical-align: -0.05em;
+  opacity: 0.7;
+}
+.mm-task.is-done {
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.mm-icon {
+  display: inline-flex;
+  flex: none;
+}
+.mm-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mm-note-icon {
+  font-size: 0.95em;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.mm-note-icon:hover { opacity: 1; }
+
+/* 折叠按钮：挂在节点外侧，短线连到节点 */
+.mm-toggle {
+  all: unset;
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translate(10px, -50%);
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mm-toggle-border);
+  border-radius: 50%;
+  background: var(--mm-toggle-bg);
+  color: var(--mm-toggle-fg);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.mm-toggle::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 10px;
+  height: 1.5px;
+  margin-top: -0.75px;
+  background: var(--mm-toggle-border);
+}
+.mm-toggle .mm-icon { font-size: 10px; }
+.mm-toggle:hover {
+  border-color: var(--mm-selection);
+  color: var(--mm-selection);
+}
+.mm-node:hover .mm-toggle,
+.mm-node.is-selected .mm-toggle,
+.mm-toggle.is-folded {
+  opacity: 1;
+}
+.mm-node[data-side="left"] .mm-toggle {
+  left: auto;
+  right: 100%;
+  transform: translate(-10px, -50%);
+}
+.mm-node[data-side="left"] .mm-toggle::before {
+  right: auto;
+  left: 100%;
+}
+.mm-node.is-underline .mm-toggle { top: 100%; }
+
+/* ---------- 彩虹主题 ---------- */
+
+.mm-node[data-branch="0"] { --mm-branch: var(--mm-branch-0); }
+.mm-node[data-branch="1"] { --mm-branch: var(--mm-branch-1); }
+.mm-node[data-branch="2"] { --mm-branch: var(--mm-branch-2); }
+.mm-node[data-branch="3"] { --mm-branch: var(--mm-branch-3); }
+.mm-node[data-branch="4"] { --mm-branch: var(--mm-branch-4); }
+.mm-node[data-branch="5"] { --mm-branch: var(--mm-branch-5); }
+
+.mm-root[data-theme="rainbow"] .mm-node[data-depth="0"] {
+  background: transparent;
+  color: var(--text-normal, #1f1f1f);
+  font-size: 28px;
+  font-weight: 700;
+  padding: 12px 20px;
+}
+.mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] {
+  background: var(--mm-branch);
+  color: #1f1f1f;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.mm-root[data-theme="rainbow"] .mm-node.has-color {
+  background: var(--mm-node-bg);
+  color: var(--mm-node-fg);
+}
+.mm-node.is-underline {
+  background: transparent;
+  color: var(--text-normal, #1f1f1f);
+  border-radius: 0;
+  padding: 2px 6px 4px;
+  border-bottom: 2px solid var(--mm-branch, var(--mm-line));
+}
+.mm-node.is-underline.is-selected,
+.mm-node.is-underline.is-editing {
+  border-radius: 4px;
+}
+
+/* ---------- 工具栏 ---------- */
+
+.mm-toolbar {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  cursor: default;
+}
+.mm-tool {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+}
+.mm-tool .mm-icon { font-size: 16px; }
+.mm-tool:hover {
+  background: var(--background-modifier-hover, #f0f0f0);
+  color: var(--text-normal, #1f1f1f);
+}
+.mm-tool.is-active {
+  color: var(--mm-selection);
+  background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
+}
+.mm-zoom-label {
+  width: auto;
+  min-width: 40px;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.mm-tool-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--background-modifier-border, #e3e3e3);
+}
+
+/* ---------- 备注弹层 ---------- */
+
+.mm-popover {
+  position: absolute;
+  z-index: 3;
+  max-width: 360px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  color: var(--text-normal, #1f1f1f);
+  font-size: 13px;
+  line-height: 1.55;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: auto;
+}
+.mm-popover-body.is-plain { white-space: pre-wrap; }
+.mm-root .mm-popover-body { font-size: 13px; line-height: 1.55; }
+.mm-root .mm-popover-body > :first-child { margin-top: 0; }
+.mm-root .mm-popover-body > :last-child { margin-bottom: 0; }
+.mm-root .mm-popover-body p { margin: 0 0 0.5em; }
+.mm-root .mm-popover-body ul,
+.mm-root .mm-popover-body ol { margin: 0.2em 0 0.5em; padding-left: 1.4em; }
+.mm-root .mm-popover-body li { margin: 0.1em 0; }
+.mm-root .mm-popover-body li > p { margin: 0; }
+.mm-root .mm-popover-body h1,
+.mm-root .mm-popover-body h2,
+.mm-root .mm-popover-body h3,
+.mm-root .mm-popover-body h4 { margin: 0.5em 0 0.25em; font-size: 1.05em; font-weight: 600; line-height: 1.4; }
+.mm-root .mm-popover-body pre { margin: 0.4em 0; padding: 6px 8px; font-size: 12px; }
+.mm-root .mm-popover-body blockquote { margin: 0.3em 0; padding: 0 0 0 0.8em; border-left: 2px solid var(--background-modifier-border, #ddd); }
+.mm-root .mm-popover-body .callout { margin: 0.3em 0; }
+.mm-root .mm-popover-body table { font-size: 12px; }
+.mm-root .mm-popover-body img { max-width: 100%; }
+
+/* ---------- 代码块嵌入 ---------- */
+
+.mm-codeblock {
+  position: relative;
+  height: 320px;
+  margin: 8px 0;
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ---------- v2：多选、拖拽、节点工具栏、备注编辑 ---------- */
+
+.mm-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.mm-drop-indicator {
+  position: absolute;
+  display: none;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mm-selection);
+  box-shadow: 0 0 0 2px var(--mm-bg);
+}
+.mm-node.is-dragging { opacity: 0.35; }
+.mm-node.is-drop-target {
+  box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
+  filter: brightness(0.96);
+}
+.mm-ghost {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.85;
+  transform-origin: 0 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+.mm-root.is-dragging-node,
+.mm-root.is-dragging-node .mm-node { cursor: grabbing; }
+
+.mm-marquee {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid var(--mm-selection);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--mm-selection) 10%, transparent);
+  pointer-events: none;
+}
+
+.mm-nodebar {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 5px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  cursor: default;
+}
+.mm-nodebar.is-hidden { display: none; }
+.mm-nodebar .mm-tool {
+  width: 24px;
+  height: 24px;
+}
+.mm-nodebar .mm-tool .mm-icon { font-size: 15px; }
+.mm-swatch {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--swatch, transparent);
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.mm-swatch:hover { transform: scale(1.2); }
+.mm-swatch .mm-icon { font-size: 13px; }
+
+.mm-note-editor {
+  display: block;
+  width: 300px;
+  max-width: 70vw;
+  min-height: 64px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: 13px/1.55 var(--mm-font);
+  resize: vertical;
+}
+.mm-popover-edit {
+  all: unset;
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mm-selection);
+  cursor: pointer;
+}
+.mm-popover-edit:hover { text-decoration: underline; }
+
+/* .xmind 只读视图的工作表切换 */
+.mm-sheets {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.mm-sheets button {
+  all: unset;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+}
+.mm-sheets button.is-active {
+  color: var(--mm-selection);
+  background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
+}
+
+/* rainbow 主题深色模式：分支色本身已压暗，主主题改用浅色文字 */
+.theme-dark .mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] { color: #f5f5f5; }
+.theme-dark .mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] .mm-link { color: inherit; text-decoration: underline; }
+
+/* ---------- 压过 Obsidian 的 button:not(.clickable-icon) 默认样式 ----------
+   那条规则的优先级是 (0,1,1)，比单个类名高，会把色板、工具栏、折叠徽章的背景和阴影都改掉。 */
+.mm-root button.mm-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 50%;
+  background: var(--swatch, transparent);
+  box-shadow: none;
+  font-size: 12px;
+}
+.mm-root button.mm-swatch:hover {
+  background: var(--swatch, transparent);
+  transform: scale(1.2);
+}
+.mm-root button.mm-tool {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+}
+.mm-root button.mm-tool:hover {
+  background: var(--background-modifier-hover, #f0f0f0);
+  color: var(--text-normal, #1f1f1f);
+}
+.mm-root button.mm-tool.is-active {
+  color: var(--mm-selection);
+  background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
+}
+.mm-root button.mm-zoom-label {
+  width: auto;
+  min-width: 40px;
+  padding: 0 4px;
+}
+.mm-root .mm-nodebar button.mm-tool {
+  width: 24px;
+  height: 24px;
+}
+.mm-root button.mm-toggle {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--mm-toggle-border);
+  border-radius: 50%;
+  background: var(--mm-toggle-bg);
+  box-shadow: none;
+  color: var(--mm-toggle-fg);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+.mm-root button.mm-toggle:hover {
+  background: var(--mm-toggle-bg);
+  border-color: var(--mm-selection);
+  color: var(--mm-selection);
+}
+.mm-root button.mm-popover-edit {
+  height: auto;
+  padding: 0;
+  margin: 8px 0 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--mm-selection);
+  font-size: 12px;
+}
+.mm-root .mm-sheets button {
+  height: auto;
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+}
+.mm-root .mm-sheets button:hover {
+  background: var(--background-modifier-hover, #f0f0f0);
+}
+.mm-root .mm-sheets button.is-active {
+  color: var(--mm-selection);
+  background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
+}

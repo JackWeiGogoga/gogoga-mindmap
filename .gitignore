@@ -1,0 +1,5 @@
+node_modules/
+dist/
+dev/harness.js
+*.log
+.DS_Store
