@@ -501,8 +501,8 @@ export class MindMapCanvas {
         // 整个节点都是链接目标：停在节点任意位置都触发预览（链接文字自己已经会触发）
         el.addEventListener("mouseover", (ev) => {
           if ((ev.target as HTMLElement).closest("a.internal-link")) return;
-          const anchor = el.querySelector<HTMLElement>("a.internal-link") ?? el;
-          this.opts.host?.hoverLink?.(ev, link.target, anchor);
+          // 预览插件会盯着 targetEl 判断鼠标是否还停着，所以要传节点本身而不是里面的链接文字
+          this.opts.host?.hoverLink?.(ev, link.target, el);
         });
       }
       el.append(label);

@@ -28,6 +28,8 @@ import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
 const FRONTMATTER_KEY = "mindmap";
+/** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认不需要按住 ⌘ */
+const HOVER_SOURCE = "obsidian-mindmap";
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
@@ -41,6 +43,7 @@ export default class MindMapPlugin extends Plugin {
     // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
     void loadPrism().catch(() => undefined);
+    this.registerHoverLinkSource(HOVER_SOURCE, { display: "思维导图", defaultMod: false });
     this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
     this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
@@ -349,12 +352,7 @@ export default class MindMapPlugin extends Plugin {
       },
       hoverLink: hoverParent
         ? (event, linktext, targetEl) => {
-            // 页面预览默认要按住 ⌘ 才弹；设为「直接显示」时给它一个带修饰键的事件
-            const ev =
-              this.settings.hoverPreview === "always" && !(event.metaKey || event.ctrlKey)
-                ? new MouseEvent(event.type, { clientX: event.clientX, clientY: event.clientY, metaKey: true, ctrlKey: true })
-                : event;
-            this.app.workspace.trigger("hover-link", { event: ev, source: "mindmap", hoverParent, targetEl, linktext, sourcePath: sourcePath() });
+            this.app.workspace.trigger("hover-link", { event, source: HOVER_SOURCE, hoverParent, targetEl, linktext, sourcePath: sourcePath() });
           }
         : undefined,
       pickNote: (suggested) =>
