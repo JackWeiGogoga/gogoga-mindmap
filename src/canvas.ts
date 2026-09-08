@@ -51,6 +51,17 @@ export interface CanvasOptions {
   onStructureChange?: (structure: Structure) => void;
   /** 每次布局完成后调用，可用来按内容定高度 */
   onLayout?: (bounds: Bounds) => void;
+  /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
+  embedded?: boolean;
+  /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
+  onViewChange?: (state: ViewState) => void;
+  onEditableChange?: (editable: boolean) => void;
+}
+
+export interface ViewState {
+  tx: number;
+  ty: number;
+  k: number;
 }
 
 const MIN_ZOOM = 0.2;
@@ -66,6 +77,8 @@ const ICONS: Record<string, string> = {
   logic: '<svg viewBox="0 0 24 24"><path d="M3 12h6M9 12v-6h6M9 12v6h6M9 12h6"/></svg>',
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
 };
@@ -102,6 +115,8 @@ export class MindMapCanvas {
   private overlay: HTMLElement;
   private zoomLabel!: HTMLButtonElement;
   private structureButtons = new Map<Structure, HTMLElement>();
+  private structureSep: HTMLElement | null = null;
+  private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
 
   private doc: MindDoc | null = null;
@@ -125,6 +140,7 @@ export class MindMapCanvas {
   private pinch: { dist: number; k: number } | null = null;
   private pendingDrag: { node: MindNode; x: number; y: number } | null = null;
   private lastTap: { node: MindNode; time: number } | null = null;
+  private pendingSelectPath: string | null = null;
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
   private popover: HTMLElement | null = null;
@@ -212,6 +228,52 @@ export class MindMapCanvas {
 
   getSelection(): MindNode[] {
     return [...this.selected];
+  }
+
+  getSelectedPath(): string | null {
+    return this.primary ? pathOf(this.primary) : null;
+  }
+
+  selectPath(path: string | null): void {
+    if (!this.doc || path === null) return;
+    const node = findByPath(this.doc.root, path);
+    if (!node) return;
+    if (this.els.has(node.id)) this.select(node);
+    else this.pendingSelectPath = path;
+  }
+
+  getViewState(): ViewState {
+    return { tx: this.tx, ty: this.ty, k: this.k };
+  }
+
+  /** 恢复视口；之后首次渲染不再自动适应画布 */
+  setViewState(state: ViewState): void {
+    this.tx = state.tx;
+    this.ty = state.ty;
+    this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, state.k));
+    this.hasView = true;
+    this.applyTransform();
+  }
+
+  isEditable(): boolean {
+    return this.opts.editable;
+  }
+
+  setEditable(editable: boolean): void {
+    if (this.opts.editable === editable) return;
+    if (!editable) this.flush();
+    this.opts.editable = editable;
+    this.el.classList.toggle("is-editable", editable);
+    for (const b of this.structureButtons.values()) b.classList.toggle("is-hidden", !editable);
+    this.structureSep?.classList.toggle("is-hidden", !editable);
+    if (this.editToggle) {
+      this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
+      this.editToggle.title = editable ? "完成编辑" : "编辑";
+      this.editToggle.classList.toggle("is-active", editable);
+    }
+    if (!editable) this.select(null);
+    this.positionNodebar();
+    this.opts.onEditableChange?.(editable);
   }
 
   /**
@@ -306,6 +368,11 @@ export class MindMapCanvas {
     if (!this.hasView) {
       this.hasView = true;
       this.fit();
+    }
+    if (this.pendingSelectPath !== null) {
+      const path = this.pendingSelectPath;
+      this.pendingSelectPath = null;
+      this.selectPath(path);
     }
     this.positionNodebar();
   }
@@ -437,6 +504,7 @@ export class MindMapCanvas {
     this.updateZoomLabel();
     this.positionNodebar();
     this.closePopover();
+    this.opts.onViewChange?.(this.getViewState());
   }
 
   private updateZoomLabel(): void {
@@ -475,13 +543,24 @@ export class MindMapCanvas {
       bar.append(b);
       return b;
     };
-    if (this.opts.editable) {
+    if (this.opts.embedded) {
+      this.editToggle = btn(this.opts.editable ? "check" : "pencil", this.opts.editable ? "完成编辑" : "编辑", () =>
+        this.setEditable(!this.opts.editable),
+      );
+      this.editToggle.classList.toggle("is-active", this.opts.editable);
+    }
+    if (this.opts.editable || this.opts.embedded) {
       this.structureButtons.set("logic-right", btn("logic", "逻辑图（向右）", () => this.changeStructure("logic-right")));
       this.structureButtons.set("mindmap", btn("mindmap", "思维导图（左右分布）", () => this.changeStructure("mindmap")));
-      for (const [s, b] of this.structureButtons) b.classList.toggle("is-active", s === this.opts.structure);
+      for (const [s, b] of this.structureButtons) {
+        b.classList.toggle("is-active", s === this.opts.structure);
+        b.classList.toggle("is-hidden", !this.opts.editable);
+      }
       const sep = document.createElement("span");
       sep.className = "mm-tool-sep";
+      sep.classList.toggle("is-hidden", !this.opts.editable);
       bar.append(sep);
+      this.structureSep = sep;
     }
     btn("minus", "缩小", () => this.zoomBy(1 / 1.2));
     this.zoomLabel = document.createElement("button");
@@ -582,6 +661,15 @@ export class MindMapCanvas {
 
   // ---------- 事件 ----------
 
+  /** 合成事件没有活动指针，setPointerCapture 会抛 NotFoundError；真实指针不受影响 */
+  private capture(ev: PointerEvent): void {
+    try {
+      this.el.setPointerCapture(ev.pointerId);
+    } catch {
+      // ignore
+    }
+  }
+
   private on<K extends keyof HTMLElementEventMap>(
     target: HTMLElement | Document,
     type: K,
@@ -596,6 +684,7 @@ export class MindMapCanvas {
     const el = this.el;
 
     this.on(el, "pointerdown", (ev) => {
+      if (this.opts.embedded) ev.stopPropagation();
       const target = ev.target as HTMLElement;
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar")) return;
       const nodeEl = target.closest<HTMLElement>(".mm-node");
@@ -618,16 +707,14 @@ export class MindMapCanvas {
         else if (!this.selected.has(node)) this.select(node, "replace");
         else this.setPrimary(node);
         this.el.focus({ preventScroll: true });
-        if (this.opts.editable && node.depth > 0 && ev.button === 0) {
-          this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
-        }
+        if (ev.button === 0) this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
         return;
       }
       if (ev.button !== 0 && ev.button !== 1) return;
       if (this.editing) this.commitEdit();
       this.closePopover();
       this.el.focus({ preventScroll: true });
-      el.setPointerCapture(ev.pointerId);
+      this.capture(ev);
       if (ev.shiftKey && ev.button === 0) {
         this.startMarquee(ev);
         return;
@@ -655,9 +742,12 @@ export class MindMapCanvas {
       }
       if (this.pendingDrag) {
         if (Math.hypot(ev.clientX - this.pendingDrag.x, ev.clientY - this.pendingDrag.y) >= DRAG_THRESHOLD) {
-          this.startDrag(this.pendingDrag.node, ev);
+          const node = this.pendingDrag.node;
           this.pendingDrag = null;
-          if (this.drag) el.setPointerCapture(ev.pointerId);
+          if (this.opts.editable && node.depth > 0) {
+            this.startDrag(node, ev);
+            if (this.drag) this.capture(ev);
+          }
         }
         return;
       }
@@ -682,7 +772,7 @@ export class MindMapCanvas {
         const now = performance.now();
         if (this.lastTap && this.lastTap.node === tapped && now - this.lastTap.time < 400) {
           this.lastTap = null;
-          if (this.opts.editable) this.startEdit(tapped);
+          this.editOnDoubleTap(tapped);
         } else {
           this.lastTap = { node: tapped, time: now };
         }
@@ -704,6 +794,7 @@ export class MindMapCanvas {
       (ev) => {
         if ((ev.target as HTMLElement).closest(".mm-popover")) return;
         ev.preventDefault();
+        if (this.opts.embedded) ev.stopPropagation();
         const scale = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
         if (ev.ctrlKey || ev.metaKey) {
           const rect = el.getBoundingClientRect();
@@ -718,12 +809,12 @@ export class MindMapCanvas {
     );
 
     this.on(el, "dblclick", (ev) => {
-      if (!this.opts.editable) return;
+      if (this.opts.embedded) ev.stopPropagation();
       const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
       const node = nodeEl && this.nodeFromEl(nodeEl);
       if (node) {
         ev.preventDefault();
-        this.startEdit(node);
+        this.editOnDoubleTap(node);
       }
     });
 
@@ -745,6 +836,26 @@ export class MindMapCanvas {
   }
 
   private onKeyDown(ev: KeyboardEvent): void {
+    if (this.opts.embedded) this.handleKeyEmbedded(ev);
+    else this.handleKey(ev);
+  }
+
+  /** 嵌入模式：凡是我们处理了（preventDefault）的按键都不再冒泡给外层编辑器 */
+  private handleKeyEmbedded(ev: KeyboardEvent): void {
+    this.handleKey(ev);
+    if (ev.defaultPrevented || this.editing || (ev.target as HTMLElement).tagName === "TEXTAREA") ev.stopPropagation();
+  }
+
+  /** 双击节点：可编辑就进入编辑；只读的嵌入图先打开编辑开关 */
+  private editOnDoubleTap(node: MindNode): void {
+    if (!this.opts.editable) {
+      if (!this.opts.embedded) return;
+      this.setEditable(true);
+    }
+    this.startEdit(node);
+  }
+
+  private handleKey(ev: KeyboardEvent): void {
     const mod = ev.metaKey || ev.ctrlKey;
     const target = ev.target as HTMLElement;
     if (target.tagName === "TEXTAREA") {
@@ -1235,7 +1346,7 @@ export class MindMapCanvas {
         }
       };
       ta.addEventListener("input", () => {
-        if (apply()) this.scheduleNotify();
+        if (apply() && !this.opts.embedded) this.scheduleNotify();
       });
       ta.addEventListener("blur", () => {
         if (this.popover === pop) this.closePopover();

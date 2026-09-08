@@ -1,6 +1,8 @@
-import { Component, MarkdownRenderChild, MarkdownRenderer, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
+import { Component, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, MarkdownView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, ViewState } from "obsidian";
+import { locateBlock, replaceBlock } from "./codeblock";
+import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
-import { frontmatterValue, parseMarkdown } from "./markdown";
+import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
 import { THEMES, ThemeName } from "./theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
@@ -157,33 +159,125 @@ export default class MindMapPlugin extends Plugin {
 
   // ---------- 代码块 ----------
 
+  /** 代码块重新渲染之间要保住的状态，按「文件路径:起始行」缓存 */
+  private blockStates = new Map<string, BlockState>();
+
   private registerCodeBlock(): void {
     this.registerMarkdownCodeBlockProcessor("mindmap", (source, el, ctx) => {
       const wrap = el.createDiv({ cls: "mm-codeblock" });
       const child = new MarkdownRenderChild(wrap);
-      const doc = parseMarkdown(source, {
-        fallbackTitle: "",
-        style: { maxHeadingLevel: this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) },
-      });
+      const info = ctx.getSectionInfo(el);
+      const key = `${ctx.sourcePath}:${info?.lineStart ?? "?"}`;
+      const state: BlockState = this.blockStates.get(key) ?? { view: null, selected: null, editable: false, history: new History() };
+      this.blockStates.set(key, state);
+
+      const style = { maxHeadingLevel: this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) };
+      const doc = parseMarkdown(source, { fallbackTitle: "", style });
       const structure = frontmatterValue(doc.frontmatter, "mindmap-structure");
       const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
-      let sized = false;
+      let current = source.replace(/\n$/, "");
+      let lastHeight = 0;
+      let writing = Promise.resolve();
+
+      const writeBack = (next: string, pushHistory = true) => {
+        next = next.replace(/\n$/, "");
+        if (next === current) return;
+        if (pushHistory) state.history.push(current);
+        const prev = current;
+        current = next;
+        state.selected = canvas.getSelectedPath();
+        state.view = canvas.getViewState();
+        writing = writing.then(async () => {
+          try {
+            await this.replaceCodeBlock(ctx, el, prev, next);
+          } catch (e) {
+            new Notice(`写回代码块失败：${(e as Error).message}`);
+          }
+        });
+      };
+
       const canvas = new MindMapCanvas(wrap, {
         structure: structure === "mindmap" || structure === "logic-right" ? structure : this.settings.defaultStructure,
         theme: theme && theme in THEMES ? (theme as ThemeName) : this.settings.defaultTheme,
-        editable: false,
+        editable: state.editable,
+        embedded: true,
         host: this.canvasHost(() => ctx.sourcePath, child),
+        onChange: (d) => writeBack(serializeMarkdown(d)),
+        onUndo: () => {
+          const prev = state.history.undo(current);
+          if (prev !== null) writeBack(prev, false);
+        },
+        onRedo: () => {
+          const next = state.history.redo(current);
+          if (next !== null) writeBack(next, false);
+        },
+        onStructureChange: (s) => {
+          const d = canvas.getDoc();
+          if (!d) return;
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-structure", s === this.settings.defaultStructure ? null : s);
+          writeBack(serializeMarkdown(d));
+        },
         onLayout: (bounds) => {
-          if (sized) return;
-          sized = true;
-          wrap.style.height = `${Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96)))}px`;
-          canvas.fit();
+          const h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96)));
+          if (h !== lastHeight) {
+            lastHeight = h;
+            // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧
+            requestAnimationFrame(() => {
+              wrap.style.height = `${h}px`;
+            });
+          }
+        },
+        onViewChange: (v) => {
+          state.view = v;
+        },
+        onEditableChange: (e) => {
+          state.editable = e;
+          wrap.classList.toggle("is-editable", e);
         },
       });
+      wrap.classList.toggle("is-editable", state.editable);
+      if (state.view) canvas.setViewState(state.view);
       canvas.setDoc(doc);
-      child.register(() => canvas.destroy());
+      if (state.selected) canvas.selectPath(state.selected);
+      child.register(() => {
+        state.selected = canvas.getSelectedPath();
+        state.view = canvas.getViewState();
+        canvas.destroy();
+      });
       ctx.addChild(child);
     });
+  }
+
+  /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
+  private async replaceCodeBlock(ctx: MarkdownPostProcessorContext, el: HTMLElement, expectedInner: string, nextInner: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+    if (!(file instanceof TFile)) throw new Error(`找不到文件 ${ctx.sourcePath}`);
+    const info = ctx.getSectionInfo(el);
+    const hint = info ? { lineStart: info.lineStart, lineEnd: info.lineEnd } : null;
+
+    const views = this.app.workspace
+      .getLeavesOfType("markdown")
+      .map((l) => l.view as MarkdownView)
+      .filter((v) => v.file?.path === file.path);
+    const editorView = views.find((v) => v.containerEl.contains(el)) ?? views[0];
+    if (editorView && editorView.getMode() === "source") {
+      const editor = editorView.editor;
+      const range = locateBlock(editor.getValue(), hint, expectedInner);
+      if (!range) throw new Error("在笔记里找不到这个代码块");
+      const body = nextInner === "" ? "" : `${nextInner}\n`;
+      editor.replaceRange(body, { line: range.lineStart + 1, ch: 0 }, { line: range.lineEnd, ch: 0 });
+      return;
+    }
+    let failed = false;
+    await this.app.vault.process(file, (data) => {
+      const range = locateBlock(data, hint, expectedInner);
+      if (!range) {
+        failed = true;
+        return data;
+      }
+      return replaceBlock(data, range, nextInner);
+    });
+    if (failed) throw new Error("在笔记里找不到这个代码块");
   }
 
   canvasHost(sourcePath: () => string, component: Component): CanvasHost {
@@ -197,6 +291,13 @@ export default class MindMapPlugin extends Plugin {
       },
     };
   }
+}
+
+interface BlockState {
+  view: { tx: number; ty: number; k: number } | null;
+  selected: string | null;
+  editable: boolean;
+  history: History;
 }
 
 function joinPath(folder: string, name: string): string {

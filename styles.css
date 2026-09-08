@@ -675,3 +675,8 @@
   color: var(--mm-selection);
   background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
 }
+
+/* ---------- 嵌入代码块的编辑态 ---------- */
+.mm-root .mm-tool.is-hidden,
+.mm-root .mm-tool-sep.is-hidden { display: none; }
+.mm-codeblock.is-editable { border-color: color-mix(in srgb, var(--interactive-accent, #155dff) 45%, var(--background-modifier-border, #e3e3e3)); }

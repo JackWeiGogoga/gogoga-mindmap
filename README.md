@@ -10,7 +10,8 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 1. 命令面板 → **新建思维导图**，或者给任意笔记的 frontmatter 加上 `mindmap: true`。
 2. 带这个键的笔记默认以脑图打开；视图右上角的按钮、命令 **在思维导图和 Markdown 之间切换**、
    文件右键菜单都能来回切。
-3. 普通笔记里写一个 ```` ```mindmap ```` 代码块，块内写同样的 Markdown，阅读模式会渲染成一张小图。
+3. 普通笔记里写一个 ```` ```mindmap ```` 代码块，块内写同样的 Markdown，阅读模式和实时预览都会渲染成一张小图。
+   默认只读；点工具栏的铅笔或双击节点进入编辑，改动直接写回这个代码块，撤销重做也只作用于块内。
 4. 把 `.xmind` 文件放进 vault 直接打开：只读渲染，多工作表可切换，右上角一键**转换为 Markdown 笔记**。
    XMind Zen / 2020 之后的 content.json 和 XMind 8 的 content.xml 都支持。
 5. 视图菜单（右上角 ⋯）或命令面板：**导出为 PNG**、**导出为 SVG**、**复制为图片**。
@@ -86,7 +87,8 @@ pnpm harness         # 监听构建 dev/harness.js，然后用任意静态服务
 | `src/layout.ts` | 布局引擎（逻辑图 / 左右分布）与连线几何 |
 | `src/canvas.ts` | 渲染、平移缩放、选择、内联编辑、键盘 |
 | `src/view.ts` | Obsidian 的 TextFileView，负责读写文件与撤销栈 |
-| `src/main.ts` | 视图注册与重定向、命令、代码块、菜单 |
+| `src/main.ts` | 视图注册与重定向、命令、代码块（含写回）、菜单 |
+| `src/codeblock.ts` | 在宿主笔记里定位并替换 mindmap 代码块 |
 | `src/export.ts` | SVG / PNG 导出，内嵌字体 |
 | `src/xmind.ts` | .xmind 读取（自带 zip 与 XML 解析）→ Markdown |
 | `src/xmind-view.ts` | .xmind 只读视图与转换 |
