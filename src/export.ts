@@ -71,6 +71,39 @@ async function collectFontCss(families: string[]): Promise<string> {
   return task;
 }
 
+let mathCssCache: Promise<string> | null = null;
+
+/**
+ * MathJax 的 CHTML 输出靠页面里一张 <style id="MJX-CHTML-styles"> 和自带字体，
+ * 进了 SVG 的 foreignObject 就没了。把整张表连同字体（转 data URL）搬进去。
+ */
+function collectMathJaxCss(): Promise<string> {
+  if (mathCssCache) return mathCssCache;
+  mathCssCache = (async () => {
+    const style = document.getElementById("MJX-CHTML-styles") as HTMLStyleElement | null;
+    // 字符规则是 MathJax 用 insertRule 动态加的，textContent 里没有，要从 CSSOM 序列化
+    let css = "";
+    try {
+      css = [...(style?.sheet?.cssRules ?? [])].map((r) => r.cssText).join("\n");
+    } catch {
+      css = style?.textContent ?? "";
+    }
+    if (!css) return "";
+    const urls = [...new Set([...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((m) => m[1]))];
+    for (const url of urls) {
+      try {
+        const blob = await (await fetch(url)).blob();
+        const data = await blobToDataUrl(blob);
+        css = css.split(url).join(data);
+      } catch {
+        // 抓不到的字体就留原样
+      }
+    }
+    return css;
+  })();
+  return mathCssCache;
+}
+
 export interface SvgExport {
   svg: string;
   width: number;
@@ -137,7 +170,10 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
   clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
     (n as HTMLElement).style.boxShadow = "none";
   });
-  clone.querySelectorAll("[class]").forEach((n) => n.removeAttribute("class"));
+  // 去掉类名让导出不依赖插件 CSS；但 MathJax 的字形靠 .mjx-cXXXX::before 的 content 规则，那一棵要保留
+  clone.querySelectorAll("[class]").forEach((n) => {
+    if (!n.closest("mjx-container")) n.removeAttribute("class");
+  });
   clone.querySelectorAll("[contenteditable]").forEach((n) => n.removeAttribute("contenteditable"));
   clone.style.position = "absolute";
   clone.style.left = `${ox}px`;
@@ -149,6 +185,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
   if (opts.embedFonts !== false) {
     const families = getComputedStyle(canvas.el).fontFamily.split(",").map((f) => f.replace(/["']/g, "").trim()).filter(Boolean);
     fontCss = await collectFontCss(families);
+    if (clone.querySelector("mjx-container")) fontCss += await collectMathJaxCss();
   }
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
