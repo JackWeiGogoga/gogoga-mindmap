@@ -30,7 +30,7 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { fromEditableText, plainText, renderInline, setImageWidth, toEditableText, wikilinkOf } from "./inline";
+import { fromEditableText, IMAGE_MAX_WIDTH, IMAGE_MIN_WIDTH, plainText, renderInline, setImageWidth, toEditableText, wikilinkOf } from "./inline";
 import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
 import { COLOR_NAMES, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -1996,7 +1996,8 @@ export class MindMapCanvas {
       const r = this.imgResize;
       if (!r) return;
       ev.stopPropagation();
-      const w = Math.max(40, Math.min(800, r.startW + (ev.clientX - r.startX) / this.k));
+      const w = Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, r.startW + (ev.clientX - r.startX) / this.k));
+      r.img.classList.add("has-size");
       r.img.style.width = `${Math.round(w)}px`;
       this.reflow();
       this.placeImageHandle(r.handle, r.img);

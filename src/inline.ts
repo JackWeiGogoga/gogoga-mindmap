@@ -93,6 +93,10 @@ function math(tex: string, opts: InlineOptions): HTMLElement {
   return code;
 }
 
+/** 图片节点允许的宽度范围（像素） */
+export const IMAGE_MIN_WIDTH = 40;
+export const IMAGE_MAX_WIDTH = 800;
+
 function splitAltParam(alt: string): [string, string | undefined] {
   const i = alt.lastIndexOf("|");
   return i >= 0 ? [alt.slice(0, i), alt.slice(i + 1)] : [alt, undefined];
@@ -132,7 +136,11 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
   img.alt = alt;
   img.draggable = false;
   const width = param && /^\d+$/.test(param.trim()) ? Number(param) : null;
-  if (width) img.style.width = `${width}px`;
+  if (width) {
+    // 明确设了宽度就以它为准，不受默认缩略图上限约束
+    img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, width))}px`;
+    img.classList.add("has-size");
+  }
   img.addEventListener("load", () => opts.onImageLoad?.());
   img.addEventListener("error", () => {
     img.replaceWith(wrap("span", alt || link));

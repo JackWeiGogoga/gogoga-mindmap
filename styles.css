@@ -815,7 +815,9 @@
   object-fit: contain;
   pointer-events: none;
 }
-.mm-node.has-image { align-items: flex-start; }
+/* 有明确宽度的图片不受缩略图上限约束；含图片的节点也不受文字换行宽度限制 */
+.mm-label img.mm-img.has-size { max-width: none; max-height: none; }
+.mm-node.has-image { align-items: flex-start; max-width: none; }
 .mm-node.has-image .mm-label { display: block; text-align: center; }
 .mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
 
