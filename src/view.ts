@@ -1,6 +1,7 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
+import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
@@ -16,6 +17,8 @@ export class MindMapView extends TextFileView {
   /** 页面预览（hover-link）需要宿主提供这个字段 */
   hoverPopover: HoverPopover | null = null;
   private canvas: MindMapCanvas | null = null;
+  private outline: OutlinePanel | null = null;
+  private outlineHost: HTMLElement | null = null;
   private history = new History();
   private doc: MindDoc | null = null;
 
@@ -35,6 +38,25 @@ export class MindMapView extends TextFileView {
 
   linkSelectedToNote(): Promise<void> {
     return this.canvas?.linkSelectedToNote() ?? Promise.resolve();
+  }
+
+  async toggleOutline(): Promise<void> {
+    if (this.outline) this.closeOutline();
+    else this.openOutline();
+    this.plugin.settings.outlineOpen = !!this.outline;
+    await this.plugin.saveSettings();
+  }
+
+  private openOutline(): void {
+    if (this.outline || !this.canvas || !this.outlineHost) return;
+    this.outline = new OutlinePanel(this.outlineHost, this.canvas, () => void this.toggleOutline());
+    this.contentEl.addClass("has-outline");
+  }
+
+  private closeOutline(): void {
+    this.outline?.destroy();
+    this.outline = null;
+    this.contentEl.removeClass("has-outline");
   }
 
   openSearch(): void {
@@ -62,7 +84,8 @@ export class MindMapView extends TextFileView {
     this.addAction("file-text", "以 Markdown 打开", () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
     });
-    const host = this.contentEl.createDiv();
+    this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
+    const host = this.contentEl.createDiv({ cls: "mm-canvas-host" });
     this.canvas = new MindMapCanvas(host, {
       structure: this.plugin.settings.defaultStructure,
       theme: this.plugin.settings.defaultTheme,
@@ -72,7 +95,11 @@ export class MindMapView extends TextFileView {
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onStructureChange: (s) => this.persistStructure(s),
+      onRender: () => this.outline?.refresh(),
+      onSelectionChange: (primary) => this.outline?.syncSelection(primary),
+      onToggleOutline: () => void this.toggleOutline(),
     });
+    if (this.plugin.settings.outlineOpen) this.openOutline();
   }
 
   /** 卸载前把正在输入的内容提交，Obsidian 随后会 save(true) 写盘 */
@@ -86,6 +113,8 @@ export class MindMapView extends TextFileView {
     // 这是视图被替换（切 Markdown 视图、同一标签页打开别的笔记）时最后一次写盘的机会，不能漏掉 super
     this.canvas?.flush();
     await super.onClose();
+    this.outline?.destroy();
+    this.outline = null;
     this.canvas?.destroy();
     this.canvas = null;
   }

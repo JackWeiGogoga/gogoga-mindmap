@@ -163,6 +163,7 @@ export default class MindMapPlugin extends Plugin {
         },
       });
     exportCommand("link-note", "链接到笔记 / 新建笔记", (v) => v.linkSelectedToNote());
+    exportCommand("toggle-outline", "切换大纲面板", (v) => v.toggleOutline());
     exportCommand("search", "搜索节点", async (v) => v.openSearch());
     exportCommand("expand-all", "展开全部节点", async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", "折叠全部节点", async (v) => v.setFoldLevel(1));

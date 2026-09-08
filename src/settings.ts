@@ -12,6 +12,8 @@ export interface MindMapSettings {
   indent: "tab" | "2" | "4";
   /** 代码块嵌入的最大高度 */
   codeBlockMaxHeight: number;
+  /** 脑图视图是否显示大纲面板 */
+  outlineOpen: boolean;
 }
 
 export const DEFAULT_SETTINGS: MindMapSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   maxHeadingLevel: 3,
   indent: "tab",
   codeBlockMaxHeight: 600,
+  outlineOpen: false,
 };
 
 export function indentString(s: MindMapSettings["indent"]): string {

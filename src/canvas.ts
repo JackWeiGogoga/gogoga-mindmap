@@ -62,6 +62,12 @@ export interface CanvasOptions {
   onStructureChange?: (structure: Structure) => void;
   /** 每次布局完成后调用，可用来按内容定高度 */
   onLayout?: (bounds: Bounds) => void;
+  /** 每次整体渲染完成后（树结构可能变了） */
+  onRender?: () => void;
+  /** 选中变化 */
+  onSelectionChange?: (primary: MindNode | null, all: MindNode[]) => void;
+  /** 提供则工具栏出现「大纲」按钮 */
+  onToggleOutline?: () => void;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -97,6 +103,7 @@ const ICONS: Record<string, string> = {
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+  outline: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
   paste: '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
@@ -406,6 +413,7 @@ export class MindMapCanvas {
       this.selectPath(path);
     }
     this.positionNodebar();
+    this.opts.onRender?.();
   }
 
   private scheduleRetry(): void {
@@ -597,6 +605,12 @@ export class MindMapCanvas {
       bar.append(b);
       return b;
     };
+    if (this.opts.onToggleOutline) {
+      btn("outline", "大纲面板", () => this.opts.onToggleOutline?.());
+      const sep0 = document.createElement("span");
+      sep0.className = "mm-tool-sep";
+      bar.append(sep0);
+    }
     if (this.opts.embedded) {
       this.editToggle = btn(this.opts.editable ? "check" : "pencil", this.opts.editable ? "完成编辑" : "编辑", () =>
         this.setEditable(!this.opts.editable),
@@ -1081,6 +1095,15 @@ export class MindMapCanvas {
     }
     const sel = this.primary;
     if (!sel) return;
+    if (ev.altKey && this.opts.editable && ev.key.startsWith("Arrow")) {
+      // Alt+↑↓ 在兄弟间排序，Alt+←→ 升降级
+      ev.preventDefault();
+      if (ev.key === "ArrowUp") this.moveSibling(sel, -1);
+      else if (ev.key === "ArrowDown") this.moveSibling(sel, 1);
+      else if (ev.key === "ArrowLeft") this.outdentNode(sel);
+      else this.indentNode(sel);
+      return;
+    }
     switch (ev.key) {
       case "ArrowLeft":
       case "ArrowRight":
@@ -1172,6 +1195,11 @@ export class MindMapCanvas {
       el.classList.toggle("is-selected", node !== null);
     }
     this.positionNodebar();
+    this.opts.onSelectionChange?.(this.primary, [...this.selected]);
+  }
+
+  getPrimary(): MindNode | null {
+    return this.primary;
   }
 
   private navigate(node: MindNode, key: string): void {
@@ -1427,7 +1455,83 @@ export class MindMapCanvas {
     }, delay);
   }
 
-  private toggleFold(node: MindNode): void {
+  // ---------- 供大纲面板与快捷键调用的树操作 ----------
+
+  renameNode(node: MindNode, text: string): void {
+    if (!this.opts.editable || text === node.text) return;
+    node.text = text;
+    this.render();
+    this.notify();
+  }
+
+  insertSibling(node: MindNode): MindNode | null {
+    if (!this.opts.editable || !node.parent) return null;
+    if (this.editing) this.commitEdit();
+    const created = addSibling(node, "", true);
+    if (!created) return null;
+    this.select(created);
+    this.render();
+    return created;
+  }
+
+  insertChild(node: MindNode): MindNode | null {
+    if (!this.opts.editable || !this.doc) return null;
+    if (this.editing) this.commitEdit();
+    if (node.folded) node.folded = false;
+    const created = addChild(node, this.doc.style, "");
+    this.select(created);
+    this.render();
+    return created;
+  }
+
+  deleteNode(node: MindNode): void {
+    if (!this.opts.editable || !node.parent) return;
+    const parent = node.parent;
+    const idx = parent.children.indexOf(node);
+    removeNode(node);
+    this.select(parent.children[Math.min(idx, parent.children.length - 1)] ?? parent);
+    this.render();
+    this.notify();
+  }
+
+  moveNodeTo(node: MindNode, parent: MindNode, index: number): boolean {
+    if (!this.opts.editable || !this.doc) return false;
+    if (parent.folded) parent.folded = false;
+    if (!moveNode(node, parent, index, this.doc.style)) return false;
+    this.select(node);
+    this.render();
+    this.notify();
+    return true;
+  }
+
+  /** 降级：挂到前一个兄弟的末尾 */
+  indentNode(node: MindNode): boolean {
+    const parent = node.parent;
+    if (!parent) return false;
+    const idx = parent.children.indexOf(node);
+    if (idx <= 0) return false;
+    const prev = parent.children[idx - 1];
+    return this.moveNodeTo(node, prev, prev.children.length);
+  }
+
+  /** 升级：放到父节点之后 */
+  outdentNode(node: MindNode): boolean {
+    const parent = node.parent;
+    if (!parent || !parent.parent) return false;
+    return this.moveNodeTo(node, parent.parent, parent.parent.children.indexOf(parent) + 1);
+  }
+
+  /** 在兄弟之间上下移动 */
+  moveSibling(node: MindNode, delta: number): boolean {
+    const parent = node.parent;
+    if (!parent) return false;
+    const idx = parent.children.indexOf(node);
+    const to = idx + delta;
+    if (to < 0 || to >= parent.children.length) return false;
+    return this.moveNodeTo(node, parent, delta > 0 ? to + 1 : to);
+  }
+
+  toggleFold(node: MindNode): void {
     if (this.editing) this.commitEdit();
     node.folded = !node.folded;
     this.select(node);
