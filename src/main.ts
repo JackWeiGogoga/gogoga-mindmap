@@ -138,6 +138,9 @@ export default class MindMapPlugin extends Plugin {
           return true;
         },
       });
+    exportCommand("search", "搜索节点", async (v) => v.openSearch());
+    exportCommand("expand-all", "展开全部节点", async (v) => v.setFoldLevel(null));
+    exportCommand("collapse-all", "折叠全部节点", async (v) => v.setFoldLevel(1));
     exportCommand("export-png", "导出为 PNG", (v) => v.exportPng());
     exportCommand("export-svg", "导出为 SVG", (v) => v.exportSvg());
     exportCommand("copy-png", "复制为图片", (v) => v.copyPng());

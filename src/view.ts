@@ -1,4 +1,4 @@
-import { Menu, Notice, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
 import { History } from "./history";
@@ -19,6 +19,20 @@ export class MindMapView extends TextFileView {
 
   constructor(leaf: WorkspaceLeaf, private plugin: MindMapPlugin) {
     super(leaf);
+    // 视图激活时 ⌘F 归我们，否则会被 Obsidian 的「搜索当前文件」截走
+    this.scope = new Scope(this.app.scope);
+    this.scope.register(["Mod"], "f", () => {
+      this.canvas?.openSearch();
+      return false;
+    });
+  }
+
+  openSearch(): void {
+    this.canvas?.openSearch();
+  }
+
+  setFoldLevel(level: number | null): void {
+    this.canvas?.setFoldLevel(level);
   }
 
   getViewType(): string {

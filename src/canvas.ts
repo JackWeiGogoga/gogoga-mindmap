@@ -6,6 +6,7 @@
 import {
   addChild,
   addSibling,
+  attachSubtree,
   findByPath,
   isAncestor,
   MindDoc,
@@ -29,9 +30,9 @@ import {
   Size,
   Structure,
 } from "./layout";
-import { renderInline } from "./inline";
+import { fromEditableText, plainText, renderInline, toEditableText } from "./inline";
 import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
-import { COLOR_NAMES, normalizeNote, unescapeNote } from "./markdown";
+import { COLOR_NAMES, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
@@ -78,6 +79,13 @@ const ICONS: Record<string, string> = {
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  paste: '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
@@ -136,11 +144,16 @@ export class MindMapCanvas {
   private editingIsNew = false;
 
   private pointers = new Map<number, { x: number; y: number }>();
-  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean } | null = null;
+  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean; onNode?: boolean } | null = null;
   private pinch: { dist: number; k: number } | null = null;
   private pendingDrag: { node: MindNode; x: number; y: number } | null = null;
   private lastTap: { node: MindNode; time: number } | null = null;
   private pendingSelectPath: string | null = null;
+  /** 触屏：按住节点不动一段时间才进入拖拽，期间手指移动视为平移 */
+  private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
+  private search: { bar: HTMLElement; input: HTMLInputElement; count: HTMLElement; matches: Set<MindNode>; list: MindNode[]; index: number } | null = null;
+  private foldMenu: HTMLElement | null = null;
+  private clipboardText = "";
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
   private popover: HTMLElement | null = null;
@@ -197,6 +210,7 @@ export class MindMapCanvas {
     this.primary = primaryPath !== null ? findByPath(doc.root, primaryPath) : null;
     if (this.primary && !this.selected.has(this.primary)) this.primary = null;
     this.render();
+    if (this.search) this.runSearch(this.search.input.value, false);
   }
 
   getDoc(): MindDoc | null {
@@ -284,7 +298,7 @@ export class MindMapCanvas {
     let changed = false;
     if (this.editing) {
       const label = this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
-      const text = (label?.textContent ?? "").replace(/\s*\n\s*/g, " ").trim();
+      const text = fromEditableText(label?.textContent ?? "");
       if (text && text !== this.editing.text) {
         this.editing.text = text;
         changed = true;
@@ -309,6 +323,7 @@ export class MindMapCanvas {
     this.ro?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
+    if (this.touchPress) window.clearTimeout(this.touchPress.timer);
     for (const d of this.disposers) d();
     this.el.replaceChildren();
     this.el.classList.remove("mm-root");
@@ -416,6 +431,10 @@ export class MindMapCanvas {
         el.classList.add("is-underline");
       }
       if (this.selected.has(node)) el.classList.add("is-selected");
+      if (this.search?.matches.has(node)) {
+        el.classList.add("is-match");
+        if (this.search.list[this.search.index] === node) el.classList.add("is-current-match");
+      }
 
       const label = document.createElement("div");
       label.className = "mm-label";
@@ -573,6 +592,11 @@ export class MindMapCanvas {
     btn("plus", "放大", () => this.zoomBy(1.2));
     btn("fit", "适应画布", () => this.fit());
     btn("center", "回到中心", () => this.center());
+    const sep2 = document.createElement("span");
+    sep2.className = "mm-tool-sep";
+    bar.append(sep2);
+    btn("search", "搜索节点（⌘F）", () => this.openSearch());
+    const layers = btn("layers", "折叠 / 展开", () => this.toggleFoldMenu(layers));
     this.el.append(bar);
     this.updateZoomLabel();
   }
@@ -621,6 +645,8 @@ export class MindMapCanvas {
     tool("note", "编辑备注", () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
+    tool("copy", "复制（⌘C）", () => this.copySelection());
+    tool("paste", "粘贴为子节点（⌘V）", () => void this.pasteFromClipboard());
     tool("trash", "删除", () => this.deleteSelected());
     return bar;
   }
@@ -694,6 +720,7 @@ export class MindMapCanvas {
         this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), k: this.k };
         this.pan = null;
         this.pendingDrag = null;
+        this.cancelTouchPress();
         return;
       }
       if (nodeEl) {
@@ -707,7 +734,23 @@ export class MindMapCanvas {
         else if (!this.selected.has(node)) this.select(node, "replace");
         else this.setPrimary(node);
         this.el.focus({ preventScroll: true });
-        if (ev.button === 0) this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
+        if (ev.pointerType === "touch") {
+          // 触屏没有悬停，按住 400ms 不动才拖节点；一动就当作平移画布
+          this.cancelTouchPress();
+          const timer = window.setTimeout(() => {
+            const tp = this.touchPress;
+            this.touchPress = null;
+            this.pan = null;
+            if (tp && this.opts.editable && node.depth > 0) {
+              this.startDrag(node, tp.ev);
+              this.capture(tp.ev);
+            }
+          }, 400);
+          this.touchPress = { node, timer, ev };
+          this.pan = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false, onNode: true };
+        } else if (ev.button === 0) {
+          this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
+        }
         return;
       }
       if (ev.button !== 0 && ev.button !== 1) return;
@@ -740,6 +783,9 @@ export class MindMapCanvas {
         this.updateDrag(ev);
         return;
       }
+      if (this.touchPress && this.pan && Math.hypot(ev.clientX - this.pan.x, ev.clientY - this.pan.y) >= DRAG_THRESHOLD) {
+        this.cancelTouchPress();
+      }
       if (this.pendingDrag) {
         if (Math.hypot(ev.clientX - this.pendingDrag.x, ev.clientY - this.pendingDrag.y) >= DRAG_THRESHOLD) {
           const node = this.pendingDrag.node;
@@ -766,7 +812,9 @@ export class MindMapCanvas {
       if (this.pointers.size < 2) this.pinch = null;
       if (this.marquee) this.endMarquee();
       if (this.drag) this.endDrag(ev.type === "pointerup");
-      const tapped = this.pendingDrag?.node ?? null;
+      const touched = this.touchPress?.node ?? null;
+      this.cancelTouchPress();
+      const tapped = this.pendingDrag?.node ?? touched;
       this.pendingDrag = null;
       if (tapped && ev.type === "pointerup") {
         const now = performance.now();
@@ -780,7 +828,7 @@ export class MindMapCanvas {
         this.lastTap = null;
       }
       if (this.pan) {
-        if (!this.pan.moved) this.select(null, "replace");
+        if (!this.pan.moved && !this.pan.onNode) this.select(null, "replace");
         this.pan = null;
       }
       if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
@@ -858,6 +906,7 @@ export class MindMapCanvas {
   private handleKey(ev: KeyboardEvent): void {
     const mod = ev.metaKey || ev.ctrlKey;
     const target = ev.target as HTMLElement;
+    if (target.closest(".mm-search")) return;
     if (target.tagName === "TEXTAREA") {
       if (ev.key === "Escape" || (ev.key === "Enter" && mod)) {
         ev.preventDefault();
@@ -889,6 +938,29 @@ export class MindMapCanvas {
     if (mod && ev.key.toLowerCase() === "a") {
       ev.preventDefault();
       this.selectAll();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === "f") {
+      ev.preventDefault();
+      this.openSearch();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === "c") {
+      if (this.copySelection()) ev.preventDefault();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === "x") {
+      if (this.opts.editable && this.selected.size) {
+        ev.preventDefault();
+        this.cutSelection();
+      }
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === "v") {
+      if (this.opts.editable) {
+        ev.preventDefault();
+        void this.pasteFromClipboard();
+      }
       return;
     }
     if (mod && (ev.key === "=" || ev.key === "+")) {
@@ -1264,7 +1336,7 @@ export class MindMapCanvas {
     this.editing = node;
     this.editingIsNew = isNew;
     this.positionNodebar();
-    label.textContent = node.text;
+    label.textContent = toEditableText(node.text);
     label.setAttribute("contenteditable", "plaintext-only");
     if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
@@ -1284,7 +1356,7 @@ export class MindMapCanvas {
     this.editing = null;
     this.editingIsNew = false;
     const label = this.els.get(node.id)?.querySelector<HTMLElement>(".mm-label");
-    const raw = (label?.textContent ?? "").replace(/\s*\n\s*/g, " ").trim();
+    const raw = fromEditableText(label?.textContent ?? "");
     const text = cancel ? node.text : raw;
     if (text === "" && isNew) {
       const parent = node.parent;
@@ -1299,6 +1371,253 @@ export class MindMapCanvas {
     this.render();
     if (refocus) this.el.focus({ preventScroll: true });
     if (changed) this.notify();
+  }
+
+  // ---------- 折叠层级 ----------
+
+  /** level 为 null 展开全部；否则深度 ≥ level 的节点折叠（1 = 只看主主题） */
+  setFoldLevel(level: number | null): void {
+    if (!this.doc) return;
+    if (this.editing) this.commitEdit();
+    walk(this.doc.root, (n) => {
+      if (n.children.length) n.folded = level !== null && n.depth >= level;
+    });
+    this.render();
+    if (this.opts.editable) this.notify();
+  }
+
+  private toggleFoldMenu(anchor: HTMLElement): void {
+    if (this.foldMenu) {
+      this.closeFoldMenu();
+      return;
+    }
+    const menu = document.createElement("div");
+    menu.className = "mm-menu";
+    menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    const item = (label: string, fn: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mm-menu-item";
+      b.textContent = label;
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.closeFoldMenu();
+        fn();
+      });
+      menu.append(b);
+    };
+    item("展开全部", () => this.setFoldLevel(null));
+    item("只显示主主题", () => this.setFoldLevel(1));
+    item("显示到第 2 层", () => this.setFoldLevel(2));
+    item("显示到第 3 层", () => this.setFoldLevel(3));
+    this.el.append(menu);
+    const host = this.el.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = `${Math.max(4, Math.min(r.left - host.left + r.width / 2 - menu.offsetWidth / 2, host.width - menu.offsetWidth - 4))}px`;
+    menu.style.top = `${r.top - host.top - menu.offsetHeight - 6}px`;
+    this.foldMenu = menu;
+    const onDoc = (ev: PointerEvent) => {
+      if (!menu.contains(ev.target as Node)) this.closeFoldMenu();
+    };
+    document.addEventListener("pointerdown", onDoc, { capture: true, once: true });
+  }
+
+  private closeFoldMenu(): void {
+    this.foldMenu?.remove();
+    this.foldMenu = null;
+  }
+
+  // ---------- 搜索 ----------
+
+  openSearch(): void {
+    if (this.search) {
+      this.search.input.focus();
+      this.search.input.select();
+      return;
+    }
+    const bar = document.createElement("div");
+    bar.className = "mm-search";
+    bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "mm-search-input";
+    input.placeholder = "搜索节点";
+    input.spellcheck = false;
+    const count = document.createElement("span");
+    count.className = "mm-search-count";
+    count.textContent = "0/0";
+    const tool = (name: string, title: string, fn: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mm-tool";
+      b.title = title;
+      b.append(icon(name));
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        fn();
+      });
+      return b;
+    };
+    bar.append(input, count, tool("up", "上一个（Shift+Enter）", () => this.stepMatch(-1)), tool("down", "下一个（Enter）", () => this.stepMatch(1)), tool("close", "关闭（Esc）", () => this.closeSearch()));
+    this.el.append(bar);
+    this.search = { bar, input, count, matches: new Set(), list: [], index: -1 };
+    input.addEventListener("input", () => this.runSearch(input.value));
+    input.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter" || ev.key === "ArrowDown") {
+        ev.preventDefault();
+        this.stepMatch(ev.shiftKey && ev.key === "Enter" ? -1 : 1);
+      } else if (ev.key === "ArrowUp") {
+        ev.preventDefault();
+        this.stepMatch(-1);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.closeSearch();
+      }
+    });
+    input.focus();
+  }
+
+  closeSearch(): void {
+    if (!this.search) return;
+    this.search.bar.remove();
+    this.search = null;
+    for (const el of this.els.values()) el.classList.remove("is-match", "is-current-match");
+    this.el.focus({ preventScroll: true });
+  }
+
+  private runSearch(query: string, reveal = true): void {
+    const s = this.search;
+    if (!s || !this.doc) return;
+    const q = query.trim().toLowerCase();
+    const list: MindNode[] = [];
+    if (q) {
+      walk(this.doc.root, (n) => {
+        if (plainText(n.text).toLowerCase().includes(q) || unescapeNote(n.note).toLowerCase().includes(q)) list.push(n);
+      });
+    }
+    s.list = list;
+    s.matches = new Set(list);
+    s.index = list.length ? Math.min(Math.max(s.index, 0), list.length - 1) : -1;
+    this.applyMatchClasses();
+    if (reveal && s.index >= 0) this.revealMatch();
+  }
+
+  private stepMatch(dir: number): void {
+    const s = this.search;
+    if (!s || !s.list.length) return;
+    s.index = (s.index + dir + s.list.length) % s.list.length;
+    this.applyMatchClasses();
+    this.revealMatch();
+  }
+
+  private applyMatchClasses(): void {
+    const s = this.search;
+    if (!s) return;
+    const current = s.index >= 0 ? s.list[s.index] : null;
+    for (const [id, el] of this.els) {
+      let node: MindNode | null = null;
+      for (const m of s.matches) if (m.id === id) node = m;
+      el.classList.toggle("is-match", node !== null);
+      el.classList.toggle("is-current-match", node !== null && node === current);
+    }
+    s.count.textContent = `${s.index + 1}/${s.list.length}`;
+  }
+
+  /** 展开命中节点的祖先、选中并把它挪到画布中央 */
+  private revealMatch(): void {
+    const s = this.search;
+    if (!s || s.index < 0) return;
+    const node = s.list[s.index];
+    let unfolded = false;
+    for (let p = node.parent; p; p = p.parent) {
+      if (p.folded) {
+        p.folded = false;
+        unfolded = true;
+      }
+    }
+    if (unfolded) {
+      this.render();
+      this.applyMatchClasses();
+      if (this.opts.editable) this.notify();
+    }
+    this.select(node);
+    this.centerOn(node);
+    s.input.focus();
+  }
+
+  centerOn(node: MindNode): void {
+    const p = this.layout?.placed.get(node.id);
+    if (!p) return;
+    this.tx = this.el.clientWidth / 2 - (p.x + p.w / 2) * this.k;
+    this.ty = this.el.clientHeight / 2 - (p.y + p.h / 2) * this.k;
+    this.applyTransform();
+  }
+
+  // ---------- 剪贴板 ----------
+
+  /** 选区里去掉被其他选中节点包含的，按文档顺序排列 */
+  private topLevelSelection(): MindNode[] {
+    const all = [...this.selected];
+    const tops = all.filter((n) => n.parent && !all.some((o) => o !== n && isAncestor(o, n)));
+    const key = (n: MindNode) => pathOf(n).split("/").map((x) => Number(x));
+    return tops.sort((a, b) => {
+      const ka = key(a);
+      const kb = key(b);
+      for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+        const d = (ka[i] ?? -1) - (kb[i] ?? -1);
+        if (d) return d;
+      }
+      return 0;
+    });
+  }
+
+  /** 把选中的子树写成缩进列表放进剪贴板，返回文本；没有选中返回 null */
+  copySelection(): string | null {
+    const nodes = this.topLevelSelection();
+    if (!nodes.length) return null;
+    const text = nodes.map((n) => subtreeToList(n)).join("");
+    this.clipboardText = text;
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+    return text;
+  }
+
+  cutSelection(): void {
+    if (!this.opts.editable) return;
+    if (this.copySelection()) this.deleteSelected();
+  }
+
+  async pasteFromClipboard(): Promise<void> {
+    if (!this.opts.editable || !this.doc) return;
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      text = this.clipboardText;
+    }
+    if (!text.trim()) text = this.clipboardText;
+    this.pasteText(text);
+  }
+
+  /** 把文本解析成节点挂到当前节点下（无选中则挂到根） */
+  pasteText(text: string): void {
+    if (!this.opts.editable || !this.doc) return;
+    const nodes = parseClipboard(text);
+    if (!nodes.length) return;
+    if (this.editing) this.commitEdit();
+    const target = this.primary ?? this.doc.root;
+    if (target.folded) target.folded = false;
+    for (const n of nodes) attachSubtree(n, target, this.doc.style);
+    this.select(null);
+    nodes.forEach((n, i) => this.select(n, i === 0 ? "replace" : "add"));
+    this.render();
+    this.notify();
+  }
+
+  private cancelTouchPress(): void {
+    if (!this.touchPress) return;
+    window.clearTimeout(this.touchPress.timer);
+    this.touchPress = null;
   }
 
   // ---------- 备注弹层 ----------

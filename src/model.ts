@@ -191,6 +191,36 @@ export function moveNode(node: MindNode, newParent: MindNode, index: number, sty
   return true;
 }
 
+/** 父节点之下应当用什么写法：不看兄弟，只看父节点 */
+function kindBelow(parent: MindNode, style: DocStyle): { kind: NodeKind; level: number } {
+  if (parent.kind === "heading" && parent.level + 1 <= Math.min(6, style.maxHeadingLevel)) {
+    return { kind: "heading", level: parent.level + 1 };
+  }
+  return { kind: "list", level: 0 };
+}
+
+/** 把一棵游离的子树（粘贴、导入得到的）挂到 parent 下，并按新位置重算 kind/level/depth */
+export function attachSubtree(node: MindNode, parent: MindNode, style: DocStyle, index?: number): void {
+  const top = kindForNewChild(parent, style);
+  node.parent = parent;
+  const at = index === undefined ? parent.children.length : Math.max(0, Math.min(index, parent.children.length));
+  parent.children.splice(at, 0, node);
+  node.kind = top.kind;
+  node.level = top.level;
+  node.depth = parent.depth + 1;
+  const fix = (n: MindNode) => {
+    const k = kindBelow(n, style);
+    for (const c of n.children) {
+      c.parent = n;
+      c.kind = k.kind;
+      c.level = k.level;
+      c.depth = n.depth + 1;
+      fix(c);
+    }
+  };
+  fix(node);
+}
+
 /** 深拷贝一棵子树（不含 parent 指针的循环），用于历史或测试 */
 export function cloneTree(node: MindNode, parent: MindNode | null = null): MindNode {
   const copy = createNode({

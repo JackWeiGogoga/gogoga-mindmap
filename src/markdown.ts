@@ -164,6 +164,45 @@ export function normalizeNote(plain: string): string {
   return noteNeedsEscape(plain) ? escapeNote(plain) : plain;
 }
 
+// ---------- 剪贴板 ----------
+
+/** 把子树写成缩进列表：复制节点时放进剪贴板，任何地方都能粘贴成 Markdown */
+export function subtreeToList(node: MindNode, indent = "\t"): string {
+  const lines: string[] = [];
+  const walk = (n: MindNode, depth: number) => {
+    lines.push(`${indent.repeat(depth)}- ${n.text}${formatMarker(n)}`.trimEnd());
+    if (n.note) {
+      for (const l of normalizeNote(n.note).split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
+    }
+    for (const c of n.children) walk(c, depth + 1);
+  };
+  walk(node, 0);
+  return lines.join("\n") + "\n";
+}
+
+/** 剪贴板文本 → 游离的节点列表：有标题/列表结构就按结构来，纯文本则每行一个节点 */
+export function parseClipboard(text: string): MindNode[] {
+  const trimmed = text.replace(/\r/g, "").trim();
+  if (!trimmed) return [];
+  const doc = parseMarkdown(trimmed, { fallbackTitle: "" });
+  if (doc.rootFromHeading) {
+    doc.root.parent = null;
+    return [doc.root];
+  }
+  const nodes: MindNode[] = [];
+  if (doc.root.note) {
+    for (const line of doc.root.note.split("\n")) {
+      const t = line.trim();
+      if (t) nodes.push(createNode({ parent: null, text: t, kind: "list" }));
+    }
+  }
+  for (const c of doc.root.children) {
+    c.parent = null;
+    nodes.push(c);
+  }
+  return nodes;
+}
+
 export interface ParseOptions {
   /** 没有一级标题时用作根节点标签（通常是文件名） */
   fallbackTitle?: string;

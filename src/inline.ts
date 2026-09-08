@@ -10,8 +10,19 @@ export interface InlineOptions {
 const TOKEN_RE =
   /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]|\[([^\]]+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_]*?)_(?![\w_])/g;
 
+const BR_RE = /<br\s*\/?>/i;
+
+/** 节点标签里的 <br> 是多行文本的存储形式（标题里放不下真正的换行） */
 export function renderInline(el: HTMLElement, text: string, opts: InlineOptions = {}): void {
   el.textContent = "";
+  const segments = text.split(BR_RE);
+  segments.forEach((seg, i) => {
+    if (i > 0) el.appendChild(document.createElement("br"));
+    renderSegment(el, seg, opts);
+  });
+}
+
+function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void {
   let rest = text;
   const task = /^\[( |x|X)\]\s+/.exec(rest);
   if (task) {
@@ -68,9 +79,23 @@ function link(label: string, href: string, internal: boolean, opts: InlineOption
   return a;
 }
 
+/** 编辑框里的换行 ⇄ 存储用的 <br> */
+export function toEditableText(text: string): string {
+  return text.replace(/<br\s*\/?>/gi, "\n");
+}
+export function fromEditableText(text: string): string {
+  return text
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join("<br>");
+}
+
 /** 节点标签的纯文本版本，用于测量和搜索 */
 export function plainText(text: string): string {
   return text
+    .replace(/<br\s*\/?>/gi, " ")
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a, b) => b ?? a)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_, a, b, c, d, e) => a ?? b ?? c ?? d ?? e);

@@ -273,3 +273,54 @@ test("备注里的列表和标题会包成 callout，往返后原文不变", () 
   assert.equal(unescapeNote(again2.root.children[0].children[0].note), "- x\n- y");
   assert.equal(escapeNote("a\n\nb"), "> [!note]\n> a\n>\n> b");
 });
+
+import { parseClipboard, subtreeToList } from "../../src/markdown";
+import { attachSubtree } from "../../src/model";
+
+test("复制子树 → 缩进列表 → 粘贴回来结构、标记、备注都在", () => {
+  const doc = parseMarkdown(`# R
+
+## A %%green%%
+
+段落备注
+
+### A1
+- x %%fold%%
+\t- x1
+`);
+  const a = doc.root.children[0];
+  const text = subtreeToList(a);
+  assert.equal(
+    text,
+    `- A %%green%%
+\t段落备注
+\t- A1
+\t\t- x %%fold%%
+\t\t\t- x1
+`,
+  );
+  const nodes = parseClipboard(text);
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].text, "A");
+  assert.equal(nodes[0].color, "green");
+  assert.equal(nodes[0].note, "段落备注");
+  assert.equal(nodes[0].children[0].children[0].folded, true);
+
+  // 粘到 B（二级标题）下：顶层变 H3，再深的按 maxHeadingLevel=3 变列表
+  const target = addChild(doc.root, doc.style, "B");
+  attachSubtree(nodes[0], target, doc.style);
+  const md = serializeMarkdown(doc);
+  assert.ok(md.includes("## B\n\n### A %%green%%\n\n段落备注\n\n- A1\n\t- x %%fold%%\n\t\t- x1\n"), md);
+});
+
+test("粘贴纯文本：每行一个节点；带标题的文本按结构解析", () => {
+  const plain = parseClipboard("苹果\n香蕉\n\n橙子\n");
+  assert.deepEqual(plain.map((n) => n.text), ["苹果", "香蕉", "橙子"]);
+  const mixed = parseClipboard("说明\n- a\n  - a1\n- b");
+  assert.deepEqual(mixed.map((n) => n.text), ["说明", "a", "b"]);
+  assert.equal(mixed[1].children[0].text, "a1");
+  const h1 = parseClipboard("# 标题\n## 子\n");
+  assert.equal(h1.length, 1);
+  assert.equal(h1[0].children[0].text, "子");
+  assert.deepEqual(parseClipboard("   \n"), []);
+});

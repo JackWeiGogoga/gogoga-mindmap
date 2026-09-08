@@ -63,3 +63,11 @@ test("折叠的节点不参与布局", () => {
   assert.equal(total, 9);
   assert.equal(res.placed.size, 6);
 });
+
+import { fromEditableText, plainText, toEditableText } from "../../src/inline";
+
+test("多行节点文本用 <br> 存储，编辑时还原成换行", () => {
+  assert.equal(fromEditableText("第一行\n  第二行  \n\n第三行"), "第一行<br>第二行<br>第三行");
+  assert.equal(toEditableText("a<br>b<br/>c"), "a\nb\nc");
+  assert.equal(plainText("a<br>**b**"), "a b");
+});
