@@ -495,7 +495,16 @@ export class MindMapCanvas {
         onImageLoad: () => this.scheduleReflow(),
       });
       if (label.querySelector("img")) el.classList.add("has-image");
-      if (wikilinkOf(node.text)) el.classList.add("is-linked");
+      const link = wikilinkOf(node.text);
+      if (link) {
+        el.classList.add("is-linked");
+        // 整个节点都是链接目标：停在节点任意位置都触发预览（链接文字自己已经会触发）
+        el.addEventListener("mouseover", (ev) => {
+          if ((ev.target as HTMLElement).closest("a.internal-link")) return;
+          const anchor = el.querySelector<HTMLElement>("a.internal-link") ?? el;
+          this.opts.host?.hoverLink?.(ev, link.target, anchor);
+        });
+      }
       el.append(label);
 
       if (node.note) {

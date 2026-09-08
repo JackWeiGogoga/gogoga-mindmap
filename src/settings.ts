@@ -16,6 +16,8 @@ export interface MindMapSettings {
   outlineOpen: boolean;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
+  /** 链接节点的悬停预览：直接显示，还是像 Obsidian 默认那样按住 ⌘ 才显示 */
+  hoverPreview: "always" | "mod";
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   codeBlockMaxHeight: 600,
   outlineOpen: false,
   toolbarPosition: "bottom",
+  hoverPreview: "always",
 };
 
 export function indentString(s: MindMapSettings["indent"]): string {
@@ -112,6 +115,19 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.toolbarPosition = v as ToolbarPosition;
             await this.plugin.saveSettings();
             this.plugin.applyToolbarPosition();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("链接节点的悬停预览")
+      .setDesc("鼠标停在链接到笔记的节点上时弹出笔记预览。需要启用 Obsidian 的核心插件「页面预览」。")
+      .addDropdown((d) =>
+        d
+          .addOptions({ always: "直接显示", mod: "按住 ⌘ / Ctrl 才显示" })
+          .setValue(this.plugin.settings.hoverPreview)
+          .onChange(async (v) => {
+            this.plugin.settings.hoverPreview = v as "always" | "mod";
+            await this.plugin.saveSettings();
           }),
       );
 

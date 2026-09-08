@@ -349,7 +349,12 @@ export default class MindMapPlugin extends Plugin {
       },
       hoverLink: hoverParent
         ? (event, linktext, targetEl) => {
-            this.app.workspace.trigger("hover-link", { event, source: "mindmap", hoverParent, targetEl, linktext, sourcePath: sourcePath() });
+            // 页面预览默认要按住 ⌘ 才弹；设为「直接显示」时给它一个带修饰键的事件
+            const ev =
+              this.settings.hoverPreview === "always" && !(event.metaKey || event.ctrlKey)
+                ? new MouseEvent(event.type, { clientX: event.clientX, clientY: event.clientY, metaKey: true, ctrlKey: true })
+                : event;
+            this.app.workspace.trigger("hover-link", { event: ev, source: "mindmap", hoverParent, targetEl, linktext, sourcePath: sourcePath() });
           }
         : undefined,
       pickNote: (suggested) =>
