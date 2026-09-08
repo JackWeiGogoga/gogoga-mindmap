@@ -68,12 +68,23 @@ export interface CanvasOptions {
   onSelectionChange?: (primary: MindNode | null, all: MindNode[]) => void;
   /** 提供则工具栏出现「大纲」按钮 */
   onToggleOutline?: () => void;
+  /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
+  toolbarPosition?: ToolbarPosition;
+  onToolbarPositionChange?: (pos: ToolbarPosition) => void;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
   onViewChange?: (state: ViewState) => void;
   onEditableChange?: (editable: boolean) => void;
 }
+
+export type ToolbarPosition = "bottom" | "top" | "left" | "right";
+const TOOLBAR_POSITION_LABELS: { id: ToolbarPosition; label: string }[] = [
+  { id: "bottom", label: "下方（水平）" },
+  { id: "top", label: "上方（水平）" },
+  { id: "left", label: "左侧（垂直）" },
+  { id: "right", label: "右侧（垂直）" },
+];
 
 export interface ViewState {
   tx: number;
@@ -141,6 +152,9 @@ export class MindMapCanvas {
   private nodesEl: HTMLElement;
   private overlay: HTMLElement;
   private zoomLabel!: HTMLButtonElement;
+  private toolbar!: HTMLElement;
+  private toolbarPos: ToolbarPosition = "bottom";
+  private positionMenu: HTMLElement | null = null;
   private structureButton: HTMLButtonElement | null = null;
   private structureSep: HTMLElement | null = null;
   private structureMenu: HTMLElement | null = null;
@@ -197,6 +211,9 @@ export class MindMapCanvas {
     this.el.dataset.theme = opts.theme;
     this.el.dataset.structure = opts.structure;
     this.el.classList.toggle("is-editable", opts.editable);
+    this.el.classList.toggle("is-embedded", !!opts.embedded);
+    this.toolbarPos = opts.toolbarPosition ?? "bottom";
+    this.el.dataset.toolbar = this.toolbarPos;
 
     this.viewport = document.createElement("div");
     this.viewport.className = "mm-viewport";
@@ -293,6 +310,12 @@ export class MindMapCanvas {
 
   isEditable(): boolean {
     return this.opts.editable;
+  }
+
+  setToolbarPosition(pos: ToolbarPosition): void {
+    this.toolbarPos = pos;
+    this.el.dataset.toolbar = pos;
+    if (this.toolbar) this.toolbar.dataset.pos = pos;
   }
 
   setEditable(editable: boolean): void {
@@ -591,6 +614,32 @@ export class MindMapCanvas {
   private buildToolbar(): void {
     const bar = document.createElement("div");
     bar.className = "mm-toolbar";
+    bar.dataset.pos = this.toolbarPos;
+    this.toolbar = bar;
+    if (this.opts.onToolbarPositionChange) {
+      bar.title = "右键切换工具栏位置";
+      bar.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (this.positionMenu) return;
+        const anchor = (ev.target as HTMLElement).closest<HTMLElement>(".mm-tool") ?? bar;
+        this.positionMenu = this.buildMenu(
+          TOOLBAR_POSITION_LABELS.map((p) => ({
+            label: p.label,
+            active: p.id === this.toolbarPos,
+            run: () => {
+              this.setToolbarPosition(p.id);
+              this.opts.onToolbarPositionChange?.(p.id);
+            },
+          })),
+          anchor,
+          () => {
+            this.positionMenu?.remove();
+            this.positionMenu = null;
+          },
+        );
+      });
+    }
     const btn = (name: string, title: string, onClick: () => void) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -691,8 +740,17 @@ export class MindMapCanvas {
     this.el.append(menu);
     const host = this.el.getBoundingClientRect();
     const r = anchor.getBoundingClientRect();
-    menu.style.left = `${Math.max(4, Math.min(r.left - host.left + r.width / 2 - menu.offsetWidth / 2, host.width - menu.offsetWidth - 4))}px`;
-    menu.style.top = `${r.top - host.top - menu.offsetHeight - 6}px`;
+    const clampX = (x: number) => Math.max(4, Math.min(x, host.width - menu.offsetWidth - 4));
+    const clampY = (y: number) => Math.max(4, Math.min(y, host.height - menu.offsetHeight - 4));
+    // 工具栏里的按钮按工具栏位置决定弹出方向；其他地方（节点工具栏）一律向上弹
+    const pos: ToolbarPosition = anchor.closest(".mm-toolbar") ? this.toolbarPos : "bottom";
+    if (pos === "left" || pos === "right") {
+      menu.style.left = `${clampX(pos === "left" ? r.right - host.left + 8 : r.left - host.left - menu.offsetWidth - 8)}px`;
+      menu.style.top = `${clampY(r.top - host.top + r.height / 2 - menu.offsetHeight / 2)}px`;
+    } else {
+      menu.style.left = `${clampX(r.left - host.left + r.width / 2 - menu.offsetWidth / 2)}px`;
+      menu.style.top = `${clampY(pos === "top" ? r.bottom - host.top + 6 : r.top - host.top - menu.offsetHeight - 6)}px`;
+    }
     document.addEventListener(
       "pointerdown",
       (ev) => {

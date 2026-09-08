@@ -9,7 +9,7 @@ import type { MindDoc } from "./model";
 import type { ThemeName } from "./theme";
 import { THEMES } from "./theme";
 import type MindMapPlugin from "./main";
-import { indentString } from "./settings";
+import { indentString, ToolbarPosition } from "./settings";
 
 export const VIEW_TYPE_MINDMAP = "mindmap";
 
@@ -38,6 +38,10 @@ export class MindMapView extends TextFileView {
 
   linkSelectedToNote(): Promise<void> {
     return this.canvas?.linkSelectedToNote() ?? Promise.resolve();
+  }
+
+  setToolbarPosition(pos: ToolbarPosition): void {
+    this.canvas?.setToolbarPosition(pos);
   }
 
   async toggleOutline(): Promise<void> {
@@ -98,6 +102,12 @@ export class MindMapView extends TextFileView {
       onRender: () => this.outline?.refresh(),
       onSelectionChange: (primary) => this.outline?.syncSelection(primary),
       onToggleOutline: () => void this.toggleOutline(),
+      toolbarPosition: this.plugin.settings.toolbarPosition,
+      onToolbarPositionChange: (pos) => {
+        this.plugin.settings.toolbarPosition = pos;
+        void this.plugin.saveSettings();
+        this.plugin.applyToolbarPosition(this);
+      },
     });
     if (this.plugin.settings.outlineOpen) this.openOutline();
   }

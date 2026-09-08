@@ -76,6 +76,14 @@ export default class MindMapPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  /** 把设置里的工具栏位置应用到所有打开的脑图视图（except 可跳过刚发起改动的那个） */
+  applyToolbarPosition(except?: MindMapView): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      const view = leaf.view;
+      if (view instanceof MindMapView && view !== except) view.setToolbarPosition(this.settings.toolbarPosition);
+    }
+  }
+
   // ---------- 视图切换 ----------
 
   isMindMapFile(path: string): boolean {
@@ -230,6 +238,7 @@ export default class MindMapPlugin extends Plugin {
         theme: theme && theme in THEMES ? (theme as ThemeName) : this.settings.defaultTheme,
         editable: state.editable,
         embedded: true,
+        toolbarPosition: this.settings.toolbarPosition,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),
         onUndo: () => {
