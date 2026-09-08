@@ -737,8 +737,13 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 .mm-root button.mm-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  box-sizing: border-box;
   height: auto;
-  padding: 6px 10px;
+  padding: 6px 12px 6px 8px;
   border: none;
   border-radius: 5px;
   background: transparent;
@@ -747,6 +752,16 @@
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+}
+/* 左侧固定一条勾选位，勾出现在同一列，标签永远对齐 */
+.mm-root button.mm-menu-item::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  margin-right: 4px;
+  color: var(--mm-selection);
+  font-size: 12px;
+  text-align: center;
 }
 .mm-root button.mm-menu-item:hover { background: var(--background-modifier-hover, #f0f0f0); }
 
@@ -782,7 +797,7 @@
 }
 .mm-drop-indicator.is-vertical { width: 4px; height: 40px; }
 .mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
-.mm-root button.mm-menu-item.is-active::before { content: "✓ "; }
+.mm-root button.mm-menu-item.is-active::before { content: "✓"; }
 
 /* ---------- 节点 ⇄ 笔记链接 ---------- */
 .mm-node.is-linked .mm-label .mm-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
