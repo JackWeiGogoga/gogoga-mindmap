@@ -79,7 +79,7 @@ export default class MindMapPlugin extends Plugin {
     );
 
     // 属性面板里的 icon 一行：加图标预览，去掉被误判成外链的观感
-    this.propertyIcons = new PropertyIconDecorator();
+    this.propertyIcons = new PropertyIconDecorator(this.app);
     const refreshProps = () => this.propertyIcons?.schedule();
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));

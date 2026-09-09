@@ -1253,3 +1253,16 @@
   pointer-events: none;
 }
 .metadata-property.mm-icon-prop .metadata-property-value .metadata-link-flair { display: none; }
+
+/* 预览可点，点开图标选择器 */
+.mm-icon-prop-preview {
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+.mm-icon-prop-preview:hover,
+.mm-icon-prop-preview:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  outline: none;
+}
