@@ -511,6 +511,7 @@ export class MindMapCanvas {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
     if (this.reflowTimer !== null) window.clearTimeout(this.reflowTimer);
+    if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
     if (this.touchPress) window.clearTimeout(this.touchPress.timer);
     for (const d of this.disposers) d();
     this.el.replaceChildren();
@@ -825,8 +826,25 @@ export class MindMapCanvas {
     this.opts.onLayout?.(this.layout.bounds);
   }
 
+  private settleTimer: number | null = null;
+
+  /**
+   * 平移/缩放期间把画布提成独立合成层，拖起来才跟手。
+   * 但合成层是按「提层那一刻」的比例栅格化的，一直挂着 will-change 的话，放大后看到的
+   * 就是被 GPU 拉伸的位图 —— 文字发虚。所以手一停就摘掉，让浏览器按当前比例重新栅格化。
+   */
+  private holdLayer(): void {
+    if (this.viewport.style.willChange !== "transform") this.viewport.style.willChange = "transform";
+    if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
+    this.settleTimer = window.setTimeout(() => {
+      this.settleTimer = null;
+      this.viewport.style.willChange = "";
+    }, 200);
+  }
+
   private applyTransform(): void {
     this.viewport.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.k})`;
+    this.holdLayer();
     this.updateZoomLabel();
     this.positionNodebar();
     this.closePopover();

@@ -108,7 +108,7 @@
   left: 0;
   top: 0;
   transform-origin: 0 0;
-  will-change: transform;
+  /* will-change 由 canvas.ts 在平移/缩放时临时加、停手后摘掉；常驻会让放大后的文字糊 */
 }
 
 .mm-edges {
