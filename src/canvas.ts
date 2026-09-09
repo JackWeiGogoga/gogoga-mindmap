@@ -722,7 +722,20 @@ export class MindMapCanvas {
         if (frame) this.frames.set(node.id, frame);
         else this.frames.delete(node.id);
         const shield = label.querySelector<HTMLElement>(".mm-frame-shield");
-        if (shield) this.tip(shield, "双击激活播放器；激活前点哪儿都只是选中节点", "fixed", "top");
+        if (shield) {
+          this.tip(shield, "双击画面或点「激活」，之后才能播放和跳转", "fixed", "top");
+          const activate = shield.querySelector<HTMLElement>(".mm-frame-activate");
+          if (activate) {
+            // 按钮上不要触发选中/拖拽，点完直接放开挡板
+            activate.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+            activate.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              this.select(node);
+              this.positionNodebar();
+              this.setLiveFrame(node.id);
+            });
+          }
+        }
         el.append(label);
       }
       if (el.querySelector("img")) el.classList.add("has-image");

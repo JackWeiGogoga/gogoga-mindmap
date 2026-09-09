@@ -855,22 +855,30 @@
   border-radius: 6px;
   cursor: pointer;
 }
-.mm-frame-shield::after {
-  content: "双击激活";
+/* 激活按钮：跟双击画面等效，多一条不用猜的路。
+   Obsidian 的 button:not(.clickable-icon) 会盖掉单类名按钮样式，所以带上 .mm-root */
+.mm-root button.mm-frame-activate {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
-  padding: 2px 7px;
+  right: 7px;
+  bottom: 7px;
+  padding: 3px 10px;
+  height: auto;
+  width: auto;
+  border: 0;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.62);
+  background: rgba(0, 0, 0, 0.66);
+  box-shadow: none;
   color: #fff;
   font-size: 11px;
   line-height: 1.5;
+  cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
-  pointer-events: none;
 }
-.mm-frame-shield:hover::after { opacity: 1; }
+.mm-root button.mm-frame-activate:hover { background: rgba(0, 0, 0, 0.82); }
+/* 悬停画面时出现；节点被选中时常驻，免得完全发现不了 */
+.mm-frame-shield:hover .mm-frame-activate,
+.mm-node.is-selected .mm-frame-activate { opacity: 1; }
 .mm-node.is-frame-live .mm-frame-shield { display: none; }
 /* 放开之后加一圈虚线，免得不知道现在点下去是会跳走的。
    用 outline 不用 box-shadow —— 选中态已经占了 box-shadow，两者要能叠加 */

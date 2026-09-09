@@ -320,6 +320,12 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   box.className = "mm-frame-box";
   const shield = document.createElement("span");
   shield.className = "mm-frame-shield";
+  // 双击画面之外再给一个明确的按钮，不用猜交互（点击处理在 canvas.ts 里挂）
+  const activate = document.createElement("button");
+  activate.type = "button";
+  activate.className = "mm-frame-activate";
+  activate.textContent = "激活";
+  shield.append(activate);
   box.append(f, shield);
   return box;
 }

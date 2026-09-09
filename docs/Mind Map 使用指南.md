@@ -10,7 +10,7 @@ icon: lucide:mindmap-tree
 
 按 `/` 折叠展开一支，工具栏的层级按钮可以一键「展开全部」。
 
-## 从这里开始 %%green%%
+## 从这里开始 %%green fold%%
 
 ### 怎么新建
 
@@ -130,14 +130,15 @@ console.log("hello");
 - 选中图片节点，右下角有个手柄，**拖动改大小**，双击恢复原始尺寸
 - 网图也能直接引：![Obsidian|120](https://obsidian.md/images/obsidian-logo-gradient.svg)
 
-### 视频嵌入 %%fold%%
+### 视频嵌入
 
 从 B 站、YouTube 那里复制的 `<iframe …>` 嵌入代码，直接粘进节点就渲染成播放器。
 
 - <iframe width="400" height="225" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1&high_quality=1&danmaku=0" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>
 - 只认 iframe 这一个标签，`src` 必须是 http(s)；`javascript:` 和别的标签一律当普通文字显示
 - 宽高取代码里的 width / height，钳在 80–1200 之间
-- 播放器上盖了一层挡板：单击只是选中节点，**双击才激活**，激活后才能播放、才点得到「进入 B 站」那种跳转按钮
+- 播放器上盖了一层挡板：单击只是选中节点，激活之后才能播放、才点得到「进入 B 站」那种跳转按钮
+- 两种激活方式：**双击画面**，或者点右下角浮出来的**「激活」按钮**（鼠标悬停时出现，节点选中时常驻）
 - 激活的节点带一圈虚线；点画布空白处或选别的节点就自动收回挡板
 - 选中后右下角有手柄，**拖动改大小**（默认锁 16:9，按住 Shift 单独拉高度），双击恢复 560×315
 - 默认**不自动播放**，展开也只是把播放器摆在那儿，想看点一下
