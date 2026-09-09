@@ -135,6 +135,8 @@ pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 | `src/theme.ts` | 主题注册表：连线形状、分支色、下划线层级、间距 |
 | `src/icon.ts` | 插件自带的脑图图标（Phosphor tree-structure） |
 | `src/icon-picker.ts` | 设置里的图标选择器，可搜索、可用 emoji |
+| `src/icon-value.ts` | 图标取值的纯逻辑（前缀、emoji 判定） |
+| `src/property-icon.ts` | 属性面板里 icon 一行的预览装饰 |
 | `styles.css` | 主题变量与各主题的 `[data-theme]` 配色块，跟随 Obsidian 明暗模式 |
 
 ## 发布

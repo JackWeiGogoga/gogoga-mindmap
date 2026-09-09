@@ -1231,3 +1231,25 @@
   color: var(--text-muted);
   font-size: 11px;
 }
+
+/* ---------- 属性面板里的 icon 一行 ---------- */
+.mm-icon-prop-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-inline-end: 6px;
+  color: var(--text-muted);
+  vertical-align: -4px;
+}
+.mm-icon-prop-preview.is-emoji { font-size: 15px; line-height: 1; }
+/* 值里带冒号会被当成 scheme:path，Obsidian 画成外链；这里还原成普通文本 */
+.metadata-property.mm-icon-prop .metadata-property-value .metadata-link-inner {
+  color: var(--text-normal);
+  text-decoration: none;
+  cursor: default;
+  pointer-events: none;
+}
+.metadata-property.mm-icon-prop .metadata-property-value .metadata-link-flair { display: none; }

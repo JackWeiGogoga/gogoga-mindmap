@@ -154,3 +154,20 @@ test("聚焦分支时布局按相对深度算间距", () => {
   assert.equal(a1.x, pa.x + pa.w + DEFAULT_LAYOUT.gapRoot, "它的子节点用根到主主题的间距");
   assert.equal(res.placed.size, 4);
 });
+
+import { bareId, iconIdOf, isEmojiValue } from "../../src/icon-value";
+
+test("图标值的识别：图标名、emoji、以及不该被误判的网址", () => {
+  assert.equal(iconIdOf("lucide:mindmap-tree"), "mindmap-tree");
+  assert.equal(iconIdOf("network"), "network");
+  assert.equal(iconIdOf("🧠"), null);
+  assert.equal(isEmojiValue("🧠"), true);
+  assert.equal(isEmojiValue("emoji:🧠"), true);
+  assert.equal(isEmojiValue("lucide:mindmap-tree"), false);
+  // 属性面板上别人写的网址不能被当成 emoji，否则链接样式会被抹掉
+  assert.equal(isEmojiValue("https://example.com"), false);
+  assert.equal(isEmojiValue("obsidian://open?vault=x"), false);
+  assert.equal(iconIdOf("https://example.com"), null);
+  assert.equal(bareId("lucide-network"), "network");
+  assert.equal(bareId("mindmap-tree"), "mindmap-tree");
+});

@@ -1,7 +1,8 @@
 import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
 import { MINDMAP_LIST_ICON } from "./icon";
-import { displayEmoji, iconIdOf, IconPickerModal, isEmojiValue, storedValue } from "./icon-picker";
+import { IconPickerModal, storedValue } from "./icon-picker";
+import { displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
 import { THEME_LIST, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 

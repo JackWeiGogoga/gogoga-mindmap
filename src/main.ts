@@ -22,6 +22,7 @@ import {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
 import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
+import { PropertyIconDecorator } from "./property-icon";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
@@ -44,6 +45,7 @@ export default class MindMapPlugin extends Plugin {
   private markdownOverride = new Set<string>();
 
   private mathReady = false;
+  private propertyIcons: PropertyIconDecorator | null = null;
 
   async onload(): Promise<void> {
     registerMindMapIcon();
@@ -76,7 +78,22 @@ export default class MindMapPlugin extends Plugin {
       }),
     );
 
-    this.app.workspace.onLayoutReady(() => this.convertOpenLeaves());
+    // 属性面板里的 icon 一行：加图标预览，去掉被误判成外链的观感
+    this.propertyIcons = new PropertyIconDecorator();
+    const refreshProps = () => this.propertyIcons?.schedule();
+    this.registerEvent(this.app.workspace.on("file-open", refreshProps));
+    this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
+    this.registerEvent(this.app.metadataCache.on("changed", refreshProps));
+    this.register(() => {
+      this.propertyIcons?.destroy();
+      this.propertyIcons = null;
+    });
+
+    this.app.workspace.onLayoutReady(() => {
+      this.convertOpenLeaves();
+      this.propertyIcons?.schedule();
+    });
   }
 
   async loadSettings(): Promise<void> {

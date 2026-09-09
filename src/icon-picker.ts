@@ -1,40 +1,14 @@
 import { App, FuzzyMatch, FuzzySuggestModal, getIconIds, setIcon } from "obsidian";
 import { MINDMAP_ICON } from "./icon";
+import { bareId } from "./icon-value";
 
 export type PickedIcon = { kind: "icon"; id: string } | { kind: "emoji"; value: string };
 
-/**
- * 存进笔记 `icon` 属性的值。
- * Notebook Navigator 只有 `lucide:` 这一分支会调 Obsidian 的图标查找，
- * 自定义注册的图标也只有走这里才认得出来，所以统一带上前缀。
- */
+export { bareId, displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
+
+/** 选中之后写进属性的值 */
 export function storedValue(pick: PickedIcon): string {
   return pick.kind === "emoji" ? pick.value : `lucide:${bareId(pick.id)}`;
-}
-
-/** getIconIds() 返回的 Lucide 图标带 `lucide-` 前缀，写进属性时要去掉 */
-export function bareId(id: string): string {
-  return id.startsWith("lucide-") ? id.slice("lucide-".length) : id;
-}
-
-/** 把存储值还原成可以交给 setIcon 的图标 id；是 emoji 则返回 null */
-export function iconIdOf(value: string): string | null {
-  const v = value.trim();
-  if (!v) return null;
-  if (v.startsWith("emoji:")) return null;
-  const name = v.startsWith("lucide:") ? v.slice("lucide:".length) : v;
-  // 纯符号（emoji）不是图标 id
-  if (!/^[a-z0-9-]+$/i.test(name)) return null;
-  return name;
-}
-
-export function isEmojiValue(value: string): boolean {
-  const v = value.trim();
-  return !!v && iconIdOf(v) === null;
-}
-
-export function displayEmoji(value: string): string {
-  return value.trim().replace(/^emoji:/, "");
 }
 
 const RECOMMENDED = ["mindmap-tree", "lucide-network", "lucide-waypoints", "lucide-workflow", "lucide-list-tree", "lucide-git-fork", "lucide-brain"];
