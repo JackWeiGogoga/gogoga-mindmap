@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
+import { MINDMAP_LIST_ICON } from "./icon";
 import { THEME_LIST, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
@@ -14,6 +15,12 @@ export interface MindMapSettings {
   codeBlockMaxHeight: number;
   /** 脑图视图是否显示大纲面板 */
   outlineOpen: boolean;
+  /**
+   * 写进 frontmatter `icon` 属性的值，让文件列表显示图标。
+   * Notebook Navigator、Iconize 等都读这个属性；留空则不写。
+   * 默认是插件自带的 lucide:mindmap-tree；也支持 Lucide 图标名（lucide:network）或 emoji（🧠）。
+   */
+  listIcon: string;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
 }
@@ -34,6 +41,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   codeBlockMaxHeight: 600,
   outlineOpen: false,
   toolbarPosition: "bottom",
+  listIcon: MINDMAP_LIST_ICON,
 };
 
 export function indentString(s: MindMapSettings["indent"]): string {
@@ -97,6 +105,23 @@ export class MindMapSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.indent)
           .onChange(async (v) => {
             this.plugin.settings.indent = v as MindMapSettings["indent"];
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("文件列表里的图标")
+      .setDesc(
+        "把这个值写进笔记的 icon 属性，Notebook Navigator、Iconize 等文件列表会据此显示图标。" +
+          `默认 ${MINDMAP_LIST_ICON} 是插件自带的脑图图标；也可填 Lucide 图标名（lucide:network）或 emoji（🧠）。留空则不写入。` +
+          "只影响之后新建或转换的笔记；已有的用命令「给已有脑图笔记补上列表图标」批量补。",
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder(MINDMAP_LIST_ICON)
+          .setValue(this.plugin.settings.listIcon)
+          .onChange(async (v) => {
+            this.plugin.settings.listIcon = v.trim();
             await this.plugin.saveSettings();
           }),
       );

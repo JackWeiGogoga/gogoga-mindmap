@@ -1,6 +1,7 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
+import { MINDMAP_ICON } from "./icon";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
@@ -94,7 +95,7 @@ export class MindMapView extends TextFileView {
   }
 
   getIcon(): string {
-    return "git-fork";
+    return MINDMAP_ICON;
   }
 
   async onOpen(): Promise<void> {

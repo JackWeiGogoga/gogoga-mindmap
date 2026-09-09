@@ -21,6 +21,7 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
+import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
@@ -34,6 +35,8 @@ import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 const FRONTMATTER_KEY = "mindmap";
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
 const HOVER_SOURCE = "obsidian-mindmap";
+/** 文件列表插件（Notebook Navigator、Iconize 等）读的图标属性 */
+const ICON_KEY = "icon";
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
@@ -43,6 +46,7 @@ export default class MindMapPlugin extends Plugin {
   private mathReady = false;
 
   async onload(): Promise<void> {
+    registerMindMapIcon();
     await this.loadSettings();
     // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
@@ -63,7 +67,7 @@ export default class MindMapPlugin extends Plugin {
         menu.addItem((item) =>
           item
             .setTitle(isMap ? "以 Markdown 打开" : "以思维导图打开")
-            .setIcon(isMap ? "file-text" : "git-fork")
+            .setIcon(isMap ? "file-text" : MINDMAP_ICON)
             .onClick(() => {
               const leaf = this.app.workspace.getLeaf(false);
               void (isMap ? this.openAsMarkdown(file, leaf) : this.openAsMindMap(file, leaf));
@@ -77,10 +81,43 @@ export default class MindMapPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<MindMapSettings> | null) };
+    // 0.3.x 用的是借来的 lucide:git-fork；裸的 mindmap-tree 又不被文件列表插件认，统一迁到带前缀的值
+    if (this.settings.listIcon === "lucide:git-fork" || this.settings.listIcon === MINDMAP_ICON) {
+      this.settings.listIcon = MINDMAP_LIST_ICON;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  /** 给所有还没有 icon 属性的脑图笔记补上，返回处理数量 */
+  async addListIcons(): Promise<void> {
+    const icon = this.settings.listIcon;
+    if (!icon) {
+      new Notice("先在设置里填一个图标值");
+      return;
+    }
+    const targets = this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => this.isMindMapFile(f.path) && !this.app.metadataCache.getCache(f.path)?.frontmatter?.[ICON_KEY]);
+    if (!targets.length) {
+      new Notice("所有脑图笔记都已经有图标了");
+      return;
+    }
+    let done = 0;
+    for (const file of targets) {
+      try {
+        await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+          fm[ICON_KEY] = icon;
+        });
+        done += 1;
+      } catch (e) {
+        console.error(`给 ${file.path} 写图标失败`, e);
+      }
+    }
+    new Notice(`已给 ${done} 篇脑图笔记补上图标`);
   }
 
   /** 把设置里的工具栏位置应用到所有打开的脑图视图（except 可跳过刚发起改动的那个） */
@@ -132,9 +169,12 @@ export default class MindMapPlugin extends Plugin {
   }
 
   async openAsMindMap(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
-    if (!this.isMindMapFile(file.path)) {
+    const icon = this.settings.listIcon;
+    const needsIcon = !!icon && !this.app.metadataCache.getCache(file.path)?.frontmatter?.[ICON_KEY];
+    if (!this.isMindMapFile(file.path) || needsIcon) {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         fm[FRONTMATTER_KEY] = true;
+        if (needsIcon) fm[ICON_KEY] = icon;
       });
     }
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
@@ -164,7 +204,7 @@ export default class MindMapPlugin extends Plugin {
       callback: () => void this.createMindMap(),
     });
 
-    this.addRibbonIcon("git-fork", "新建思维导图", () => void this.createMindMap());
+    this.addRibbonIcon(MINDMAP_ICON, "新建思维导图", () => void this.createMindMap());
 
     const exportCommand = (id: string, name: string, run: (view: MindMapView) => Promise<void>) =>
       this.addCommand({
@@ -179,6 +219,12 @@ export default class MindMapPlugin extends Plugin {
       });
     exportCommand("link-note", "链接到笔记 / 新建笔记", (v) => v.linkSelectedToNote());
     exportCommand("toggle-outline", "切换大纲面板", (v) => v.toggleOutline());
+
+    this.addCommand({
+      id: "add-list-icons",
+      name: "给已有脑图笔记补上列表图标",
+      callback: () => void this.addListIcons(),
+    });
     exportCommand("focus-branch", "聚焦选中分支", async (v) => v.focusSelected());
     exportCommand("exit-focus", "退出聚焦", async (v) => v.exitFocus());
     exportCommand("copy-node-link", "复制节点链接", (v) => v.copySelectedNodeLink());
@@ -197,7 +243,8 @@ export default class MindMapPlugin extends Plugin {
     let name = `${base}.md`;
     for (let i = 1; this.app.vault.getAbstractFileByPath(joinPath(folder.path, name)); i++) name = `${base} ${i}.md`;
     const title = name.replace(/\.md$/, "");
-    const content = `---\n${FRONTMATTER_KEY}: true\n---\n\n# ${title}\n\n## 主题 1\n\n## 主题 2\n\n## 主题 3\n`;
+    const iconLine = this.settings.listIcon ? `${ICON_KEY}: ${this.settings.listIcon}\n` : "";
+    const content = `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n## 主题 1\n\n## 主题 2\n\n## 主题 3\n`;
     const file = await this.app.vault.create(joinPath(folder.path, name), content);
     const leaf = this.app.workspace.getLeaf(false);
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });

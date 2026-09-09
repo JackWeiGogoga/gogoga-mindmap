@@ -1,5 +1,6 @@
 import { FileView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import { MindMapCanvas } from "./canvas";
+import { MINDMAP_ICON } from "./icon";
 import { indentString } from "./settings";
 import { parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
 import { VIEW_TYPE_MINDMAP } from "./view";
@@ -28,7 +29,7 @@ export class XmindView extends FileView {
   }
 
   getIcon(): string {
-    return "git-fork";
+    return MINDMAP_ICON;
   }
 
   canAcceptExtension(extension: string): boolean {
@@ -93,7 +94,9 @@ export class XmindView extends FileView {
     const file = this.file;
     const sheet = this.sheets[this.current];
     if (!file || !sheet) return;
-    const md = xmindSheetToMarkdown(sheet, this.docStyle());
+    let md = xmindSheetToMarkdown(sheet, this.docStyle());
+    const icon = this.plugin.settings.listIcon;
+    if (icon) md = md.replace(/^---\nmindmap: true\n/, `---\nmindmap: true\nicon: ${icon}\n`);
     const folder = file.parent?.path ?? "";
     const base = this.sheets.length > 1 ? `${file.basename} - ${sheet.title}` : file.basename;
     let name = `${base}.md`;
