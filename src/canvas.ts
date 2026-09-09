@@ -2078,7 +2078,9 @@ export class MindMapCanvas {
   toggleFold(node: MindNode): void {
     if (this.editing) this.commitEdit();
     node.folded = !node.folded;
-    this.select(node);
+    // 折起来会把选中的后代藏进去，这时才把选中收拢到自己身上；
+    // 否则不碰选中状态 —— 点一下折叠按钮就冒出浮动工具栏太吵了
+    if (node.folded && [...this.selected].some((n) => isAncestor(node, n))) this.select(node);
     this.render();
     if (this.opts.editable) this.notify();
   }
