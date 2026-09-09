@@ -34,9 +34,27 @@ export interface MenuLike {
   addItem(cb: (item: MenuItem) => unknown): unknown;
 }
 
+/**
+ * NN 自己的菜单项一律不带 section，我们要是留着 action-primary，Obsidian 排序时会把它顶到最上面。
+ * 所以跟 NN 对齐成空 section，再挪到第一个分隔符前面 —— 也就是「新建笔记 / 新建画布 / 新建绘图」那一组的末尾。
+ * 按分隔符定位而不是按标题，NN 改文案或加项都不影响。
+ */
+export function placeInCreateGroup(item: MenuItem): void {
+  item.setSection("");
+  const owner = item as unknown as { menu?: { items?: unknown[] } };
+  const items = owner.menu?.items;
+  if (!Array.isArray(items)) return;
+  const at = items.indexOf(item);
+  // 分隔符没有 titleEl，MenuItem 才有
+  const sep = items.findIndex((it) => !(it as { titleEl?: unknown } | null)?.titleEl);
+  if (at < 0 || sep < 0 || sep >= at) return;
+  items.splice(at, 1);
+  items.splice(sep, 0, item);
+}
+
 export interface NnMenuHandlers {
-  /** 文件夹右键：加「新建思维导图」之类的项 */
-  folder: (menu: MenuLike, folder: TFolder) => void;
+  /** 文件夹右键：加「新建思维导图」之类的项；tweak 用来把项挪到 NN 的「新建」组末尾 */
+  folder: (menu: MenuLike, folder: TFolder, tweak: (item: MenuItem) => void) => void;
   /** 笔记右键：加「以思维导图打开」之类的项 */
   file: (menu: MenuLike, file: TAbstractFile) => void;
 }
@@ -55,7 +73,9 @@ export function registerNotebookNavigatorMenus(app: App, handlers: NnMenuHandler
     try {
       const asMenu = (addItem: NnAddItem): MenuLike => ({ addItem: (cb) => addItem(cb as (item: MenuItem) => void) });
       if (api.registerFolderMenu) {
-        offs.push(api.registerFolderMenu((ctx) => handlers.folder(asMenu(ctx.addItem), ctx.folder)));
+        offs.push(
+          api.registerFolderMenu((ctx) => handlers.folder(asMenu(ctx.addItem), ctx.folder, placeInCreateGroup)),
+        );
       }
       if (api.registerFileMenu) {
         offs.push(api.registerFileMenu((ctx) => handlers.file(asMenu(ctx.addItem), ctx.file)));

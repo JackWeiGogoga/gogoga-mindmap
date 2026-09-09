@@ -9,6 +9,7 @@ import {
   MarkdownRenderer,
   MarkdownView,
   Menu,
+  MenuItem,
   Notice,
   setTooltip,
   Plugin,
@@ -73,7 +74,7 @@ export default class MindMapPlugin extends Plugin {
     // Notebook Navigator 自己吞掉右键菜单，不走 file-menu 事件，得单独接一份
     this.register(
       registerNotebookNavigatorMenus(this.app, {
-        folder: (menu, folder) => this.addFolderMenuItems(menu, folder),
+        folder: (menu, folder, tweak) => this.addFolderMenuItems(menu, folder, tweak),
         file: (menu, file) => this.addFileMenuItems(menu, file),
       }),
     );
@@ -253,14 +254,16 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("copy-png", "复制为图片", (v) => v.copyPng());
   }
 
-  private addFolderMenuItems(menu: MenuLike, folder: TFolder): void {
-    menu.addItem((item) =>
+  private addFolderMenuItems(menu: MenuLike, folder: TFolder, tweak?: (item: MenuItem) => void): void {
+    menu.addItem((item) => {
       item
         .setTitle("新建思维导图")
         .setIcon(MINDMAP_ICON)
+        // 核心文件列表里跟「新建笔记 / 新建文件夹 / 新建画布」同组，我们注册得晚，自然排在最后
         .setSection("action-primary")
-        .onClick(() => void this.createMindMap(folder)),
-    );
+        .onClick(() => void this.createMindMap(folder));
+      tweak?.(item);
+    });
   }
 
   private addFileMenuItems(menu: MenuLike, file: TAbstractFile): void {
