@@ -33,7 +33,9 @@ export function splitBlockId(text: string): { text: string; blockId?: string } {
 export function newBlockId(): string {
   return Math.random().toString(36).slice(2, 8);
 }
-const HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+// 色值在文件里不带 #：写成 %%#a3e5a2%% 的话，Obsidian 会把 #a3e5a2 当成标签索引进标签面板，
+// 即使它在 %% 注释里也一样。读的时候两种都认，写的时候一律去掉 #。
+const HEX_RE = /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export const DEFAULT_STYLE: DocStyle = {
   indent: "\t",
@@ -57,7 +59,9 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   for (const t of tokens) {
     const lower = t.toLowerCase();
     if (lower === "fold") marker.folded = true;
-    else if ((COLOR_NAMES as readonly string[]).includes(lower) || HEX_RE.test(t)) marker.color = lower;
+    else if ((COLOR_NAMES as readonly string[]).includes(lower)) marker.color = lower;
+    // 内存里保留 # 前缀，直接当 CSS 颜色用
+    else if (HEX_RE.test(t)) marker.color = lower.startsWith("#") ? lower : `#${lower}`;
     else return { text: text.trimEnd(), marker: { folded: false } };
   }
   return { text: text.slice(0, m.index).trimEnd(), marker };
@@ -65,7 +69,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
 
 export function formatMarker(node: Pick<MindNode, "color" | "folded">): string {
   const parts: string[] = [];
-  if (node.color) parts.push(node.color);
+  if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }

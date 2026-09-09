@@ -86,7 +86,7 @@ mindmap: true
 
 根备注
 
-## A %%#f9a3a3%%
+## A %%f9a3a3%%
 - A1
 - A2 %%fold%%
 \t- A21

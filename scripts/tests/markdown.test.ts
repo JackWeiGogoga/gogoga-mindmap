@@ -381,3 +381,18 @@ test("整层兄弟在标题与列表之间转换", () => {
 `, "a21 随父节点一起回到列表");
   assert.equal(convertLevelKind(doc.root, "list", doc.style), false, "根节点不能转");
 });
+
+test("色值不带 # 写回，避免被 Obsidian 当成标签；读时两种都认", () => {
+  // 旧文件里的 %%#a3e5a2%% 仍能读，写回时归一成不带 #
+  const doc = parseMarkdown("# R\n\n## A %%#a3e5a2%%\n\n## B %%f9a3a3%%\n\n## C %%red%%\n");
+  assert.equal(doc.root.children[0].color, "#a3e5a2");
+  assert.equal(doc.root.children[1].color, "#f9a3a3");
+  assert.equal(doc.root.children[2].color, "red");
+  const md = serializeMarkdown(doc);
+  assert.equal(md, "# R\n\n## A %%a3e5a2%%\n\n## B %%f9a3a3%%\n\n## C %%red%%\n");
+  assert.ok(!md.includes("%%#"), "写回的文件里不应再有 #，否则会进标签面板");
+  // 归一之后往返稳定
+  assert.equal(serializeMarkdown(parseMarkdown(md)), md);
+  assert.deepEqual(splitMarker("x %%#ABC%%"), { text: "x", marker: { color: "#abc", folded: false } });
+  assert.deepEqual(splitMarker("x %%abc%%"), { text: "x", marker: { color: "#abc", folded: false } });
+});
