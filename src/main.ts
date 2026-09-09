@@ -13,6 +13,7 @@ import {
   setTooltip,
   Plugin,
   renderMath,
+  TAbstractFile,
   TFile,
   TFolder,
   WorkspaceLeaf,
@@ -23,6 +24,7 @@ const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "
 import { locateBlock, replaceBlock } from "./codeblock";
 import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
+import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
@@ -64,17 +66,15 @@ export default class MindMapPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (!(file instanceof TFile) || file.extension !== "md") return;
-        const isMap = this.isMindMapFile(file.path);
-        menu.addItem((item) =>
-          item
-            .setTitle(isMap ? "以 Markdown 打开" : "以思维导图打开")
-            .setIcon(isMap ? "file-text" : MINDMAP_ICON)
-            .onClick(() => {
-              const leaf = this.app.workspace.getLeaf(false);
-              void (isMap ? this.openAsMarkdown(file, leaf) : this.openAsMindMap(file, leaf));
-            }),
-        );
+        if (file instanceof TFolder) this.addFolderMenuItems(menu, file);
+        else this.addFileMenuItems(menu, file);
+      }),
+    );
+    // Notebook Navigator 自己吞掉右键菜单，不走 file-menu 事件，得单独接一份
+    this.register(
+      registerNotebookNavigatorMenus(this.app, {
+        folder: (menu, folder) => this.addFolderMenuItems(menu, folder),
+        file: (menu, file) => this.addFileMenuItems(menu, file),
       }),
     );
 
@@ -253,9 +253,34 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("copy-png", "复制为图片", (v) => v.copyPng());
   }
 
-  private async createMindMap(): Promise<void> {
+  private addFolderMenuItems(menu: MenuLike, folder: TFolder): void {
+    menu.addItem((item) =>
+      item
+        .setTitle("新建思维导图")
+        .setIcon(MINDMAP_ICON)
+        .setSection("action-primary")
+        .onClick(() => void this.createMindMap(folder)),
+    );
+  }
+
+  private addFileMenuItems(menu: MenuLike, file: TAbstractFile): void {
+    if (!(file instanceof TFile) || file.extension !== "md") return;
+    const isMap = this.isMindMapFile(file.path);
+    menu.addItem((item) =>
+      item
+        .setTitle(isMap ? "以 Markdown 打开" : "以思维导图打开")
+        .setIcon(isMap ? "file-text" : MINDMAP_ICON)
+        .onClick(() => {
+          const leaf = this.app.workspace.getLeaf(false);
+          void (isMap ? this.openAsMarkdown(file, leaf) : this.openAsMindMap(file, leaf));
+        }),
+    );
+  }
+
+  /** 不传文件夹就按 Obsidian 的新建笔记位置设置来 */
+  private async createMindMap(target?: TFolder): Promise<void> {
     const active = this.app.workspace.getActiveFile();
-    const folder: TFolder = this.app.fileManager.getNewFileParent(active?.path ?? "");
+    const folder: TFolder = target ?? this.app.fileManager.getNewFileParent(active?.path ?? "");
     const base = "未命名思维导图";
     let name = `${base}.md`;
     for (let i = 1; this.app.vault.getAbstractFileByPath(joinPath(folder.path, name)); i++) name = `${base} ${i}.md`;
