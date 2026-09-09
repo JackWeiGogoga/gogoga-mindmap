@@ -1,6 +1,6 @@
 import { LayoutOptions } from "./layout";
 
-export type ThemeName = "snow" | "rainbow" | "business" | "warm" | "mono" | "forest";
+export type ThemeName = "snow" | "rainbow" | "business" | "warm" | "mono" | "line" | "forest";
 export type EdgeStyle = "curve" | "elbow";
 
 export interface Theme {
@@ -68,6 +68,15 @@ export const THEMES: Record<ThemeName, Theme> = {
     branchColors: false,
     underlineFromDepth: null,
     layout: { gapLevel: 34, gapSibling: 10, gapMain: 30 },
+  },
+  line: {
+    name: "line",
+    label: "线条 · 纯文字节点，细折线",
+    rootEdge: "elbow",
+    edge: "elbow",
+    branchColors: false,
+    underlineFromDepth: null,
+    layout: { gapLevel: 30, gapSibling: 14, gapMain: 18 },
   },
   forest: {
     name: "forest",

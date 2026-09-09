@@ -39,6 +39,7 @@
   --mm-node-size: 14px;
   --mm-node-weight: 400;
   --mm-node-border: none;
+  --mm-root-border: none;
   --mm-branch-fg: #1f1f1f;
   --mm-edge-w1: 3px;
   --mm-edge-w2: 2px;
@@ -177,6 +178,7 @@
   font-size: var(--mm-root-size);
   font-weight: var(--mm-root-weight);
   max-width: var(--mm-root-max-width);
+  border: var(--mm-root-border);
 }
 
 .mm-node[data-color="red"]    { --mm-node-bg: var(--mm-c-red);    --mm-node-fg: var(--mm-c-fg); }
@@ -1110,7 +1112,6 @@
   --mm-edge-w3: 1px;
   --mm-toggle-border: #a1a1aa;
 }
-.mm-root[data-theme="mono"] .mm-node[data-depth="0"] { border: none; }
 .theme-dark .mm-root[data-theme="mono"] {
   --mm-line: #71717a;
   --mm-root-bg: #fafafa;
@@ -1152,4 +1153,39 @@
   --mm-branch-3: #9aab63;
   --mm-branch-4: #6ba299;
   --mm-branch-5: #8aa87e;
+}
+
+/* ---------- 线条：除中心主题外都是纯文字，统一细度的圆角折线 ---------- */
+.mm-root[data-theme="line"] {
+  --mm-line: #52525b;
+  --mm-root-bg: #e4e4e7;
+  --mm-root-fg: #18181b;
+  --mm-root-border: 1px solid #a1a1aa;
+  --mm-main-bg: transparent;
+  --mm-main-fg: var(--text-normal, #1f1f1f);
+  --mm-node-bg: transparent;
+  --mm-node-fg: var(--text-normal, #1f1f1f);
+  --mm-node-border: none;
+  --mm-root-radius: 8px;
+  --mm-main-radius: 4px;
+  --mm-node-radius: 4px;
+  --mm-root-pad: 12px 24px;
+  --mm-main-pad: 4px 10px;
+  --mm-node-pad: 4px 9px;
+  --mm-root-size: 22px;
+  --mm-root-weight: 500;
+  --mm-main-size: 15px;
+  --mm-main-weight: 400;
+  --mm-node-size: 14px;
+  --mm-edge-w1: 1.5px;
+  --mm-edge-w2: 1.5px;
+  --mm-edge-w3: 1.5px;
+  --mm-toggle-border: #a1a1aa;
+}
+.theme-dark .mm-root[data-theme="line"] {
+  --mm-line: #d4d4d8;
+  --mm-root-bg: #52525b;
+  --mm-root-fg: #fafafa;
+  --mm-root-border: 1px solid #d4d4d8;
+  --mm-toggle-border: #8a8a94;
 }
