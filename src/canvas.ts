@@ -33,10 +33,15 @@ import {
 import {
   fromEditableText,
   IMAGE_MAX_WIDTH,
+  FRAME_DEFAULT_H,
+  FRAME_DEFAULT_W,
+  FRAME_MAX,
+  FRAME_MIN,
   IMAGE_MIN_WIDTH,
   MARKER_GROUPS,
   plainText,
   renderInline,
+  setFrameSize,
   setImageWidth,
   splitMarkers,
   toEditableText,
@@ -289,7 +294,17 @@ export class MindMapCanvas {
   private markerPickerCleanup: (() => void) | null = null;
   private dropHover: HTMLElement | null = null;
   private imgHandle: HTMLElement | null = null;
-  private imgResize: { node: MindNode; img: HTMLImageElement; startX: number; startW: number; handle: HTMLElement } | null = null;
+  private imgResize: {
+    node: MindNode;
+    /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
+    box: HTMLImageElement | HTMLIFrameElement;
+    frame: boolean;
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+    handle: HTMLElement;
+  } | null = null;
   private clipboardText = "";
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
@@ -2743,18 +2758,35 @@ export class MindMapCanvas {
     this.imgHandle = null;
     if (!this.opts.editable || !this.primary || this.editing) return;
     const el = this.els.get(this.primary.id);
-    const img = el?.querySelector<HTMLImageElement>("img.mm-img");
-    if (!el || !img || !img.complete) return;
+    const iframe = el?.querySelector<HTMLIFrameElement>("iframe.mm-frame");
+    const img = iframe ? null : el?.querySelector<HTMLImageElement>("img.mm-img");
+    const box = iframe ?? img;
+    if (!el || !box || (img && !img.complete)) return;
+    const frame = !!iframe;
     const handle = document.createElement("div");
     handle.className = "mm-img-handle";
-    this.tip(handle, "拖动改图片大小，双击恢复原始尺寸", "fixed", "right");
+    this.tip(
+      handle,
+      frame ? "拖动改大小（按住 Shift 单独调高度），双击恢复 560×315" : "拖动改图片大小，双击恢复原始尺寸",
+      "fixed",
+      "right",
+    );
     el.append(handle);
-    this.placeImageHandle(handle, img);
+    this.placeImageHandle(handle, box);
     const node = this.primary;
     handle.addEventListener("pointerdown", (ev) => {
       ev.stopPropagation();
       ev.preventDefault();
-      this.imgResize = { node, img, startX: ev.clientX, startW: img.clientWidth, handle };
+      this.imgResize = {
+        node,
+        box,
+        frame,
+        startX: ev.clientX,
+        startY: ev.clientY,
+        startW: box.clientWidth,
+        startH: box.clientHeight,
+        handle,
+      };
       try {
         handle.setPointerCapture(ev.pointerId);
       } catch {
@@ -2765,28 +2797,56 @@ export class MindMapCanvas {
       const r = this.imgResize;
       if (!r) return;
       ev.stopPropagation();
-      const w = Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, r.startW + (ev.clientX - r.startX) / this.k));
-      r.img.classList.add("has-size");
-      r.img.style.width = `${Math.round(w)}px`;
+      const dx = (ev.clientX - r.startX) / this.k;
+      const dy = (ev.clientY - r.startY) / this.k;
+      if (r.frame) {
+        // 默认锁宽高比（视频基本都是 16:9），按住 Shift 才单独拉高度
+        const w = Math.max(FRAME_MIN, Math.min(FRAME_MAX, r.startW + dx));
+        const h = ev.shiftKey
+          ? Math.max(FRAME_MIN, Math.min(FRAME_MAX, r.startH + dy))
+          : Math.max(FRAME_MIN, Math.min(FRAME_MAX, (w * r.startH) / r.startW));
+        r.box.style.width = `${Math.round(w)}px`;
+        r.box.style.height = `${Math.round(h)}px`;
+      } else {
+        const w = Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, r.startW + dx));
+        r.box.classList.add("has-size");
+        r.box.style.width = `${Math.round(w)}px`;
+      }
       this.reflow();
-      this.placeImageHandle(r.handle, r.img);
+      this.placeImageHandle(r.handle, r.box);
     });
     const finish = (ev: PointerEvent) => {
       const r = this.imgResize;
       if (!r) return;
       ev.stopPropagation();
       this.imgResize = null;
-      const w = Math.round(r.img.clientWidth);
-      if (w !== r.startW) {
-        r.node.text = setImageWidth(r.node.text, w);
-        this.render();
+      const w = Math.round(r.box.clientWidth);
+      const h = Math.round(r.box.clientHeight);
+      if (w === r.startW && h === r.startH) return;
+      if (r.frame) {
+        // 不能走 render()：重建标签会把 iframe 摘下来再插回去，视频就从头开始了。
+        // 尺寸已经是行内样式的样子，只把文本同步回去即可。
+        r.node.text = setFrameSize(r.node.text, { w, h });
         this.notify();
+        return;
       }
+      r.node.text = setImageWidth(r.node.text, w);
+      this.render();
+      this.notify();
     };
     handle.addEventListener("pointerup", finish);
     handle.addEventListener("pointercancel", finish);
     handle.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
+      if (frame) {
+        node.text = setFrameSize(node.text, null);
+        box.style.width = `${FRAME_DEFAULT_W}px`;
+        box.style.height = `${FRAME_DEFAULT_H}px`;
+        this.reflow();
+        this.placeImageHandle(handle, box);
+        this.notify();
+        return;
+      }
       node.text = setImageWidth(node.text, null);
       this.render();
       this.notify();
@@ -2794,9 +2854,9 @@ export class MindMapCanvas {
     this.imgHandle = handle;
   }
 
-  private placeImageHandle(handle: HTMLElement, img: HTMLImageElement): void {
-    handle.style.left = `${img.offsetLeft + img.offsetWidth - 7}px`;
-    handle.style.top = `${img.offsetTop + img.offsetHeight - 7}px`;
+  private placeImageHandle(handle: HTMLElement, box: HTMLElement): void {
+    handle.style.left = `${box.offsetLeft + box.offsetWidth - 7}px`;
+    handle.style.top = `${box.offsetTop + box.offsetHeight - 7}px`;
   }
 
   // ---------- 备注弹层 ----------

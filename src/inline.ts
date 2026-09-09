@@ -239,10 +239,26 @@ export function setImageWidth(text: string, width: number | null): string {
   return text;
 }
 
+/**
+ * 改写 `<iframe …>` 上的 width / height。传 null 恢复默认 560×315
+ * （iframe 没有「原始尺寸」这回事，属性本身就是尺寸）。
+ */
+export function setFrameSize(text: string, size: { w: number; h: number } | null): string {
+  const m = FRAME_TAG_RE.exec(text);
+  if (!m) return text;
+  const w = size ? Math.max(FRAME_MIN, Math.min(FRAME_MAX, Math.round(size.w))) : FRAME_DEFAULT_W;
+  const h = size ? Math.max(FRAME_MIN, Math.min(FRAME_MAX, Math.round(size.h))) : FRAME_DEFAULT_H;
+  let attrs = m[1].replace(/\s*(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi, "");
+  attrs = `width="${w}" height="${h}"${attrs.startsWith(" ") ? "" : " "}${attrs}`.trimEnd();
+  return text.slice(0, m.index) + `<iframe ${attrs}>${m[2] ?? ""}` + text.slice(m.index + m[0].length);
+}
+
+const FRAME_TAG_RE = /<iframe\s([^>]*?)\/?>(\s*<\/iframe>)?/i;
+
 export const FRAME_MIN = 80;
 export const FRAME_MAX = 1200;
-const FRAME_DEFAULT_W = 560;
-const FRAME_DEFAULT_H = 315;
+export const FRAME_DEFAULT_W = 560;
+export const FRAME_DEFAULT_H = 315;
 
 const ATTR_RE = /([A-Za-z][\w-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 
@@ -276,6 +292,9 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   const existing = opts.reuseFrame?.(src);
   const f = existing ?? document.createElement("iframe");
   f.className = "mm-frame";
+  // 拖手柄改大小时写的是行内样式，复用时先清掉，让下面的属性说了算
+  f.style.width = "";
+  f.style.height = "";
   f.width = String(w);
   f.height = String(h);
   const title = attrs.get("title");

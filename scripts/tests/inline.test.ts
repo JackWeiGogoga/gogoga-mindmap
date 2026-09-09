@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TOKEN_RE } from "../../src/inline";
+import { setFrameSize, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -109,4 +109,37 @@ test("只认 iframe，别的标签当普通文字", () => {
   assert.deepEqual(tokens('<script src="https://a.cn/x.js"></script>'), [[URL_GROUP, "https://a.cn/x.js"]]);
   assert.deepEqual(tokens("<b>粗</b>"), []);
   assert.deepEqual(tokens("<iframe>没有属性</iframe>"), []);
+});
+
+test("setFrameSize 改写 width / height，其余属性原样保留", () => {
+  const out = setFrameSize(BILI, { w: 400, h: 225 });
+  assert.match(out, /^<iframe width="400" height="225" /);
+  assert.match(out, /src="https:\/\/player\.bilibili\.com/);
+  assert.match(out, /title="Bilibili video player"/);
+  assert.match(out, /allowfullscreen><\/iframe>$/);
+  // 不能留下旧的 width / height
+  assert.equal(out.match(/width=/g)?.length, 1);
+  assert.equal(out.match(/height=/g)?.length, 1);
+});
+
+test("setFrameSize 传 null 恢复 560×315", () => {
+  const small = setFrameSize(BILI, { w: 200, h: 113 });
+  assert.match(setFrameSize(small, null), /^<iframe width="560" height="315" /);
+});
+
+test("setFrameSize 钳住上下限", () => {
+  assert.match(setFrameSize(BILI, { w: 5, h: 5 }), /width="80" height="80"/);
+  assert.match(setFrameSize(BILI, { w: 9999, h: 9999 }), /width="1200" height="1200"/);
+});
+
+test("setFrameSize 给没写宽高的 iframe 补上", () => {
+  const bare = '<iframe src="https://a.cn/x"></iframe>';
+  assert.equal(setFrameSize(bare, { w: 320, h: 180 }), '<iframe width="320" height="180" src="https://a.cn/x"></iframe>');
+});
+
+test("setFrameSize 只动 iframe，句子里的其他文字不变", () => {
+  const text = `看这个 ${BILI} 结束`;
+  const out = setFrameSize(text, { w: 300, h: 169 });
+  assert.ok(out.startsWith("看这个 "));
+  assert.ok(out.endsWith(" 结束"));
 });
