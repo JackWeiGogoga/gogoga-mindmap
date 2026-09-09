@@ -2147,6 +2147,14 @@ export class MindMapCanvas {
     }
     const changed = !cancel && (text !== node.text || isNew);
     node.text = text;
+    // startEdit 把 label 换成了 contenteditable 的原文。文字没改的话签名跟着没变，
+    // rebuild 会认为这个节点不用动，于是原文就留在那儿了 —— 纯文字节点看不出来，
+    // 图片、链接、iframe 这种有渲染形态的就露馅。所以提交时强制让这个节点失效。
+    const el = this.els.get(node.id);
+    if (el) {
+      this.elSigs.delete(el);
+      this.elContent.delete(el);
+    }
     this.render();
     if (refocus) this.el.focus({ preventScroll: true });
     if (changed) this.notify();

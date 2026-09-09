@@ -134,7 +134,7 @@ console.log("hello");
 
 从 B 站、YouTube 那里复制的 `<iframe …>` 嵌入代码，直接粘进节点就渲染成播放器。
 
-- <iframe width="286" height="161" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1&high_quality=1&danmaku=0" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>
+- <iframe width="400" height="225" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1&high_quality=1&danmaku=0" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>
 - 只认 iframe 这一个标签，`src` 必须是 http(s)；`javascript:` 和别的标签一律当普通文字显示
 - 宽高取代码里的 width / height，钳在 80–1200 之间
 - 播放器上盖了一层挡板：单击只是选中节点，**双击才激活**，激活后才能播放、才点得到「进入 B 站」那种跳转按钮
