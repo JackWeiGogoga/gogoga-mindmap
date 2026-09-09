@@ -202,6 +202,10 @@ function icon(name: string): HTMLElement {
   return span;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 function contrastText(hex: string): string {
   let h = hex.replace("#", "");
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
@@ -800,7 +804,12 @@ export class MindMapCanvas {
         this.edgePaths.push(path);
       }
       edgeIndex += 1;
-      const d = edgePath(g, style);
+      // 下划线式节点：文字底下那条线由本条连线一路画过去，而不是再用 CSS 的 border-bottom 另画一条，
+      // 否则两者的粗细和 y 坐标对不齐，接缝处会断开
+      const tail = anchorBottom(child)
+        ? ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`
+        : "";
+      const d = edgePath(g, style) + tail;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;

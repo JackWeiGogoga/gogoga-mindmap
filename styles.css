@@ -345,12 +345,13 @@
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
 }
+/* 底下那条线由连线画（见 canvas.ts 的 tail），这里只留出位置 */
 .mm-node.is-underline {
   background: transparent;
   color: var(--text-normal, #1f1f1f);
+  border: none;
   border-radius: 0;
-  padding: 2px 6px 4px;
-  border-bottom: 2px solid var(--mm-branch, var(--mm-line));
+  padding: 2px 6px 5px;
 }
 .mm-node.is-underline.is-selected,
 .mm-node.is-underline.is-editing {
