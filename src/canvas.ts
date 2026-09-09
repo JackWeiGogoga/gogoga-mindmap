@@ -283,6 +283,8 @@ export class MindMapCanvas {
   private pinch: { dist: number; k: number } | null = null;
   private pendingDrag: { node: MindNode; x: number; y: number } | null = null;
   private lastTap: { node: MindNode; time: number } | null = null;
+  /** 这次按下是不是落在播放器挡板上；双击挡板是「激活播放器」，不是「编辑文字」 */
+  private downOnShield = false;
   private pendingSelectPath: string | null = null;
   /** 触屏：按住节点不动一段时间才进入拖拽，期间手指移动视为平移 */
   private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
@@ -720,13 +722,7 @@ export class MindMapCanvas {
         if (frame) this.frames.set(node.id, frame);
         else this.frames.delete(node.id);
         const shield = label.querySelector<HTMLElement>(".mm-frame-shield");
-        if (shield) {
-          this.tip(shield, "双击激活播放器；激活前点哪儿都只是选中节点", "fixed", "top");
-          shield.addEventListener("dblclick", (ev) => {
-            ev.stopPropagation();
-            this.setLiveFrame(node.id);
-          });
-        }
+        if (shield) this.tip(shield, "双击激活播放器；激活前点哪儿都只是选中节点", "fixed", "top");
         el.append(label);
       }
       if (el.querySelector("img")) el.classList.add("has-image");
@@ -1263,6 +1259,8 @@ export class MindMapCanvas {
       if (this.opts.embedded) ev.stopPropagation();
       const target = ev.target as HTMLElement;
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar")) return;
+      // 双击有两条路（原生 dblclick 和 pointerup 自判定），两条都得知道有没有落在挡板上
+      this.downOnShield = !!target.closest(".mm-frame-shield");
       const nodeEl = target.closest<HTMLElement>(".mm-node");
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
@@ -1370,7 +1368,8 @@ export class MindMapCanvas {
         const now = performance.now();
         if (this.lastTap && this.lastTap.node === tapped && now - this.lastTap.time < 400) {
           this.lastTap = null;
-          this.editOnDoubleTap(tapped);
+          if (this.downOnShield) this.setLiveFrame(tapped.id);
+          else this.editOnDoubleTap(tapped);
         } else {
           this.lastTap = { node: tapped, time: now };
         }
@@ -1410,10 +1409,10 @@ export class MindMapCanvas {
       if (this.opts.embedded) ev.stopPropagation();
       const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
       const node = nodeEl && this.nodeFromEl(nodeEl);
-      if (node) {
-        ev.preventDefault();
-        this.editOnDoubleTap(node);
-      }
+      if (!node) return;
+      ev.preventDefault();
+      if ((ev.target as HTMLElement).closest(".mm-frame-shield")) this.setLiveFrame(node.id);
+      else this.editOnDoubleTap(node);
     });
 
     // 链接节点的悬停预览：用一个委托监听，元素复用时不会重复绑定
