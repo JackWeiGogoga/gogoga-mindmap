@@ -7,7 +7,7 @@ import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import type { MindDoc } from "./model";
 import type { ThemeName } from "./theme";
-import { THEMES } from "./theme";
+import { isThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import { indentString, ToolbarPosition } from "./settings";
 
@@ -113,6 +113,7 @@ export class MindMapView extends TextFileView {
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onStructureChange: (s) => this.persistStructure(s),
+      onThemeChange: (t) => this.persistTheme(t),
       onRender: () => this.outline?.refresh(),
       onSelectionChange: (primary) => this.outline?.syncSelection(primary),
       onToggleOutline: () => void this.toggleOutline(),
@@ -241,7 +242,7 @@ export class MindMapView extends TextFileView {
     const structure = frontmatterValue(doc.frontmatter, "mindmap-structure");
     this.canvas.setStructure(isStructure(structure) ? structure : this.plugin.settings.defaultStructure);
     const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
-    this.canvas.setTheme(theme && theme in THEMES ? (theme as ThemeName) : this.plugin.settings.defaultTheme);
+    this.canvas.setTheme(isThemeName(theme) ? theme : this.plugin.settings.defaultTheme);
   }
 
   private onDocChange(doc: MindDoc): void {
@@ -250,6 +251,14 @@ export class MindMapView extends TextFileView {
     this.history.push(this.data);
     this.data = next;
     this.requestSave();
+  }
+
+  private persistTheme(theme: ThemeName): void {
+    if (!this.doc) return;
+    const value = theme === this.plugin.settings.defaultTheme ? null : theme;
+    this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-theme", value);
+    if (!this.doc.frontmatter) this.doc.frontmatter = setFrontmatterValue("", "mindmap", "true");
+    this.onDocChange(this.doc);
   }
 
   private persistStructure(structure: Structure): void {

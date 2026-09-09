@@ -35,6 +35,9 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 - **节点链接笔记**：⌘K 或工具栏的链接按钮，选一篇已有笔记或直接新建，标签变成 `[[笔记|原文]]`；
   新建的笔记在右侧分栏打开。已链接的节点再按 ⌘K 可打开或取消链接。按住 ⌘ 悬停有页面预览。
 - **结构**：逻辑图（向右）、思维导图（左右分布）、组织结构图（向下）、树形图，工具栏结构菜单切换。
+- **主题**：工具栏的调色盘按钮切换，六个主题——雪松（默认，深色中心配灰底节点）、彩虹（分支各一色）、
+  商务（蓝色系直角折线）、暖阳（橙调大圆角）、极简（黑白描边细线）、森林（绿调分支）。
+  切换结果写进 `mindmap-theme`，按文件生效；设置里可改新文件的默认主题。每个主题都配了深色模式。
 - **公式与图片**：标签里写 `$E=mc^2$` 渲染成公式；`![[图片.png|160]]` 或 `![alt](url)` 渲染成缩略图，
   数字参数是宽度，选中后拖右下角手柄改大小。备注里的代码块带语法高亮。导出 PNG/SVG 时公式和图片都会内嵌。
 - **右键菜单**：节点和空白处都有，编辑、增删、聚焦、折叠、链接、备注、标记、任务、本级转标题/列表、复制链接、删除全在里面。
@@ -53,7 +56,7 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 ---
 mindmap: true
 mindmap-structure: mindmap   # 可选：logic-right（默认）| mindmap | org-down | tree-right
-mindmap-theme: rainbow       # 可选：snow（默认）| rainbow
+mindmap-theme: rainbow       # 可选：snow（默认）| rainbow | business | warm | mono | forest
 ---
 
 # 中心主题                     ← 唯一的一级标题；没有就用文件名
@@ -129,7 +132,8 @@ pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 | `src/xmind-view.ts` | .xmind 只读视图与转换 |
 | `src/outline.ts` | 大纲面板 |
 | `src/note-picker.ts` | 链接笔记的选择器弹窗 |
-| `styles.css` | 主题变量，跟随 Obsidian 明暗模式 |
+| `src/theme.ts` | 主题注册表：连线形状、分支色、下划线层级、间距 |
+| `styles.css` | 主题变量与各主题的 `[data-theme]` 配色块，跟随 Obsidian 明暗模式 |
 
 ## 发布
 

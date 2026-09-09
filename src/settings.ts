@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
-import type { ThemeName } from "./theme";
+import { THEME_LIST, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
 export interface MindMapSettings {
@@ -64,10 +64,10 @@ export class MindMapSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("默认主题")
-      .setDesc("snow：深色中心主题、灰色节点、折线；rainbow：彩虹分支、曲线。单个文件可用 mindmap-theme 覆盖。")
+      .setDesc("新文件用的主题。工具栏的调色盘按钮可以按文件切换，切换结果会写进 mindmap-theme。")
       .addDropdown((d) =>
         d
-          .addOptions({ snow: "snow", rainbow: "rainbow" })
+          .addOptions(Object.fromEntries(THEME_LIST.map((t) => [t.name, t.label])))
           .setValue(this.plugin.settings.defaultTheme)
           .onChange(async (v) => {
             this.plugin.settings.defaultTheme = v as ThemeName;

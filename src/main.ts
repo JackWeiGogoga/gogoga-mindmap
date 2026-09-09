@@ -27,7 +27,7 @@ import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
-import { THEMES, ThemeName } from "./theme";
+import { isThemeName } from "./theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
@@ -245,7 +245,7 @@ export default class MindMapPlugin extends Plugin {
 
       const canvas = new MindMapCanvas(wrap, {
         structure: isStructure(structure) ? structure : this.settings.defaultStructure,
-        theme: theme && theme in THEMES ? (theme as ThemeName) : this.settings.defaultTheme,
+        theme: isThemeName(theme) ? theme : this.settings.defaultTheme,
         editable: state.editable,
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,

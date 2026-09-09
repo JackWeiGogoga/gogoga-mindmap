@@ -23,6 +23,26 @@
   --mm-toggle-fg: #555555;
   --mm-toggle-border: #8a8a8a;
   --mm-max-width: 300px;
+  --mm-root-max-width: 440px;
+
+  /* 各层级的形状与字号，主题在 [data-theme] 块里覆盖 */
+  --mm-root-radius: 8px;
+  --mm-root-pad: 18px 32px;
+  --mm-root-size: 26px;
+  --mm-root-weight: 600;
+  --mm-main-radius: 8px;
+  --mm-main-pad: 10px 16px;
+  --mm-main-size: 17px;
+  --mm-main-weight: 600;
+  --mm-node-radius: 6px;
+  --mm-node-pad: 6px 10px;
+  --mm-node-size: 14px;
+  --mm-node-weight: 400;
+  --mm-node-border: none;
+  --mm-branch-fg: #1f1f1f;
+  --mm-edge-w1: 3px;
+  --mm-edge-w2: 2px;
+  --mm-edge-w3: 1.5px;
 
   /* 命名颜色：%%red%% 等 */
   --mm-c-fg: #1f1f1f;
@@ -105,10 +125,10 @@
   stroke: var(--mm-line);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5px;
+  stroke-width: var(--mm-edge-w3);
 }
-.mm-edge[data-depth="1"] { stroke-width: 3px; }
-.mm-edge[data-depth="2"] { stroke-width: 2px; }
+.mm-edge[data-depth="1"] { stroke-width: var(--mm-edge-w1); }
+.mm-edge[data-depth="2"] { stroke-width: var(--mm-edge-w2); }
 
 .mm-nodes {
   position: absolute;
@@ -126,12 +146,13 @@
   gap: 6px;
   width: max-content;
   max-width: var(--mm-max-width);
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: var(--mm-node-pad);
+  border: var(--mm-node-border);
+  border-radius: var(--mm-node-radius);
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
-  font-size: 14px;
-  font-weight: 400;
+  font-size: var(--mm-node-size);
+  font-weight: var(--mm-node-weight);
   line-height: 1.4;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -142,20 +163,20 @@
 .mm-node[data-depth="1"] {
   background: var(--mm-main-bg);
   color: var(--mm-main-fg);
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 17px;
-  font-weight: 600;
+  padding: var(--mm-main-pad);
+  border-radius: var(--mm-main-radius);
+  font-size: var(--mm-main-size);
+  font-weight: var(--mm-main-weight);
 }
 
 .mm-node[data-depth="0"] {
   background: var(--mm-root-bg);
   color: var(--mm-root-fg);
-  padding: 18px 32px;
-  border-radius: 8px;
-  font-size: 26px;
-  font-weight: 600;
-  max-width: 440px;
+  padding: var(--mm-root-pad);
+  border-radius: var(--mm-root-radius);
+  font-size: var(--mm-root-size);
+  font-weight: var(--mm-root-weight);
+  max-width: var(--mm-root-max-width);
 }
 
 .mm-node[data-color="red"]    { --mm-node-bg: var(--mm-c-red);    --mm-node-fg: var(--mm-c-fg); }
@@ -316,22 +337,11 @@
 .mm-node[data-branch="4"] { --mm-branch: var(--mm-branch-4); }
 .mm-node[data-branch="5"] { --mm-branch: var(--mm-branch-5); }
 
-.mm-root[data-theme="rainbow"] .mm-node[data-depth="0"] {
-  background: transparent;
-  color: var(--text-normal, #1f1f1f);
-  font-size: 28px;
-  font-weight: 700;
-  padding: 12px 20px;
-}
-.mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] {
+.mm-root[data-branch-colors="true"] .mm-node[data-depth="1"] {
   background: var(--mm-branch);
-  color: #1f1f1f;
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 500;
+  color: var(--mm-branch-fg);
 }
-.mm-root[data-theme="rainbow"] .mm-node.has-color {
+.mm-root[data-branch-colors="true"] .mm-node.has-color {
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
 }
@@ -1000,3 +1010,145 @@
 .mm-root button.mm-marker-btn.is-active { border-color: var(--mm-selection); background: color-mix(in srgb, var(--mm-selection) 12%, transparent); }
 .mm-marker-picker .mm-menu-item { margin-top: 4px; justify-content: center; font-size: 12px; color: var(--text-muted, #666); }
 .mm-marker-picker .mm-menu-item::before { display: none; }
+
+
+/* ==========================================================================
+   主题。每个主题只覆盖需要的变量；行为（连线形状、分支色、下划线、间距）在 theme.ts。
+   深色模式的覆盖跟在各自主题后面。
+   ========================================================================== */
+
+/* ---------- 彩虹：中心主题无底色，主主题用分支色 ---------- */
+.mm-root[data-theme="rainbow"] {
+  --mm-root-bg: transparent;
+  --mm-root-fg: var(--text-normal, #1f1f1f);
+  --mm-root-size: 28px;
+  --mm-root-weight: 700;
+  --mm-root-pad: 12px 20px;
+  --mm-main-pad: 8px 16px;
+  --mm-main-radius: 10px;
+  --mm-main-size: 16px;
+  --mm-main-weight: 500;
+}
+
+/* ---------- 商务：深蓝中心，实心蓝主主题，直角折线 ---------- */
+.mm-root[data-theme="business"] {
+  --mm-line: #64748b;
+  --mm-root-bg: #1e3a5f;
+  --mm-root-fg: #ffffff;
+  --mm-main-bg: #2b6cb0;
+  --mm-main-fg: #ffffff;
+  --mm-node-bg: #eef2f7;
+  --mm-node-fg: #1a202c;
+  --mm-root-radius: 4px;
+  --mm-main-radius: 4px;
+  --mm-node-radius: 3px;
+  --mm-root-size: 24px;
+  --mm-main-size: 16px;
+  --mm-node-size: 13px;
+  --mm-main-weight: 500;
+  --mm-toggle-border: #94a3b8;
+  --mm-edge-w1: 2px;
+  --mm-edge-w2: 1.5px;
+  --mm-edge-w3: 1.25px;
+}
+.theme-dark .mm-root[data-theme="business"] {
+  --mm-line: #7d8da3;
+  --mm-root-bg: #24405f;
+  --mm-main-bg: #2c5282;
+  --mm-node-bg: #232a35;
+  --mm-node-fg: #e2e8f0;
+}
+
+/* ---------- 暖阳：橙调，大圆角 ---------- */
+.mm-root[data-theme="warm"] {
+  --mm-line: #a3714f;
+  --mm-root-bg: #c2410c;
+  --mm-root-fg: #fff7ed;
+  --mm-main-bg: #fed7aa;
+  --mm-main-fg: #7c2d12;
+  --mm-node-bg: #fff7ed;
+  --mm-node-fg: #431407;
+  --mm-root-radius: 18px;
+  --mm-main-radius: 14px;
+  --mm-node-radius: 10px;
+  --mm-root-pad: 16px 30px;
+  --mm-main-pad: 9px 18px;
+  --mm-node-pad: 6px 12px;
+  --mm-toggle-border: #c08457;
+  --mm-toggle-fg: #8a5a3b;
+}
+.theme-dark .mm-root[data-theme="warm"] {
+  --mm-line: #c08d6a;
+  --mm-root-bg: #9a3412;
+  --mm-main-bg: #57320f;
+  --mm-main-fg: #fed7aa;
+  --mm-node-bg: #33241a;
+  --mm-node-fg: #fde3c7;
+}
+
+/* ---------- 极简：黑白描边，发丝线 ---------- */
+.mm-root[data-theme="mono"] {
+  --mm-line: #a1a1aa;
+  --mm-root-bg: #18181b;
+  --mm-root-fg: #fafafa;
+  --mm-main-bg: transparent;
+  --mm-main-fg: #18181b;
+  --mm-node-bg: transparent;
+  --mm-node-fg: #27272a;
+  --mm-node-border: 1px solid #d4d4d8;
+  --mm-root-radius: 2px;
+  --mm-main-radius: 2px;
+  --mm-node-radius: 2px;
+  --mm-root-size: 22px;
+  --mm-main-size: 15px;
+  --mm-node-size: 13px;
+  --mm-main-weight: 600;
+  --mm-root-pad: 14px 26px;
+  --mm-edge-w1: 1.5px;
+  --mm-edge-w2: 1.25px;
+  --mm-edge-w3: 1px;
+  --mm-toggle-border: #a1a1aa;
+}
+.mm-root[data-theme="mono"] .mm-node[data-depth="0"] { border: none; }
+.theme-dark .mm-root[data-theme="mono"] {
+  --mm-line: #71717a;
+  --mm-root-bg: #fafafa;
+  --mm-root-fg: #18181b;
+  --mm-main-fg: #f4f4f5;
+  --mm-node-fg: #d4d4d8;
+  --mm-node-border: 1px solid #3f3f46;
+  --mm-toggle-border: #52525b;
+}
+
+/* ---------- 森林：绿调分支 ---------- */
+.mm-root[data-theme="forest"] {
+  --mm-line: #4d7c0f;
+  --mm-root-bg: #14532d;
+  --mm-root-fg: #ecfdf5;
+  --mm-node-bg: #f0fdf4;
+  --mm-node-fg: #14532d;
+  --mm-branch-fg: #14532d;
+  --mm-root-radius: 12px;
+  --mm-main-radius: 10px;
+  --mm-node-radius: 8px;
+  --mm-branch-0: #a7e0b0;
+  --mm-branch-1: #bfe5a0;
+  --mm-branch-2: #93ddc8;
+  --mm-branch-3: #d9e8a0;
+  --mm-branch-4: #a3d9d0;
+  --mm-branch-5: #c7e3b8;
+  --mm-toggle-border: #86a86b;
+}
+.theme-dark .mm-root[data-theme="forest"] {
+  --mm-line: #7aa04a;
+  --mm-root-bg: #1a4d33;
+  --mm-node-bg: #1f2c22;
+  --mm-node-fg: #d6f0dc;
+  --mm-branch-fg: #0f2d1a;
+  --mm-branch-0: #6aa878;
+  --mm-branch-1: #86ab68;
+  --mm-branch-2: #5ea48f;
+  --mm-branch-3: #9aab63;
+  --mm-branch-4: #6ba299;
+  --mm-branch-5: #8aa87e;
+}

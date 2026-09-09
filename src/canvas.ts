@@ -44,7 +44,7 @@ import {
   toggleTask,
   wikilinkOf,
 } from "./inline";
-import { BRANCH_COLOR_COUNT, ThemeName, THEMES } from "./theme";
+import { BRANCH_COLOR_COUNT, THEME_LIST, ThemeName, THEMES } from "./theme";
 import { COLOR_NAMES, convertLevelKind, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
@@ -104,6 +104,7 @@ export interface CanvasOptions {
   onUndo?: () => void;
   onRedo?: () => void;
   onStructureChange?: (structure: Structure) => void;
+  onThemeChange?: (theme: ThemeName) => void;
   /** 每次布局完成后调用，可用来按内容定高度 */
   onLayout?: (bounds: Bounds) => void;
   /** 每次整体渲染完成后（树结构可能变了） */
@@ -147,6 +148,7 @@ const ICONS: Record<string, string> = {
   fit: '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
   center: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
   logic: '<svg viewBox="0 0 24 24"><path d="M3 12h6M9 12v-6h6M9 12v6h6M9 12h6"/></svg>',
+  palette: '<svg viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 1 0-18c4.97 0 9 3.58 9 8 0 2.21-1.79 4-4 4h-1.5a1.5 1.5 0 0 0-1.06 2.56A1.5 1.5 0 0 1 12 21Z"/><circle cx="7.5" cy="12" r="1"/><circle cx="9.5" cy="8" r="1"/><circle cx="14.5" cy="7.5" r="1"/><circle cx="17.5" cy="11" r="1"/></svg>',
   structure: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v4M6 17v-3h12v3"/></svg>',
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
@@ -234,6 +236,8 @@ export class MindMapCanvas {
   private structureButton: HTMLButtonElement | null = null;
   private structureSep: HTMLElement | null = null;
   private structureMenu: HTMLElement | null = null;
+  private themeButton: HTMLButtonElement | null = null;
+  private themeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
 
@@ -298,6 +302,7 @@ export class MindMapCanvas {
     this.el.classList.add("mm-root");
     this.el.tabIndex = 0;
     this.el.dataset.theme = opts.theme;
+    this.el.dataset.branchColors = THEMES[opts.theme].branchColors ? "true" : "false";
     this.el.dataset.structure = opts.structure;
     this.el.classList.toggle("is-editable", opts.editable);
     this.el.classList.toggle("is-embedded", !!opts.embedded);
@@ -362,7 +367,37 @@ export class MindMapCanvas {
   setTheme(theme: ThemeName): void {
     this.opts.theme = theme;
     this.el.dataset.theme = theme;
+    this.el.dataset.branchColors = THEMES[theme].branchColors ? "true" : "false";
+    if (this.themeButton) this.tip(this.themeButton, this.themeTipText(), "toolbar");
     this.render();
+  }
+
+  private themeTipText(): string {
+    return `主题：${THEMES[this.opts.theme].label.split(" · ")[0]} · 点击切换`;
+  }
+
+  private toggleThemeMenu(anchor: HTMLElement): void {
+    if (this.themeMenu) {
+      this.closeThemeMenu();
+      return;
+    }
+    this.themeMenu = this.buildMenu(
+      THEME_LIST.map((t) => ({
+        label: t.label,
+        active: t.name === this.opts.theme,
+        run: () => {
+          this.setTheme(t.name);
+          this.opts.onThemeChange?.(t.name);
+        },
+      })),
+      anchor,
+      () => this.closeThemeMenu(),
+    );
+  }
+
+  private closeThemeMenu(): void {
+    this.themeMenu?.remove();
+    this.themeMenu = null;
   }
 
   getBounds(): Bounds | null {
@@ -426,6 +461,7 @@ export class MindMapCanvas {
     this.opts.editable = editable;
     this.el.classList.toggle("is-editable", editable);
     this.structureButton?.classList.toggle("is-hidden", !editable);
+    this.themeButton?.classList.toggle("is-hidden", !editable);
     this.structureSep?.classList.toggle("is-hidden", !editable);
     if (this.editToggle) {
       this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
@@ -476,6 +512,9 @@ export class MindMapCanvas {
     this.el.replaceChildren();
     this.el.classList.remove("mm-root");
     this.crumbs = null;
+    this.structureMenu = null;
+    this.themeMenu = null;
+    this.themeButton = null;
     this.markerPicker = null;
     this.markerPickerCleanup = null;
     this.edgePaths = [];
@@ -924,6 +963,10 @@ export class MindMapCanvas {
       this.tip(sb, this.structureTipText(), "toolbar");
       sb.classList.toggle("is-hidden", !this.opts.editable);
       this.structureButton = sb;
+      const tb = btn("palette", "", () => this.toggleThemeMenu(tb));
+      this.tip(tb, this.themeTipText(), "toolbar");
+      tb.classList.toggle("is-hidden", !this.opts.editable);
+      this.themeButton = tb;
       const sep = document.createElement("span");
       sep.className = "mm-tool-sep";
       sep.classList.toggle("is-hidden", !this.opts.editable);
