@@ -1266,3 +1266,12 @@
   color: var(--text-normal);
   outline: none;
 }
+
+/* 静态时只显示图标本身；点进去编辑（focus-within）再把取值文本露出来 */
+.metadata-property.mm-icon-prop:not(:focus-within) .metadata-property-value > :not(.mm-icon-prop-preview) {
+  display: none;
+}
+/* 值那一格塌成图标宽度后仍要能点进去编辑 */
+.metadata-property.mm-icon-prop .metadata-property-value {
+  min-height: var(--metadata-input-height, 22px);
+}

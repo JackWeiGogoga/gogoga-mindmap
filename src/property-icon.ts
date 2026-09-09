@@ -98,6 +98,8 @@ export class PropertyIconDecorator {
     }
     if (preview.dataset.value === raw) return;
     preview.dataset.value = raw;
+    // 静态时只留图标，取值放进提示里，仍然看得到
+    setTooltip(preview, `选择图标 · 当前 ${raw}`, { placement: "top" });
     // empty() 会连事件一起清掉？不会，只清子节点；监听挂在 preview 本身
     preview.empty();
     preview.toggleClass("is-emoji", isEmojiValue(raw));
