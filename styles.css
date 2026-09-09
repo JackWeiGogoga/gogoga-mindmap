@@ -836,12 +836,47 @@
 
 /* <iframe> 嵌入：视频这类东西自己要吃走鼠标事件，所以节点留一圈边距当把手，
    不然整个节点被 iframe 盖住，既选不中也拖不动 */
+.mm-frame-box {
+  position: relative;
+  display: block;
+  width: max-content;
+  margin: 2px auto;
+}
 .mm-label iframe.mm-frame {
   display: block;
-  margin: 2px auto;
   border: 0;
   border-radius: 6px;
   background: #000;
+}
+/* 挡板：跨域 iframe 里点了哪儿看不见，默认整块挡住，双击才放开 */
+.mm-frame-shield {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.mm-frame-shield::after {
+  content: "双击激活";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.mm-frame-shield:hover::after { opacity: 1; }
+.mm-node.is-frame-live .mm-frame-shield { display: none; }
+/* 放开之后加一圈虚线，免得不知道现在点下去是会跳走的。
+   用 outline 不用 box-shadow —— 选中态已经占了 box-shadow，两者要能叠加 */
+.mm-node.is-frame-live {
+  outline: 2px dashed var(--mm-selection);
+  outline-offset: 3px;
 }
 .mm-node.has-frame {
   align-items: flex-start;

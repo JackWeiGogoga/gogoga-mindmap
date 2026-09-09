@@ -260,6 +260,8 @@ export class MindMapCanvas {
   private elContent = new WeakMap<HTMLElement, string>();
   /** 每个节点当前活着的 iframe，按 id 存，重渲染时复用同一个元素 */
   private frames = new Map<string, HTMLIFrameElement>();
+  /** 挡板已经放开的那个节点；跨域 iframe 里点了哪儿看不见，默认全挡住免得误跳转 */
+  private liveFrame: string | null = null;
   /** 上次写进去的位置，避免重复写同样的值 */
   private lastPos = new WeakMap<HTMLElement, { x: number; y: number }>();
   /** 连线 path 的复用池 */
@@ -717,10 +719,21 @@ export class MindMapCanvas {
         const frame = label.querySelector("iframe");
         if (frame) this.frames.set(node.id, frame);
         else this.frames.delete(node.id);
+        const shield = label.querySelector<HTMLElement>(".mm-frame-shield");
+        if (shield) {
+          this.tip(shield, "双击激活播放器；激活前点哪儿都只是选中节点", "fixed", "top");
+          shield.addEventListener("dblclick", (ev) => {
+            ev.stopPropagation();
+            this.setLiveFrame(node.id);
+          });
+        }
         el.append(label);
       }
       if (el.querySelector("img")) el.classList.add("has-image");
-      if (this.frames.has(node.id)) el.classList.add("has-frame");
+      if (this.frames.has(node.id)) {
+        el.classList.add("has-frame");
+        if (this.liveFrame === node.id) el.classList.add("is-frame-live");
+      }
       const link = wikilinkOf(node.text);
       if (link) {
         el.classList.add("is-linked");
@@ -1679,6 +1692,7 @@ export class MindMapCanvas {
       this.selected.clear();
       this.primary = null;
     }
+    if (this.liveFrame && node?.id !== this.liveFrame) this.setLiveFrame(null);
     if (node) {
       if (mode === "toggle" && this.selected.has(node)) {
         this.selected.delete(node);
@@ -2854,9 +2868,25 @@ export class MindMapCanvas {
     this.imgHandle = handle;
   }
 
+  /** 放开某个节点的播放器挡板。只改 class，不重渲染 —— 重建标签会让 iframe 重新加载 */
+  private setLiveFrame(id: string | null): void {
+    if (this.liveFrame === id) return;
+    const prev = this.liveFrame ? this.els.get(this.liveFrame) : null;
+    prev?.classList.remove("is-frame-live");
+    this.liveFrame = id;
+    if (id) this.els.get(id)?.classList.add("is-frame-live");
+  }
+
   private placeImageHandle(handle: HTMLElement, box: HTMLElement): void {
-    handle.style.left = `${box.offsetLeft + box.offsetWidth - 7}px`;
-    handle.style.top = `${box.offsetTop + box.offsetHeight - 7}px`;
+    // iframe 外面还包了一层定位的 .mm-frame-box，offsetLeft 是相对最近的定位祖先，得一路加回节点
+    let left = box.offsetWidth;
+    let top = box.offsetHeight;
+    for (let n: HTMLElement | null = box; n && !n.classList.contains("mm-node"); n = n.offsetParent as HTMLElement | null) {
+      left += n.offsetLeft;
+      top += n.offsetTop;
+    }
+    handle.style.left = `${left - 7}px`;
+    handle.style.top = `${top - 7}px`;
   }
 
   // ---------- 备注弹层 ----------

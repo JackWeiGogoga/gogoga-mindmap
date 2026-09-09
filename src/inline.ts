@@ -314,7 +314,14 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   if (attrs.has("allowfullscreen")) f.allowFullscreen = true;
   if (attrs.has("allow")) f.allow = attrs.get("allow")!;
   if (!existing) f.src = finalSrc;
-  return f;
+  // 盖一层挡板：跨域 iframe 里点了哪儿我们看不见，不挡的话随手一点就跳去源站。
+  // 挡板吃掉所有鼠标事件，节点照常能选能拖；双击挡板才把播放器放开（见 canvas.ts）。
+  const box = document.createElement("span");
+  box.className = "mm-frame-box";
+  const shield = document.createElement("span");
+  shield.className = "mm-frame-shield";
+  box.append(f, shield);
+  return box;
 }
 
 /** 图片：`![[文件|宽度]]` 的参数若是数字就当宽度；解析不到就显示文字 */

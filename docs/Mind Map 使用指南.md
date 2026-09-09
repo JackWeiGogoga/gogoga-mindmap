@@ -130,14 +130,15 @@ console.log("hello");
 - 选中图片节点，右下角有个手柄，**拖动改大小**，双击恢复原始尺寸
 - 网图也能直接引：![Obsidian|120](https://obsidian.md/images/obsidian-logo-gradient.svg)
 
-### 视频嵌入 %%fold%%
+### 视频嵌入
 
 从 B 站、YouTube 那里复制的 `<iframe …>` 嵌入代码，直接粘进节点就渲染成播放器。
 
 - <iframe width="286" height="161" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1&high_quality=1&danmaku=0" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>
 - 只认 iframe 这一个标签，`src` 必须是 http(s)；`javascript:` 和别的标签一律当普通文字显示
 - 宽高取代码里的 width / height，钳在 80–1200 之间
-- 视频会吃掉鼠标事件，所以节点四周留了一圈边距当把手，拖节点要抓边上
+- 播放器上盖了一层挡板：单击只是选中节点，**双击才激活**，激活后才能播放、才点得到「进入 B 站」那种跳转按钮
+- 激活的节点带一圈虚线；点画布空白处或选别的节点就自动收回挡板
 - 选中后右下角有手柄，**拖动改大小**（默认锁 16:9，按住 Shift 单独拉高度），双击恢复 560×315
 - 默认**不自动播放**，展开也只是把播放器摆在那儿，想看点一下
 - 真要它自己播，在地址里写 `autoplay=1`
