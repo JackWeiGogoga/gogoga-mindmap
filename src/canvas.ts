@@ -331,8 +331,12 @@ export class MindMapCanvas {
 
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => {
-        if (this.needsRender) this.render();
-        else this.positionNodebar();
+        if (this.needsRender) {
+          this.render();
+          return;
+        }
+        if (!this.hasView && this.fit()) this.hasView = true;
+        this.positionNodebar();
       });
       this.ro.observe(this.el);
     }
@@ -527,18 +531,20 @@ export class MindMapCanvas {
     this.toolbarTips = [];
   }
 
-  fit(): void {
-    if (!this.layout) return;
+  /** 返回是否真的适应了：容器还没量出尺寸时会失败，调用方得再试一次 */
+  fit(): boolean {
+    if (!this.layout) return false;
     const { bounds } = this.layout;
     const cw = this.el.clientWidth;
     const ch = this.el.clientHeight;
-    if (!cw || !ch) return;
+    if (!cw || !ch) return false;
     let k = Math.min(1, (cw - FIT_PADDING * 2) / bounds.w, (ch - FIT_PADDING * 2) / bounds.h);
     if (k > 0.96) k = 1;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
     this.tx = cw / 2 - (bounds.x + bounds.w / 2) * this.k;
     this.ty = ch / 2 - (bounds.y + bounds.h / 2) * this.k;
     this.applyTransform();
+    return true;
   }
 
   /** 根节点居中，缩放归 100% */
@@ -578,10 +584,9 @@ export class MindMapCanvas {
     this.editing = null;
     this.rebuild();
     this.reflow();
-    if (!this.hasView) {
-      this.hasView = true;
-      this.fit();
-    }
+    // 代码块嵌入首次渲染时容器高度还是 0（真正的高度要等 onLayout 下一帧才写上去），
+    // 这时 fit 量不出东西。失败就别置 hasView，等 ResizeObserver 拿到高度再适应一次。
+    if (!this.hasView && this.fit()) this.hasView = true;
     if (this.pendingSelectPath !== null) {
       const path = this.pendingSelectPath;
       this.pendingSelectPath = null;
