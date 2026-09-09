@@ -279,6 +279,17 @@ function frameSize(v: string | undefined, fallback: number): number {
 }
 
 /**
+ * 默认不自动播放。B 站这类播放器不带参数就直接开播，而 iframe 的 allow 权限策略在
+ * Obsidian 的 Electron 里拦不住（实测给不给 autoplay 权限都照播），只有 URL 参数管用。
+ * `autoplay=0` 是各家播放器通用的写法，认不出这个参数的站点会忽略它，没有副作用。
+ * 用户自己写了 autoplay= 就听用户的。只改渲染用的地址，笔记里的原文不动。
+ */
+export function noAutoplay(src: string): string {
+  if (/[?&]autoplay=/i.test(src)) return src;
+  return src + (src.includes("?") ? "&" : "?") + "autoplay=0";
+}
+
+/**
  * `<iframe …>` 嵌入。只接 http(s) 的 src —— javascript:／data: 一律退回显示原文，
  * 免得节点文本变成可执行的东西。宽高钳在 80–1200 之间，防止一个节点把画布撑爆。
  */
@@ -288,8 +299,9 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   if (!/^https?:\/\//i.test(src)) return wrap("span", original);
   const w = frameSize(attrs.get("width"), FRAME_DEFAULT_W);
   const h = frameSize(attrs.get("height"), FRAME_DEFAULT_H);
+  const finalSrc = noAutoplay(src);
   // 复用已有的那个，不然每次重渲染视频都从头开始
-  const existing = opts.reuseFrame?.(src);
+  const existing = opts.reuseFrame?.(finalSrc);
   const f = existing ?? document.createElement("iframe");
   f.className = "mm-frame";
   // 拖手柄改大小时写的是行内样式，复用时先清掉，让下面的属性说了算
@@ -301,7 +313,7 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   if (title) f.title = title;
   if (attrs.has("allowfullscreen")) f.allowFullscreen = true;
   if (attrs.has("allow")) f.allow = attrs.get("allow")!;
-  if (!existing) f.src = src;
+  if (!existing) f.src = finalSrc;
   return f;
 }
 

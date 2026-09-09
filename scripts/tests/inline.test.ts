@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { setFrameSize, TOKEN_RE } from "../../src/inline";
+import { noAutoplay, setFrameSize, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -142,4 +142,16 @@ test("setFrameSize 只动 iframe，句子里的其他文字不变", () => {
   const out = setFrameSize(text, { w: 300, h: 169 });
   assert.ok(out.startsWith("看这个 "));
   assert.ok(out.endsWith(" 结束"));
+});
+
+test("默认补上 autoplay=0", () => {
+  assert.equal(noAutoplay("https://a.cn/p?x=1"), "https://a.cn/p?x=1&autoplay=0");
+  assert.equal(noAutoplay("https://a.cn/p"), "https://a.cn/p?autoplay=0");
+});
+
+test("用户写了 autoplay 就不动它", () => {
+  assert.equal(noAutoplay("https://a.cn/p?autoplay=1"), "https://a.cn/p?autoplay=1");
+  assert.equal(noAutoplay("https://a.cn/p?x=1&autoplay=1&y=2"), "https://a.cn/p?x=1&autoplay=1&y=2");
+  // 只认真正的参数，路径里带 autoplay 字样的不算
+  assert.equal(noAutoplay("https://a.cn/autoplay/x"), "https://a.cn/autoplay/x?autoplay=0");
 });
