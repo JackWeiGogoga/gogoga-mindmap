@@ -130,7 +130,7 @@ console.log("hello");
 - 选中图片节点，右下角有个手柄，**拖动改大小**，双击恢复原始尺寸
 - 网图也能直接引：![Obsidian|120](https://obsidian.md/images/obsidian-logo-gradient.svg)
 
-### 视频嵌入
+### 视频嵌入 %%fold%%
 
 从 B 站、YouTube 那里复制的 `<iframe …>` 嵌入代码，直接粘进节点就渲染成播放器。
 
