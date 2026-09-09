@@ -1189,3 +1189,45 @@
   --mm-root-border: 1px solid #d4d4d8;
   --mm-toggle-border: #8a8a94;
 }
+
+/* ---------- 设置页与图标选择器 ---------- */
+.mm-setting-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-inline-end: 6px;
+  color: var(--text-normal);
+}
+.mm-setting-icon-preview.is-emoji { font-size: 17px; line-height: 1; }
+.mm-setting-icon-value {
+  margin-inline-end: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-monospace, monospace);
+}
+.mm-icon-picker .mm-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mm-icon-picker .mm-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+}
+.mm-icon-picker .mm-icon-label { flex: 1 1 auto; }
+.mm-icon-picker .mm-icon-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+}

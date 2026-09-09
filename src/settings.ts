@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
 import { MINDMAP_LIST_ICON } from "./icon";
+import { displayEmoji, iconIdOf, IconPickerModal, isEmojiValue, storedValue } from "./icon-picker";
 import { THEME_LIST, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
@@ -109,20 +110,67 @@ export class MindMapSettingTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(containerEl)
+    const iconSetting = new Setting(containerEl)
       .setName("文件列表里的图标")
       .setDesc(
-        "把这个值写进笔记的 icon 属性，Notebook Navigator、Iconize 等文件列表会据此显示图标。" +
-          `默认 ${MINDMAP_LIST_ICON} 是插件自带的脑图图标；也可填 Lucide 图标名（lucide:network）或 emoji（🧠）。留空则不写入。` +
+        "写进笔记的 icon 属性，Notebook Navigator、Iconize 等文件列表会据此显示图标。" +
+          "这不是 Obsidian 核心属性，没装这类插件时它只是一行普通属性。" +
           "只影响之后新建或转换的笔记；已有的用命令「给已有脑图笔记补上列表图标」批量补。",
+      );
+
+    const preview = iconSetting.controlEl.createSpan({ cls: "mm-setting-icon-preview" });
+    const label = iconSetting.controlEl.createSpan({ cls: "mm-setting-icon-value" });
+    const refresh = () => {
+      const v = this.plugin.settings.listIcon;
+      preview.empty();
+      preview.toggleClass("is-emoji", isEmojiValue(v));
+      if (!v) {
+        label.setText("不写入");
+        return;
+      }
+      if (isEmojiValue(v)) preview.setText(displayEmoji(v));
+      else {
+        const id = iconIdOf(v);
+        if (id) setIcon(preview, id);
+      }
+      label.setText(v);
+    };
+    refresh();
+
+    iconSetting
+      .addButton((b) =>
+        b
+          .setButtonText("选择图标")
+          .setCta()
+          .onClick(() => {
+            new IconPickerModal(this.app, (pick) => {
+              if (!pick) return;
+              void (async () => {
+                this.plugin.settings.listIcon = storedValue(pick);
+                await this.plugin.saveSettings();
+                refresh();
+              })();
+            }).open();
+          }),
       )
-      .addText((t) =>
-        t
-          .setPlaceholder(MINDMAP_LIST_ICON)
-          .setValue(this.plugin.settings.listIcon)
-          .onChange(async (v) => {
-            this.plugin.settings.listIcon = v.trim();
+      .addExtraButton((b) =>
+        b
+          .setIcon("rotate-ccw")
+          .setTooltip("恢复默认")
+          .onClick(async () => {
+            this.plugin.settings.listIcon = MINDMAP_LIST_ICON;
             await this.plugin.saveSettings();
+            refresh();
+          }),
+      )
+      .addExtraButton((b) =>
+        b
+          .setIcon("x")
+          .setTooltip("不写入图标")
+          .onClick(async () => {
+            this.plugin.settings.listIcon = "";
+            await this.plugin.saveSettings();
+            refresh();
           }),
       );
 
