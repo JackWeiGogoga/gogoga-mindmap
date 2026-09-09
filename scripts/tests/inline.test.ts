@@ -18,6 +18,7 @@ const URL_GROUP = 18;
 const MD_LINK_GROUP = 8;
 const MD_IMAGE_GROUP = 3;
 const TAG_GROUP = 17;
+const FRAME_GROUP = 19;
 
 test("裸 URL 单独成链", () => {
   assert.deepEqual(tokens("https://obsidian.md"), [[URL_GROUP, "https://obsidian.md"]]);
@@ -78,4 +79,34 @@ test("不成形的地址不匹配", () => {
   assert.deepEqual(tokens("https://"), []);
   assert.deepEqual(tokens("ftp://a.cn"), []);
   assert.deepEqual(tokens("说了句 https 而已"), []);
+});
+
+const BILI =
+  '<iframe width="560" height="315" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>';
+
+test("<iframe> 整段被当成一个 token，src 里的地址不再被单独抓一次", () => {
+  assert.deepEqual(tokens(BILI), [[FRAME_GROUP, BILI]]);
+});
+
+test("自闭合和带 </iframe> 都认", () => {
+  const open = '<iframe src="https://a.cn/x" width="300" height="200">';
+  assert.deepEqual(tokens(open), [[FRAME_GROUP, open]]);
+  const self = '<iframe src="https://a.cn/x" />';
+  assert.deepEqual(tokens(self), [[FRAME_GROUP, self]]);
+});
+
+test("iframe 前后的文字照常解析", () => {
+  const text = `看这个 ${BILI} #标签`;
+  assert.deepEqual(tokens(text), [
+    [FRAME_GROUP, BILI],
+    [TAG_GROUP, "#标签"],
+  ]);
+});
+
+test("只认 iframe，别的标签当普通文字", () => {
+  // <script> 不会变成 token，标签本身原样显示（renderInline 从不写 innerHTML，不存在执行风险）；
+  // 里面的地址跟正文里的裸链一样会成链，仅此而已
+  assert.deepEqual(tokens('<script src="https://a.cn/x.js"></script>'), [[URL_GROUP, "https://a.cn/x.js"]]);
+  assert.deepEqual(tokens("<b>粗</b>"), []);
+  assert.deepEqual(tokens("<iframe>没有属性</iframe>"), []);
 });

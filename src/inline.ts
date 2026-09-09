@@ -17,6 +17,11 @@ export interface InlineOptions {
   onTag?: (tag: string, ev: MouseEvent) => void;
   /** 点了任务复选框 */
   onTaskToggle?: (ev: MouseEvent) => void;
+  /**
+   * 取回这个节点上已经建好的 iframe。iframe 一旦从 DOM 里摘下来再插回去就会重新加载，
+   * 所以视频这类内容必须复用同一个元素，不能每次重渲染都新建。
+   */
+  reuseFrame?: (src: string) => HTMLIFrameElement | null;
 }
 
 /** 可加在节点开头的标记（emoji，存在文字里，任何地方都能显示） */
@@ -88,6 +93,13 @@ const URL_STOP = String.raw`\s<>\]"'\x60。，、；：！？…「」『』【�
 // 半角句读可以出现在 URL 中间（a.cn/x.html），但不能收尾
 const BARE_URL = String.raw`(https?:\/\/[^${URL_STOP}]*[^${URL_STOP},.;:!?])`;
 
+/**
+ * 直接粘 B 站 / YouTube 那种 `<iframe …></iframe>` 嵌入代码。只认这一个标签，
+ * 属性另外解析（见 frame()），全程用 DOM API 建元素，不会把用户文本当 HTML 执行。
+ * 放在 TOKEN_RE 最后，但 `<` 比 src 里的 `https://` 靠前，最左优先保证整段被它接走。
+ */
+const IFRAME = String.raw`<iframe\s([^>]*?)\/?>(?:\s*<\/iframe>)?`;
+
 export const TOKEN_RE = new RegExp(
   String.raw`!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]` +
     String.raw`|!\[([^\]]*)\]\(([^)\s]+)\)` +
@@ -100,12 +112,13 @@ export const TOKEN_RE = new RegExp(
     String.raw`|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])` +
     String.raw`|(?<![\w_])_([^_\s][^_]*?)_(?![\w_])` +
     String.raw`|(?<![\w#&])#([\p{L}\p{N}_\/-]*[\p{L}_\/-][\p{L}\p{N}_\/-]*)` +
-    `|${BARE_URL}`,
+    `|${BARE_URL}` +
+    `|${IFRAME}`,
   "gu",
 );
 
 // 分组含义：1-2 ![[图片|参数]]  3-4 ![alt](url)  5 $公式$  6-7 [[链接|别名]]  8-9 [文字](url)
-// 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签  18 裸 URL
+// 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签  18 裸 URL  19 <iframe> 的属性串
 
 const BR_RE = /<br\s*\/?>/i;
 
@@ -175,6 +188,8 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       el.appendChild(tag(m[17], opts));
     } else if (m[18] !== undefined) {
       el.appendChild(link(m[18], m[18], false, opts));
+    } else if (m[19] !== undefined) {
+      el.appendChild(frame(m[19], m[0], opts));
     }
   }
   if (last < rest.length) el.appendChild(document.createTextNode(rest.slice(last)));
@@ -222,6 +237,53 @@ export function setImageWidth(text: string, width: number | null): string {
     return text.slice(0, md.index) + `![${newAlt}](${md[2]})` + text.slice(md.index + md[0].length);
   }
   return text;
+}
+
+export const FRAME_MIN = 80;
+export const FRAME_MAX = 1200;
+const FRAME_DEFAULT_W = 560;
+const FRAME_DEFAULT_H = 315;
+
+const ATTR_RE = /([A-Za-z][\w-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+
+/** 把 `<iframe …>` 的属性串拆成键值对，键统一小写 */
+function parseAttrs(raw: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (let m = ATTR_RE.exec(raw); m; m = ATTR_RE.exec(raw)) {
+    out.set(m[1].toLowerCase(), m[2] ?? m[3] ?? m[4] ?? "");
+  }
+  ATTR_RE.lastIndex = 0;
+  return out;
+}
+
+function frameSize(v: string | undefined, fallback: number): number {
+  const n = Number.parseInt(v ?? "", 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(FRAME_MIN, Math.min(FRAME_MAX, n));
+}
+
+/**
+ * `<iframe …>` 嵌入。只接 http(s) 的 src —— javascript:／data: 一律退回显示原文，
+ * 免得节点文本变成可执行的东西。宽高钳在 80–1200 之间，防止一个节点把画布撑爆。
+ */
+function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLElement {
+  const attrs = parseAttrs(attrsRaw);
+  const src = attrs.get("src") ?? "";
+  if (!/^https?:\/\//i.test(src)) return wrap("span", original);
+  const w = frameSize(attrs.get("width"), FRAME_DEFAULT_W);
+  const h = frameSize(attrs.get("height"), FRAME_DEFAULT_H);
+  // 复用已有的那个，不然每次重渲染视频都从头开始
+  const existing = opts.reuseFrame?.(src);
+  const f = existing ?? document.createElement("iframe");
+  f.className = "mm-frame";
+  f.width = String(w);
+  f.height = String(h);
+  const title = attrs.get("title");
+  if (title) f.title = title;
+  if (attrs.has("allowfullscreen")) f.allowFullscreen = true;
+  if (attrs.has("allow")) f.allow = attrs.get("allow")!;
+  if (!existing) f.src = src;
+  return f;
 }
 
 /** 图片：`![[文件|宽度]]` 的参数若是数字就当宽度；解析不到就显示文字 */

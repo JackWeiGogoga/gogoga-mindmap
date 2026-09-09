@@ -251,6 +251,10 @@ export class MindMapCanvas {
   private sizes = new Map<string, Size>();
   /** 节点内容的签名，用来判断能否原样复用元素 */
   private elSigs = new WeakMap<HTMLElement, string>();
+  /** 只跟「节点里画什么」有关的签名；它没变就别动 DOM 子节点（iframe 重新插入会重新加载） */
+  private elContent = new WeakMap<HTMLElement, string>();
+  /** 每个节点当前活着的 iframe，按 id 存，重渲染时复用同一个元素 */
+  private frames = new Map<string, HTMLIFrameElement>();
   /** 上次写进去的位置，避免重复写同样的值 */
   private lastPos = new WeakMap<HTMLElement, { x: number; y: number }>();
   /** 连线 path 的复用池 */
@@ -622,15 +626,14 @@ export class MindMapCanvas {
     const visit = (node: MindNode) => {
       const rel = node.depth - base.depth;
       const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
+      // 内容签名管子节点，整体签名再叠上纯表现的部分（选中、配色、层级）；
+      // 只有前者变了才重建 DOM，选一下节点不该把里面的 iframe 打回重载
+      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, theme.name].join("\u0001");
       const sig = [
-        node.text,
-        node.note ? "n" : "",
+        contentSig,
         node.color ?? "",
-        node.folded ? "f" : "",
-        node.children.length,
         rel,
         branch ?? "",
-        theme.name,
         this.selected.has(node) ? "s" : "",
         this.search?.matches.has(node) ? (this.search.list[this.search.index] === node ? "M" : "m") : "",
       ].join("\u0001");
@@ -641,8 +644,9 @@ export class MindMapCanvas {
         return;
       }
       const el = reused ?? document.createElement("div");
+      const keepChildren = !!reused && this.elContent.get(reused) === contentSig;
       if (reused) {
-        el.replaceChildren();
+        if (!keepChildren) el.replaceChildren();
         el.removeAttribute("style");
         el.removeAttribute("data-color");
         el.removeAttribute("data-branch");
@@ -650,6 +654,7 @@ export class MindMapCanvas {
         this.lastPos.delete(el);
       }
       this.elSigs.set(el, sig);
+      this.elContent.set(el, contentSig);
       el.className = "mm-node";
       el.dataset.id = node.id;
       el.dataset.depth = String(Math.min(rel, 3));
@@ -673,23 +678,34 @@ export class MindMapCanvas {
         if (this.search.list[this.search.index] === node) el.classList.add("is-current-match");
       }
 
-      const label = document.createElement("div");
-      label.className = "mm-label";
-      renderInline(label, node.text || (node.depth === 0 ? "中心主题" : ""), {
-        onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
-        onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
-        renderMath: this.opts.host?.renderMath,
-        resolveImage: this.opts.host?.resolveImage,
-        onImageLoad: () => this.scheduleReflow(),
-        onTag: (tag) => this.opts.host?.openTag?.(tag),
-        onTaskToggle: () => {
-          if (!this.opts.editable) return;
-          node.text = toggleTask(node.text);
-          this.render();
-          this.notify();
-        },
-      });
-      if (label.querySelector("img")) el.classList.add("has-image");
+      if (!keepChildren) {
+        const label = document.createElement("div");
+        label.className = "mm-label";
+        renderInline(label, node.text || (node.depth === 0 ? "中心主题" : ""), {
+          onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
+          onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
+          renderMath: this.opts.host?.renderMath,
+          resolveImage: this.opts.host?.resolveImage,
+          onImageLoad: () => this.scheduleReflow(),
+          onTag: (tag) => this.opts.host?.openTag?.(tag),
+          onTaskToggle: () => {
+            if (!this.opts.editable) return;
+            node.text = toggleTask(node.text);
+            this.render();
+            this.notify();
+          },
+          reuseFrame: (src) => {
+            const f = this.frames.get(node.id);
+            return f && f.src === src ? f : null;
+          },
+        });
+        const frame = label.querySelector("iframe");
+        if (frame) this.frames.set(node.id, frame);
+        else this.frames.delete(node.id);
+        el.append(label);
+      }
+      if (el.querySelector("img")) el.classList.add("has-image");
+      if (this.frames.has(node.id)) el.classList.add("has-frame");
       const link = wikilinkOf(node.text);
       if (link) {
         el.classList.add("is-linked");
@@ -697,9 +713,8 @@ export class MindMapCanvas {
       } else if (el.dataset.link) {
         delete el.dataset.link;
       }
-      el.append(label);
 
-      if (node.note) {
+      if (!keepChildren && node.note) {
         const n = icon("note");
         n.classList.add("mm-note-icon");
         this.tip(n, "查看备注");
@@ -711,7 +726,7 @@ export class MindMapCanvas {
         el.append(n);
       }
 
-      if (node.children.length) {
+      if (!keepChildren && node.children.length) {
         const t = document.createElement("button");
         t.className = "mm-toggle" + (node.folded ? " is-folded" : "");
         t.type = "button";
@@ -735,6 +750,7 @@ export class MindMapCanvas {
       if (next.has(id)) continue;
       this.elSigs.delete(el);
       this.lastPos.delete(el);
+      this.frames.delete(id);
       el.remove();
     }
     this.els = next;

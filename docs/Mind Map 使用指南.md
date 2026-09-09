@@ -130,6 +130,17 @@ console.log("hello");
 - 选中图片节点，右下角有个手柄，**拖动改大小**，双击恢复原始尺寸
 - 网图也能直接引：![Obsidian|120](https://obsidian.md/images/obsidian-logo-gradient.svg)
 
+### 视频嵌入 %%fold%%
+
+从 B 站、YouTube 那里复制的 `<iframe …>` 嵌入代码，直接粘进节点就渲染成播放器。
+
+- <iframe width="400" height="225" src="https://player.bilibili.com/player.html?bvid=BV1WAuG6wEWZ&page=1&high_quality=1&danmaku=0" title="Bilibili video player" frameborder="0" allowfullscreen></iframe>
+- 只认 iframe 这一个标签，`src` 必须是 http(s)；`javascript:` 和别的标签一律当普通文字显示
+- 宽高取代码里的 width / height，钳在 80–1200 之间
+- 视频会吃掉鼠标事件，所以节点四周留了一圈边距当把手，拖节点要抓边上
+- 折叠着的分支不会加载，展开才开始跑
+- 备注里也能放，那条路走 Obsidian 自己的渲染器，点开 ≡ 才加载
+
 ### 链接到笔记 %%fold%%
 
 - ⌘K 或工具栏的链接按钮，搜一篇已有笔记挂上去
@@ -139,6 +150,7 @@ console.log("hello");
 - 就像这一个 → [[脑图代码块嵌入示例|一篇带嵌入脑图的笔记]]，按住 ⌘ 悬停能预览
 - 外部网址写成 Markdown 链接就行，比如 [Obsidian 官网](https://obsidian.md)，点击用浏览器打开
 - 直接粘一个裸网址也会自动成链，句尾的标点不会被吃进去
+- 官网是 https://obsidian.md 可以点
 
 ### 复制节点链接 %%fold%%
 
