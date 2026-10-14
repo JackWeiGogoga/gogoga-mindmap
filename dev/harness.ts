@@ -1,4 +1,5 @@
 /** 浏览器调试页：不依赖 Obsidian，直接渲染 canvas 并把写回的 Markdown 打印出来。 */
+import "./obsidian-shim";
 import { MindMapCanvas } from "../src/canvas";
 import { buildSvg, svgToPng } from "../src/export";
 import { parseMarkdown, serializeMarkdown } from "../src/markdown";
@@ -82,7 +83,7 @@ function build() {
     theme: $<HTMLSelectElement>("theme").value as ThemeName,
     editable: $<HTMLInputElement>("editable").checked,
     host: {
-      openLink: (href, internal) => console.log("open link", href, internal),
+      openLink: (href, internal) => console.debug("open link", href, internal),
     },
     onChange: (doc) => {
       history.push(current);
@@ -106,7 +107,7 @@ function build() {
       canvas.setDoc(parseMarkdown(current, { fallbackTitle: "样例" }));
       out.textContent = current;
     },
-    onStructureChange: (s) => console.log("structure ->", s),
+    onStructureChange: (s) => console.debug("structure ->", s),
   });
   canvas.setDoc(parseMarkdown(current, { fallbackTitle: "样例" }));
   out.textContent = current;
@@ -120,33 +121,33 @@ $("dark").addEventListener("change", () => {
   document.body.classList.toggle("theme-light", !$<HTMLInputElement>("dark").checked);
 });
 $("editable").addEventListener("change", build);
-$("exportSvg").addEventListener("click", async () => {
+$("exportSvg").addEventListener("click", () => void (async () => {
   canvas.select(null);
   const { svg, width, height } = await buildSvg(canvas);
   const preview = $("preview");
-  preview.style.display = "block";
+  preview.setCssStyles({ display: "block" });
   preview.replaceChildren();
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  img.style.maxWidth = "100%";
+  img.setCssStyles({ maxWidth: "100%" });
   img.title = `${width}×${height}`;
   preview.append(img);
   (window as unknown as { lastSvg: string }).lastSvg = svg;
-});
-$("exportPng").addEventListener("click", async () => {
+})());
+$("exportPng").addEventListener("click", () => void (async () => {
   canvas.select(null);
   const exp = await buildSvg(canvas);
   const blob = await svgToPng(exp, 2);
   const preview = $("preview");
-  preview.style.display = "block";
+  preview.setCssStyles({ display: "block" });
   preview.replaceChildren();
   const img = new Image();
   img.src = URL.createObjectURL(blob);
-  img.style.maxWidth = "100%";
+  img.setCssStyles({ maxWidth: "100%" });
   img.title = `${exp.width * 2}×${exp.height * 2} · ${Math.round(blob.size / 1024)} KB`;
   preview.append(img);
   (window as unknown as { lastPngSize: number }).lastPngSize = blob.size;
-});
+})());
 $("reload").addEventListener("click", () => {
   current = SAMPLE;
   build();

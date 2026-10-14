@@ -45,7 +45,7 @@ export class IconPickerModal extends FuzzySuggestModal<PickedIcon> {
         ordered.push(id);
       }
     }
-    return ordered.map((id) => ({ kind: "icon", id }) as PickedIcon);
+    return ordered.map((id) => ({ kind: "icon", id }));
   }
 
   getItemText(item: PickedIcon): string {

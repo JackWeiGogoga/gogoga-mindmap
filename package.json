@@ -1,6 +1,6 @@
 {
   "name": "gogoga-mindmap",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "XMind 风格的 Obsidian 思维导图：Markdown 与脑图双向互转，现代审美，零依赖。",
   "private": true,
   "type": "module",
@@ -11,14 +11,19 @@
     "test": "node scripts/run-tests.mjs",
     "harness": "node esbuild.config.mjs harness",
     "install-vault": "node scripts/install-vault.mjs",
-    "gen-bench": "node scripts/gen-bench.mjs"
+    "gen-bench": "node scripts/gen-bench.mjs",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@eslint/json": "0.14.0",
     "@types/node": "^22.0.0",
-    "builtin-modules": "^4.0.0",
     "esbuild": "^0.24.0",
-    "obsidian": "^1.7.2",
-    "typescript": "^5.6.0"
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "0.4.2",
+    "obsidian": "^1.14.4",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.71.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

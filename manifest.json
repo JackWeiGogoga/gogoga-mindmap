@@ -1,8 +1,8 @@
 {
   "id": "gogoga-mindmap",
   "name": "gogoga Mind Map",
-  "version": "0.3.0",
-  "minAppVersion": "1.5.0",
+  "version": "0.3.1",
+  "minAppVersion": "1.5.7",
   "description": "Edit Markdown notes as XMind-style mind maps. Headings and list items become nodes, and edits on either side stay in sync.",
   "author": "jackwei",
   "isDesktopOnly": false,

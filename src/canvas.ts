@@ -178,14 +178,18 @@ const ICONS: Record<string, string> = {
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
 };
 
-const IS_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+/** Obsidian 在 body 上标了平台（mod-macos / is-ios），按它来，不去读 navigator */
+function isApple(): boolean {
+  const cls = document.body.classList;
+  return cls.contains("mod-macos") || cls.contains("is-ios");
+}
 
 /** 把 Mod/Shift/Alt 写成当前平台的样子：⌘⇧⌥ 或 Ctrl+Shift+Alt+ */
 function sc(...keys: string[]): string {
-  const map: Record<string, string> = IS_APPLE
+  const map: Record<string, string> = isApple()
     ? { Mod: "⌘", Shift: "⇧", Alt: "⌥", Enter: "↵" }
     : { Mod: "Ctrl+", Shift: "Shift+", Alt: "Alt+", Enter: "Enter" };
-  return keys.map((k) => map[k] ?? k).join(IS_APPLE ? "" : "");
+  return keys.map((k) => map[k] ?? k).join("");
 }
 
 const COLOR_LABELS: Record<string, string> = {
@@ -201,9 +205,10 @@ const COLOR_LABELS: Record<string, string> = {
 };
 
 function icon(name: string): HTMLElement {
-  const span = document.createElement("span");
-  span.className = "mm-icon";
-  span.innerHTML = ICONS[name];
+  const span = createSpan({ cls: "mm-icon" });
+  // 图标是上面写死的 SVG 字符串，按 SVG 文档解析后挂上去，不走 innerHTML
+  const markup = ICONS[name].replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+  span.append(new DOMParser().parseFromString(markup, "image/svg+xml").documentElement);
   return span;
 }
 
@@ -339,13 +344,13 @@ export class MindMapCanvas {
     this.toolbarPos = opts.toolbarPosition ?? "bottom";
     this.el.dataset.toolbar = this.toolbarPos;
 
-    this.viewport = document.createElement("div");
+    this.viewport = createDiv();
     this.viewport.className = "mm-viewport";
-    this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    this.svg = createSvg("svg");
     this.svg.setAttribute("class", "mm-edges");
-    this.nodesEl = document.createElement("div");
+    this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
-    this.overlay = document.createElement("div");
+    this.overlay = createDiv();
     this.overlay.className = "mm-overlay";
     this.viewport.append(this.svg, this.nodesEl, this.overlay);
     this.el.append(this.viewport);
@@ -662,7 +667,7 @@ export class MindMapCanvas {
         for (const c of visibleChildren(node)) visit(c);
         return;
       }
-      const el = reused ?? document.createElement("div");
+      const el = reused ?? createDiv();
       const keepChildren = !!reused && this.elContent.get(reused) === contentSig;
       if (reused) {
         if (!keepChildren) el.replaceChildren();
@@ -698,7 +703,7 @@ export class MindMapCanvas {
       }
 
       if (!keepChildren) {
-        const label = document.createElement("div");
+        const label = createDiv();
         label.className = "mm-label";
         renderInline(label, node.text || (node.depth === 0 ? "中心主题" : ""), {
           onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
@@ -764,7 +769,7 @@ export class MindMapCanvas {
       }
 
       if (!keepChildren && node.children.length) {
-        const t = document.createElement("button");
+        const t = createEl("button");
         t.className = "mm-toggle" + (node.folded ? " is-folded" : "");
         t.type = "button";
         if (node.folded) t.textContent = String(node.children.length);
@@ -857,7 +862,7 @@ export class MindMapCanvas {
       // 复用已有的 path，只改变了的属性；重新创建几千个 SVG 元素会让布局整体失效
       let path = this.edgePaths[edgeIndex];
       if (!path) {
-        path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path = createSvg("path");
         path.setAttribute("class", "mm-edge");
         this.svg.append(path);
         this.edgePaths.push(path);
@@ -875,10 +880,10 @@ export class MindMapCanvas {
       const branch = this.els.get(child.node.id)?.dataset.branch;
       const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
       if (path.style.stroke !== stroke) path.style.stroke = stroke;
-      if (path.style.display) path.style.display = "";
+      if (path.style.display) path.setCssStyles({ display: "" });
     }
     for (let i = edgeIndex; i < this.edgePaths.length; i++) {
-      if (!this.edgePaths[i].style.display) this.edgePaths[i].style.display = "none";
+      if (!this.edgePaths[i].style.display) this.edgePaths[i].setCssStyles({ display: "none" });
     }
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
@@ -892,11 +897,11 @@ export class MindMapCanvas {
    * 就是被 GPU 拉伸的位图 —— 文字发虚。所以手一停就摘掉，让浏览器按当前比例重新栅格化。
    */
   private holdLayer(): void {
-    if (this.viewport.style.willChange !== "transform") this.viewport.style.willChange = "transform";
+    if (this.viewport.style.willChange !== "transform") this.viewport.setCssStyles({ willChange: "transform" });
     if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
     this.settleTimer = window.setTimeout(() => {
       this.settleTimer = null;
-      this.viewport.style.willChange = "";
+      this.viewport.setCssStyles({ willChange: "" });
     }, 200);
   }
 
@@ -988,7 +993,7 @@ export class MindMapCanvas {
   }
 
   private buildToolbar(): void {
-    const bar = document.createElement("div");
+    const bar = createDiv();
     bar.className = "mm-toolbar";
     bar.dataset.pos = this.toolbarPos;
     this.toolbar = bar;
@@ -1017,7 +1022,7 @@ export class MindMapCanvas {
       });
     }
     const btn = (name: string, title: string, onClick: () => void) => {
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-tool";
       b.dataset.tool = name;
@@ -1033,7 +1038,7 @@ export class MindMapCanvas {
     };
     if (this.opts.onToggleOutline) {
       btn("outline", "大纲面板 · 树形列表，可改名和调层级", () => this.opts.onToggleOutline?.());
-      const sep0 = document.createElement("span");
+      const sep0 = createSpan();
       sep0.className = "mm-tool-sep";
       bar.append(sep0);
     }
@@ -1052,14 +1057,14 @@ export class MindMapCanvas {
       this.tip(tb, this.themeTipText(), "toolbar");
       tb.classList.toggle("is-hidden", !this.opts.editable);
       this.themeButton = tb;
-      const sep = document.createElement("span");
+      const sep = createSpan();
       sep.className = "mm-tool-sep";
       sep.classList.toggle("is-hidden", !this.opts.editable);
       bar.append(sep);
       this.structureSep = sep;
     }
     btn("minus", `缩小 ${sc("Mod", "-")}`, () => this.zoomBy(1 / 1.2));
-    this.zoomLabel = document.createElement("button");
+    this.zoomLabel = createEl("button");
     this.zoomLabel.type = "button";
     this.zoomLabel.className = "mm-tool mm-zoom-label";
     this.zoomLabel.dataset.tool = "zoom";
@@ -1070,13 +1075,13 @@ export class MindMapCanvas {
     btn("plus", `放大 ${sc("Mod", "+")}`, () => this.zoomBy(1.2));
     btn("fit", `适应画布 · 缩放到看得见全部节点 ${sc("Mod", "0")}`, () => this.fit());
     btn("center", "回到中心 · 中心主题居中，缩放 100%", () => this.center());
-    const sep2 = document.createElement("span");
+    const sep2 = createSpan();
     sep2.className = "mm-tool-sep";
     bar.append(sep2);
     if (this.opts.onUndo) {
       btn("undo", `撤销 ${sc("Mod", "Z")}`, () => this.opts.onUndo?.());
       btn("redo", `重做 ${sc("Mod", "Shift", "Z")}`, () => this.opts.onRedo?.());
-      const sep3 = document.createElement("span");
+      const sep3 = createSpan();
       sep3.className = "mm-tool-sep";
       bar.append(sep3);
     }
@@ -1116,7 +1121,7 @@ export class MindMapCanvas {
     close: () => void,
     point?: { x: number; y: number },
   ): HTMLElement {
-    const menu = document.createElement("div");
+    const menu = createDiv();
     menu.className = "mm-menu";
     menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     let cleanup = () => undefined as void;
@@ -1125,7 +1130,7 @@ export class MindMapCanvas {
       close();
     };
     for (const it of items) {
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-menu-item" + (it.active ? " is-active" : "");
       b.textContent = it.label;
@@ -1162,11 +1167,11 @@ export class MindMapCanvas {
   // ---------- 节点浮动工具栏 ----------
 
   private buildNodebar(): HTMLElement {
-    const bar = document.createElement("div");
+    const bar = createDiv();
     bar.className = "mm-nodebar";
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     const swatch = (color: string | null) => {
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-swatch";
       this.tip(b, color ? `${COLOR_LABELS[color] ?? color} · 给选中的节点上色` : "清除颜色");
@@ -1180,11 +1185,11 @@ export class MindMapCanvas {
     };
     swatch(null);
     for (const c of COLOR_NAMES) swatch(c);
-    const sep = document.createElement("span");
+    const sep = createSpan();
     sep.className = "mm-tool-sep";
     bar.append(sep);
     const tool = (name: string, title: string, onClick: () => void) => {
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-tool";
       b.dataset.tool = name;
@@ -1824,7 +1829,7 @@ export class MindMapCanvas {
 
   private startMarquee(ev: PointerEvent): void {
     const host = this.el.getBoundingClientRect();
-    const box = document.createElement("div");
+    const box = createDiv();
     box.className = "mm-marquee";
     this.el.append(box);
     this.marquee = { x: ev.clientX - host.left, y: ev.clientY - host.top, el: box, base: new Set(this.selected) };
@@ -1879,7 +1884,7 @@ export class MindMapCanvas {
     ghost.querySelector(".mm-toggle")?.remove();
     ghost.style.transform = `scale(${this.k})`;
     this.el.append(ghost);
-    const indicator = document.createElement("div");
+    const indicator = createDiv();
     indicator.className = "mm-drop-indicator";
     this.overlay.append(indicator);
     for (const n of subtree) this.els.get(n.id)?.classList.add("is-dragging");
@@ -1899,7 +1904,7 @@ export class MindMapCanvas {
     this.drag.target = target;
     for (const el of this.els.values()) el.classList.remove("is-drop-target");
     const ind = this.drag.indicator;
-    ind.style.display = "none";
+    ind.setCssStyles({ display: "none" });
     if (!target || !this.layout) return;
     if (target.kind === "node") {
       this.els.get(target.parent.id)?.classList.add("is-drop-target");
@@ -1916,7 +1921,7 @@ export class MindMapCanvas {
       if (pos === -1) x = kids[kids.length - 1].x + kids[kids.length - 1].w + gap;
       else if (pos === 0) x = kids[0].x - gap;
       else x = (kids[pos - 1].x + kids[pos - 1].w + kids[pos].x) / 2;
-      Object.assign(ind.style, { display: "block", left: `${x - 2}px`, top: `${kids[0].y}px` });
+      ind.setCssStyles({ display: "block", left: `${x - 2}px`, top: `${kids[0].y}px` });
       return;
     }
     let y: number;
@@ -1924,7 +1929,7 @@ export class MindMapCanvas {
     else if (pos === 0) y = kids[0].y - gap / 2;
     else y = (kids[pos - 1].y + kids[pos - 1].h + kids[pos].y) / 2;
     const x = side === "left" ? kids[0].x + kids[0].w - 48 : kids[0].x;
-    Object.assign(ind.style, { display: "block", left: `${x}px`, top: `${y - 2}px` });
+    ind.setCssStyles({ display: "block", left: `${x}px`, top: `${y - 2}px` });
   }
 
   private findDropTarget(wx: number, wy: number, exclude: Set<MindNode>): DropTarget | null {
@@ -2218,19 +2223,19 @@ export class MindMapCanvas {
       this.search.input.select();
       return;
     }
-    const bar = document.createElement("div");
+    const bar = createDiv();
     bar.className = "mm-search";
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    const input = document.createElement("input");
+    const input = createEl("input");
     input.type = "text";
     input.className = "mm-search-input";
     input.placeholder = "搜索节点";
     input.spellcheck = false;
-    const count = document.createElement("span");
+    const count = createSpan();
     count.className = "mm-search-count";
     count.textContent = "0/0";
     const tool = (name: string, title: string, fn: () => void) => {
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-tool";
       b.dataset.tool = name;
@@ -2585,7 +2590,7 @@ export class MindMapCanvas {
     this.closeMarkerPicker();
     const node = this.primary;
     if (!node || !this.opts.editable) return;
-    const picker = document.createElement("div");
+    const picker = createDiv();
     picker.className = "mm-menu mm-marker-picker";
     picker.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     const refresh = () => {
@@ -2593,14 +2598,14 @@ export class MindMapCanvas {
       picker.querySelectorAll<HTMLElement>(".mm-marker-btn").forEach((b) => b.classList.toggle("is-active", current.has(b.dataset.emoji ?? "")));
     };
     for (const group of MARKER_GROUPS) {
-      const row = document.createElement("div");
+      const row = createDiv();
       row.className = "mm-marker-row";
-      const label = document.createElement("span");
+      const label = createSpan();
       label.className = "mm-marker-label";
       label.textContent = group.name;
       row.append(label);
       for (const emoji of group.emojis) {
-        const b = document.createElement("button");
+        const b = createEl("button");
         b.type = "button";
         b.className = "mm-marker-btn";
         b.dataset.emoji = emoji;
@@ -2616,7 +2621,7 @@ export class MindMapCanvas {
       }
       picker.append(row);
     }
-    const clear = document.createElement("button");
+    const clear = createEl("button");
     clear.type = "button";
     clear.className = "mm-menu-item";
     clear.textContent = "清除全部标记";
@@ -2677,19 +2682,19 @@ export class MindMapCanvas {
     this.crumbs?.remove();
     this.crumbs = null;
     if (!this.focusRoot) return;
-    const bar = document.createElement("div");
+    const bar = createDiv();
     bar.className = "mm-crumbs";
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     const chain: MindNode[] = [];
     for (let n: MindNode | null = this.focusRoot; n; n = n.parent) chain.unshift(n);
     chain.forEach((n, i) => {
       if (i > 0) {
-        const sepEl = document.createElement("span");
+        const sepEl = createSpan();
         sepEl.className = "mm-crumb-sep";
         sepEl.textContent = "›";
         bar.append(sepEl);
       }
-      const b = document.createElement("button");
+      const b = createEl("button");
       b.type = "button";
       b.className = "mm-crumb" + (i === chain.length - 1 ? " is-current" : "");
       b.textContent = i === 0 ? "全图" : plainText(n.text) || "（空）";
@@ -2765,7 +2770,7 @@ export class MindMapCanvas {
     if (!base) return;
     let link: string;
     if (!node.parent) link = `[[${base}]]`;
-    else if (node.kind === "heading") link = `[[${base}#${plainText(node.text).replace(/[#|\[\]]/g, " ").trim()}]]`;
+    else if (node.kind === "heading") link = `[[${base}#${plainText(node.text).replace(/[#|[\]]/g, " ").trim()}]]`;
     else {
       if (!node.blockId) {
         if (!this.opts.editable) {
@@ -2799,7 +2804,7 @@ export class MindMapCanvas {
     const box = iframe ?? img;
     if (!el || !box || (img && !img.complete)) return;
     const frame = !!iframe;
-    const handle = document.createElement("div");
+    const handle = createDiv();
     handle.className = "mm-img-handle";
     this.tip(
       handle,
@@ -2924,14 +2929,14 @@ export class MindMapCanvas {
     this.closePopover();
     const nodeEl = this.els.get(node.id);
     if (!nodeEl) return;
-    const pop = document.createElement("div");
+    const pop = createDiv();
     pop.className = "mm-popover";
     pop.dataset.id = node.id;
     pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     pop.addEventListener("wheel", (ev) => ev.stopPropagation());
     const editable = this.opts.editable && (edit || !node.note);
     if (editable) {
-      const ta = document.createElement("textarea");
+      const ta = createEl("textarea");
       ta.className = "mm-note-editor";
       ta.placeholder = "备注（支持 Markdown，可以写列表）";
       const plain = unescapeNote(node.note);
@@ -2969,7 +2974,7 @@ export class MindMapCanvas {
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     } else {
-      const body = document.createElement("div");
+      const body = createDiv();
       body.className = "mm-popover-body";
       if (this.opts.host?.renderNote) {
         body.classList.add("markdown-rendered");
@@ -2980,7 +2985,7 @@ export class MindMapCanvas {
       }
       pop.append(body);
       if (this.opts.editable) {
-        const editBtn = document.createElement("button");
+        const editBtn = createEl("button");
         editBtn.type = "button";
         editBtn.className = "mm-popover-edit";
         editBtn.textContent = "编辑";

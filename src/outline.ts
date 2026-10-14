@@ -19,18 +19,18 @@ export class OutlinePanel {
     this.el = container;
     this.el.classList.add("mm-outline");
     this.el.tabIndex = 0;
-    const header = document.createElement("div");
+    const header = createDiv();
     header.className = "mm-outline-header";
-    const title = document.createElement("span");
+    const title = createSpan();
     title.textContent = "大纲";
-    const close = document.createElement("button");
+    const close = createEl("button");
     close.type = "button";
     close.className = "mm-tool mm-outline-close";
     canvas.tipFor(close, "关闭大纲面板", "left");
     close.textContent = "×";
     close.addEventListener("click", onClose);
     header.append(title, close);
-    this.list = document.createElement("div");
+    this.list = createDiv();
     this.list.className = "mm-outline-list";
     this.el.append(header, this.list);
 
@@ -56,13 +56,13 @@ export class OutlinePanel {
     this.rows.clear();
     const primary = this.canvas.getPrimary();
     const visit = (node: MindNode) => {
-      const row = document.createElement("div");
+      const row = createDiv();
       row.className = "mm-outline-row";
       row.dataset.id = node.id;
       row.style.setProperty("--depth", String(node.depth));
       if (node === primary) row.classList.add("is-selected");
 
-      const chevron = document.createElement("span");
+      const chevron = createSpan();
       chevron.className = "mm-outline-chevron" + (node.children.length ? "" : " is-leaf") + (node.folded ? " is-folded" : "");
       chevron.textContent = node.children.length ? "▾" : "";
       chevron.addEventListener("click", (ev) => {
@@ -72,20 +72,20 @@ export class OutlinePanel {
       row.append(chevron);
 
       if (node.color) {
-        const dot = document.createElement("span");
+        const dot = createSpan();
         dot.className = "mm-outline-dot";
         dot.dataset.color = node.color;
         if (!/^[a-z]+$/.test(node.color)) dot.style.background = node.color;
         row.append(dot);
       }
 
-      const text = document.createElement("span");
+      const text = createSpan();
       text.className = "mm-outline-text";
       text.textContent = plainText(node.text) || (node.depth === 0 ? "中心主题" : "");
       row.append(text);
 
       if (node.note) {
-        const n = document.createElement("span");
+        const n = createSpan();
         n.className = "mm-outline-note";
         n.textContent = "≡";
         row.append(n);

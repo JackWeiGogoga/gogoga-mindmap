@@ -1,7 +1,9 @@
 import {
   Component,
+  FileView,
   finishRenderMath,
   HoverParent,
+  ItemView,
   loadMathJax,
   loadPrism,
   MarkdownPostProcessorContext,
@@ -150,17 +152,22 @@ export default class MindMapPlugin extends Plugin {
 
   isMindMapFile(path: string): boolean {
     const fm = this.app.metadataCache.getCache(path)?.frontmatter;
-    const v = fm?.[FRONTMATTER_KEY];
+    const v: unknown = fm?.[FRONTMATTER_KEY];
     return v === true || v === "true" || (typeof v === "string" && v.length > 0 && v !== "false");
   }
 
   private patchSetViewState(): void {
-    const plugin = this;
+    const shouldRedirect = (file: string) => !this.markdownOverride.has(file) && this.isMindMapFile(file);
     const proto = WorkspaceLeaf.prototype;
-    const original = proto.setViewState;
+    // 原型上的方法要留着以后还原，取的是未绑定的函数本身，调用时再 call 回当前 leaf
+    const original = Object.getOwnPropertyDescriptor(proto, "setViewState")!.value as (
+      this: WorkspaceLeaf,
+      state: ViewState,
+      eState?: unknown,
+    ) => Promise<void>;
     proto.setViewState = function (this: WorkspaceLeaf, state: ViewState, eState?: unknown): Promise<void> {
       const file = state?.state?.file;
-      if (state?.type === "markdown" && typeof file === "string" && !plugin.markdownOverride.has(file) && plugin.isMindMapFile(file)) {
+      if (state?.type === "markdown" && typeof file === "string" && shouldRedirect(file)) {
         state = { ...state, type: VIEW_TYPE_MINDMAP };
       }
       return original.call(this, state, eState);
@@ -205,9 +212,9 @@ export default class MindMapPlugin extends Plugin {
       id: "toggle-view",
       name: "在思维导图和 Markdown 之间切换",
       checkCallback: (checking) => {
-        const leaf = this.app.workspace.activeLeaf;
-        const view = leaf?.view;
-        const file = (view as { file?: TFile } | undefined)?.file;
+        const view = this.app.workspace.getActiveViewOfType(FileView);
+        const leaf = view?.leaf;
+        const file = view?.file;
         if (!leaf || !file || !view) return false;
         const type = view.getViewType();
         if (type !== "markdown" && type !== VIEW_TYPE_MINDMAP) return false;
@@ -362,7 +369,7 @@ export default class MindMapPlugin extends Plugin {
           if (h !== lastHeight) {
             lastHeight = h;
             // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
               wrap.style.height = `${h}px`;
             });
           }
@@ -524,12 +531,13 @@ export default class MindMapPlugin extends Plugin {
         return null;
       }
     }
-    const origin = this.app.workspace.activeLeaf;
+    if (!(file instanceof TFile)) return null;
+    const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
     const leaf = this.app.workspace.getLeaf("split", "vertical");
-    await leaf.openFile(file as TFile, { active: false });
+    await leaf.openFile(file, { active: false });
     // 新笔记在右侧打开，焦点留在脑图上，方便继续加节点
     if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
-    return file as TFile;
+    return file;
   }
 }
 

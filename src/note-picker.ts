@@ -20,7 +20,7 @@ export class NotePickerModal extends FuzzySuggestModal<PickItem> {
     return this.app.vault
       .getMarkdownFiles()
       .sort((a, b) => b.stat.mtime - a.stat.mtime)
-      .map((file) => ({ kind: "file", file }) as PickItem);
+      .map((file) => ({ kind: "file", file }));
   }
 
   getItemText(item: PickItem): string {

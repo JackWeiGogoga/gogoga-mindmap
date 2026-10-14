@@ -27,7 +27,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
+    r.onerror = () => reject(r.error ?? new Error("读取失败"));
     r.readAsDataURL(blob);
   });
 }
@@ -164,20 +164,18 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const scale = canvas.el.getBoundingClientRect().width / Math.max(1, canvas.el.clientWidth);
     const h = label.getBoundingClientRect().height / (scale || 1);
     const zoom = (canvas as unknown as { k: number }).k || 1;
-    if (h / zoom <= lh * 1.5) cloneLabels[i].style.whiteSpace = "nowrap";
+    if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "nowrap" });
   });
   clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
-    (n as HTMLElement).style.boxShadow = "none";
+    (n as HTMLElement).setCssStyles({ boxShadow: "none" });
   });
   // 去掉类名让导出不依赖插件 CSS；但 MathJax 的字形靠 .mjx-cXXXX::before 的 content 规则，那一棵要保留
   clone.querySelectorAll("[class]").forEach((n) => {
     if (!n.closest("mjx-container")) n.removeAttribute("class");
   });
   clone.querySelectorAll("[contenteditable]").forEach((n) => n.removeAttribute("contenteditable"));
-  clone.style.position = "absolute";
-  clone.style.left = `${ox}px`;
-  clone.style.top = `${oy}px`;
+  clone.setCssStyles({ position: "absolute", left: `${ox}px`, top: `${oy}px` });
   const xhtml = new XMLSerializer().serializeToString(clone);
 
   const bg = opts.background === undefined ? getComputedStyle(canvas.el).backgroundColor : opts.background;
@@ -206,7 +204,7 @@ export async function svgToPng(exp: SvgExport, scale = 2): Promise<Blob> {
     img.onerror = () => reject(new Error("SVG 渲染失败"));
     img.src = url;
   });
-  const c = document.createElement("canvas");
+  const c = createEl("canvas");
   c.width = Math.round(exp.width * scale);
   c.height = Math.round(exp.height * scale);
   const ctx = c.getContext("2d");

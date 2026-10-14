@@ -71,7 +71,7 @@ export function registerNotebookNavigatorMenus(app: App, handlers: NnMenuHandler
     const api = menusApi(app);
     if (!api) return false;
     try {
-      const asMenu = (addItem: NnAddItem): MenuLike => ({ addItem: (cb) => addItem(cb as (item: MenuItem) => void) });
+      const asMenu = (addItem: NnAddItem): MenuLike => ({ addItem: (cb) => addItem(cb) });
       if (api.registerFolderMenu) {
         offs.push(
           api.registerFolderMenu((ctx) => handlers.folder(asMenu(ctx.addItem), ctx.folder, placeInCreateGroup)),

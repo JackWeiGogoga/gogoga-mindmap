@@ -127,7 +127,7 @@ export function renderInline(el: HTMLElement, text: string, opts: InlineOptions 
   el.textContent = "";
   const segments = text.split(BR_RE);
   segments.forEach((seg, i) => {
-    if (i > 0) el.appendChild(document.createElement("br"));
+    if (i > 0) el.appendChild(createEl("br"));
     renderSegment(el, seg, opts);
   });
 }
@@ -137,7 +137,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
   if (el.childElementCount === 0) {
     const { markers, rest: afterMarkers } = splitMarkers(rest);
     if (markers.length) {
-      const span = document.createElement("span");
+      const span = createSpan();
       span.className = "mm-markers";
       span.textContent = markers.join(" ");
       el.appendChild(span);
@@ -146,7 +146,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
   }
   const task = /^\[( |x|X)\]\s+/.exec(rest);
   if (task) {
-    const box = document.createElement("span");
+    const box = createSpan();
     box.className = "mm-task" + (task[1] === " " ? "" : " is-done");
     box.title = "点击切换";
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
@@ -302,11 +302,10 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   const finalSrc = noAutoplay(src);
   // 复用已有的那个，不然每次重渲染视频都从头开始
   const existing = opts.reuseFrame?.(finalSrc);
-  const f = existing ?? document.createElement("iframe");
+  const f = existing ?? createEl("iframe");
   f.className = "mm-frame";
   // 拖手柄改大小时写的是行内样式，复用时先清掉，让下面的属性说了算
-  f.style.width = "";
-  f.style.height = "";
+  f.setCssStyles({ width: "", height: "" });
   f.width = String(w);
   f.height = String(h);
   const title = attrs.get("title");
@@ -316,12 +315,12 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   if (!existing) f.src = finalSrc;
   // 盖一层挡板：跨域 iframe 里点了哪儿我们看不见，不挡的话随手一点就跳去源站。
   // 挡板吃掉所有鼠标事件，节点照常能选能拖；双击挡板才把播放器放开（见 canvas.ts）。
-  const box = document.createElement("span");
+  const box = createSpan();
   box.className = "mm-frame-box";
-  const shield = document.createElement("span");
+  const shield = createSpan();
   shield.className = "mm-frame-shield";
   // 双击画面之外再给一个明确的按钮，不用猜交互（点击处理在 canvas.ts 里挂）
-  const activate = document.createElement("button");
+  const activate = createEl("button");
   activate.type = "button";
   activate.className = "mm-frame-activate";
   activate.textContent = "激活";
@@ -334,7 +333,7 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
 function image(link: string, param: string | undefined, alt: string, opts: InlineOptions): HTMLElement {
   const src = opts.resolveImage ? opts.resolveImage(link) : /^https?:\/\//.test(link) ? link : null;
   if (!src) return wrap("span", alt || link);
-  const img = document.createElement("img");
+  const img = createEl("img");
   img.className = "mm-img";
   img.src = src;
   img.alt = alt;
@@ -354,7 +353,7 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
 }
 
 function tag(name: string, opts: InlineOptions): HTMLElement {
-  const a = document.createElement("a");
+  const a = createEl("a");
   a.className = "tag mm-tag";
   a.textContent = `#${name}`;
   a.href = "#";
@@ -367,14 +366,14 @@ function tag(name: string, opts: InlineOptions): HTMLElement {
   return a;
 }
 
-function wrap(tag: string, text: string): HTMLElement {
-  const e = document.createElement(tag);
+function wrap(tag: keyof HTMLElementTagNameMap, text: string): HTMLElement {
+  const e = createEl(tag);
   e.textContent = text;
   return e;
 }
 
 function link(label: string, href: string, internal: boolean, opts: InlineOptions): HTMLElement {
-  const a = document.createElement("a");
+  const a = createEl("a");
   a.textContent = label;
   a.className = internal ? "internal-link mm-link" : "external-link mm-link";
   a.setAttribute("data-href", href);
@@ -411,7 +410,7 @@ export function plainText(text: string): string {
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a, b) => b ?? a)
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_: string, a: string, b?: string) => b ?? a)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_, a, b, c, d, e) => a ?? b ?? c ?? d ?? e);
+    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_: string, a?: string, b?: string, c?: string, d?: string, e?: string) => a ?? b ?? c ?? d ?? e ?? "");
 }

@@ -1,5 +1,5 @@
 import esbuild from "esbuild";
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
 
 const production = process.argv.includes("production");
 const harness = process.argv.includes("harness");
@@ -11,7 +11,7 @@ const outfile = harness ? "dev/harness.js" : "dist/main.js";
 const context = await esbuild.context({
   entryPoints: [entry],
   bundle: true,
-  external: ["obsidian", "electron", ...builtins],
+  external: ["obsidian", "electron", ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
   format: harness ? "iife" : "cjs",
   target: "es2020",
   platform: "browser",
