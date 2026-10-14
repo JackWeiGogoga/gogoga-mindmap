@@ -38,7 +38,7 @@ import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
 const FRONTMATTER_KEY = "mindmap";
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
-const HOVER_SOURCE = "obsidian-mindmap";
+const HOVER_SOURCE = "gogoga-mindmap";
 /** 文件列表插件（Notebook Navigator、Iconize 等）读的图标属性 */
 const ICON_KEY = "icon";
 

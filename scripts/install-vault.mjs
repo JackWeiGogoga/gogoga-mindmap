@@ -5,7 +5,7 @@ import path from "node:path";
 const vault =
   process.env.OBSIDIAN_VAULT ??
   path.join(process.env.HOME, "Library/Mobile Documents/iCloud~md~obsidian/Documents/JackWei");
-const dest = path.join(vault, ".obsidian/plugins/obsidian-mindmap");
+const dest = path.join(vault, ".obsidian/plugins/gogoga-mindmap");
 
 if (!existsSync(path.join(vault, ".obsidian"))) {
   console.error(`找不到 vault：${vault}`);

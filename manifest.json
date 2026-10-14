@@ -1,9 +1,10 @@
 {
-  "id": "obsidian-mindmap",
-  "name": "Mind Map",
+  "id": "gogoga-mindmap",
+  "name": "gogoga Mind Map",
   "version": "0.3.0",
   "minAppVersion": "1.5.0",
-  "description": "XMind 风格的思维导图：Markdown 与脑图双向互转，标题和列表即节点。",
+  "description": "Edit Markdown notes as XMind-style mind maps. Headings and list items become nodes, and edits on either side stay in sync.",
   "author": "jackwei",
-  "isDesktopOnly": false
+  "isDesktopOnly": false,
+  "authorUrl": "https://github.com/JackWeiGogoga"
 }

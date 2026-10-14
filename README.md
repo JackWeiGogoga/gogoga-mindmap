@@ -1,4 +1,4 @@
-# Mind Map for Obsidian
+# gogoga Mind Map
 
 XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列表就是节点，脑图视图只是同一个 `.md`
 文件的另一种编辑器，改哪边另一边都跟着变。零运行时依赖，桌面端和移动端都能用。
@@ -150,10 +150,10 @@ pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 
 ## 发布
 
-推 tag 即发布：`git tag v0.2.0 && git push --tags`，GitHub Actions 会构建并把 `main.js`、`manifest.json`、`styles.css`
+推 tag 即发布：`git tag 0.3.1 && git push --tags`（tag 必须与 manifest.json 的 version 完全一致，不带 v），GitHub Actions 会构建并把 `main.js`、`manifest.json`、`styles.css`
 挂到 Release。用 BRAT 的人填仓库地址就能装；手动安装把这三个文件放进
-`<vault>/.obsidian/plugins/obsidian-mindmap/`。运行时不需要 Node。
+`<vault>/.obsidian/plugins/gogoga-mindmap/`。运行时不需要 Node。
 
 ## 许可
 
-MIT
+MIT，见 [LICENSE](LICENSE)。
