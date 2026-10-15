@@ -2,6 +2,7 @@ import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf }
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas } from "./canvas";
 import { MINDMAP_ICON } from "./icon";
+import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
@@ -91,7 +92,7 @@ export class MindMapView extends TextFileView {
   }
 
   getDisplayText(): string {
-    return this.file?.basename ?? "思维导图";
+    return this.file?.basename ?? t("view.displayText");
   }
 
   getIcon(): string {
@@ -100,7 +101,7 @@ export class MindMapView extends TextFileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass("mm-view-content");
-    this.addAction("file-text", "以 Markdown 打开", () => {
+    this.addAction("file-text", t("menu.openAsMarkdown"), () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
     });
     this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
@@ -149,22 +150,22 @@ export class MindMapView extends TextFileView {
     super.onPaneMenu(menu, source);
     menu.addItem((item) =>
       item
-        .setTitle("以 Markdown 打开")
+        .setTitle(t("menu.openAsMarkdown"))
         .setIcon("file-text")
         .setSection("pane")
         .onClick(() => {
           if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
         }),
     );
-    menu.addItem((item) => item.setTitle("导出为 PNG").setIcon("image").setSection("pane").onClick(() => void this.exportPng()));
-    menu.addItem((item) => item.setTitle("导出为 SVG").setIcon("image").setSection("pane").onClick(() => void this.exportSvg()));
-    menu.addItem((item) => item.setTitle("复制为图片").setIcon("copy").setSection("pane").onClick(() => void this.copyPng()));
+    menu.addItem((item) => item.setTitle(t("command.exportPng")).setIcon("image").setSection("pane").onClick(() => void this.exportPng()));
+    menu.addItem((item) => item.setTitle(t("command.exportSvg")).setIcon("image").setSection("pane").onClick(() => void this.exportSvg()));
+    menu.addItem((item) => item.setTitle(t("command.copyPng")).setIcon("copy").setSection("pane").onClick(() => void this.copyPng()));
   }
 
   // ---------- 导出 ----------
 
   private async attachmentPath(ext: string): Promise<string> {
-    if (!this.file) throw new Error("没有打开的文件");
+    if (!this.file) throw new Error(t("error.noOpenFile"));
     return this.app.fileManager.getAvailablePathForAttachment(`${this.file.basename}.${ext}`, this.file.path);
   }
 
@@ -175,9 +176,9 @@ export class MindMapView extends TextFileView {
       const blob = await svgToPng(await buildSvg(this.canvas), 2);
       const path = await this.attachmentPath("png");
       await this.app.vault.createBinary(path, await blob.arrayBuffer());
-      new Notice(`已导出 ${path}`);
+      new Notice(t("notice.exported", { path }));
     } catch (e) {
-      new Notice(`导出失败：${(e as Error).message}`);
+      new Notice(t("notice.exportFailed", { error: (e as Error).message }));
     }
   }
 
@@ -188,9 +189,9 @@ export class MindMapView extends TextFileView {
       const { svg } = await buildSvg(this.canvas);
       const path = await this.attachmentPath("svg");
       await this.app.vault.create(path, svg);
-      new Notice(`已导出 ${path}`);
+      new Notice(t("notice.exported", { path }));
     } catch (e) {
-      new Notice(`导出失败：${(e as Error).message}`);
+      new Notice(t("notice.exportFailed", { error: (e as Error).message }));
     }
   }
 
@@ -200,9 +201,9 @@ export class MindMapView extends TextFileView {
       this.canvas.select(null);
       const blob = await svgToPng(await buildSvg(this.canvas), 2);
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      new Notice("已复制为图片");
+      new Notice(t("notice.copiedAsImage"));
     } catch (e) {
-      new Notice(`复制失败：${(e as Error).message}`);
+      new Notice(t("notice.copyFailedWithError", { error: (e as Error).message }));
     }
   }
 

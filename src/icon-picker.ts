@@ -1,5 +1,6 @@
 import { App, FuzzyMatch, FuzzySuggestModal, getIconIds, setIcon } from "obsidian";
 import { MINDMAP_ICON } from "./icon";
+import { t } from "./i18n";
 import { bareId } from "./icon-value";
 
 export type PickedIcon = { kind: "icon"; id: string } | { kind: "emoji"; value: string };
@@ -19,11 +20,11 @@ export class IconPickerModal extends FuzzySuggestModal<PickedIcon> {
 
   constructor(app: App, private onPick: (pick: PickedIcon | null) => void) {
     super(app);
-    this.setPlaceholder("搜索图标名，或直接粘贴一个 emoji");
+    this.setPlaceholder(t("iconPicker.placeholder"));
     this.setInstructions([
-      { command: "↑↓", purpose: "选择" },
-      { command: "↵", purpose: "使用" },
-      { command: "esc", purpose: "取消" },
+      { command: "↑↓", purpose: t("picker.navigate") },
+      { command: "↵", purpose: t("picker.use") },
+      { command: "esc", purpose: t("picker.dismiss") },
     ]);
     this.modalEl.addClass("mm-icon-picker");
   }
@@ -67,12 +68,12 @@ export class IconPickerModal extends FuzzySuggestModal<PickedIcon> {
     const preview = el.createSpan({ cls: "mm-icon-preview" });
     if (match.item.kind === "emoji") {
       preview.setText(match.item.value);
-      el.createSpan({ text: `使用这个 emoji`, cls: "mm-icon-label" });
+      el.createSpan({ text: t("iconPicker.useEmoji"), cls: "mm-icon-label" });
       return;
     }
     setIcon(preview, match.item.id);
     el.createSpan({ text: bareId(match.item.id), cls: "mm-icon-label" });
-    if (match.item.id === MINDMAP_ICON) el.createSpan({ text: "插件自带", cls: "mm-icon-tag" });
+    if (match.item.id === MINDMAP_ICON) el.createSpan({ text: t("iconPicker.builtIn"), cls: "mm-icon-tag" });
   }
 
   onChooseItem(item: PickedIcon): void {

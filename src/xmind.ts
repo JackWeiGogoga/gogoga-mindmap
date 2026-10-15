@@ -3,6 +3,7 @@
  * 解压用浏览器自带的 DecompressionStream，不引第三方库。
  */
 
+import { t } from "./i18n";
 import { createNode, DocStyle, MindDoc, MindNode } from "./model";
 import { DEFAULT_STYLE, serializeMarkdown } from "./markdown";
 
@@ -36,13 +37,13 @@ export async function readZip(buf: ArrayBuffer): Promise<Map<string, Uint8Array>
       break;
     }
   }
-  if (eocd < 0) throw new Error("不是有效的 zip 文件");
+  if (eocd < 0) throw new Error(t("xmind.notZip"));
   const count = dv.getUint16(eocd + 10, true);
   let p = dv.getUint32(eocd + 16, true);
   const entries = new Map<string, Uint8Array>();
   const decoder = new TextDecoder();
   for (let i = 0; i < count; i++) {
-    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("zip 目录损坏");
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error(t("xmind.zipCorrupt"));
     const method = dv.getUint16(p + 10, true);
     const csize = dv.getUint32(p + 20, true);
     const nlen = dv.getUint16(p + 28, true);
@@ -54,7 +55,7 @@ export async function readZip(buf: ArrayBuffer): Promise<Map<string, Uint8Array>
     const data = bytes.subarray(start, start + csize);
     if (method === 0) entries.set(name, data);
     else if (method === 8) entries.set(name, await inflateRaw(data));
-    else throw new Error(`不支持的压缩方式 ${method}`);
+    else throw new Error(t("xmind.unsupportedCompression", { method }));
     p += 46 + nlen + elen + clen;
   }
   return entries;
@@ -100,7 +101,7 @@ function parseContentJson(text: string): XmindSheet[] {
   const sheets = JSON.parse(text) as JsonSheet[];
   return sheets
     .filter((s) => s.rootTopic)
-    .map((s, i) => ({ title: cleanTitle(s.title) || `工作表 ${i + 1}`, root: fromJsonTopic(s.rootTopic!) }));
+    .map((s, i) => ({ title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!) }));
 }
 
 // ---------- content.xml (XMind 8) ----------
@@ -211,7 +212,7 @@ function parseContentXml(text: string): XmindSheet[] {
     .map((s, i) => {
       const topic = childrenByName(s, "topic")[0];
       if (!topic) return null;
-      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || `工作表 ${i + 1}`, root: fromXmlTopic(topic) };
+      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic) };
     })
     .filter((s): s is XmindSheet => !!s);
 }
@@ -223,7 +224,7 @@ export async function parseXmind(buf: ArrayBuffer): Promise<XmindSheet[]> {
   if (json) return parseContentJson(decoder.decode(json));
   const xml = entries.get("content.xml");
   if (xml) return parseContentXml(decoder.decode(xml));
-  throw new Error("找不到 content.json 或 content.xml，可能不是 XMind 文件");
+  throw new Error(t("xmind.noContent"));
 }
 
 // ---------- → Markdown ----------

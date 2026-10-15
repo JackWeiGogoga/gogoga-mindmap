@@ -1,6 +1,7 @@
 import { FileView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import { MindMapCanvas } from "./canvas";
 import { MINDMAP_ICON } from "./icon";
+import { t } from "./i18n";
 import { indentString } from "./settings";
 import { parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
 import { VIEW_TYPE_MINDMAP } from "./view";
@@ -38,7 +39,7 @@ export class XmindView extends FileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass("mm-view-content");
-    this.addAction("file-text", "转换为 Markdown 笔记", () => void this.convert());
+    this.addAction("file-text", t("xmind.convert"), () => void this.convert());
     const host = this.contentEl.createDiv();
     this.canvas = new MindMapCanvas(host, {
       structure: this.plugin.settings.defaultStructure,
@@ -59,7 +60,7 @@ export class XmindView extends FileView {
       this.sheets = await parseXmind(await this.app.vault.readBinary(file));
     } catch (e) {
       this.sheets = [];
-      new Notice(`无法读取 ${file.name}：${(e as Error).message}`);
+      new Notice(t("xmind.readFailed", { name: file.name, error: (e as Error).message }));
     }
     this.current = 0;
     this.renderSheet();
@@ -106,6 +107,6 @@ export class XmindView extends FileView {
     const path = folder && folder !== "/" ? `${folder}/${name}` : name;
     const created = await this.app.vault.create(path, md);
     await this.leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: created.path }, active: true });
-    new Notice(`已转换为 ${created.path}`);
+    new Notice(t("xmind.converted", { path: created.path }));
   }
 }

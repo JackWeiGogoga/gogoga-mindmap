@@ -1,4 +1,5 @@
 import { App, setIcon, setTooltip, TFile } from "obsidian";
+import { t } from "./i18n";
 import { IconPickerModal, storedValue } from "./icon-picker";
 import { displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
 
@@ -82,7 +83,7 @@ export class PropertyIconDecorator {
       preview = createSpan({ cls: "mm-icon-prop-preview" });
       preview.setAttribute("role", "button");
       preview.tabIndex = 0;
-      setTooltip(preview, "选择图标", { placement: "top" });
+      setTooltip(preview, t("propertyIcon.choose"), { placement: "top" });
       // 用 mousedown 抢在属性控件把焦点交给输入框之前
       preview.addEventListener("mousedown", (ev) => {
         ev.preventDefault();
@@ -99,7 +100,7 @@ export class PropertyIconDecorator {
     if (preview.dataset.value === raw) return;
     preview.dataset.value = raw;
     // 静态时只留图标，取值放进提示里，仍然看得到
-    setTooltip(preview, `选择图标 · 当前 ${raw}`, { placement: "top" });
+    setTooltip(preview, t("propertyIcon.chooseCurrent", { value: raw }), { placement: "top" });
     // empty() 会连事件一起清掉？不会，只清子节点；监听挂在 preview 本身
     preview.empty();
     preview.toggleClass("is-emoji", isEmojiValue(raw));

@@ -2,6 +2,7 @@ import {
   Component,
   FileView,
   finishRenderMath,
+  getLanguage,
   HoverParent,
   ItemView,
   loadMathJax,
@@ -25,6 +26,7 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
+import { setLocale, t } from "./i18n";
 import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
@@ -53,12 +55,14 @@ export default class MindMapPlugin extends Plugin {
   private propertyIcons: PropertyIconDecorator | null = null;
 
   async onload(): Promise<void> {
+    // 界面语言跟随 Obsidian；必须在注册命令、视图、功能区图标和设置页之前定下来
+    setLocale(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
     // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
     void loadPrism().catch(() => undefined);
-    this.registerHoverLinkSource(HOVER_SOURCE, { display: "思维导图", defaultMod: true });
+    this.registerHoverLinkSource(HOVER_SOURCE, { display: t("hover.display"), defaultMod: true });
     this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
     this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
@@ -116,14 +120,14 @@ export default class MindMapPlugin extends Plugin {
   async addListIcons(): Promise<void> {
     const icon = this.settings.listIcon;
     if (!icon) {
-      new Notice("先在设置里填一个图标值");
+      new Notice(t("notice.setIconFirst"));
       return;
     }
     const targets = this.app.vault
       .getMarkdownFiles()
       .filter((f) => this.isMindMapFile(f.path) && !this.app.metadataCache.getCache(f.path)?.frontmatter?.[ICON_KEY]);
     if (!targets.length) {
-      new Notice("所有脑图笔记都已经有图标了");
+      new Notice(t("notice.allHaveIcons"));
       return;
     }
     let done = 0;
@@ -134,10 +138,10 @@ export default class MindMapPlugin extends Plugin {
         });
         done += 1;
       } catch (e) {
-        console.error(`给 ${file.path} 写图标失败`, e);
+        console.error(t("log.iconWriteFailed", { path: file.path }), e);
       }
     }
-    new Notice(`已给 ${done} 篇脑图笔记补上图标`);
+    new Notice(t("notice.iconsAdded", { count: done }));
   }
 
   /** 把设置里的工具栏位置应用到所有打开的脑图视图（except 可跳过刚发起改动的那个） */
@@ -210,7 +214,7 @@ export default class MindMapPlugin extends Plugin {
   private registerCommands(): void {
     this.addCommand({
       id: "toggle-view",
-      name: "在思维导图和 Markdown 之间切换",
+      name: t("command.toggleView"),
       checkCallback: (checking) => {
         const view = this.app.workspace.getActiveViewOfType(FileView);
         const leaf = view?.leaf;
@@ -225,11 +229,11 @@ export default class MindMapPlugin extends Plugin {
 
     this.addCommand({
       id: "new-mindmap",
-      name: "新建思维导图",
+      name: t("command.newMindMap"),
       callback: () => void this.createMindMap(),
     });
 
-    this.addRibbonIcon(MINDMAP_ICON, "新建思维导图", () => void this.createMindMap());
+    this.addRibbonIcon(MINDMAP_ICON, t("command.newMindMap"), () => void this.createMindMap());
 
     const exportCommand = (id: string, name: string, run: (view: MindMapView) => Promise<void>) =>
       this.addCommand({
@@ -242,29 +246,29 @@ export default class MindMapPlugin extends Plugin {
           return true;
         },
       });
-    exportCommand("link-note", "链接到笔记 / 新建笔记", (v) => v.linkSelectedToNote());
-    exportCommand("toggle-outline", "切换大纲面板", (v) => v.toggleOutline());
+    exportCommand("link-note", t("command.linkNote"), (v) => v.linkSelectedToNote());
+    exportCommand("toggle-outline", t("command.toggleOutline"), (v) => v.toggleOutline());
 
     this.addCommand({
       id: "add-list-icons",
-      name: "给已有脑图笔记补上列表图标",
+      name: t("command.addListIcons"),
       callback: () => void this.addListIcons(),
     });
-    exportCommand("focus-branch", "聚焦选中分支", async (v) => v.focusSelected());
-    exportCommand("exit-focus", "退出聚焦", async (v) => v.exitFocus());
-    exportCommand("copy-node-link", "复制节点链接", (v) => v.copySelectedNodeLink());
-    exportCommand("search", "搜索节点", async (v) => v.openSearch());
-    exportCommand("expand-all", "展开全部节点", async (v) => v.setFoldLevel(null));
-    exportCommand("collapse-all", "折叠全部节点", async (v) => v.setFoldLevel(1));
-    exportCommand("export-png", "导出为 PNG", (v) => v.exportPng());
-    exportCommand("export-svg", "导出为 SVG", (v) => v.exportSvg());
-    exportCommand("copy-png", "复制为图片", (v) => v.copyPng());
+    exportCommand("focus-branch", t("command.focusBranch"), async (v) => v.focusSelected());
+    exportCommand("exit-focus", t("command.exitFocus"), async (v) => v.exitFocus());
+    exportCommand("copy-node-link", t("command.copyNodeLink"), (v) => v.copySelectedNodeLink());
+    exportCommand("search", t("command.search"), async (v) => v.openSearch());
+    exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
+    exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
+    exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());
+    exportCommand("export-svg", t("command.exportSvg"), (v) => v.exportSvg());
+    exportCommand("copy-png", t("command.copyPng"), (v) => v.copyPng());
   }
 
   private addFolderMenuItems(menu: MenuLike, folder: TFolder, tweak?: (item: MenuItem) => void): void {
     menu.addItem((item) => {
       item
-        .setTitle("新建思维导图")
+        .setTitle(t("command.newMindMap"))
         .setIcon(MINDMAP_ICON)
         // 核心文件列表里跟「新建笔记 / 新建文件夹 / 新建画布」同组，我们注册得晚，自然排在最后
         .setSection("action-primary")
@@ -278,7 +282,7 @@ export default class MindMapPlugin extends Plugin {
     const isMap = this.isMindMapFile(file.path);
     menu.addItem((item) =>
       item
-        .setTitle(isMap ? "以 Markdown 打开" : "以思维导图打开")
+        .setTitle(isMap ? t("menu.openAsMarkdown") : t("menu.openAsMindMap"))
         .setIcon(isMap ? "file-text" : MINDMAP_ICON)
         .onClick(() => {
           const leaf = this.app.workspace.getLeaf(false);
@@ -291,16 +295,18 @@ export default class MindMapPlugin extends Plugin {
   private async createMindMap(target?: TFolder): Promise<void> {
     const active = this.app.workspace.getActiveFile();
     const folder: TFolder = target ?? this.app.fileManager.getNewFileParent(active?.path ?? "");
-    const base = "未命名思维导图";
+    const base = t("newFile.baseName");
     let name = `${base}.md`;
     for (let i = 1; this.app.vault.getAbstractFileByPath(joinPath(folder.path, name)); i++) name = `${base} ${i}.md`;
     const title = name.replace(/\.md$/, "");
     const iconLine = this.settings.listIcon ? `${ICON_KEY}: ${this.settings.listIcon}\n` : "";
-    const content = `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n## 主题 1\n\n## 主题 2\n\n## 主题 3\n`;
+    // 新文件的起始内容跟随界面语言；只影响新建的文件
+    const topics = [1, 2, 3].map((n) => `## ${t("newFile.topic", { n })}\n`).join("\n");
+    const content = `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n${topics}`;
     const file = await this.app.vault.create(joinPath(folder.path, name), content);
     const leaf = this.app.workspace.getLeaf(false);
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
-    new Notice(`已创建 ${file.path}`);
+    new Notice(t("notice.created", { path: file.path }));
   }
 
   // ---------- 代码块 ----------
@@ -337,7 +343,7 @@ export default class MindMapPlugin extends Plugin {
           try {
             await this.replaceCodeBlock(ctx, el, prev, next);
           } catch (e) {
-            new Notice(`写回代码块失败：${(e as Error).message}`);
+            new Notice(t("notice.writeBackFailed", { error: (e as Error).message }));
           }
         });
       };
@@ -398,7 +404,7 @@ export default class MindMapPlugin extends Plugin {
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
   private async replaceCodeBlock(ctx: MarkdownPostProcessorContext, el: HTMLElement, expectedInner: string, nextInner: string): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
-    if (!(file instanceof TFile)) throw new Error(`找不到文件 ${ctx.sourcePath}`);
+    if (!(file instanceof TFile)) throw new Error(t("error.fileNotFound", { path: ctx.sourcePath }));
     const info = ctx.getSectionInfo(el);
     const hint = info ? { lineStart: info.lineStart, lineEnd: info.lineEnd } : null;
 
@@ -410,7 +416,7 @@ export default class MindMapPlugin extends Plugin {
     if (editorView && editorView.getMode() === "source") {
       const editor = editorView.editor;
       const range = locateBlock(editor.getValue(), hint, expectedInner);
-      if (!range) throw new Error("在笔记里找不到这个代码块");
+      if (!range) throw new Error(t("error.blockNotFound"));
       const body = nextInner === "" ? "" : `${nextInner}\n`;
       editor.replaceRange(body, { line: range.lineStart + 1, ch: 0 }, { line: range.lineEnd, ch: 0 });
       return;
@@ -424,7 +430,7 @@ export default class MindMapPlugin extends Plugin {
       }
       return replaceBlock(data, range, nextInner);
     });
-    if (failed) throw new Error("在笔记里找不到这个代码块");
+    if (failed) throw new Error(t("error.blockNotFound"));
   }
 
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
@@ -527,7 +533,7 @@ export default class MindMapPlugin extends Plugin {
       try {
         file = await this.app.vault.create(path, "");
       } catch (e) {
-        new Notice(`新建笔记失败：${(e as Error).message}`);
+        new Notice(t("notice.createNoteFailed", { error: (e as Error).message }));
         return null;
       }
     }

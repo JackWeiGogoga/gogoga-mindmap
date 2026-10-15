@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { LayoutOptions } from "./layout";
 
 export type ThemeName = "snow" | "rainbow" | "business" | "warm" | "mono" | "line" | "forest";
@@ -5,8 +6,6 @@ export type EdgeStyle = "curve" | "elbow";
 
 export interface Theme {
   name: ThemeName;
-  /** 菜单和设置里显示的名字 */
-  label: string;
   /** 根到主主题的连线 */
   rootEdge: EdgeStyle;
   /** 其余层级的连线 */
@@ -26,7 +25,6 @@ export interface Theme {
 export const THEMES: Record<ThemeName, Theme> = {
   snow: {
     name: "snow",
-    label: "雪松 · 深色中心，灰底节点",
     rootEdge: "curve",
     edge: "elbow",
     branchColors: false,
@@ -35,7 +33,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   rainbow: {
     name: "rainbow",
-    label: "彩虹 · 分支各一色，曲线",
     rootEdge: "curve",
     edge: "curve",
     branchColors: true,
@@ -44,7 +41,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   business: {
     name: "business",
-    label: "商务 · 蓝色系，直角折线",
     rootEdge: "elbow",
     edge: "elbow",
     branchColors: false,
@@ -53,7 +49,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   warm: {
     name: "warm",
-    label: "暖阳 · 橙调，大圆角曲线",
     rootEdge: "curve",
     edge: "curve",
     branchColors: false,
@@ -62,7 +57,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   mono: {
     name: "mono",
-    label: "极简 · 黑白描边，细线",
     rootEdge: "elbow",
     edge: "elbow",
     branchColors: false,
@@ -71,7 +65,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   line: {
     name: "line",
-    label: "线条 · 纯文字节点，细折线",
     rootEdge: "elbow",
     edge: "elbow",
     branchColors: false,
@@ -80,7 +73,6 @@ export const THEMES: Record<ThemeName, Theme> = {
   },
   forest: {
     name: "forest",
-    label: "森林 · 绿调分支，曲线",
     rootEdge: "curve",
     edge: "curve",
     branchColors: true,
@@ -90,6 +82,16 @@ export const THEMES: Record<ThemeName, Theme> = {
 };
 
 export const THEME_LIST: Theme[] = Object.values(THEMES);
+
+/** 主题的短名（雪松 / Snow），用在工具栏提示里；用到时才查字典，跟随界面语言 */
+export function themeShortLabel(name: ThemeName): string {
+  return t(`theme.${name}`);
+}
+
+/** 菜单和设置里显示的完整名字：短名 · 一句说明 */
+export function themeLabel(name: ThemeName): string {
+  return t("theme.label", { name: themeShortLabel(name), desc: t(`theme.${name}.desc`) });
+}
 
 export function isThemeName(v: unknown): v is ThemeName {
   return typeof v === "string" && v in THEMES;

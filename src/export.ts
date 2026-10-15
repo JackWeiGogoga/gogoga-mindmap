@@ -4,6 +4,7 @@
  */
 
 import type { MindMapCanvas } from "./canvas";
+import { t } from "./i18n";
 
 const INLINE_PROPS = [
   "position", "left", "top", "width", "height", "box-sizing", "display", "align-items", "justify-content", "gap", "flex",
@@ -27,7 +28,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error ?? new Error("读取失败"));
+    r.onerror = () => reject(r.error ?? new Error(t("export.readFailed")));
     r.readAsDataURL(blob);
   });
 }
@@ -124,7 +125,7 @@ function inlineStyles(orig: Element, clone: Element): void {
 
 export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}): Promise<SvgExport> {
   const bounds = canvas.getBounds();
-  if (!bounds) throw new Error("没有可导出的内容");
+  if (!bounds) throw new Error(t("export.nothing"));
   const pad = opts.padding ?? 32;
   const width = Math.ceil(bounds.w + pad * 2);
   const height = Math.ceil(bounds.h + pad * 2);
@@ -201,17 +202,17 @@ export async function svgToPng(exp: SvgExport, scale = 2): Promise<Blob> {
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(exp.svg)}`;
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();
-    img.onerror = () => reject(new Error("SVG 渲染失败"));
+    img.onerror = () => reject(new Error(t("export.svgRenderFailed")));
     img.src = url;
   });
   const c = createEl("canvas");
   c.width = Math.round(exp.width * scale);
   c.height = Math.round(exp.height * scale);
   const ctx = c.getContext("2d");
-  if (!ctx) throw new Error("无法创建画布");
+  if (!ctx) throw new Error(t("export.noCanvas"));
   ctx.scale(scale, scale);
   ctx.drawImage(img, 0, 0);
   return new Promise<Blob>((resolve, reject) => {
-    c.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG 编码失败"))), "image/png");
+    c.toBlob((b) => (b ? resolve(b) : reject(new Error(t("export.pngEncodeFailed")))), "image/png");
   });
 }

@@ -3,6 +3,8 @@
  * wiki 链接、普通链接、任务复选框。只做一层，不嵌套；输出全部用 DOM API 构造，不拼 HTML。
  */
 
+import { t } from "./i18n";
+
 export interface InlineOptions {
   onLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
   /** 鼠标悬停在内部链接上（Obsidian 用来弹页面预览） */
@@ -25,11 +27,12 @@ export interface InlineOptions {
 }
 
 /** 可加在节点开头的标记（emoji，存在文字里，任何地方都能显示） */
-export const MARKER_GROUPS: { name: string; emojis: string[]; exclusive: boolean }[] = [
-  { name: "优先级", emojis: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"], exclusive: true },
-  { name: "进度", emojis: ["⏳", "✅", "❌"], exclusive: true },
-  { name: "旗帜", emojis: ["🚩", "🟧", "🟨", "🟩", "🟦", "🟪"], exclusive: false },
-  { name: "符号", emojis: ["⭐", "❗", "❓", "💡", "⚠️", "🔥", "❤️", "📌"], exclusive: false },
+/** name 是界面上的分组名，用 getter 在用到时才查字典；emoji 本身是数据，不翻译 */
+export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive: boolean }[] = [
+  { get name() { return t("marker.priority"); }, emojis: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"], exclusive: true },
+  { get name() { return t("marker.progress"); }, emojis: ["⏳", "✅", "❌"], exclusive: true },
+  { get name() { return t("marker.flags"); }, emojis: ["🚩", "🟧", "🟨", "🟩", "🟦", "🟪"], exclusive: false },
+  { get name() { return t("marker.symbols"); }, emojis: ["⭐", "❗", "❓", "💡", "⚠️", "🔥", "❤️", "📌"], exclusive: false },
 ];
 const ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
 
@@ -148,7 +151,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
   if (task) {
     const box = createSpan();
     box.className = "mm-task" + (task[1] === " " ? "" : " is-done");
-    box.title = "点击切换";
+    box.title = t("inline.toggleTask");
     box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     box.addEventListener("click", (ev) => {
       ev.stopPropagation();
@@ -323,7 +326,7 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   const activate = createEl("button");
   activate.type = "button";
   activate.className = "mm-frame-activate";
-  activate.textContent = "激活";
+  activate.textContent = t("inline.activate");
   shield.append(activate);
   box.append(f, shield);
   return box;

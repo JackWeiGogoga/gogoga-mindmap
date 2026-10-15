@@ -4,7 +4,7 @@
 
 An XMind-style mind map plugin. Markdown is the single source of truth: headings and list items are the nodes, and the mind map view is just another editor for the same `.md` file, so edits on either side show up on the other. No runtime dependencies; works on both desktop and mobile.
 
-The plugin's interface is currently in Simplified Chinese. Interface labels below are given in Chinese, with an English gloss.
+The interface follows Obsidian's language setting — English, or Simplified Chinese when Obsidian is set to Chinese.
 
 ![Demo: two-way sync between Markdown and the mind map, four structures, seven themes, folding and focus](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/demo.gif)
 
@@ -16,13 +16,13 @@ The plugin's interface is currently in Simplified Chinese. Interface labels belo
 > [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) (Mind Map user guide), opened as a mind map, is a clickable, foldable map of the plugin's features: every capability is on it, demonstrated by the plugin itself. The note it links to,
 > [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (Mind map code block example), is an ordinary note with two `mindmap` blocks embedded in it.
 
-1. Command palette → **新建思维导图** (New mind map), or add `mindmap: true` to the frontmatter of any note.
-2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **在思维导图和 Markdown 之间切换** (Toggle between mind map and Markdown), or the file context menu.
+1. Command palette → **New mind map**, or add `mindmap: true` to the frontmatter of any note.
+2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **Toggle between mind map and Markdown**, or the file context menu.
 3. In a regular note, write a ```` ```mindmap ```` code block containing the same kind of Markdown, and it renders as a small mind map in both Reading view and Live Preview.
    It's read-only by default. Click the pencil in the toolbar or double-click a node to start editing. Changes are written straight back into the code block, and undo and redo only apply within the block.
-4. Put an `.xmind` file in your vault and open it directly: it renders read-only, you can switch between sheets, and one click in the top-right corner does **转换为 Markdown 笔记** (Convert to Markdown note).
+4. Put an `.xmind` file in your vault and open it directly: it renders read-only, you can switch between sheets, and one click in the top-right corner does **Convert to Markdown note**.
    Both `content.json` (XMind Zen / 2020 and later) and `content.xml` (XMind 8) are supported.
-5. From the view menu (⋯ in the top-right corner) or the command palette: **导出为 PNG** (Export as PNG), **导出为 SVG** (Export as SVG), **复制为图片** (Copy as image).
+5. From the view menu (⋯ in the top-right corner) or the command palette: **Export as PNG**, **Export as SVG**, **Copy as image**.
    PNG is exported at 2× resolution, and Obsidian's bundled Inter font is embedded, so the export matches what you see on screen.
 
 ### Editing
@@ -34,25 +34,25 @@ The plugin's interface is currently in Simplified Chinese. Interface labels belo
 - ⌘F searches nodes: matches are highlighted, Enter / Shift+Enter jump between results and center them, and collapsed ancestors expand automatically.
 - ⌘C / ⌘X / ⌘V copy, cut, and paste subtrees. The clipboard holds Markdown as an indented list, so you can paste it anywhere.
   The other way round, paste a list, headings, or plain text lines, and they become children of the current node, following their structure.
-- The level button in the toolbar: **展开全部** (Expand all), **只显示主主题** (Show main topics only), **显示到第 2 层** / **显示到第 3 层** (Show up to level 2 / 3).
+- The level button in the toolbar: **Expand all**, **Show main topics only**, **Show up to level 2** / **Show up to level 3**.
 - While editing, Shift+Enter inserts a line break. Multi-line text is stored as `<br>` in the heading or list item and renders normally in Reading view.
 - Touch: one finger to pan, two fingers to zoom, tap to select, press and hold for 0.4 seconds then drag to change a node's parent. Buttons get larger automatically on touch screens.
-- **Outline panel**: the leftmost toolbar button or the command **切换大纲面板** (Toggle outline panel) opens a tree list on the left, linked both ways with the canvas.
+- **Outline panel**: the leftmost toolbar button or the command **Toggle outline panel** opens a tree list on the left, linked both ways with the canvas.
   In the panel: ↑↓ to move, Tab / Shift+Tab to demote / promote, Alt+↑↓ to reorder, Enter to add a sibling and rename it in place, Delete to delete, Space to fold.
   On the canvas, Alt+arrow keys likewise reorder, promote, and demote.
 - **Link nodes to notes**: press ⌘K or click the link button in the toolbar, then pick an existing note or create a new one. The label becomes `[[note|original text]]`, and a newly created note opens in a split on the right. Press ⌘K again on a linked node to open or remove the link. Hold ⌘ and hover for a page preview.
-- **Structures**: logic chart (rightward), mind map (left and right), org chart (downward), and tree chart. Switch them from the structure menu in the toolbar: **逻辑图（向右）**, **思维导图（左右分布）**, **组织结构图（向下）**, **树形图**.
-- **Themes**: switch with the palette button in the toolbar. Seven themes: **雪松** (snow, the default: dark center with gray node backgrounds), **彩虹** (rainbow: one color per branch), **商务** (business: blue tones with right-angle elbow lines), **暖阳** (warm: orange tones with large rounded corners), **极简** (mono: black-and-white outlines with thin lines), **线条** (line: text-only nodes with thin elbow lines), and **森林** (forest: green-toned branches).
-  Your choice is written to `mindmap-theme` and applies per file; the **默认主题** (Default theme) setting changes the theme for new files. Every theme has a dark mode.
+- **Structures**: logic chart (rightward), mind map (left and right), org chart (downward), and tree chart. Switch them from the structure menu in the toolbar: **Logic chart (rightward)**, **Mind map (left and right)**, **Org chart (downward)**, **Tree chart**.
+- **Themes**: switch with the palette button in the toolbar. Seven themes: **Snow** (the default: dark center with gray node backgrounds), **Rainbow** (one color per branch), **Business** (blue tones with right-angle elbow lines), **Warm** (orange tones with large rounded corners), **Mono** (black-and-white outlines with thin lines), **Line** (text-only nodes with thin elbow lines), and **Forest** (green-toned branches).
+  Your choice is written to `mindmap-theme` and applies per file; the **Default theme** setting changes the theme for new files. Every theme has a dark mode.
 - **Math and images**: `$E=mc^2$` in a label renders as math. `![[image.png|160]]` or `![alt](url)` renders as a thumbnail, where the number is the width; select it and drag the handle in the bottom-right corner to resize. Code blocks in notes get syntax highlighting. Math and images are embedded when exporting PNG/SVG.
-- **Context menu**: available on nodes and on empty space. Editing, adding and removing nodes, focus, fold, link, note, markers, tasks, **本级转为标题** / **本级转为列表** (Convert level to headings / lists), **复制节点链接** (Copy node link), and delete are all there.
+- **Context menu**: available on nodes and on empty space. Editing, adding and removing nodes, focus, fold, link, note, markers, tasks, **Convert level to headings** / **Convert level to lists**, **Copy node link**, and delete are all there.
 - **Focus on a branch**: show one branch on its own as if it were the root. The breadcrumb at the top takes you back to the full map or any ancestor in one click; Esc also exits.
-- **Markers**: the star button in the node toolbar opens a picker with four groups, **优先级** (Priority), **进度** (Progress), **旗帜** (Flags), and **符号** (Symbols). Markers are stored as emoji at the start of the text, so they display anywhere.
+- **Markers**: the star button in the node toolbar opens a picker with four groups, **Priority**, **Progress**, **Flags**, and **Symbols**. Markers are stored as emoji at the start of the text, so they display anywhere.
 - **Task checkboxes**: `[ ] item` renders as a checkbox; clicking cycles between incomplete, complete, and removed.
 - **#tags**: a `#tag` in a node renders in tag style; clicking it opens global search.
 - **External links**: `[text](https://…)` or a bare pasted URL becomes a link that opens in the browser when clicked. Trailing punctuation isn't swallowed into the link.
 - **Video and other iframe embeds**: paste an `<iframe …>` copied from Bilibili or YouTube straight into a node and it renders as a player. Only the iframe tag is accepted, and `src` must be http(s). Attributes are parsed separately and the element is built with the DOM API, never innerHTML. Autoplay is off by default (`autoplay=0` is added at render time without touching the note; write `autoplay=1` yourself if you want autoplay), and players in collapsed branches aren't loaded. Embeds also work in notes, rendered by Obsidian's own renderer.
-  A shield covers the player: a single click only selects the node, and the player is released only when you double-click it or click the **激活** (Activate) button in the bottom-right corner, so a stray click doesn't send you to the source site. An activated node gets a dashed outline and is deactivated when you click elsewhere.
+  A shield covers the player: a single click only selects the node, and the player is released only when you double-click it or click the **Activate** button in the bottom-right corner, so a stray click doesn't send you to the source site. An activated node gets a dashed outline and is deactivated when you click elsewhere.
   When selected, drag the handle in the bottom-right corner to resize (aspect ratio is locked by default; hold Shift to change height only; double-click to reset to 560×315).
 - **Drag in and paste**: drag a note from the file list onto a node to add it as a `[[link]]` child. Dropped or pasted images are saved to the attachment folder and become image nodes.
 - **Copy node link**: heading nodes give `[[note#heading]]`; list nodes get a block ID added automatically and give `[[note#^id]]`, which you can reference from other notes.
@@ -80,7 +80,7 @@ A paragraph here becomes the central topic's note.
 ```
 
 - Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
-- Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **标题的最深级别** (Deepest heading level) setting.
+- Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **Deepest heading level** setting.
 - Paragraphs and code blocks under a node are kept as-is as its note, and the node shows a ≡ icon you can click to view it.
 - Markdown exported from XMind uses this same heading hierarchy, so it opens directly; it also works the other way, imported into XMind.
 

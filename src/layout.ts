@@ -7,14 +7,16 @@
  *   tree-right   树形图：子节点在父节点下方向右缩进，像文件树
  */
 
+import { t } from "./i18n";
 import { MindNode, visibleChildren } from "./model";
 
 export type Structure = "logic-right" | "mindmap" | "org-down" | "tree-right";
-export const STRUCTURES: { id: Structure; label: string }[] = [
-  { id: "logic-right", label: "逻辑图（向右）" },
-  { id: "mindmap", label: "思维导图（左右分布）" },
-  { id: "org-down", label: "组织结构图（向下）" },
-  { id: "tree-right", label: "树形图" },
+/** label 是 getter：模块加载时界面语言还没定，用到时再取 */
+export const STRUCTURES: { id: Structure; readonly label: string }[] = [
+  { id: "logic-right", get label() { return t("structure.logicRight"); } },
+  { id: "mindmap", get label() { return t("structure.mindmap"); } },
+  { id: "org-down", get label() { return t("structure.orgDown"); } },
+  { id: "tree-right", get label() { return t("structure.treeRight"); } },
 ];
 export function isStructure(s: unknown): s is Structure {
   return STRUCTURES.some((x) => x.id === s);

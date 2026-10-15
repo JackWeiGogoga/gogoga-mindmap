@@ -5,6 +5,7 @@
  */
 
 import type { MindMapCanvas } from "./canvas";
+import { t } from "./i18n";
 import { plainText } from "./inline";
 import { MindNode, visibleChildren } from "./model";
 
@@ -22,11 +23,11 @@ export class OutlinePanel {
     const header = createDiv();
     header.className = "mm-outline-header";
     const title = createSpan();
-    title.textContent = "大纲";
+    title.textContent = t("outline.title");
     const close = createEl("button");
     close.type = "button";
     close.className = "mm-tool mm-outline-close";
-    canvas.tipFor(close, "关闭大纲面板", "left");
+    canvas.tipFor(close, t("outline.close"), "left");
     close.textContent = "×";
     close.addEventListener("click", onClose);
     header.append(title, close);
@@ -81,7 +82,7 @@ export class OutlinePanel {
 
       const text = createSpan();
       text.className = "mm-outline-text";
-      text.textContent = plainText(node.text) || (node.depth === 0 ? "中心主题" : "");
+      text.textContent = plainText(node.text) || (node.depth === 0 ? t("canvas.centralTopic") : "");
       row.append(text);
 
       if (node.note) {

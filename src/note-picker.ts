@@ -1,4 +1,5 @@
 import { App, FuzzyMatch, FuzzySuggestModal, TFile } from "obsidian";
+import { t } from "./i18n";
 
 export type PickItem = { kind: "new"; name: string } | { kind: "file"; file: TFile };
 
@@ -8,11 +9,11 @@ export class NotePickerModal extends FuzzySuggestModal<PickItem> {
 
   constructor(app: App, private suggested: string, private onPick: (item: PickItem | null) => void) {
     super(app);
-    this.setPlaceholder("输入笔记名：选择已有笔记，或回车新建");
+    this.setPlaceholder(t("notePicker.placeholder"));
     this.setInstructions([
-      { command: "↑↓", purpose: "选择" },
-      { command: "↵", purpose: "链接" },
-      { command: "esc", purpose: "取消" },
+      { command: "↑↓", purpose: t("picker.navigate") },
+      { command: "↵", purpose: t("picker.link") },
+      { command: "esc", purpose: t("picker.dismiss") },
     ]);
   }
 
@@ -39,7 +40,7 @@ export class NotePickerModal extends FuzzySuggestModal<PickItem> {
 
   renderSuggestion(match: FuzzyMatch<PickItem>, el: HTMLElement): void {
     if (match.item.kind === "new") {
-      el.createSpan({ text: `新建笔记「${match.item.name}」`, cls: "mm-picker-new" });
+      el.createSpan({ text: t("notePicker.create", { name: match.item.name }), cls: "mm-picker-new" });
       return;
     }
     super.renderSuggestion(match, el);

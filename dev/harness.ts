@@ -3,8 +3,12 @@ import "./obsidian-shim";
 import { MindMapCanvas } from "../src/canvas";
 import { buildSvg, svgToPng } from "../src/export";
 import { parseMarkdown, serializeMarkdown } from "../src/markdown";
+import { setLocale } from "../src/i18n";
 import type { Structure } from "../src/layout";
 import type { ThemeName } from "../src/theme";
+
+// 界面语言：?lang=en 看英文，默认中文；不读 navigator
+setLocale(new URLSearchParams(window.location.search).get("lang") ?? "zh");
 
 const SAMPLE = `---
 mindmap: true
