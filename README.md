@@ -3,16 +3,16 @@
 XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列表就是节点，脑图视图只是同一个 `.md`
 文件的另一种编辑器，改哪边另一边都跟着变。零运行时依赖，桌面端和移动端都能用。
 
-![演示：Markdown 与脑图双向同步、四种结构、七个主题、折叠与聚焦](docs/demo.gif)
+![演示：Markdown 与脑图双向同步、四种结构、七个主题、折叠与聚焦](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/demo.gif)
 
-![Mind Map 使用指南（snow 主题）](docs/snow.png)
+![Mind Map 使用指南（snow 主题）](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/snow.png)
 
 ## 用法
 
 > [!tip] 想快速上手，把 `docs/` 下的两篇复制进 vault：
-> [Mind Map 使用指南](<docs/Mind Map 使用指南.md>) 用脑图打开就是一张可以点开、可以折叠的功能地图，
+> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) 用脑图打开就是一张可以点开、可以折叠的功能地图，
 > 插件的每个能力都在上面，而且用它自己演示了一遍；它链到的
-> [脑图代码块嵌入示例](<docs/脑图代码块嵌入示例.md>) 则是一篇插了两块 `mindmap` 的普通笔记。
+> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) 则是一篇插了两块 `mindmap` 的普通笔记。
 
 1. 命令面板 → **新建思维导图**，或者给任意笔记的 frontmatter 加上 `mindmap: true`。
 2. 带这个键的笔记默认以脑图打开；视图右上角的按钮、命令 **在思维导图和 Markdown 之间切换**、
