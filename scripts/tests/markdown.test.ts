@@ -7,41 +7,41 @@ const canonical = `---
 mindmap: true
 ---
 
-# 佩洛西事件
+# 周末露营计划
 
-事件说明作为根节点备注。
+计划说明作为根节点备注。
 
-## 先发后审8% %%green%%
-- 删除率 12%
-\t- 总共 53395
-\t- 删除 6747
+## 装备清单 %%green%%
+- 帐篷 2 顶
+	- 睡袋 4 个
+	- 防潮垫 4 张
 
-## 先审后发92% %%red%%
+## 路线与行程 %%red%%
 
-### 总体删除率 42%
-- 总共 578008
-- 删除 245649
+### 第一天 出发
+- 车程 3 小时
+- 午饭 服务区
 
-### 未命中关键词的删除率 38%
-- 总共 310440
-\t- 先审后发中，未命中关键词占比53%，这是可以转为先发的上限 %%blue%%
-- 删除 120596
-\t- 有审核理由 10743
-\t\t- 涉习 8 %%red%%
-\t\t- 生态 9001 %%green fold%%
-\t\t\t- 隐藏的子节点
+### 第二天 徒步
+- 环湖步道 12 km
+	- 提前查好天气，下雨就改走林间小路 %%blue%%
+- 傍晚返程
+	- 采购清单 6 项
+		- 木炭 2 袋 %%red%%
+		- 饮用水 12 瓶 %%green fold%%
+			- 隐藏的子节点
 `;
 
 test("规范格式往返完全一致", () => {
   const doc = parseMarkdown(canonical);
   assert.equal(doc.rootFromHeading, true);
-  assert.equal(doc.root.text, "佩洛西事件");
-  assert.equal(doc.root.note, "事件说明作为根节点备注。");
+  assert.equal(doc.root.text, "周末露营计划");
+  assert.equal(doc.root.note, "计划说明作为根节点备注。");
   assert.equal(doc.root.children.length, 2);
   assert.equal(doc.root.children[0].color, "green");
   assert.equal(doc.root.children[0].children[0].children.length, 2);
   const folded = findByPath(doc.root, "1/1/1/0/1")!;
-  assert.equal(folded.text, "生态 9001");
+  assert.equal(folded.text, "饮用水 12 瓶");
   assert.equal(folded.folded, true);
   assert.equal(folded.color, "green");
   assert.equal(folded.children.length, 1);
