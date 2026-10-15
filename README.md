@@ -3,7 +3,7 @@
 XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列表就是节点，脑图视图只是同一个 `.md`
 文件的另一种编辑器，改哪边另一边都跟着变。零运行时依赖，桌面端和移动端都能用。
 
-![snow 主题](docs/snow.png)
+![Mind Map 使用指南（snow 主题）](docs/snow.png)
 
 ## 用法
 
