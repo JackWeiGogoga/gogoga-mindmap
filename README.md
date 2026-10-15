@@ -1,161 +1,159 @@
 # gogoga Mind Map
 
-XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列表就是节点，脑图视图只是同一个 `.md`
-文件的另一种编辑器，改哪边另一边都跟着变。零运行时依赖，桌面端和移动端都能用。
+**English** | [简体中文](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/README.zh-CN.md)
 
-![演示：Markdown 与脑图双向同步、四种结构、七个主题、折叠与聚焦](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/demo.gif)
+An XMind-style mind map plugin. Markdown is the single source of truth: headings and list items are the nodes, and the mind map view is just another editor for the same `.md` file, so edits on either side show up on the other. No runtime dependencies; works on both desktop and mobile.
 
-![Mind Map 使用指南（snow 主题）](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/snow.png)
+The plugin's interface is currently in Simplified Chinese. Interface labels below are given in Chinese, with an English gloss.
 
-## 用法
+![Demo: two-way sync between Markdown and the mind map, four structures, seven themes, folding and focus](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/demo.gif)
 
-> [!tip] 想快速上手，把 `docs/` 下的两篇复制进 vault：
-> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) 用脑图打开就是一张可以点开、可以折叠的功能地图，
-> 插件的每个能力都在上面，而且用它自己演示了一遍；它链到的
-> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) 则是一篇插了两块 `mindmap` 的普通笔记。
+![The Mind Map user guide note (snow theme)](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/snow.png)
 
-1. 命令面板 → **新建思维导图**，或者给任意笔记的 frontmatter 加上 `mindmap: true`。
-2. 带这个键的笔记默认以脑图打开；视图右上角的按钮、命令 **在思维导图和 Markdown 之间切换**、
-   文件右键菜单都能来回切。
-3. 普通笔记里写一个 ```` ```mindmap ```` 代码块，块内写同样的 Markdown，阅读模式和实时预览都会渲染成一张小图。
-   默认只读；点工具栏的铅笔或双击节点进入编辑，改动直接写回这个代码块，撤销重做也只作用于块内。
-4. 把 `.xmind` 文件放进 vault 直接打开：只读渲染，多工作表可切换，右上角一键**转换为 Markdown 笔记**。
-   XMind Zen / 2020 之后的 content.json 和 XMind 8 的 content.xml 都支持。
-5. 视图菜单（右上角 ⋯）或命令面板：**导出为 PNG**、**导出为 SVG**、**复制为图片**。
-   PNG 是 2 倍分辨率，Obsidian 自带的 Inter 字体会内嵌，导出和屏幕上看到的一致。
+## Usage
 
-### 编辑
+> [!tip] For a quick start, copy the two Chinese-language example notes in `docs/` into your vault.
+> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) (Mind Map user guide), opened as a mind map, is a clickable, foldable map of the plugin's features: every capability is on it, demonstrated by the plugin itself. The note it links to,
+> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (Mind map code block example), is an ordinary note with two `mindmap` blocks embedded in it.
 
-- 单击选中，双击编辑；选中后节点上方出现浮动工具栏：9 种颜色、编辑备注、删除。
-- **拖拽节点**到另一个节点上成为它的子节点，拖到子节点列的空隙里则插到那个位置；左右分布时拖到另一侧也行。
-- Shift 点击加选，⌘ 点击反选，**Shift 拖拽空白处框选**，⌘A 全选；多选后颜色和删除对整组生效。
-- 点节点上的 ≡ 查看备注，工具栏里的备注按钮直接编辑；备注支持 Markdown，写回时保持在节点下方。
-- ⌘F 搜索节点：匹配的节点高亮，Enter / Shift+Enter 在结果间跳转并居中，折叠着的祖先会自动展开。
-- ⌘C / ⌘X / ⌘V 复制、剪切、粘贴子树。剪贴板里是缩进列表形式的 Markdown，可以粘到任何地方；
-  反过来把一段列表、标题或纯文本行粘进来，会按结构变成当前节点的子节点。
-- 工具栏的层级按钮：展开全部、只显示主主题、显示到第 2 / 3 层。
-- 编辑时 Shift+Enter 换行，多行文本以 `<br>` 存在标题或列表项里，阅读模式照常渲染。
-- 触屏：单指平移、双指缩放、轻点选中、按住 0.4 秒再拖动换父节点，按钮在触屏上自动放大。
-- **大纲面板**：工具栏最左的按钮或命令「切换大纲面板」，左侧出现树形列表，与画布双向联动。
-  面板里 ↑↓ 移动、Tab / Shift+Tab 降级升级、Alt+↑↓ 排序、Enter 加兄弟并就地改名、Delete 删除、Space 折叠。
-  画布上同样支持 Alt+方向键排序与升降级。
-- **节点链接笔记**：⌘K 或工具栏的链接按钮，选一篇已有笔记或直接新建，标签变成 `[[笔记|原文]]`；
-  新建的笔记在右侧分栏打开。已链接的节点再按 ⌘K 可打开或取消链接。按住 ⌘ 悬停有页面预览。
-- **结构**：逻辑图（向右）、思维导图（左右分布）、组织结构图（向下）、树形图，工具栏结构菜单切换。
-- **主题**：工具栏的调色盘按钮切换，六个主题——雪松（默认，深色中心配灰底节点）、彩虹（分支各一色）、
-  商务（蓝色系直角折线）、暖阳（橙调大圆角）、极简（黑白描边细线）、线条（纯文字节点配细折线）、森林（绿调分支）。
-  切换结果写进 `mindmap-theme`，按文件生效；设置里可改新文件的默认主题。每个主题都配了深色模式。
-- **公式与图片**：标签里写 `$E=mc^2$` 渲染成公式；`![[图片.png|160]]` 或 `![alt](url)` 渲染成缩略图，
-  数字参数是宽度，选中后拖右下角手柄改大小。备注里的代码块带语法高亮。导出 PNG/SVG 时公式和图片都会内嵌。
-- **右键菜单**：节点和空白处都有，编辑、增删、聚焦、折叠、链接、备注、标记、任务、本级转标题/列表、复制链接、删除全在里面。
-- **聚焦分支**：把某个分支当作根单独显示，顶部面包屑一键回到全图或任一祖先；Esc 也能退出。
-- **标记**：节点工具栏的星形按钮打开选择器，优先级、进度、旗帜、符号四组，以 emoji 存在文字开头，任何地方都能显示。
-- **任务复选框**：`[ ] 事项` 渲染成复选框，点击在未完成、完成、去掉之间切换。
-- **#标签**：节点里的 `#标签` 渲染成标签样式，点击打开全局搜索。
-- **外部链接**：`[文字](https://…)` 或直接粘一个裸网址都会成链，点击用浏览器打开；句尾标点不会被吃进去。
-- **视频等 iframe 嵌入**：B 站 / YouTube 复制的 `<iframe …>` 直接粘进节点就渲染成播放器。只认 iframe 这一个标签、`src` 必须是 http(s)，属性另行解析后用 DOM API 建元素，不写 innerHTML；默认不自动播放（渲染时补 `autoplay=0`，笔记原文不动；想自动播就自己写 `autoplay=1`），折叠着的分支不加载。备注里也能放，走 Obsidian 自己的渲染器。
-  播放器上盖了一层挡板，单击只是选中节点，双击画面或点右下角的「激活」按钮才放行，避免顺手一点就跳去源站；激活的节点带一圈虚线，点别处自动收回。
-  选中后右下角的手柄能拖着改大小（默认锁宽高比，Shift 单独拉高度，双击恢复 560×315）。
-- **拖入与粘贴**：从文件列表把笔记拖到节点上变成 `[[链接]]` 子节点，拖入或粘贴图片会存到附件目录并生成图片节点。
-- **复制节点链接**：标题节点给 `[[笔记#标题]]`，列表节点自动补块 id 给 `[[笔记#^id]]`，别的笔记里可以引用。
-- **移动端**：节点工具栏有加子节点、加兄弟按钮，底部工具栏有撤销重做，没有键盘也能完整编辑。
-- ⌘B / ⌘I 给选中节点整体加粗、斜体。
+1. Command palette → **新建思维导图** (New mind map), or add `mindmap: true` to the frontmatter of any note.
+2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **在思维导图和 Markdown 之间切换** (Toggle between mind map and Markdown), or the file context menu.
+3. In a regular note, write a ```` ```mindmap ```` code block containing the same kind of Markdown, and it renders as a small mind map in both Reading view and Live Preview.
+   It's read-only by default. Click the pencil in the toolbar or double-click a node to start editing. Changes are written straight back into the code block, and undo and redo only apply within the block.
+4. Put an `.xmind` file in your vault and open it directly: it renders read-only, you can switch between sheets, and one click in the top-right corner does **转换为 Markdown 笔记** (Convert to Markdown note).
+   Both `content.json` (XMind Zen / 2020 and later) and `content.xml` (XMind 8) are supported.
+5. From the view menu (⋯ in the top-right corner) or the command palette: **导出为 PNG** (Export as PNG), **导出为 SVG** (Export as SVG), **复制为图片** (Copy as image).
+   PNG is exported at 2× resolution, and Obsidian's bundled Inter font is embedded, so the export matches what you see on screen.
 
-### Markdown 映射
+### Editing
+
+- Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
+- **Drag a node** onto another node to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side.
+- Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color and delete apply to the whole group.
+- Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back.
+- ⌘F searches nodes: matches are highlighted, Enter / Shift+Enter jump between results and center them, and collapsed ancestors expand automatically.
+- ⌘C / ⌘X / ⌘V copy, cut, and paste subtrees. The clipboard holds Markdown as an indented list, so you can paste it anywhere.
+  The other way round, paste a list, headings, or plain text lines, and they become children of the current node, following their structure.
+- The level button in the toolbar: **展开全部** (Expand all), **只显示主主题** (Show main topics only), **显示到第 2 层** / **显示到第 3 层** (Show up to level 2 / 3).
+- While editing, Shift+Enter inserts a line break. Multi-line text is stored as `<br>` in the heading or list item and renders normally in Reading view.
+- Touch: one finger to pan, two fingers to zoom, tap to select, press and hold for 0.4 seconds then drag to change a node's parent. Buttons get larger automatically on touch screens.
+- **Outline panel**: the leftmost toolbar button or the command **切换大纲面板** (Toggle outline panel) opens a tree list on the left, linked both ways with the canvas.
+  In the panel: ↑↓ to move, Tab / Shift+Tab to demote / promote, Alt+↑↓ to reorder, Enter to add a sibling and rename it in place, Delete to delete, Space to fold.
+  On the canvas, Alt+arrow keys likewise reorder, promote, and demote.
+- **Link nodes to notes**: press ⌘K or click the link button in the toolbar, then pick an existing note or create a new one. The label becomes `[[note|original text]]`, and a newly created note opens in a split on the right. Press ⌘K again on a linked node to open or remove the link. Hold ⌘ and hover for a page preview.
+- **Structures**: logic chart (rightward), mind map (left and right), org chart (downward), and tree chart. Switch them from the structure menu in the toolbar: **逻辑图（向右）**, **思维导图（左右分布）**, **组织结构图（向下）**, **树形图**.
+- **Themes**: switch with the palette button in the toolbar. Seven themes: **雪松** (snow, the default: dark center with gray node backgrounds), **彩虹** (rainbow: one color per branch), **商务** (business: blue tones with right-angle elbow lines), **暖阳** (warm: orange tones with large rounded corners), **极简** (mono: black-and-white outlines with thin lines), **线条** (line: text-only nodes with thin elbow lines), and **森林** (forest: green-toned branches).
+  Your choice is written to `mindmap-theme` and applies per file; the **默认主题** (Default theme) setting changes the theme for new files. Every theme has a dark mode.
+- **Math and images**: `$E=mc^2$` in a label renders as math. `![[image.png|160]]` or `![alt](url)` renders as a thumbnail, where the number is the width; select it and drag the handle in the bottom-right corner to resize. Code blocks in notes get syntax highlighting. Math and images are embedded when exporting PNG/SVG.
+- **Context menu**: available on nodes and on empty space. Editing, adding and removing nodes, focus, fold, link, note, markers, tasks, **本级转为标题** / **本级转为列表** (Convert level to headings / lists), **复制节点链接** (Copy node link), and delete are all there.
+- **Focus on a branch**: show one branch on its own as if it were the root. The breadcrumb at the top takes you back to the full map or any ancestor in one click; Esc also exits.
+- **Markers**: the star button in the node toolbar opens a picker with four groups, **优先级** (Priority), **进度** (Progress), **旗帜** (Flags), and **符号** (Symbols). Markers are stored as emoji at the start of the text, so they display anywhere.
+- **Task checkboxes**: `[ ] item` renders as a checkbox; clicking cycles between incomplete, complete, and removed.
+- **#tags**: a `#tag` in a node renders in tag style; clicking it opens global search.
+- **External links**: `[text](https://…)` or a bare pasted URL becomes a link that opens in the browser when clicked. Trailing punctuation isn't swallowed into the link.
+- **Video and other iframe embeds**: paste an `<iframe …>` copied from Bilibili or YouTube straight into a node and it renders as a player. Only the iframe tag is accepted, and `src` must be http(s). Attributes are parsed separately and the element is built with the DOM API, never innerHTML. Autoplay is off by default (`autoplay=0` is added at render time without touching the note; write `autoplay=1` yourself if you want autoplay), and players in collapsed branches aren't loaded. Embeds also work in notes, rendered by Obsidian's own renderer.
+  A shield covers the player: a single click only selects the node, and the player is released only when you double-click it or click the **激活** (Activate) button in the bottom-right corner, so a stray click doesn't send you to the source site. An activated node gets a dashed outline and is deactivated when you click elsewhere.
+  When selected, drag the handle in the bottom-right corner to resize (aspect ratio is locked by default; hold Shift to change height only; double-click to reset to 560×315).
+- **Drag in and paste**: drag a note from the file list onto a node to add it as a `[[link]]` child. Dropped or pasted images are saved to the attachment folder and become image nodes.
+- **Copy node link**: heading nodes give `[[note#heading]]`; list nodes get a block ID added automatically and give `[[note#^id]]`, which you can reference from other notes.
+- **Mobile**: the node toolbar has add child and add sibling buttons, and the bottom toolbar has undo and redo, so you can fully edit without a keyboard.
+- ⌘B / ⌘I make the selected nodes bold or italic as a whole.
+
+### Markdown mapping
 
 ```markdown
 ---
 mindmap: true
-mindmap-structure: mindmap   # 可选：logic-right（默认）| mindmap | org-down | tree-right
-mindmap-theme: rainbow       # 可选：snow（默认）| rainbow | business | warm | mono | line | forest
+mindmap-structure: mindmap   # optional: logic-right (default) | mindmap | org-down | tree-right
+mindmap-theme: rainbow       # optional: snow (default) | rainbow | business | warm | mono | line | forest
 ---
 
-# 中心主题                     ← 唯一的一级标题；没有就用文件名
+# Central topic                ← the only H1; the file name is used if there is none
 
-这里的段落是中心主题的备注。
+A paragraph here becomes the central topic's note.
 
-## 主主题 %%green%%            ← %%颜色%% 给节点上色，阅读模式里看不见
-### 子主题
-- 更深的层级用列表
-	- 再深一层
-- 折叠状态也存在文件里 %%fold%%
+## Main topic %%green%%        ← %%color%% colors a node and is invisible in Reading view
+### Subtopic
+- Deeper levels use lists
+	- One level deeper
+- Fold state is stored in the file too %%fold%%
 ```
 
-- 颜色名：`red orange yellow green teal blue purple pink gray`，或 `#hex`。
-- 标题最多到 H6，之后自动改用列表。新建节点默认从第四级开始用列表，可在设置里改。
-- 节点下面的段落、代码块原样保留为备注，节点上会显示一个 ≡ 图标，点开查看。
-- XMind 导出的 Markdown 就是这套标题层级，可以直接打开；反过来也能被 XMind 导入。
+- Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
+- Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **标题的最深级别** (Deepest heading level) setting.
+- Paragraphs and code blocks under a node are kept as-is as its note, and the node shows a ≡ icon you can click to view it.
+- Markdown exported from XMind uses this same heading hierarchy, so it opens directly; it also works the other way, imported into XMind.
 
-### 快捷键（画布获得焦点时）
+### Keyboard shortcuts (when the canvas has focus)
 
-| 键 | 作用 |
+| Key | Action |
 |---|---|
-| Tab | 添加子节点 |
-| Enter | 添加兄弟节点（根节点上是添加子节点）；Shift+Enter 插到前面 |
-| 双击 / 空格 / F2 | 编辑；Enter 提交，Esc 取消 |
-| Delete / Backspace | 删除选中的节点及其子树 |
-| ⌘F | 搜索节点，Enter / Shift+Enter 跳转 |
-| ⌘C / ⌘X / ⌘V | 复制 / 剪切 / 粘贴子树 |
-| Shift+Enter（编辑中） | 节点内换行 |
-| ⌘K | 链接到笔记 / 新建笔记 |
-| Alt+↑↓ / Alt+←→ | 兄弟间排序 / 升级降级 |
-| Shift+点击 / ⌘+点击 / Shift+拖拽 / ⌘A | 加选 / 反选 / 框选 / 全选 |
-| 拖拽节点 | 换父节点或调整顺序 |
-| / | 折叠、展开 |
-| 方向键 | 在节点间移动 |
-| ⌘Z / ⌘⇧Z | 撤销 / 重做 |
-| 滚轮 / 拖拽空白处 | 平移 |
-| ⌘+滚轮 / 双指捏合 / ⌘= ⌘- | 缩放；⌘0 适应画布 |
+| Tab | Add child node |
+| Enter | Add sibling node (adds a child on the root node); Shift+Enter inserts before |
+| Double-click / Space / F2 | Edit; Enter to commit, Esc to cancel |
+| Delete / Backspace | Delete the selected nodes and their subtrees |
+| ⌘F | Search nodes; Enter / Shift+Enter to jump |
+| ⌘C / ⌘X / ⌘V | Copy / cut / paste subtree |
+| Shift+Enter (while editing) | Line break inside a node |
+| ⌘K | Link to a note / create a new note |
+| Alt+↑↓ / Alt+←→ | Reorder among siblings / promote or demote |
+| Shift+click / ⌘+click / Shift+drag / ⌘A | Add to selection / toggle / box-select / select all |
+| Drag node | Change parent or reorder |
+| / | Fold, unfold |
+| Arrow keys | Move between nodes |
+| ⌘Z / ⌘⇧Z | Undo / redo |
+| Scroll wheel / drag empty space | Pan |
+| ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
 
-## 开发
+## Development
 
 ```bash
 pnpm install
-pnpm test            # Markdown 往返与布局的单元测试
+pnpm test            # unit tests for Markdown round-tripping and layout
 pnpm typecheck
-pnpm build           # 产物在 dist/main.js
-pnpm install-vault   # 复制到 JackWei vault（OBSIDIAN_VAULT=... 可覆盖）
-pnpm harness         # 监听构建 dev/harness.js，然后用任意静态服务器打开 dev/index.html
-pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
+pnpm lint            # the same ESLint rules the Obsidian community directory runs
+pnpm build           # outputs dist/main.js
+pnpm install-vault   # copies the build into the vault set by OBSIDIAN_VAULT=...
+pnpm harness         # watch-builds dev/harness.js; open dev/index.html with any static server
+pnpm gen-bench 3000  # writes a large mind map note into the vault's inbox for stress testing
 ```
 
-### 性能
+### Performance
 
-3000 节点（Obsidian 桌面端实测，优化后）：打开 195ms，单次渲染 11ms，打字时每次重排 7ms，
-平移每帧 0.2ms，折叠到第二层 55ms，导出 PNG 785ms。1000 节点分别是 53ms / 2ms / 1.6ms / 0.2ms / 10ms。
-渲染按节点 id 复用 DOM，只重建内容变了的元素；连线复用 path 只改 `d`；打字时只重新测量正在编辑的节点。
+With 3,000 nodes (measured in Obsidian desktop, after optimization): opening takes 195 ms, a single render 11 ms, each relayout while typing 7 ms, panning 0.2 ms per frame, folding to level 2 55 ms, and exporting PNG 785 ms. With 1,000 nodes the figures are 53 ms / 2 ms / 1.6 ms / 0.2 ms / 10 ms.
+Rendering reuses DOM elements by node ID and only rebuilds elements whose content changed; connectors reuse their path and only update `d`; while typing, only the node being edited is re-measured.
 
-`dev/index.html` 是脱离 Obsidian 的调试页，能切主题、结构、深色模式，并实时打印写回的 Markdown。
+`dev/index.html` is a debug page that runs outside Obsidian. It can switch themes, structures, and dark mode, and prints the Markdown being written back in real time.
 
-### 结构
+### Structure
 
-| 文件 | 职责 |
+| File | Responsibility |
 |---|---|
-| `src/markdown.ts` | Markdown ⇄ 树，往返无损 |
-| `src/model.ts` | 树模型与增删移操作 |
-| `src/layout.ts` | 布局引擎（逻辑图 / 左右分布）与连线几何 |
-| `src/canvas.ts` | 渲染、平移缩放、选择、内联编辑、键盘 |
-| `src/view.ts` | Obsidian 的 TextFileView，负责读写文件与撤销栈 |
-| `src/main.ts` | 视图注册与重定向、命令、代码块（含写回）、菜单 |
-| `src/codeblock.ts` | 在宿主笔记里定位并替换 mindmap 代码块 |
-| `src/export.ts` | SVG / PNG 导出，内嵌字体 |
-| `src/xmind.ts` | .xmind 读取（自带 zip 与 XML 解析）→ Markdown |
-| `src/xmind-view.ts` | .xmind 只读视图与转换 |
-| `src/outline.ts` | 大纲面板 |
-| `src/note-picker.ts` | 链接笔记的选择器弹窗 |
-| `src/theme.ts` | 主题注册表：连线形状、分支色、下划线层级、间距 |
-| `src/icon.ts` | 插件自带的脑图图标（Phosphor tree-structure） |
-| `src/icon-picker.ts` | 设置里的图标选择器，可搜索、可用 emoji |
-| `src/icon-value.ts` | 图标取值的纯逻辑（前缀、emoji 判定） |
-| `src/property-icon.ts` | 属性面板里 icon 一行的预览，点它可选图标 |
-| `styles.css` | 主题变量与各主题的 `[data-theme]` 配色块，跟随 Obsidian 明暗模式 |
+| `src/markdown.ts` | Markdown ⇄ tree, lossless round-trip |
+| `src/model.ts` | Tree model and add/delete/move operations |
+| `src/layout.ts` | Layout engine (logic chart / left-and-right) and connector geometry |
+| `src/canvas.ts` | Rendering, pan and zoom, selection, inline editing, keyboard |
+| `src/view.ts` | Obsidian `TextFileView`: reads and writes the file, and holds the undo stack |
+| `src/main.ts` | View registration and redirection, commands, code blocks (including write-back), menus |
+| `src/codeblock.ts` | Locates and replaces the mindmap code block in the host note |
+| `src/export.ts` | SVG / PNG export with embedded fonts |
+| `src/xmind.ts` | .xmind reading (built-in zip and XML parsing) → Markdown |
+| `src/xmind-view.ts` | Read-only .xmind view and conversion |
+| `src/outline.ts` | Outline panel |
+| `src/note-picker.ts` | Picker modal for linking notes |
+| `src/theme.ts` | Theme registry: connector shape, branch colors, underline levels, spacing |
+| `src/icon.ts` | The plugin's own mind map icon (Phosphor tree-structure) |
+| `src/icon-picker.ts` | Icon picker in settings, searchable, supports emoji |
+| `src/icon-value.ts` | Pure logic for icon values (prefixes, emoji detection) |
+| `src/property-icon.ts` | Preview for the icon row in the Properties panel; click it to pick an icon |
+| `styles.css` | Theme variables and each theme's `[data-theme]` color block, following Obsidian's light/dark mode |
 
-## 发布
+## Release
 
-推 tag 即发布：`git tag 0.3.1 && git push --tags`（tag 必须与 manifest.json 的 version 完全一致，不带 v），GitHub Actions 会构建并把 `main.js`、`manifest.json`、`styles.css`
-挂到 Release。用 BRAT 的人填仓库地址就能装；手动安装把这三个文件放进
-`<vault>/.obsidian/plugins/gogoga-mindmap/`。运行时不需要 Node。
+Pushing a tag publishes a release: `git tag 0.3.1 && git push --tags` (the tag must match `version` in manifest.json exactly, without a `v`). GitHub Actions builds the plugin and attaches `main.js`, `manifest.json`, and `styles.css` to the release.
+BRAT users can install it by entering the repository URL. To install manually, put these three files in
+`<vault>/.obsidian/plugins/gogoga-mindmap/`. Node isn't needed at runtime.
 
-## 许可
+## License
 
-MIT，见 [LICENSE](LICENSE)。
+MIT, see [LICENSE](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/LICENSE).
