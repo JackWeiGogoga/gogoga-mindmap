@@ -102,7 +102,7 @@ A paragraph here becomes the central topic's note.
 | / | Fold, unfold |
 | Arrow keys | Move between nodes |
 | ⌘Z / ⌘⇧Z | Undo / redo |
-| Scroll wheel / drag empty space | Pan |
+| Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
 
 ## Development
