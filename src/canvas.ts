@@ -122,6 +122,8 @@ export interface CanvasOptions {
   /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
   toolbarPosition?: ToolbarPosition;
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
+  /** 返回 true 时滚轮直接缩放、Shift+滚轮平移；每次滚动时读取，改设置立即生效 */
+  wheelZoom?: () => boolean;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -1419,9 +1421,14 @@ export class MindMapCanvas {
         ev.preventDefault();
         if (this.opts.embedded) ev.stopPropagation();
         const scale = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
+        const rect = el.getBoundingClientRect();
         if (ev.ctrlKey || ev.metaKey) {
-          const rect = el.getBoundingClientRect();
+          // 触控板捏合也走这里（浏览器会带上 ctrlKey）
           this.zoomBy(Math.exp(-ev.deltaY * scale * 0.01), ev.clientX - rect.left, ev.clientY - rect.top);
+        } else if (!ev.shiftKey && this.opts.wheelZoom?.()) {
+          // 鼠标一格 deltaY 约 100，限幅后每格约 1.2 倍，和工具栏 +/- 一致
+          const d = Math.max(-100, Math.min(100, ev.deltaY * scale));
+          this.zoomBy(Math.exp(-d * 0.0018), ev.clientX - rect.left, ev.clientY - rect.top);
         } else {
           this.tx -= ev.deltaX * scale;
           this.ty -= ev.deltaY * scale;

@@ -120,6 +120,7 @@ export class MindMapView extends TextFileView {
       onSelectionChange: (primary) => this.outline?.syncSelection(primary),
       onToggleOutline: () => void this.toggleOutline(),
       toolbarPosition: this.plugin.settings.toolbarPosition,
+      wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       onToolbarPositionChange: (pos) => {
         this.plugin.settings.toolbarPosition = pos;
         void this.plugin.saveSettings();

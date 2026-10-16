@@ -231,6 +231,10 @@ const en = {
   "settings.toolbar.name": "Toolbar position",
   "settings.toolbar.desc":
     "Top and bottom are horizontal bars, left and right are vertical bars. You can also right-click the toolbar to change it.",
+  "settings.wheel.name": "Mouse wheel",
+  "settings.wheel.desc": "Pan: the wheel scrolls the map, Cmd/Ctrl + wheel zooms. Zoom: the wheel zooms, Shift + wheel scrolls.",
+  "settings.wheel.pan": "Pan",
+  "settings.wheel.zoom": "Zoom",
   "settings.hover.name": "Hover preview for linked nodes",
   "settings.hover.desc":
     "Ctrl-hover (⌘-hover on macOS) over a node that links to a note to see a preview of the note, as elsewhere in Obsidian. " +
@@ -449,6 +453,10 @@ const zh: Record<Key, string> = {
   "settings.listIcon.clear": "不写入图标",
   "settings.toolbar.name": "工具栏位置",
   "settings.toolbar.desc": "上下是水平条，左右是垂直条。在工具栏上右键也能切换。",
+  "settings.wheel.name": "鼠标滚轮",
+  "settings.wheel.desc": "平移：滚轮移动画布，Cmd/Ctrl + 滚轮缩放。缩放：滚轮直接缩放，Shift + 滚轮移动画布。",
+  "settings.wheel.pan": "平移",
+  "settings.wheel.zoom": "缩放",
   "settings.hover.name": "链接节点的悬停预览",
   "settings.hover.desc":
     "按住 ⌘ / Ctrl 把鼠标停在链接到笔记的节点上，会弹出笔记预览，和 Obsidian 其他地方一致。" +

@@ -26,6 +26,8 @@ export interface MindMapSettings {
   listIcon: string;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
+  /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
+  wheelAction: "pan" | "zoom";
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   codeBlockMaxHeight: 600,
   outlineOpen: false,
   toolbarPosition: "bottom",
+  wheelAction: "pan",
   listIcon: MINDMAP_LIST_ICON,
 };
 
@@ -184,6 +187,19 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.toolbarPosition = v as ToolbarPosition;
             await this.plugin.saveSettings();
             this.plugin.applyToolbarPosition();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.wheel.name"))
+      .setDesc(t("settings.wheel.desc"))
+      .addDropdown((d) =>
+        d
+          .addOptions({ pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") })
+          .setValue(this.plugin.settings.wheelAction)
+          .onChange(async (v) => {
+            this.plugin.settings.wheelAction = v as MindMapSettings["wheelAction"];
+            await this.plugin.saveSettings();
           }),
       );
 

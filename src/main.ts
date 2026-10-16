@@ -357,6 +357,7 @@ export default class MindMapPlugin extends Plugin {
         editable: state.editable,
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,
+        wheelZoom: () => this.settings.wheelAction === "zoom",
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),
         onUndo: () => {
