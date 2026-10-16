@@ -3,7 +3,7 @@ import { MindMapCanvas } from "./canvas";
 import { MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { indentString } from "./settings";
-import { parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
+import { describeLost, parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
 import { VIEW_TYPE_MINDMAP } from "./view";
 import type MindMapPlugin from "./main";
 
@@ -15,6 +15,7 @@ export class XmindView extends FileView {
   private sheets: XmindSheet[] = [];
   private current = 0;
   private sheetBar: HTMLElement | null = null;
+  private lostBar: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: MindMapPlugin) {
     super(leaf);
@@ -74,9 +75,16 @@ export class XmindView extends FileView {
     if (!this.canvas) return;
     this.sheetBar?.remove();
     this.sheetBar = null;
+    this.lostBar?.remove();
+    this.lostBar = null;
     const sheet = this.sheets[this.current];
     if (!sheet) return;
     this.canvas.setDoc(xmindSheetToDoc(sheet, this.docStyle()));
+    const lost = describeLost(sheet.lost);
+    if (lost) {
+      this.lostBar = this.canvas.el.createDiv({ cls: "mm-xmind-lost", text: lost });
+      this.lostBar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    }
     if (this.sheets.length > 1) {
       const bar = this.canvas.el.createDiv({ cls: "mm-sheets" });
       bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
@@ -107,6 +115,7 @@ export class XmindView extends FileView {
     const path = folder && folder !== "/" ? `${folder}/${name}` : name;
     const created = await this.app.vault.create(path, md);
     await this.leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: created.path }, active: true });
-    new Notice(t("xmind.converted", { path: created.path }));
+    const lost = describeLost(sheet.lost);
+    new Notice(t("xmind.converted", { path: created.path }) + (lost ? `\n${lost}` : ""), lost ? 8000 : undefined);
   }
 }

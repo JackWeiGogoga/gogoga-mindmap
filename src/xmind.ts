@@ -8,16 +8,49 @@ import { createNode, DocStyle, MindDoc, MindNode } from "./model";
 import { DEFAULT_STYLE, serializeMarkdown } from "./markdown";
 
 export interface XmindTopic {
+  id?: string;
   title: string;
   note?: string;
   color?: string;
   folded?: boolean;
+  /** 外框：XMind 的 boundary 挂在父主题上、按子主题下标框一段；这里换算成挂在起始子主题上 */
+  box?: { span: number; title: string };
   children: XmindTopic[];
+}
+
+/** 插件还不支持、打开和转换时会丢掉的内容，按条数统计，用来提示用户 */
+export interface XmindLost {
+  detached: number;
+  relationships: number;
+  summaries: number;
+  comments: number;
 }
 
 export interface XmindSheet {
   title: string;
   root: XmindTopic;
+  lost: XmindLost;
+}
+
+const noLoss = (): XmindLost => ({ detached: 0, relationships: 0, summaries: 0, comments: 0 });
+
+/** 把 XMind 的 boundary range 落到子主题上："(0,2)" 框住第 0–2 个子主题，"master" 框住主题自己 */
+function applyBoundary(topic: XmindTopic, range: string | undefined, title: string): void {
+  const m = /^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(range ?? "");
+  const box = (span: number) => ({ span: Math.max(1, span), title: cleanTitle(title).replace(/["%]/g, "") });
+  if (!m) {
+    if (range === "master" && !topic.box) topic.box = box(1);
+    return;
+  }
+  const a = Number(m[1]);
+  const b = Math.min(Number(m[2]), topic.children.length - 1);
+  const start = topic.children[a];
+  if (start && b >= a && !start.box) start.box = box(b - a + 1);
+}
+
+function collectIds(t: XmindTopic, out: Set<string>): void {
+  if (t.id) out.add(t.id);
+  for (const c of t.children) collectIds(c, out);
 }
 
 // ---------- zip ----------
@@ -64,9 +97,13 @@ export async function readZip(buf: ArrayBuffer): Promise<Map<string, Uint8Array>
 // ---------- content.json (XMind Zen / 2020+) ----------
 
 interface JsonTopic {
+  id?: string;
   title?: string;
+  boundaries?: { range?: string; title?: string }[];
+  summaries?: unknown[];
+  comments?: unknown[];
   notes?: { plain?: { content?: string } };
-  children?: { attached?: JsonTopic[] };
+  children?: { attached?: JsonTopic[]; detached?: JsonTopic[] };
   branch?: string;
   style?: { properties?: Record<string, string> };
   labels?: string[];
@@ -75,33 +112,44 @@ interface JsonTopic {
 interface JsonSheet {
   title?: string;
   rootTopic?: JsonTopic;
+  relationships?: unknown[];
 }
 
 function cleanTitle(s: string | undefined): string {
   return (s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim();
 }
 
-function fromJsonTopic(t: JsonTopic): XmindTopic {
+function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss()): XmindTopic {
   const fill = t.style?.properties?.["fill"];
   const color = fill && /^#[0-9a-f]{6}/i.test(fill) ? fill.slice(0, 7).toLowerCase() : undefined;
   const notes: string[] = [];
   const plain = t.notes?.plain?.content?.trim();
   if (plain) notes.push(plain);
   if (t.labels?.length) notes.push(t.labels.map((l) => `#${l.replace(/\s+/g, "-")}`).join(" "));
-  return {
+  lost.detached += t.children?.detached?.length ?? 0;
+  lost.summaries += t.summaries?.length ?? 0;
+  lost.comments += t.comments?.length ?? 0;
+  const topic: XmindTopic = {
+    id: t.id,
     title: cleanTitle(t.title),
     note: notes.length ? notes.join("\n\n") : undefined,
     color,
     folded: t.branch === "folded" || undefined,
-    children: (t.children?.attached ?? []).map(fromJsonTopic),
+    children: (t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
   };
+  for (const b of t.boundaries ?? []) applyBoundary(topic, b.range, b.title ?? "");
+  return topic;
 }
 
 function parseContentJson(text: string): XmindSheet[] {
   const sheets = JSON.parse(text) as JsonSheet[];
   return sheets
     .filter((s) => s.rootTopic)
-    .map((s, i) => ({ title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!) }));
+    .map((s, i) => {
+      const lost = noLoss();
+      lost.relationships = s.relationships?.length ?? 0;
+      return { title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!, lost), lost };
+    });
 }
 
 // ---------- content.xml (XMind 8) ----------
@@ -191,18 +239,24 @@ function childrenByName(el: XEl, name: string): XEl[] {
   return el.children.filter((c) => c.name === name);
 }
 
-function fromXmlTopic(el: XEl): XmindTopic {
+function fromXmlTopic(el: XEl, lost: XmindLost = noLoss()): XmindTopic {
   const title = cleanTitle(childrenByName(el, "title")[0]?.text ?? "");
   const notesEl = childrenByName(el, "notes")[0];
   const plain = notesEl ? childrenByName(notesEl, "plain")[0]?.text.trim() : undefined;
   const children: XmindTopic[] = [];
   for (const ch of childrenByName(el, "children")) {
     for (const topics of childrenByName(ch, "topics")) {
+      if (topics.attrs["type"] === "detached") lost.detached += childrenByName(topics, "topic").length;
       if (topics.attrs["type"] !== "attached") continue;
-      for (const t of childrenByName(topics, "topic")) children.push(fromXmlTopic(t));
+      for (const t of childrenByName(topics, "topic")) children.push(fromXmlTopic(t, lost));
     }
   }
-  return { title, note: plain || undefined, folded: el.attrs["branch"] === "folded" || undefined, children };
+  for (const s of childrenByName(el, "summaries")) lost.summaries += childrenByName(s, "summary").length;
+  const topic: XmindTopic = { id: el.attrs["id"], title, note: plain || undefined, folded: el.attrs["branch"] === "folded" || undefined, children };
+  for (const bs of childrenByName(el, "boundaries")) {
+    for (const b of childrenByName(bs, "boundary")) applyBoundary(topic, b.attrs["range"], childrenByName(b, "title")[0]?.text ?? "");
+  }
+  return topic;
 }
 
 function parseContentXml(text: string): XmindSheet[] {
@@ -212,7 +266,9 @@ function parseContentXml(text: string): XmindSheet[] {
     .map((s, i) => {
       const topic = childrenByName(s, "topic")[0];
       if (!topic) return null;
-      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic) };
+      const lost = noLoss();
+      for (const r of childrenByName(s, "relationships")) lost.relationships += childrenByName(r, "relationship").length;
+      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic, lost), lost };
     })
     .filter((s): s is XmindSheet => !!s);
 }
@@ -221,10 +277,28 @@ export async function parseXmind(buf: ArrayBuffer): Promise<XmindSheet[]> {
   const entries = await readZip(buf);
   const decoder = new TextDecoder();
   const json = entries.get("content.json");
-  if (json) return parseContentJson(decoder.decode(json));
   const xml = entries.get("content.xml");
-  if (xml) return parseContentXml(decoder.decode(xml));
-  throw new Error(t("xmind.noContent"));
+  const sheets = json ? parseContentJson(decoder.decode(json)) : xml ? parseContentXml(decoder.decode(xml)) : null;
+  if (!sheets) throw new Error(t("xmind.noContent"));
+  // XMind 8 的评论在单独的 comments.xml 里，按 object-id 归到所在的工作表
+  const comments = entries.get("comments.xml");
+  if (comments) {
+    const targets = [...decoder.decode(comments).matchAll(/<(?:\w+:)?comment\b[^>]*\bobject-id\s*=\s*"([^"]*)"/g)].map((m) => m[1]);
+    for (const sheet of sheets) {
+      const ids = new Set<string>();
+      collectIds(sheet.root, ids);
+      sheet.lost.comments += targets.filter((id) => ids.has(id)).length;
+    }
+  }
+  return sheets;
+}
+
+/** 提示里列出的丢失项；没有返回空串 */
+export function describeLost(lost: XmindLost): string {
+  const items = (["detached", "relationships", "summaries", "comments"] as const)
+    .filter((k) => lost[k] > 0)
+    .map((k) => t(`xmind.lost.${k}`, { n: lost[k] }));
+  return items.length ? t("xmind.lost", { items: items.join(t("xmind.lost.sep")) }) : "";
 }
 
 // ---------- → Markdown ----------
@@ -240,6 +314,7 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       note: t.note ?? "",
       color: t.color,
       folded: !!t.folded,
+      box: t.box && { ...t.box },
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });

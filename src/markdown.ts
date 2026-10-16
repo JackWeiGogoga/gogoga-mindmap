@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { createNode, DocStyle, MindDoc, MindNode, NodeKind } from "./model";
+import { Boundary, createNode, DocStyle, MindDoc, MindNode, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -47,18 +47,25 @@ export const DEFAULT_STYLE: DocStyle = {
 interface Marker {
   color?: string;
   folded: boolean;
+  box?: Boundary;
 }
+
+/** 标记里的一项：box、box=3 可带一个 "标题"（标题里不能有 " 和 %），其余按空白切 */
+const MARKER_TOKEN_RE = /box(?:=(\d+))?(?:[ \t]*"([^"%]*)")?(?=\s|$)|\S+/g;
 
 /** 从标签末尾摘出我们认识的 %% 标记；不认识的注释原样留在文本里 */
 export function splitMarker(text: string): { text: string; marker: Marker } {
   const m = MARKER_RE.exec(text);
   const marker: Marker = { folded: false };
   if (!m) return { text: text.trimEnd(), marker };
-  const tokens = m[1].split(/\s+/).filter(Boolean);
+  const tokens = [...m[1].matchAll(MARKER_TOKEN_RE)];
   if (tokens.length === 0) return { text: text.trimEnd(), marker };
-  for (const t of tokens) {
+  for (const tok of tokens) {
+    const t = tok[0];
     const lower = t.toLowerCase();
-    if (lower === "fold") marker.folded = true;
+    if (t.startsWith("box") && (t === "box" || /^box[=\s"]/.test(t))) {
+      marker.box = { span: Math.max(1, Number(tok[1] ?? 1)), title: tok[2]?.trim() ?? "" };
+    } else if (lower === "fold") marker.folded = true;
     else if ((COLOR_NAMES as readonly string[]).includes(lower)) marker.color = lower;
     // 内存里保留 # 前缀，直接当 CSS 颜色用
     else if (HEX_RE.test(t)) marker.color = lower.startsWith("#") ? lower : `#${lower}`;
@@ -67,10 +74,14 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
+  if (node.box) {
+    const title = node.box.title.replace(/["%]/g, "").trim();
+    parts.push(`box${node.box.span > 1 ? `=${node.box.span}` : ""}${title ? ` "${title}"` : ""}`);
+  }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
 
@@ -277,6 +288,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.text = text;
         root.color = marker.color;
         root.folded = marker.folded;
+        root.box = marker.box;
         root.level = 1;
         root.kind = "heading";
         // 根之前的文本是 preamble
@@ -287,7 +299,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box });
         parent.children.push(node);
         headingStack.push(node);
         target = { node, buf: noteBuf };
@@ -306,7 +318,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       target = { node, buf: noteBuf };
@@ -394,6 +406,7 @@ function mostCommon(items: string[]): string | null {
 
 export function serializeMarkdown(doc: MindDoc): string {
   normalizeKinds(doc);
+  normalizeBoxes(doc.root);
   const out: string[] = [];
   const ensureBlank = () => {
     if (out.length && out[out.length - 1] !== "") out.push("");

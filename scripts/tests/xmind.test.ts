@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
-import { parseXmind, readZip, xmindSheetToMarkdown } from "../../src/xmind";
+import { describeLost, parseXmind, readZip, xmindSheetToMarkdown } from "../../src/xmind";
 
 /** 用 Node 的 zlib 手工拼一个最小 zip（deflate 或 stored） */
 function makeZip(files: Record<string, string>, stored = false): ArrayBuffer {
@@ -131,4 +131,55 @@ mindmap: true
 ## 乙
 `,
   );
+});
+
+test("外框转成 %%box%%，不支持的内容计数提示", async () => {
+  const json = JSON.stringify([
+    {
+      title: "S",
+      relationships: [{ id: "r1" }, { id: "r2" }],
+      rootTopic: {
+        id: "root",
+        title: "根",
+        boundaries: [{ range: "(1,2)", title: "后两个" }, { range: "(0,0)" }],
+        summaries: [{ range: "(0,1)" }],
+        children: {
+          attached: [{ id: "a", title: "A", boundaries: [{ range: "master" }] }, { id: "b", title: "B" }, { id: "c", title: "C" }],
+          detached: [{ id: "f", title: "自由" }],
+        },
+      },
+    },
+  ]);
+  const [sheet] = await parseXmind(makeZip({ "content.json": json }));
+  assert.deepEqual(sheet.lost, { detached: 1, relationships: 2, summaries: 1, comments: 0 });
+  assert.equal(
+    xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
+    `---
+mindmap: true
+---
+
+# 根
+
+## A %%box%%
+
+## B %%box=2 "后两个"%%
+
+## C
+`,
+  );
+  assert.ok(describeLost(sheet.lost).length > 0);
+  assert.equal(describeLost({ detached: 0, relationships: 0, summaries: 0, comments: 0 }), "");
+
+  const xml = `<xmap-content><sheet id="s"><title>X</title>
+    <topic id="t1"><title>根</title>
+      <children><topics type="attached"><topic id="t2"><title>甲</title></topic><topic id="t3"><title>乙</title></topic></topics>
+      <topics type="detached"><topic id="t9"><title>浮</title></topic></topics></children>
+      <boundaries><boundary range="(0,1)"><title>两个</title></boundary></boundaries>
+    </topic>
+    <relationships><relationship end1="t2" end2="t3"/></relationships>
+  </sheet></xmap-content>`;
+  const comments = `<comments><comment object-id="t2" author="a"><content>hi</content></comment><comment object-id="zz"/></comments>`;
+  const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
+  assert.deepEqual(x.lost, { detached: 1, relationships: 1, summaries: 0, comments: 1 });
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个"%%/);
 });

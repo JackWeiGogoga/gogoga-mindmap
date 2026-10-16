@@ -8,7 +8,7 @@
  */
 
 import { t } from "./i18n";
-import { MindNode, visibleChildren } from "./model";
+import { boxGroups, MindNode, visibleChildren } from "./model";
 
 export type Structure = "logic-right" | "mindmap" | "org-down" | "tree-right";
 /** label 是 getter：模块加载时界面语言还没定，用到时再取 */
@@ -53,6 +53,10 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
 /** 树形图的缩进；连线的竖干画在缩进的一半处 */
 export const TREE_INDENT = 32;
 
+/** 外框到框内内容的留白；有标题时顶部再多留一行 */
+export const BOX_PAD = 10;
+export const BOX_TITLE_H = 24;
+
 export interface Placed {
   node: MindNode;
   x: number;
@@ -69,8 +73,17 @@ export interface Bounds {
   h: number;
 }
 
+export interface PlacedBox extends Bounds {
+  /** 外框的起始节点（%%box%% 标记所在的节点） */
+  start: MindNode;
+  members: MindNode[];
+  side: Side;
+}
+
 export interface LayoutResult {
   placed: Map<string, Placed>;
+  /** 由内向外排列：先画外层再画内层时倒着遍历 */
+  boxes: PlacedBox[];
   bounds: Bounds;
 }
 
@@ -89,6 +102,56 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     }
     return s;
   };
+
+  // ---- 外框：一组相邻兄弟占的空间在堆叠方向上前后各多留 BOX_PAD（有标题再加一行） ----
+  const groupCache = new Map<string, Map<string, MindNode>>();
+  const groupOf = (n: MindNode): MindNode | undefined => {
+    const p = n.parent;
+    if (!p || n === root) return undefined;
+    let g = groupCache.get(p.id);
+    if (!g) {
+      g = boxGroups(p.children);
+      groupCache.set(p.id, g);
+    }
+    return g.get(n.id);
+  };
+  const boxTop = (start: MindNode) => BOX_PAD + (start.box?.title ? BOX_TITLE_H : 0);
+  /** list 按排布顺序；before[i]/after[i] 是第 i 个节点前后要让出的外框留白 */
+  function boxPads(list: MindNode[]): { before: number[]; after: number[] } {
+    const gs = list.map(groupOf);
+    return {
+      before: gs.map((g, i) => (g && g !== gs[i - 1] ? boxTop(g) : 0)),
+      after: gs.map((g, i) => (g && g !== gs[i + 1] ? BOX_PAD : 0)),
+    };
+  }
+  const padTotal = (list: MindNode[]) => {
+    const { before, after } = boxPads(list);
+    return before.reduce((a, b) => a + b, 0) + after.reduce((a, b) => a + b, 0);
+  };
+  /** 横向排布：每段外框左右各 BOX_PAD */
+  const sidePads = (list: MindNode[]) => {
+    const gs = list.map(groupOf);
+    return gs.reduce((sum, g, i) => sum + (g && g !== gs[i - 1] ? 2 * BOX_PAD : 0), 0);
+  };
+  /** 父节点 id → 它子节点里的外框（按排布顺序，一段连续的同组兄弟为一个） */
+  const runs = new Map<string, { start: MindNode; members: MindNode[]; side: Side }[]>();
+  function recordRuns(parent: MindNode, list: MindNode[], side: Side): void {
+    let cur: { start: MindNode; members: MindNode[]; side: Side } | null = null;
+    for (const c of list) {
+      const g = groupOf(c);
+      if (!g) {
+        cur = null;
+        continue;
+      }
+      if (!cur || cur.start !== g) {
+        cur = { start: g, members: [], side };
+        const arr = runs.get(parent.id) ?? [];
+        arr.push(cur);
+        runs.set(parent.id, arr);
+      }
+      cur.members.push(c);
+    }
+  }
 
   const rs = sizeOf(root);
   placed.set(root.id, { node: root, x: -rs.w / 2, y: -rs.h / 2, w: rs.w, h: rs.h, side: "right" });
@@ -112,7 +175,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     return depthOf(parent) === 0 ? opts.gapMain : opts.gapSibling;
   }
   function extentOfList(nodes: MindNode[], gap: number): number {
-    return nodes.reduce((sum, c, i) => sum + extentH(c) + (i > 0 ? gap : 0), 0);
+    return nodes.reduce((sum, c, i) => sum + extentH(c) + (i > 0 ? gap : 0), 0) + padTotal(nodes);
   }
   function extentH(n: MindNode): number {
     const cached = extents.get(n.id);
@@ -129,15 +192,18 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     const gapH = depthOf(parent) === 0 ? opts.gapRoot : opts.gapLevel;
     const gapV = gapFor(parent);
     let y = cy - extentOfList(list, gapV) / 2;
-    for (const c of list) {
+    const { before, after } = boxPads(list);
+    recordRuns(parent, list, side);
+    list.forEach((c, i) => {
+      y += before[i];
       const s = sizeOf(c);
       const e = extentH(c);
       const ccy = y + e / 2;
       const x = side === "right" ? p.x + p.w + gapH : p.x - gapH - s.w;
       placed.set(c.id, { node: c, x, y: ccy - s.h / 2, w: s.w, h: s.h, side });
       placeColumn(c, visibleChildren(c), side, ccy);
-      y += e + gapV;
-    }
+      y += e + after[i] + gapV;
+    });
   }
 
   // ---- 组织结构图：子树宽度自底向上，子节点水平排在父节点下方并居中 ----
@@ -149,7 +215,7 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     if (cached !== undefined) return cached;
     const own = sizeOf(n).w;
     const k = visibleChildren(n);
-    const e = k.length ? Math.max(own, k.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? hGapFor(n) : 0), 0)) : own;
+    const e = k.length ? Math.max(own, k.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? hGapFor(n) : 0), 0) + sidePads(k)) : own;
     extents.set(n.id, e);
     return e;
   }
@@ -158,24 +224,29 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     const p = placed.get(parent.id)!;
     const gapV = depthOf(parent) === 0 ? Math.round(opts.gapRoot * 0.6) : opts.gapLevel + 8;
     const gapX = hGapFor(parent);
-    const total = list.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? gapX : 0), 0);
+    const total = list.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? gapX : 0), 0) + sidePads(list);
     let x = p.x + p.w / 2 - total / 2;
     const y = p.y + p.h + gapV;
-    for (const c of list) {
+    // 横向排布时标题在框顶，不占横向空间，左右只留 BOX_PAD
+    const gs = list.map(groupOf);
+    recordRuns(parent, list, "down");
+    list.forEach((c, i) => {
+      if (gs[i] && gs[i] !== gs[i - 1]) x += BOX_PAD;
       const s = sizeOf(c);
       const e = extentW(c);
       const ccx = x + e / 2;
       placed.set(c.id, { node: c, x: ccx - s.w / 2, y, w: s.w, h: s.h, side: "down" });
       layoutDown(c, visibleChildren(c));
-      x += e + gapX;
-    }
+      x += e + gapX + (gs[i] && gs[i] !== gs[i + 1] ? BOX_PAD : 0);
+    });
   }
 
   // ---- 树形图：子节点在父节点下方向右缩进，逐个向下堆叠 ----
   function treeExtent(n: MindNode): number {
     const cached = extents.get(n.id);
     if (cached !== undefined) return cached;
-    const e = sizeOf(n).h + visibleChildren(n).reduce((sum, c) => sum + opts.gapSibling + treeExtent(c), 0);
+    const k = visibleChildren(n);
+    const e = sizeOf(n).h + k.reduce((sum, c) => sum + opts.gapSibling + treeExtent(c), 0) + padTotal(k);
     extents.set(n.id, e);
     return e;
   }
@@ -184,25 +255,57 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     const p = placed.get(parent.id)!;
     let y = p.y + p.h + opts.gapSibling;
     const x = p.x + TREE_INDENT;
-    for (const c of list) {
+    const { before, after } = boxPads(list);
+    recordRuns(parent, list, "tree");
+    list.forEach((c, i) => {
+      y += before[i];
       const s = sizeOf(c);
       placed.set(c.id, { node: c, x, y, w: s.w, h: s.h, side: "tree" });
       layoutTreeRight(c, visibleChildren(c));
-      y += treeExtent(c) + opts.gapSibling;
-    }
+      y += treeExtent(c) + after[i] + opts.gapSibling;
+    });
   }
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const p of placed.values()) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x + p.w);
-    maxY = Math.max(maxY, p.y + p.h);
+  // 外框自底向上：子树范围（含里层外框）外扩留白
+  const boxes: PlacedBox[] = [];
+  const union = (a: Bounds | null, b: Bounds | null): Bounds | null => {
+    if (!a) return b;
+    if (!b) return a;
+    const x = Math.min(a.x, b.x);
+    const y = Math.min(a.y, b.y);
+    return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+  };
+  const subtree = new Map<string, Bounds | null>();
+  function boundsOf(n: MindNode): Bounds | null {
+    const p = placed.get(n.id);
+    if (!p) return null;
+    let b: Bounds | null = { x: p.x, y: p.y, w: p.w, h: p.h };
+    for (const c of visibleChildren(n)) {
+      const cb = boundsOf(c);
+      subtree.set(c.id, cb);
+      b = union(b, cb);
+    }
+    for (const run of runs.get(n.id) ?? []) {
+      let inner: Bounds | null = null;
+      for (const m of run.members) inner = union(inner, subtree.get(m.id) ?? null);
+      if (!inner) continue;
+      const top = boxTop(run.start);
+      const box: PlacedBox = {
+        start: run.start,
+        members: run.members,
+        side: run.side,
+        x: inner.x - BOX_PAD,
+        y: inner.y - top,
+        w: inner.w + 2 * BOX_PAD,
+        h: inner.h + top + BOX_PAD,
+      };
+      boxes.push(box);
+      b = union(b, box);
+    }
+    return b;
   }
-  return { placed, bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY } };
+  const all = boundsOf(root) ?? { x: 0, y: 0, w: 0, h: 0 };
+  return { placed, boxes, bounds: all };
 }
 
 export interface EdgeGeometry {

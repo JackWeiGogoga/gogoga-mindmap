@@ -171,3 +171,39 @@ test("图标值的识别：图标名、emoji、以及不该被误判的网址", 
   assert.equal(bareId("lucide-network"), "network");
   assert.equal(bareId("mindmap-tree"), "mindmap-tree");
 });
+
+test("外框：框住子树，同层兄弟让出留白不重叠，各结构都成立", () => {
+  const md = `# Root
+
+## A %%box "标题"%%
+- a1
+- a2 %%box=2%%
+- a3
+
+## B
+
+## C %%box%%
+- c1
+`;
+  for (const structure of ["logic-right", "mindmap", "org-down", "tree-right"] as const) {
+    const doc = parseMarkdown(md);
+    const res = layoutTree(doc.root, measure, { ...DEFAULT_LAYOUT, structure });
+    const byText = (t: string) => [...res.placed.values()].find((p) => p.node.text === t)!;
+    const boxOf = (t: string) => res.boxes.find((b) => b.start.text === t)!;
+    assert.equal(res.boxes.length, 3, structure);
+    const inside = (p: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+      p.x >= b.x && p.y >= b.y && p.x + p.w <= b.x + b.w && p.y + p.h <= b.y + b.h;
+    const boxA = boxOf("A");
+    for (const t of ["A", "a1", "a2", "a3"]) assert.ok(inside(byText(t), boxA), `${structure}: ${t} 应在 A 的外框里`);
+    const inner = boxOf("a2");
+    assert.ok(inside(byText("a2"), inner) && inside(byText("a3"), inner) && !inside(byText("a1"), inner), structure);
+    assert.ok(inside(inner, boxA), `${structure}: 里层外框应在外层里面`);
+    // 没框住的兄弟不能压进外框
+    assert.ok(!inside(byText("B"), boxA) && !inside(byText("B"), boxOf("C")), structure);
+    const bx = byText("B");
+    const overlapsBox = (b: typeof boxA) => bx.x < b.x + b.w && b.x < bx.x + bx.w && bx.y < b.y + b.h && b.y < bx.y + bx.h;
+    assert.ok(!overlapsBox(boxA) && !overlapsBox(boxOf("C")), `${structure}: B 与外框重叠`);
+    // 整体范围包含外框
+    for (const b of res.boxes) assert.ok(inside(b, res.bounds), structure);
+  }
+});

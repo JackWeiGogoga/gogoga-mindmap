@@ -12,12 +12,14 @@ import {
   MindDoc,
   MindNode,
   moveNode,
+  boxGroups,
   pathOf,
   removeNode,
   visibleChildren,
   walk,
 } from "./model";
 import {
+  BOX_PAD,
   Bounds,
   DEFAULT_LAYOUT,
   edgeGeometry,
@@ -281,6 +283,12 @@ export class MindMapCanvas {
   private lastPos = new WeakMap<HTMLElement, { x: number; y: number }>();
   /** 连线 path 的复用池 */
   private edgePaths: SVGPathElement[] = [];
+  /** 外框：rect 放在连线下面的一个 g 里，按「外层先画」复用；标题是 nodes 层里的 HTML，按起始节点 id 复用 */
+  private boxLayer!: SVGGElement;
+  private boxRects: SVGRectElement[] = [];
+  private boxTitles = new Map<string, HTMLElement>();
+  private boxTitleStart = new WeakMap<HTMLElement, MindNode>();
+  private editingBox: MindNode | null = null;
 
   private tx = 0;
   private ty = 0;
@@ -358,6 +366,9 @@ export class MindMapCanvas {
     this.viewport.className = "mm-viewport";
     this.svg = createSvg("svg");
     this.svg.setAttribute("class", "mm-edges");
+    this.boxLayer = createSvg("g");
+    this.boxLayer.setAttribute("class", "mm-boxes");
+    this.svg.append(this.boxLayer);
     this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
     this.overlay = createDiv();
@@ -895,8 +906,192 @@ export class MindMapCanvas {
     for (let i = edgeIndex; i < this.edgePaths.length; i++) {
       if (!this.edgePaths[i].style.display) this.edgePaths[i].setCssStyles({ display: "none" });
     }
+    this.drawBoxes();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
+  }
+
+  /** 外框的 rect 和标题；layout.boxes 是由内向外，倒过来画让里层压在外层上面 */
+  private drawBoxes(): void {
+    const boxes = [...this.layout!.boxes].reverse();
+    const titled = new Set<string>();
+    boxes.forEach((b, i) => {
+      let rect = this.boxRects[i];
+      if (!rect) {
+        rect = createSvg("rect");
+        rect.setAttribute("class", "mm-box");
+        rect.setAttribute("rx", "10");
+        this.boxLayer.append(rect);
+        this.boxRects.push(rect);
+      }
+      const attrs: Record<string, string> = { x: String(round2(b.x)), y: String(round2(b.y)), width: String(round2(b.w)), height: String(round2(b.h)) };
+      for (const [k, v] of Object.entries(attrs)) if (rect.getAttribute(k) !== v) rect.setAttribute(k, v);
+      const branch = this.els.get(b.start.id)?.dataset.branch;
+      const color = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      if (rect.style.getPropertyValue("--mm-box-color") !== color) rect.style.setProperty("--mm-box-color", color);
+      if (rect.style.display) rect.setCssStyles({ display: "" });
+
+      // 思维导图结构里一组兄弟可能被左右拆开，标题只挂第一段
+      const title = b.start.box?.title ?? "";
+      if (!title || titled.has(b.start.id)) return;
+      titled.add(b.start.id);
+      let el = this.boxTitles.get(b.start.id);
+      if (!el) {
+        el = this.createBoxTitle();
+        this.boxTitles.set(b.start.id, el);
+      }
+      this.boxTitleStart.set(el, b.start);
+      if (this.editingBox !== b.start && el.textContent !== title) el.textContent = title;
+      el.style.left = `${round2(b.x + BOX_PAD)}px`;
+      el.style.top = `${round2(b.y + 4)}px`;
+      el.style.maxWidth = `${round2(Math.max(40, b.w - 2 * BOX_PAD))}px`;
+      if (el.style.getPropertyValue("--mm-box-color") !== color) el.style.setProperty("--mm-box-color", color);
+    });
+    for (let i = boxes.length; i < this.boxRects.length; i++) {
+      if (!this.boxRects[i].style.display) this.boxRects[i].setCssStyles({ display: "none" });
+    }
+    for (const [id, el] of this.boxTitles) {
+      if (titled.has(id)) continue;
+      el.remove();
+      this.boxTitles.delete(id);
+    }
+  }
+
+  private createBoxTitle(): HTMLElement {
+    const el = createDiv();
+    el.className = "mm-box-title";
+    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const start = this.boxTitleStart.get(el);
+      if (start && this.editingBox !== start) this.selectBoxMembers(start);
+    });
+    el.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const start = this.boxTitleStart.get(el);
+      if (start && this.opts.editable) this.editBoxTitle(start);
+    });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const start = this.boxTitleStart.get(el);
+      if (!start || this.editingBox === start) return;
+      this.selectBoxMembers(start);
+      this.showContextMenu(this.opts.editable ? this.boxMenuEntries(start) : [], ev);
+    });
+    this.nodesEl.append(el);
+    return el;
+  }
+
+  /** node 所在外框的起始节点 */
+  private boxOf(node: MindNode): MindNode | null {
+    if (!node.parent) return null;
+    return boxGroups(node.parent.children).get(node.id) ?? null;
+  }
+
+  private boxMembers(start: MindNode): MindNode[] {
+    const siblings = start.parent?.children ?? [start];
+    const i = siblings.indexOf(start);
+    return siblings.slice(i, i + Math.max(1, start.box?.span ?? 1));
+  }
+
+  private selectBoxMembers(start: MindNode): void {
+    const members = this.boxMembers(start);
+    this.select(members[0]);
+    for (const m of members.slice(1)) this.select(m, "add");
+    this.positionNodebar();
+  }
+
+  private boxMenuEntries(start: MindNode): MenuEntry[] {
+    return [
+      { title: start.box?.title ? t("menu.editBoxTitle") : t("menu.addBoxTitle"), icon: "type", run: () => this.editBoxTitle(start) },
+      { title: t("menu.removeBox"), icon: "square-dashed", run: () => this.removeBox(start) },
+    ];
+  }
+
+  /** 给选中的节点加外框：同一父节点下相邻的合成一个，其余各自一个；已在外框里的跳过 */
+  addBoxToSelected(): void {
+    if (!this.opts.editable) return;
+    const byParent = new Map<MindNode, number[]>();
+    for (const n of this.selected) {
+      if (!n.parent || this.boxOf(n)) continue;
+      const arr = byParent.get(n.parent) ?? [];
+      arr.push(n.parent.children.indexOf(n));
+      byParent.set(n.parent, arr);
+    }
+    if (!byParent.size) return;
+    for (const [parent, idx] of byParent) {
+      idx.sort((a, b) => a - b);
+      for (let i = 0; i < idx.length; ) {
+        let j = i;
+        while (j + 1 < idx.length && idx[j + 1] === idx[j] + 1) j++;
+        parent.children[idx[i]].box = { span: idx[j] - idx[i] + 1, title: "" };
+        i = j + 1;
+      }
+    }
+    this.render();
+    this.notify();
+  }
+
+  removeBox(start: MindNode): void {
+    if (!this.opts.editable || !start.box) return;
+    start.box = undefined;
+    this.render();
+    this.notify();
+  }
+
+  /** 原地编辑外框标题；没有标题时先给个默认字样并全选，清空即去掉标题 */
+  editBoxTitle(start: MindNode): void {
+    if (!this.opts.editable || !start.box) return;
+    const before = start.box.title;
+    if (!before) {
+      start.box.title = t("canvas.boxTitleDefault");
+      this.render();
+    }
+    const el = this.boxTitles.get(start.id);
+    if (!el) return;
+    this.editingBox = start;
+    el.classList.add("is-editing");
+    el.setAttribute("contenteditable", "plaintext-only");
+    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+
+    let done = false;
+    const finish = (commit: boolean) => {
+      if (done) return;
+      done = true;
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("blur", onBlur);
+      el.removeAttribute("contenteditable");
+      el.classList.remove("is-editing");
+      this.editingBox = null;
+      if (!start.box) return;
+      const text = commit ? (el.textContent ?? "").replace(/["%\r\n]/g, "").trim() : before;
+      const changed = text !== before;
+      start.box.title = text;
+      el.textContent = text;
+      this.render();
+      if (changed) this.notify();
+      this.el.focus({ preventScroll: true });
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter" && !ev.isComposing) {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish(false);
+      }
+    };
+    const onBlur = () => finish(true);
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("blur", onBlur);
   }
 
   private settleTimer: number | null = null;
@@ -2532,8 +2727,11 @@ export class MindMapCanvas {
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
-        sep,
       );
+      const box = this.boxOf(node);
+      if (box) entries.push(...this.boxMenuEntries(box));
+      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent, run: () => this.addBoxToSelected() });
+      entries.push(sep);
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
       entries.push(

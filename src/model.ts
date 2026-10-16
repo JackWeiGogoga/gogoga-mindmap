@@ -18,6 +18,8 @@ export interface MindNode {
   color?: string;
   /** 折叠状态，用 %%fold%% 持久化 */
   folded: boolean;
+  /** 外框：框住本节点及其后 span-1 个兄弟（连同各自的分支），用 %%box%% / %%box=3 "标题"%% 持久化 */
+  box?: Boundary;
   kind: NodeKind;
   /** 标题节点的级别 1..6；合成根节点为最小标题级别 - 1 */
   level: number;
@@ -28,6 +30,12 @@ export interface MindNode {
   children: MindNode[];
   parent: MindNode | null;
   depth: number;
+}
+
+export interface Boundary {
+  /** 框住的兄弟数，含本节点，至少 1 */
+  span: number;
+  title: string;
 }
 
 export interface DocStyle {
@@ -67,6 +75,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     tail: init.tail ?? "",
     color: init.color,
     folded: init.folded ?? false,
+    box: init.box,
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
@@ -82,6 +91,31 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
 export function walk(node: MindNode, fn: (n: MindNode) => void): void {
   fn(node);
   for (const c of node.children) walk(c, fn);
+}
+
+/** 外框跨度不能超出后面剩下的兄弟（删掉兄弟后收窄）；根节点没有兄弟 */
+export function normalizeBoxes(root: MindNode): void {
+  walk(root, (n) => {
+    if (!n.box) return;
+    const siblings = n.parent?.children;
+    const rest = siblings ? siblings.length - siblings.indexOf(n) : 1;
+    n.box.span = Math.max(1, Math.min(n.box.span, rest));
+  });
+}
+
+/**
+ * 一组兄弟里的外框：返回 节点 id → 所属外框的起始节点。
+ * 起始节点落在前一个外框范围里的那个外框忽略（同一层不嵌套，跨层可以）。
+ */
+export function boxGroups(siblings: MindNode[]): Map<string, MindNode> {
+  const out = new Map<string, MindNode>();
+  for (let i = 0; i < siblings.length; i++) {
+    const start = siblings[i];
+    if (!start.box || out.has(start.id)) continue;
+    const end = Math.min(siblings.length, i + Math.max(1, start.box.span));
+    for (let j = i; j < end; j++) out.set(siblings[j].id, start);
+  }
+  return out;
 }
 
 export function visibleChildren(node: MindNode): MindNode[] {
@@ -233,6 +267,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     tail: node.tail,
     color: node.color,
     folded: node.folded,
+    box: node.box && { ...node.box },
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,

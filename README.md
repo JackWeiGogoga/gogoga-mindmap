@@ -21,7 +21,7 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 3. In a regular note, write a ```` ```mindmap ```` code block containing the same kind of Markdown, and it renders as a small mind map in both Reading view and Live Preview.
    It's read-only by default. Click the pencil in the toolbar or double-click a node to start editing. Changes are written straight back into the code block, and undo and redo only apply within the block.
 4. Put an `.xmind` file in your vault and open it directly: it renders read-only, you can switch between sheets, and one click in the top-right corner does **Convert to Markdown note**.
-   Both `content.json` (XMind Zen / 2020 and later) and `content.xml` (XMind 8) are supported.
+   Both `content.json` (XMind Zen / 2020 and later) and `content.xml` (XMind 8) are supported. Boundaries come along; floating topics, relationships, summaries, and comments aren't supported yet, and a note in the top-right corner says how many were left out.
 5. From the view menu (⋯ in the top-right corner) or the command palette: **Export as PNG**, **Export as SVG**, **Copy as image**.
    PNG is exported at 2× resolution, and Obsidian's bundled Inter font is embedded, so the export matches what you see on screen.
 
@@ -48,6 +48,7 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 - **Context menu**: available on nodes and on empty space. Editing, adding and removing nodes, focus, fold, link, note, markers, tasks, **Convert level to headings** / **Convert level to lists**, **Copy node link**, and delete are all there.
 - **Focus on a branch**: show one branch on its own as if it were the root. The breadcrumb at the top takes you back to the full map or any ancestor in one click; Esc also exits.
 - **Markers**: the star button in the node toolbar opens a picker with four groups, **Priority**, **Progress**, **Flags**, and **Symbols**. Markers are stored as emoji at the start of the text, so they display anywhere.
+- **Boundaries**: right-click a node → **Add boundary** to draw a dashed frame around it and its branch. Select several adjacent siblings first to frame them together. Right-click again, or right-click the boundary's title, to add or edit a title or remove the boundary; double-clicking the title also edits it. Boundaries are included in PNG/SVG exports.
 - **Task checkboxes**: `[ ] item` renders as a checkbox; clicking cycles between incomplete, complete, and removed.
 - **#tags**: a `#tag` in a node renders in tag style; clicking it opens global search.
 - **External links**: `[text](https://…)` or a bare pasted URL becomes a link that opens in the browser when clicked. Trailing punctuation isn't swallowed into the link.
@@ -80,6 +81,7 @@ A paragraph here becomes the central topic's note.
 ```
 
 - Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
+- Boundaries are stored in the same comment: `%%box%%` frames the node and its branch, `%%box=3%%` also takes in the next two siblings, and `%%box "Title"%%` adds a title.
 - Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **Deepest heading level** setting.
 - Paragraphs and code blocks under a node are kept as-is as its note, and the node shows a ≡ icon you can click to view it.
 - Markdown exported from XMind uses this same heading hierarchy, so it opens directly; it also works the other way, imported into XMind.

@@ -396,3 +396,33 @@ test("色值不带 # 写回，避免被 Obsidian 当成标签；读时两种都�
   assert.deepEqual(splitMarker("x %%#ABC%%"), { text: "x", marker: { color: "#abc", folded: false } });
   assert.deepEqual(splitMarker("x %%abc%%"), { text: "x", marker: { color: "#abc", folded: false } });
 });
+
+test("外框标记：box / box=N / 带标题，与颜色、折叠共存且往返不变", () => {
+  const md = `# 根
+
+## A %%box "第一组"%%
+- a1 %%red box=2%%
+- a2
+- a3 %%fold box=3 "跨 度"%%
+	- a31
+
+## B %%box=2%%
+
+## C
+`;
+  const doc = parseMarkdown(md);
+  const a = findByPath(doc.root, "0")!;
+  assert.deepEqual(a.box, { span: 1, title: "第一组" });
+  const a1 = findByPath(doc.root, "0/0")!;
+  assert.equal(a1.color, "red");
+  assert.deepEqual(a1.box, { span: 2, title: "" });
+  const a3 = findByPath(doc.root, "0/2")!;
+  assert.equal(a3.folded, true);
+  // 只剩自己一个兄弟，写回时跨度收窄成 1
+  assert.deepEqual(a3.box, { span: 3, title: "跨 度" });
+  const out = serializeMarkdown(doc);
+  assert.equal(out, md.replace('box=3 "跨 度"', 'box "跨 度"'));
+  assert.equal(serializeMarkdown(parseMarkdown(out)), out);
+  // 不认识的写法整段留在文字里
+  assert.equal(splitMarker("x %%boxer%%").text, "x %%boxer%%");
+});

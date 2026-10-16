@@ -131,6 +131,43 @@
 .mm-edge[data-depth="1"] { stroke-width: var(--mm-edge-w1); }
 .mm-edge[data-depth="2"] { stroke-width: var(--mm-edge-w2); }
 
+/* 外框：虚线圆角框 + 淡底色，开分支色的主题跟随起始节点的分支色 */
+.mm-box {
+  fill: var(--mm-box-color, var(--mm-line));
+  fill-opacity: 0.05;
+  stroke: var(--mm-box-color, var(--mm-line));
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.mm-box-title {
+  position: absolute;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: var(--mm-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--mm-box-color, var(--mm-line));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  user-select: none;
+}
+.mm-root.is-editable .mm-box-title { cursor: pointer; }
+.mm-box-title.is-editing {
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none !important;
+  outline: 1.5px solid var(--mm-selection);
+  background: var(--mm-bg);
+  cursor: text;
+  user-select: text;
+}
+
 .mm-nodes {
   position: absolute;
   left: 0;
@@ -565,6 +602,22 @@
 .mm-popover-edit:hover { text-decoration: underline; }
 
 /* .xmind 只读视图的工作表切换 */
+/* .xmind 里有插件不支持的内容时的提示条 */
+.mm-xmind-lost {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 2;
+  max-width: min(420px, calc(100% - 24px));
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: var(--font-ui-small, 13px);
+  line-height: 1.45;
+  color: var(--text-muted, #666);
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
 .mm-sheets {
   position: absolute;
   left: 12px;

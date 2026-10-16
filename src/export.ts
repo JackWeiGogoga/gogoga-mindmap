@@ -133,6 +133,13 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
   const oy = -bounds.y + pad;
   const { nodes, edges } = canvas.layers;
 
+  const boxes = [...edges.querySelectorAll<SVGRectElement>("rect.mm-box")]
+    .filter((r) => r.style.display !== "none")
+    .map((r) => {
+      const cs = getComputedStyle(r);
+      const a = (k: string) => r.getAttribute(k) ?? "0";
+      return `<rect x="${a("x")}" y="${a("y")}" width="${a("width")}" height="${a("height")}" rx="${a("rx")}" fill="${cs.fill}" fill-opacity="${cs.fillOpacity}" stroke="${cs.stroke}" stroke-opacity="${cs.strokeOpacity}" stroke-width="${cs.strokeWidth}" stroke-dasharray="${cs.strokeDasharray}"/>`;
+    });
   const paths = [...edges.querySelectorAll("path")].map((p) => {
     const cs = getComputedStyle(p);
     const d = p.getAttribute("d") ?? "";
@@ -190,7 +197,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     (fontCss ? `<defs><style>${fontCss}</style></defs>` : "") +
     (bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : "") +
-    `<g transform="translate(${ox} ${oy})">${paths.join("")}</g>` +
+    `<g transform="translate(${ox} ${oy})">${boxes.join("")}${paths.join("")}</g>` +
     `<foreignObject x="0" y="0" width="${width}" height="${height}">` +
     `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${width}px;height:${height}px;overflow:hidden">${xhtml}</div>` +
     `</foreignObject></svg>`;
