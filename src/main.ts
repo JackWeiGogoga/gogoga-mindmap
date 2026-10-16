@@ -171,7 +171,10 @@ export default class MindMapPlugin extends Plugin {
     ) => Promise<void>;
     proto.setViewState = function (this: WorkspaceLeaf, state: ViewState, eState?: unknown): Promise<void> {
       const file = state?.state?.file;
-      if (state?.type === "markdown" && typeof file === "string" && shouldRedirect(file)) {
+      // 已经以 Markdown 打开的同一文件（阅读/编辑模式切换等）不再拦回脑图
+      const current = this.view as { file?: TFile } | undefined;
+      const alreadyMarkdown = this.view?.getViewType() === "markdown" && current?.file?.path === file;
+      if (state?.type === "markdown" && typeof file === "string" && !alreadyMarkdown && shouldRedirect(file)) {
         state = { ...state, type: VIEW_TYPE_MINDMAP };
       }
       return original.call(this, state, eState);
@@ -191,7 +194,7 @@ export default class MindMapPlugin extends Plugin {
   async openAsMarkdown(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
     this.markdownOverride.add(file.path);
     try {
-      await leaf.setViewState({ type: "markdown", state: { file: file.path }, active: true });
+      await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" }, active: true });
     } finally {
       this.markdownOverride.delete(file.path);
     }
