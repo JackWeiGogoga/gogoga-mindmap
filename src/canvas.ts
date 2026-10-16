@@ -182,6 +182,7 @@ const ICONS: Record<string, string> = {
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
+  box: '<svg viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg>',
 };
 
 /** Obsidian 在 body 上标了平台（mod-macos / is-ios），按它来，不去读 navigator */
@@ -1033,6 +1034,23 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 工具栏按钮 / ⌘⇧B：选中的节点有在外框里的就移除这些外框，否则加外框 */
+  toggleBoxOnSelected(): void {
+    if (!this.opts.editable || !this.selected.size) return;
+    const starts = new Set<MindNode>();
+    for (const n of this.selected) {
+      const s = this.boxOf(n);
+      if (s) starts.add(s);
+    }
+    if (!starts.size) {
+      this.addBoxToSelected();
+      return;
+    }
+    for (const s of starts) s.box = undefined;
+    this.render();
+    this.notify();
+  }
+
   removeBox(start: MindNode): void {
     if (!this.opts.editable || !start.box) return;
     start.box = undefined;
@@ -1412,6 +1430,7 @@ export class MindMapCanvas {
     tool("note", t("canvas.noteTip"), () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
+    tool("box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), () => this.toggleBoxOnSelected());
     if (this.opts.host?.pickNote) tool("link", t("canvas.linkTip", { key: sc("Mod", "K") }), () => void this.linkSelectedToNote());
     tool("copy", t("canvas.copyTip", { key: sc("Mod", "C") }), () => this.copySelection());
     tool("paste", t("canvas.pasteTip", { key: sc("Mod", "V") }), () => void this.pasteFromClipboard());
@@ -1816,6 +1835,13 @@ export class MindMapCanvas {
     }
     if (mod && ev.key.toLowerCase() === "v") {
       // 交给 paste 事件：它能拿到剪贴板里的图片文件
+      return;
+    }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "b") {
+      if (this.opts.editable && this.selected.size) {
+        ev.preventDefault();
+        this.toggleBoxOnSelected();
+      }
       return;
     }
     if (mod && (ev.key.toLowerCase() === "b" || ev.key.toLowerCase() === "i")) {
