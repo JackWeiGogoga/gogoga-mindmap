@@ -535,6 +535,11 @@ export class MindMapCanvas {
    * 把进行中的编辑（标签、备注）同步到树上并通知，但不关闭编辑界面。
    * 视图自动保存前调用，保证写盘内容包含正在输入的文字。
    */
+  /** 画布上正在改文字或备注：这时外面来的内容先不要覆盖 */
+  isBusy(): boolean {
+    return !!this.editing || !!this.popoverApply;
+  }
+
   syncPending(): boolean {
     let changed = false;
     if (this.editing) {

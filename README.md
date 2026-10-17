@@ -18,6 +18,8 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 
 1. Command palette → **New mind map**, or add `mindmap: true` to the frontmatter of any note.
 2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **Toggle between mind map and Markdown**, or the file context menu.
+   Switching a regular note to a mind map adds `mindmap: true` so it keeps opening that way; turn off **Remember the mind map view** in settings to switch only the current tab and leave the file alone.
+   To write and watch side by side, use **Preview as mind map in a split** (command palette or file context menu): the map opens on the right, follows your typing as you go, and the file isn't changed.
 3. In a regular note, write a ```` ```mindmap ```` code block containing the same kind of Markdown, and it renders as a small mind map in both Reading view and Live Preview.
    It's read-only by default. Click the pencil in the toolbar or double-click a node to start editing. Changes are written straight back into the code block, and undo and redo only apply within the block.
 4. Put an `.xmind` file in your vault and open it directly: it renders read-only, you can switch between sheets, and one click in the top-right corner does **Convert to Markdown note**.

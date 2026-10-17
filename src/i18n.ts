@@ -8,6 +8,7 @@
 const en = {
   // 命令、功能区、菜单
   "command.toggleView": "Toggle between mind map and Markdown",
+  "command.openPreview": "Preview as mind map in a split",
   "command.newMindMap": "New mind map",
   "command.linkNote": "Link to note or create note",
   "command.toggleOutline": "Toggle outline panel",
@@ -241,6 +242,8 @@ const en = {
   "settings.listIcon.reset": "Restore default",
   "settings.listIcon.clear": "Don't write an icon",
   "settings.toolbar.name": "Toolbar position",
+  "settings.rememberView.name": "Remember the mind map view",
+  "settings.rememberView.desc": "On: switching adds mindmap: true to the properties, so the note always opens as a mind map. Off: only the current tab switches and the file is left alone, so it opens as Markdown next time. To write and watch side by side, use the command \"Preview as mind map in a split\".",
   "settings.toolbar.desc":
     "Top and bottom are horizontal bars, left and right are vertical bars. You can also right-click the toolbar to change it.",
   "settings.wheel.name": "Mouse wheel",
@@ -259,6 +262,7 @@ export type Key = keyof typeof en;
 
 const zh: Record<Key, string> = {
   "command.toggleView": "在思维导图和 Markdown 之间切换",
+  "command.openPreview": "在右侧以思维导图预览",
   "command.newMindMap": "新建思维导图",
   "command.linkNote": "链接到笔记 / 新建笔记",
   "command.toggleOutline": "切换大纲面板",
@@ -476,6 +480,8 @@ const zh: Record<Key, string> = {
   "settings.listIcon.reset": "恢复默认",
   "settings.listIcon.clear": "不写入图标",
   "settings.toolbar.name": "工具栏位置",
+  "settings.rememberView.name": "切换成思维导图时记住",
+  "settings.rememberView.desc": "开启：切换时在属性里写入 mindmap: true，以后打开这篇笔记都是思维导图。关闭：只切换当前标签页，不改文件，下次打开还是 Markdown。只想边写边看，也可以用命令「在右侧以思维导图预览」。",
   "settings.toolbar.desc": "上下是水平条，左右是垂直条。在工具栏上右键也能切换。",
   "settings.wheel.name": "鼠标滚轮",
   "settings.wheel.desc": "平移：滚轮移动画布，Cmd/Ctrl + 滚轮缩放。缩放：滚轮直接缩放，Shift + 滚轮移动画布。",

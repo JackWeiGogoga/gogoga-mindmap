@@ -89,6 +89,7 @@ export default class MindMapPlugin extends Plugin {
     this.propertyIcons = new PropertyIconDecorator(this.app);
     const refreshProps = () => this.propertyIcons?.schedule();
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
+    this.registerEditorSync();
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
     this.registerEvent(this.app.metadataCache.on("changed", refreshProps));
@@ -200,10 +201,51 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
-  async openAsMindMap(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
+  /**
+   * remember 为真时往 frontmatter 写 mindmap: true（和列表图标），以后都用脑图打开；
+   * 否则只把这个标签页换成脑图视图，不动文件
+   */
+  /** Markdown 编辑器打字时，同一文件的脑图视图随之更新（分屏预览靠它做到实时） */
+  private registerEditorSync(): void {
+    const timers = new Map<string, number>();
+    this.registerEvent(
+      this.app.workspace.on("editor-change", (editor, info) => {
+        const path = info.file?.path;
+        if (!path) return;
+        const views = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).map((l) => l.view).filter((v): v is MindMapView => v instanceof MindMapView && v.file?.path === path);
+        if (!views.length) return;
+        window.clearTimeout(timers.get(path));
+        timers.set(
+          path,
+          window.setTimeout(() => {
+            timers.delete(path);
+            const text = editor.getValue();
+            for (const v of views) v.syncFromEditor(text);
+          }, 150),
+        );
+      }),
+    );
+    this.register(() => timers.forEach((id) => window.clearTimeout(id)));
+  }
+
+  /** 在右侧分屏用脑图看当前笔记，不写 frontmatter；已经开着就直接显示那个 */
+  async openPreview(file: TFile): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => (l.view as MindMapView).file?.path === file.path);
+    if (existing) {
+      await this.app.workspace.revealLeaf(existing);
+      return;
+    }
+    const source = this.app.workspace.getMostRecentLeaf();
+    const leaf = this.app.workspace.getLeaf("split", "vertical");
+    await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+    // 新分屏会抢走焦点；预览是给人看的，光标留在原来的编辑器里
+    if (source) this.app.workspace.setActiveLeaf(source, { focus: true });
+  }
+
+  async openAsMindMap(file: TFile, leaf: WorkspaceLeaf, remember = this.settings.rememberView): Promise<void> {
     const icon = this.settings.listIcon;
     const needsIcon = !!icon && !this.app.metadataCache.getCache(file.path)?.frontmatter?.[ICON_KEY];
-    if (!this.isMindMapFile(file.path) || needsIcon) {
+    if (remember && (!this.isMindMapFile(file.path) || needsIcon)) {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         fm[FRONTMATTER_KEY] = true;
         if (needsIcon) fm[ICON_KEY] = icon;
@@ -249,6 +291,18 @@ export default class MindMapPlugin extends Plugin {
           return true;
         },
       });
+    this.addCommand({
+      id: "open-preview",
+      name: t("command.openPreview"),
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const file = view?.file;
+        if (!file || file.extension !== "md") return false;
+        if (!checking) void this.openPreview(file);
+        return true;
+      },
+    });
+
     exportCommand("link-note", t("command.linkNote"), (v) => v.linkSelectedToNote());
     exportCommand("toggle-outline", t("command.toggleOutline"), (v) => v.toggleOutline());
 
@@ -292,6 +346,14 @@ export default class MindMapPlugin extends Plugin {
           void (isMap ? this.openAsMarkdown(file, leaf) : this.openAsMindMap(file, leaf));
         }),
     );
+    if (!isMap) {
+      menu.addItem((item) =>
+        item
+          .setTitle(t("command.openPreview"))
+          .setIcon("columns-2")
+          .onClick(() => void this.openPreview(file)),
+      );
+    }
   }
 
   /** 不传文件夹就按 Obsidian 的新建笔记位置设置来 */

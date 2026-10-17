@@ -234,6 +234,16 @@ export class MindMapView extends TextFileView {
     this.canvas?.setDoc(this.doc);
   }
 
+  /**
+   * 旁边的 Markdown 编辑器正在改同一个文件：不等它落盘（约 2 秒），直接跟上。
+   * 脑图这边有没提交的编辑时跳过，等落盘后走 setViewData 的正常合并。
+   */
+  syncFromEditor(text: string): void {
+    if (!this.canvas || text === this.data || this.canvas.isBusy()) return;
+    this.data = text;
+    this.setViewData(text, false);
+  }
+
   clear(): void {
     this.data = "";
     this.doc = null;

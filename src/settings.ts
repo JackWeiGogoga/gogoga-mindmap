@@ -28,6 +28,8 @@ export interface MindMapSettings {
   toolbarPosition: ToolbarPosition;
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
+  /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
+  rememberView: boolean;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -48,6 +50,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineOpen: false,
   toolbarPosition: "bottom",
   wheelAction: "pan",
+  rememberView: true,
   listIcon: MINDMAP_LIST_ICON,
 };
 
@@ -63,6 +66,16 @@ export class MindMapSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+
+    new Setting(containerEl)
+      .setName(t("settings.rememberView.name"))
+      .setDesc(t("settings.rememberView.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.rememberView).onChange(async (v) => {
+          this.plugin.settings.rememberView = v;
+          await this.plugin.saveSettings();
+        }),
+      );
 
     new Setting(containerEl)
       .setName(t("settings.structure.name"))
