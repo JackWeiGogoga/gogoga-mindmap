@@ -50,6 +50,8 @@ export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
   /** 用户明确要求以 Markdown 打开的文件，跳过一次视图重定向 */
   private markdownOverride = new Set<string>();
+  /** 脑图笔记临时以 Markdown 打开时，标签页右上角那个「以思维导图打开」按钮 */
+  private mapButtons = new Map<MarkdownView, HTMLElement>();
 
   private mathReady = false;
   private propertyIcons: PropertyIconDecorator | null = null;
@@ -72,9 +74,9 @@ export default class MindMapPlugin extends Plugin {
     this.registerCommands();
 
     this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
+      this.app.workspace.on("file-menu", (menu, file, _source, leaf) => {
         if (file instanceof TFolder) this.addFolderMenuItems(menu, file);
-        else this.addFileMenuItems(menu, file);
+        else this.addFileMenuItems(menu, file, leaf);
       }),
     );
     // Notebook Navigator 自己吞掉右键菜单，不走 file-menu 事件，得单独接一份
@@ -90,6 +92,15 @@ export default class MindMapPlugin extends Plugin {
     const refreshProps = () => this.propertyIcons?.schedule();
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEditorSync();
+    const syncButtons = () => this.syncMapButtons();
+    this.registerEvent(this.app.workspace.on("layout-change", syncButtons));
+    this.registerEvent(this.app.workspace.on("file-open", syncButtons));
+    this.registerEvent(this.app.metadataCache.on("changed", syncButtons));
+    this.app.workspace.onLayoutReady(syncButtons);
+    this.register(() => {
+      for (const el of this.mapButtons.values()) el.remove();
+      this.mapButtons.clear();
+    });
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
     this.registerEvent(this.app.metadataCache.on("changed", refreshProps));
@@ -205,6 +216,26 @@ export default class MindMapPlugin extends Plugin {
    * remember 为真时往 frontmatter 写 mindmap: true（和列表图标），以后都用脑图打开；
    * 否则只把这个标签页换成脑图视图，不动文件
    */
+  /** 和脑图视图右上角的「以 Markdown 打开」对称：带 mindmap: true 的笔记在 Markdown 里显示时给一个回脑图的按钮 */
+  private syncMapButtons(): void {
+    const live = new Set<MarkdownView>();
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || !view.file || !this.isMindMapFile(view.file.path)) continue;
+      live.add(view);
+      if (this.mapButtons.has(view)) continue;
+      const el = view.addAction(MINDMAP_ICON, t("menu.openAsMindMap"), () => {
+        if (view.file) void this.openAsMindMap(view.file, view.leaf);
+      });
+      this.mapButtons.set(view, el);
+    }
+    for (const [view, el] of this.mapButtons) {
+      if (live.has(view)) continue;
+      el.remove();
+      this.mapButtons.delete(view);
+    }
+  }
+
   /** Markdown 编辑器打字时，同一文件的脑图视图随之更新（分屏预览靠它做到实时） */
   private registerEditorSync(): void {
     const timers = new Map<string, number>();
@@ -334,16 +365,24 @@ export default class MindMapPlugin extends Plugin {
     });
   }
 
-  private addFileMenuItems(menu: MenuLike, file: TAbstractFile): void {
+  /**
+   * 文件菜单里切换项按「这个文件当前怎么显示」来定，而不是只看 frontmatter：
+   * 带 mindmap: true 的笔记临时切成 Markdown 后，菜单要给出「以思维导图打开」才回得去。
+   * leaf 是标签页 ⋯ 菜单传进来的；文件列表右键没有 leaf，就看当前活动标签页是不是这个文件。
+   */
+  private addFileMenuItems(menu: MenuLike, file: TAbstractFile, leaf?: WorkspaceLeaf): void {
     if (!(file instanceof TFile) || file.extension !== "md") return;
-    const isMap = this.isMindMapFile(file.path);
+    const active = this.app.workspace.getMostRecentLeaf();
+    const shown = leaf ?? ((active?.view as { file?: TFile } | undefined)?.file === file ? active : null);
+    const shownType = shown?.view.getViewType();
+    const isMap = shownType === "markdown" ? false : shownType === VIEW_TYPE_MINDMAP ? true : this.isMindMapFile(file.path);
     menu.addItem((item) =>
       item
         .setTitle(isMap ? t("menu.openAsMarkdown") : t("menu.openAsMindMap"))
         .setIcon(isMap ? "file-text" : MINDMAP_ICON)
         .onClick(() => {
-          const leaf = this.app.workspace.getLeaf(false);
-          void (isMap ? this.openAsMarkdown(file, leaf) : this.openAsMindMap(file, leaf));
+          const target = shown ?? this.app.workspace.getLeaf(false);
+          void (isMap ? this.openAsMarkdown(file, target) : this.openAsMindMap(file, target));
         }),
     );
     if (!isMap) {
