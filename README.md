@@ -51,6 +51,7 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 - **Focus on a branch**: show one branch on its own as if it were the root. The breadcrumb at the top takes you back to the full map or any ancestor in one click; Esc also exits.
 - **Markers**: the star button in the node toolbar opens a picker with four groups, **Priority**, **Progress**, **Flags**, and **Symbols**. Markers are stored as emoji at the start of the text, so they display anywhere.
 - **Boundaries**: click the boundary button in the node toolbar, press ⌘⇧B, or right-click a node → **Add boundary** to draw a dashed frame around it and its branch. Select several adjacent siblings first to frame them together. Right-click again, or right-click the boundary's title, to add or edit a title or remove the boundary; double-clicking the title also edits it. Boundaries are included in PNG/SVG exports.
+- **Node width**: select a node and drag the handle on its outer edge to set the width; the text rewraps and the height follows. Double-click the handle, or right-click → **Reset to automatic width**, to go back. Stored as `%%w=240%%`.
 - **Task checkboxes**: `[ ] item` renders as a checkbox; clicking cycles between incomplete, complete, and removed.
 - **#tags**: a `#tag` in a node renders in tag style; clicking it opens global search.
 - **External links**: `[text](https://…)` or a bare pasted URL becomes a link that opens in the browser when clicked. Trailing punctuation isn't swallowed into the link.

@@ -13,6 +13,8 @@ import {
   MindNode,
   moveNode,
   boxGroups,
+  NODE_MAX_WIDTH,
+  NODE_MIN_WIDTH,
   pathOf,
   removeNode,
   visibleChildren,
@@ -322,6 +324,8 @@ export class MindMapCanvas {
   private markerPickerCleanup: (() => void) | null = null;
   private dropHover: HTMLElement | null = null;
   private imgHandle: HTMLElement | null = null;
+  private widthHandle: HTMLElement | null = null;
+  private widthResize: { node: MindNode; el: HTMLElement; startX: number; startW: number; dir: 1 | -1 } | null = null;
   private imgResize: {
     node: MindNode;
     /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
@@ -683,6 +687,7 @@ export class MindMapCanvas {
       const sig = [
         contentSig,
         node.color ?? "",
+        node.width ?? "",
         rel,
         branch ?? "",
         this.selected.has(node) ? "s" : "",
@@ -719,6 +724,10 @@ export class MindMapCanvas {
           el.classList.add("has-custom-color");
         }
         el.classList.add("has-color");
+      }
+      if (node.width) {
+        el.classList.add("has-width");
+        el.style.width = `${node.width}px`;
       }
       if (theme.underlineFromDepth !== null && rel >= theme.underlineFromDepth && !node.color) {
         el.classList.add("is-underline");
@@ -2759,6 +2768,7 @@ export class MindMapCanvas {
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
+      if (node.width) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidth(node) });
       const box = this.boxOf(node);
       if (box) entries.push(...this.boxMenuEntries(box));
       else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent, run: () => this.addBoxToSelected() });
@@ -3037,7 +3047,70 @@ export class MindMapCanvas {
   // ---------- 图片缩放手柄 ----------
 
   /** 选中含图片的节点时，在图片右下角放一个拖拽手柄 */
+  /** 选中节点侧边的宽度手柄：拖动改宽（文字跟着换行），双击恢复自适应。图片/视频节点有自己的手柄 */
+  private updateWidthHandle(): void {
+    if (this.widthResize) return;
+    this.widthHandle?.remove();
+    this.widthHandle = null;
+    if (!this.opts.editable || !this.primary || this.editing || this.selected.size !== 1) return;
+    const el = this.els.get(this.primary.id);
+    if (!el || el.querySelector("img.mm-img, iframe.mm-frame")) return;
+    const node = this.primary;
+    // 左侧分支向左长：手柄放在外侧（左边），往左拖是变宽
+    const dir: 1 | -1 = el.dataset.side === "left" ? -1 : 1;
+    const handle = createDiv();
+    handle.className = "mm-width-handle" + (dir < 0 ? " is-left" : "");
+    this.tip(handle, t("canvas.resizeWidth"), "fixed", dir < 0 ? "left" : "right");
+    el.append(handle);
+    handle.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      this.widthResize = { node, el, startX: ev.clientX, startW: el.offsetWidth, dir };
+      try {
+        handle.setPointerCapture(ev.pointerId);
+      } catch {
+        // 合成事件
+      }
+    });
+    handle.addEventListener("pointermove", (ev) => {
+      const r = this.widthResize;
+      if (!r) return;
+      ev.stopPropagation();
+      const w = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, r.startW + (r.dir * (ev.clientX - r.startX)) / this.k));
+      r.el.classList.add("has-width");
+      r.el.style.width = `${Math.round(w)}px`;
+      this.reflow(r.node);
+      this.positionNodebar();
+    });
+    const finish = (ev: PointerEvent) => {
+      const r = this.widthResize;
+      if (!r) return;
+      ev.stopPropagation();
+      this.widthResize = null;
+      const w = Math.round(r.el.offsetWidth);
+      if (w === r.startW) return;
+      r.node.width = w;
+      this.render();
+      this.notify();
+    };
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+    handle.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      this.resetWidth(node);
+    });
+    this.widthHandle = handle;
+  }
+
+  resetWidth(node: MindNode): void {
+    if (!this.opts.editable || !node.width) return;
+    node.width = undefined;
+    this.render();
+    this.notify();
+  }
+
   private updateImageHandle(): void {
+    this.updateWidthHandle();
     if (this.imgResize) return;
     this.imgHandle?.remove();
     this.imgHandle = null;

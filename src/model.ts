@@ -20,6 +20,8 @@ export interface MindNode {
   folded: boolean;
   /** 外框：框住本节点及其后 span-1 个兄弟（连同各自的分支），用 %%box%% / %%box=3 "标题"%% 持久化 */
   box?: Boundary;
+  /** 手动拖出来的节点宽度（px），文字按它换行；用 %%w=240%% 持久化，没有就按内容自适应 */
+  width?: number;
   kind: NodeKind;
   /** 标题节点的级别 1..6；合成根节点为最小标题级别 - 1 */
   level: number;
@@ -31,6 +33,9 @@ export interface MindNode {
   parent: MindNode | null;
   depth: number;
 }
+
+export const NODE_MIN_WIDTH = 60;
+export const NODE_MAX_WIDTH = 1200;
 
 export interface Boundary {
   /** 框住的兄弟数，含本节点，至少 1 */
@@ -76,6 +81,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     color: init.color,
     folded: init.folded ?? false,
     box: init.box,
+    width: init.width,
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
@@ -268,6 +274,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     color: node.color,
     folded: node.folded,
     box: node.box && { ...node.box },
+    width: node.width,
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,

@@ -426,3 +426,21 @@ test("外框标记：box / box=N / 带标题，与颜色、折叠共存且往返
   // 不认识的写法整段留在文字里
   assert.equal(splitMarker("x %%boxer%%").text, "x %%boxer%%");
 });
+
+test("节点宽度 %%w=N%%：与其他标记共存、往返不变、超范围收进区间", () => {
+  const md = `# 根 %%w=480%%
+
+## A %%red w=200 box%%
+- a1 %%w=90000%%
+`;
+  const doc = parseMarkdown(md);
+  assert.equal(doc.root.width, 480);
+  const a = findByPath(doc.root, "0")!;
+  assert.equal(a.width, 200);
+  assert.equal(a.color, "red");
+  assert.ok(a.box);
+  assert.equal(findByPath(doc.root, "0/0")!.width, 1200);
+  const out = serializeMarkdown(doc);
+  assert.equal(out, md.replace("w=90000", "w=1200"));
+  assert.equal(serializeMarkdown(parseMarkdown(out)), out);
+});

@@ -1035,6 +1035,28 @@
 .mm-root[data-toolbar="right"] .mm-search { right: 60px; }
 
 /* ---------- 图片缩放手柄 ---------- */
+/* 手动宽度：节点不再受最大宽度限制，文字按设定宽度换行 */
+.mm-root .mm-node.has-width { max-width: none; }
+.mm-width-handle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: -5px;
+  width: 8px;
+  height: 22px;
+  max-height: calc(100% - 8px);
+  min-height: 12px;
+  box-sizing: border-box;
+  transform: translateY(-50%);
+  border: 2px solid var(--mm-selection);
+  border-radius: 4px;
+  background: var(--mm-bg);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.mm-width-handle.is-left { right: auto; left: -5px; }
+@media (pointer: coarse) { .mm-width-handle { width: 14px; right: -8px; } .mm-width-handle.is-left { left: -8px; } }
+
 .mm-img-handle {
   position: absolute;
   z-index: 2;
