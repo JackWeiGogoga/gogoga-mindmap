@@ -7,6 +7,8 @@ import { t } from "./i18n";
 import { THEME_LIST, themeLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
+const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
+
 export interface MindMapSettings {
   defaultStructure: Structure;
   defaultTheme: ThemeName;
@@ -230,6 +232,15 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.codeBlockMaxHeight = n;
             await this.plugin.saveSettings();
           }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.support.name"))
+      .setDesc(t("settings.support.desc"))
+      .addButton((b) =>
+        b.setButtonText(t("settings.support.button")).onClick(() => {
+          window.open(FUNDING_URL);
         }),
       );
   }
