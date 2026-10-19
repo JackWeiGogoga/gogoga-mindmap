@@ -346,6 +346,11 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("exit-focus", t("command.exitFocus"), async (v) => v.exitFocus());
     exportCommand("copy-node-link", t("command.copyNodeLink"), (v) => v.copySelectedNodeLink());
     exportCommand("search", t("command.search"), async (v) => v.openSearch());
+    // 画布里的按键（/、数字键、⌘⇧B…）不是命令，快捷键面板里看不到；这里再注册一份，用户可以自己绑键。不设默认热键
+    exportCommand("toggle-fold", t("command.toggleFold"), async (v) => v.toggleFoldSelected());
+    for (const n of [1, 2, 3, 4, 5]) exportCommand(`show-level-${n}`, t("command.showLevel", { n }), async (v) => v.setFoldLevel(n));
+    exportCommand("fit-branch", t("command.fitBranch"), async (v) => v.fitSelectedBranch());
+    exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
     exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());

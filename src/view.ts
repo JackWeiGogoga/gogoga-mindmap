@@ -83,6 +83,21 @@ export class MindMapView extends TextFileView {
     this.canvas?.openSearch();
   }
 
+  /** 折叠 / 展开选中的节点（画布里按 / 也是它） */
+  toggleFoldSelected(): void {
+    const n = this.canvas?.getPrimary();
+    if (n?.children.length) this.canvas?.toggleFold(n);
+  }
+
+  fitSelectedBranch(): void {
+    const n = this.canvas?.getPrimary();
+    if (n) this.canvas?.fitBranch(n);
+  }
+
+  toggleBoxOnSelected(): void {
+    this.canvas?.toggleBoxOnSelected();
+  }
+
   setFoldLevel(level: number | null): void {
     this.canvas?.setFoldLevel(level);
   }
