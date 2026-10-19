@@ -155,3 +155,10 @@ test("用户写了 autoplay 就不动它", () => {
   // 只认真正的参数，路径里带 autoplay 字样的不算
   assert.equal(noAutoplay("https://a.cn/autoplay/x"), "https://a.cn/autoplay/x?autoplay=0");
 });
+
+test("公式：$…$ 与 $$…$$ 都识别成一个公式，金额里的 $ 不算", () => {
+  assert.deepEqual(tokens("行内 $E=mc^2$ 块级 $$\\int_0^1 x\\,dx$$ 价格 $5 和 $6"), [
+    [5, "$E=mc^2$"],
+    [5, "$$\\int_0^1 x\\,dx$$"],
+  ]);
+});

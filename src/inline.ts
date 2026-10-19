@@ -106,7 +106,8 @@ const IFRAME = String.raw`<iframe\s([^>]*?)\/?>(?:\s*<\/iframe>)?`;
 export const TOKEN_RE = new RegExp(
   String.raw`!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]` +
     String.raw`|!\[([^\]]*)\]\(([^)\s]+)\)` +
-    String.raw`|\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)` +
+    // $公式$ 和 $$公式$$ 共用一个分组；$$ 的按 \displaystyle 排（节点里不另起一块，只是大一号）
+    String.raw`|\$\$?(?!\s)([^$\n]+?)(?<!\s)\$\$?(?!\d)` +
     String.raw`|\[\[([^\]|]+)(?:\|([^\]]+))?\]\]` +
     String.raw`|\[([^\]]+)\]\(([^)\s]+)\)` +
     String.raw`|\*\*(.+?)\*\*|__(.+?)__` +
@@ -172,7 +173,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       const [alt, param] = splitAltParam(m[3]);
       el.appendChild(image(m[4], param, alt, opts));
     } else if (m[5] !== undefined) {
-      el.appendChild(math(m[5], opts));
+      el.appendChild(math(m[0].startsWith("$$") && m[0].endsWith("$$") ? `\\displaystyle ${m[5]}` : m[5], opts));
     } else if (m[6] !== undefined) {
       el.appendChild(link(m[7] ?? m[6], m[6], true, opts));
     } else if (m[8] !== undefined) {
