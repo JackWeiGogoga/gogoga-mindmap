@@ -87,6 +87,26 @@ export interface LayoutResult {
   bounds: Bounds;
 }
 
+/**
+ * 思维导图结构里主主题的左右分配：标了 %%left%% / %%right%% 的固定在那一边，
+ * 其余按文档顺序先填右边、填满一半再放左边（全都没标时就是以前的「前一半在右」）
+ */
+export function splitSides(kids: MindNode[]): { right: MindNode[]; left: MindNode[] } {
+  const half = Math.ceil(kids.length / 2);
+  let r = kids.filter((k) => k.side === "right").length;
+  const right: MindNode[] = [];
+  const left: MindNode[] = [];
+  for (const k of kids) {
+    if (k.side === "right") right.push(k);
+    else if (k.side === "left") left.push(k);
+    else if (r < half) {
+      right.push(k);
+      r++;
+    } else left.push(k);
+  }
+  return { right, left };
+}
+
 export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, opts: LayoutOptions): LayoutResult {
   const sizes = new Map<string, Size>();
   const extents = new Map<string, number>();
@@ -161,11 +181,11 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     layoutDown(root, kids);
   } else if (opts.structure === "tree-right") {
     layoutTreeRight(root, kids);
-  } else if (opts.structure === "mindmap" && kids.length > 1) {
-    const split = Math.ceil(kids.length / 2);
-    placeColumn(root, kids.slice(0, split), "right", 0);
+  } else if (opts.structure === "mindmap" && (kids.length > 1 || kids.some((k) => k.side === "left"))) {
+    const { right, left } = splitSides(kids);
+    placeColumn(root, right, "right", 0);
     // 左侧顺时针：从下往上排，所以堆叠顺序取反
-    placeColumn(root, kids.slice(split).reverse(), "left", 0);
+    placeColumn(root, left.reverse(), "left", 0);
   } else {
     placeColumn(root, kids, "right", 0);
   }

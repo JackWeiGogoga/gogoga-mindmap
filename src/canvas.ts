@@ -246,6 +246,10 @@ interface DropTarget {
   index: number;
   /** 落在节点上（成为末尾子节点）还是落在子节点列之间（插入到指定位置） */
   kind: "node" | "gap";
+  /** 思维导图结构里拖到中心主题的左边还是右边 */
+  side?: "left" | "right";
+  /** 有 side 时：插在那一侧从上往下第几个位置（画指示线用） */
+  slot?: number;
 }
 
 export class MindMapCanvas {
@@ -593,12 +597,16 @@ export class MindMapCanvas {
   /** 返回是否真的适应了：容器还没量出尺寸时会失败，调用方得再试一次 */
   fit(): boolean {
     if (!this.layout) return false;
-    const { bounds } = this.layout;
+    return this.fitBounds(this.layout.bounds);
+  }
+
+  /** maxK：整图适应时最大 100%，缩放到分支时允许放大 */
+  private fitBounds(bounds: Bounds, maxK = 1): boolean {
     const cw = this.el.clientWidth;
     const ch = this.el.clientHeight;
     if (!cw || !ch) return false;
-    let k = Math.min(1, (cw - FIT_PADDING * 2) / bounds.w, (ch - FIT_PADDING * 2) / bounds.h);
-    if (k > 0.96) k = 1;
+    let k = Math.min(maxK, (cw - FIT_PADDING * 2) / bounds.w, (ch - FIT_PADDING * 2) / bounds.h);
+    if (k > 0.96 && k < 1.04) k = 1;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
     this.tx = cw / 2 - (bounds.x + bounds.w / 2) * this.k;
     this.ty = ch / 2 - (bounds.y + bounds.h / 2) * this.k;
@@ -1875,6 +1883,18 @@ export class MindMapCanvas {
       this.zoomBy(1 / 1.2);
       return;
     }
+    if (mod && ev.shiftKey && (ev.key === "0" || ev.code === "Digit0")) {
+      ev.preventDefault();
+      if (this.primary) this.fitBranch(this.primary);
+      return;
+    }
+    // 数字键：只显示到第 N 层（1 = 只看主主题），0 = 全部展开。⌘1–9 是 Obsidian 切标签页，不占
+    if (!mod && !ev.altKey && !ev.shiftKey && /^Digit[0-9]$/.test(ev.code)) {
+      ev.preventDefault();
+      const n = Number(ev.code.slice(5));
+      this.setFoldLevel(n === 0 ? null : n);
+      return;
+    }
     if (mod && ev.key === "0") {
       ev.preventDefault();
       this.fit();
@@ -2160,11 +2180,20 @@ export class MindMapCanvas {
       this.els.get(target.parent.id)?.classList.add("is-drop-target");
       return;
     }
-    const kids = visibleChildren(target.parent).filter((c) => !this.drag!.subtree.has(c)).map((c) => this.layout!.placed.get(c.id)!).filter(Boolean);
+    const kids = visibleChildren(target.parent)
+      .filter((c) => !this.drag!.subtree.has(c))
+      .map((c) => this.layout!.placed.get(c.id)!)
+      .filter((k) => k && (!target.side || k.side === target.side))
+      .sort((a, b) => (target.side ? a.y - b.y : 0));
     if (!kids.length) return;
     const gap = target.parent.depth === 0 ? DEFAULT_LAYOUT.gapMain : DEFAULT_LAYOUT.gapSibling;
     const side = kids[0].side;
-    const pos = kids.findIndex((k) => target.parent.children.indexOf(k.node) >= target.index);
+    const pos =
+      target.slot !== undefined
+        ? target.slot >= kids.length
+          ? -1
+          : target.slot
+        : kids.findIndex((k) => target.parent.children.indexOf(k.node) >= target.index);
     ind.classList.toggle("is-vertical", side === "down");
     if (side === "down") {
       let x: number;
@@ -2199,6 +2228,7 @@ export class MindMapCanvas {
       // 落在某个子节点自己的盒子里 → 成为它的子节点
       const hit = kids.find((k) => wx >= k.x + 4 && wx <= k.x + k.w - 4 && wy >= k.y + 4 && wy <= k.y + k.h - 4);
       if (hit) return { parent: hit.node, index: hit.node.children.length, kind: "node" };
+      if (this.opts.structure === "mindmap" && p.node === (this.focusRoot ?? this.doc?.root)) return this.sideDropTarget(p, kids, wx, wy);
       const before = horizontal ? kids.filter((k) => k.x + k.w / 2 < wx).length : kids.filter((k) => k.y + k.h / 2 < wy).length;
       const index = before < kids.length ? p.node.children.indexOf(kids[before].node) : p.node.children.length;
       return { parent: p.node, index, kind: "gap" };
@@ -2211,6 +2241,26 @@ export class MindMapCanvas {
     return null;
   }
 
+  /**
+   * 思维导图结构里中心主题两侧的落点：按鼠标在中心主题哪边决定 side，只在那一侧的主主题之间找位置。
+   * 左侧是倒序排的（文档里靠后的在上面），所以插入下标要反过来算。
+   */
+  private sideDropTarget(p: Placed, kids: Placed[], wx: number, wy: number): DropTarget {
+    const side: "left" | "right" = wx < p.x + p.w / 2 ? "left" : "right";
+    const list = kids.filter((k) => k.side === side).sort((a, b) => a.y - b.y);
+    const children = p.node.children;
+    if (!list.length) return { parent: p.node, index: children.length, kind: "gap", side, slot: 0 };
+    const above = list.filter((k) => k.y + k.h / 2 < wy).length;
+    let index: number;
+    if (side === "right") {
+      index = above < list.length ? children.indexOf(list[above].node) : children.indexOf(list[list.length - 1].node) + 1;
+    } else {
+      // 屏幕上从上到下文档下标递减：插到上方那个节点之前、下方那个节点之后
+      index = above > 0 ? children.indexOf(list[above - 1].node) : children.indexOf(list[0].node) + 1;
+    }
+    return { parent: p.node, index, kind: "gap", side, slot: above };
+  }
+
   private endDrag(commit: boolean): void {
     if (!this.drag) return;
     const { node, ghost, indicator, target } = this.drag;
@@ -2221,8 +2271,25 @@ export class MindMapCanvas {
     this.drag = null;
     if (commit && target && this.doc && !isAncestor(node, target.parent) && target.parent !== node) {
       const parent = target.parent;
-      const sameSpot = node.parent === parent && parent.children.indexOf(node) === target.index;
+      const sideChange = !!target.side && node.parent === parent && this.layout?.placed.get(node.id)?.side !== target.side;
+      const sameSpot = node.parent === parent && parent.children.indexOf(node) === target.index && !sideChange;
       if (!sameSpot) {
+        if (target.side) {
+          // 第一次在左右分布里拖主主题时，把所有主主题当前在哪边都记下来，免得别的分支被自动挤到另一边
+          for (const c of parent.children) {
+            const s = this.layout?.placed.get(c.id)?.side;
+            if (!c.side && (s === "left" || s === "right")) c.side = s;
+          }
+          node.side = target.side;
+        } else if (parent !== (this.focusRoot ?? this.doc.root)) {
+          node.side = undefined;
+        }
+        if (sideChange && parent.children.indexOf(node) === target.index) {
+          this.select(node);
+          this.render();
+          this.notify();
+          return;
+        }
         if (parent.folded) parent.folded = false;
         if (moveNode(node, parent, target.index, this.doc.style)) {
           this.select(node);
@@ -2355,6 +2422,7 @@ export class MindMapCanvas {
     if (!sel || !this.doc) return;
     const node = addSibling(sel, "", !before);
     if (!node) return;
+    if (sel.side) node.side = sel.side;
     this.select(node);
     this.render();
     this.startEdit(node, true);
@@ -2433,14 +2501,37 @@ export class MindMapCanvas {
   // ---------- 折叠层级 ----------
 
   /** level 为 null 展开全部；否则深度 ≥ level 的节点折叠（1 = 只看主主题） */
+  /** 只显示到第 level 层（相对当前聚焦的根；null 为全部展开），然后适应画布 */
   setFoldLevel(level: number | null): void {
     if (!this.doc) return;
     if (this.editing) this.commitEdit();
-    walk(this.doc.root, (n) => {
-      if (n.children.length) n.folded = level !== null && n.depth >= level;
+    const base = this.focusRoot ?? this.doc.root;
+    walk(base, (n) => {
+      if (n.children.length) n.folded = level !== null && n.depth - base.depth >= level;
     });
     this.render();
+    this.fit();
     if (this.opts.editable) this.notify();
+  }
+
+  /** 把某个分支（含外框）缩放到正好占满画布 */
+  fitBranch(node: MindNode): void {
+    if (!this.layout) return;
+    let b: Bounds | null = null;
+    const add = (r: Bounds) => {
+      if (!b) b = { ...r };
+      else {
+        const x = Math.min(b.x, r.x);
+        const y = Math.min(b.y, r.y);
+        b = { x, y, w: Math.max(b.x + b.w, r.x + r.w) - x, h: Math.max(b.y + b.h, r.y + r.h) - y };
+      }
+    };
+    walk(node, (n) => {
+      const p = this.layout!.placed.get(n.id);
+      if (p) add(p);
+    });
+    for (const box of this.layout.boxes) if (box.members.some((m) => m === node || isAncestor(node, m))) add(box);
+    if (b) this.fitBounds(b, 1.5);
   }
 
   private toggleFoldMenu(anchor: HTMLElement): void {
@@ -2450,10 +2541,10 @@ export class MindMapCanvas {
     }
     this.foldMenu = this.buildMenu(
       [
-        { label: t("canvas.expandAll"), run: () => this.setFoldLevel(null) },
-        { label: t("canvas.mainTopicsOnly"), run: () => this.setFoldLevel(1) },
-        { label: t("canvas.showToLevel", { n: 2 }), run: () => this.setFoldLevel(2) },
-        { label: t("canvas.showToLevel", { n: 3 }), run: () => this.setFoldLevel(3) },
+        { label: `${t("canvas.expandAll")}  0`, run: () => this.setFoldLevel(null) },
+        { label: `${t("canvas.mainTopicsOnly")}  1`, run: () => this.setFoldLevel(1) },
+        { label: `${t("canvas.showToLevel", { n: 2 })}  2`, run: () => this.setFoldLevel(2) },
+        { label: `${t("canvas.showToLevel", { n: 3 })}  3`, run: () => this.setFoldLevel(3) },
       ],
       anchor,
       () => this.closeFoldMenu(),
@@ -2752,7 +2843,8 @@ export class MindMapCanvas {
         ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
         : { title: t("menu.focusBranch"), icon: "focus", disabled: !node.children.length, run: () => this.focusOn(node) },
     );
-    if (node.children.length) entries.push({ title: node.folded ? t("menu.expand") : t("menu.collapse"), icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) });
+    if (node.children.length) entries.push({ title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) });
+    entries.push({ title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) });
     entries.push(sep);
     if (editable) {
       if (link) {

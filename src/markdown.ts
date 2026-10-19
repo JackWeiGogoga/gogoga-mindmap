@@ -49,6 +49,7 @@ interface Marker {
   folded: boolean;
   box?: Boundary;
   width?: number;
+  side?: "left" | "right";
 }
 
 /** 标记里的一项：box、box=3 可带一个 "标题"（标题里不能有 " 和 %），其余按空白切 */
@@ -68,6 +69,8 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       marker.box = { span: Math.max(1, Number(tok[1] ?? 1)), title: tok[2]?.trim() ?? "" };
     } else if (/^w=\d{1,6}$/.test(lower)) {
       marker.width = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(2))));
+    } else if (lower === "left" || lower === "right") {
+      marker.side = lower;
     } else if (lower === "fold") marker.folded = true;
     else if ((COLOR_NAMES as readonly string[]).includes(lower)) marker.color = lower;
     // 内存里保留 # 前缀，直接当 CSS 颜色用
@@ -77,11 +80,12 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "width">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "width" | "side">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
   if (node.width) parts.push(`w=${Math.round(node.width)}`);
+  if (node.side) parts.push(node.side);
   if (node.box) {
     const title = node.box.title.replace(/["%]/g, "").trim();
     parts.push(`box${node.box.span > 1 ? `=${node.box.span}` : ""}${title ? ` "${title}"` : ""}`);
@@ -304,7 +308,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width, side: marker.side });
         parent.children.push(node);
         headingStack.push(node);
         target = { node, buf: noteBuf };
@@ -323,7 +327,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width, side: marker.side, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       target = { node, buf: noteBuf };

@@ -84,6 +84,7 @@ A paragraph here becomes the central topic's note.
 ```
 
 - Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
+- In the mind map (left and right) structure, dragging a main topic to one side pins it there with `%%left%%` / `%%right%%`, so the other branches stay put.
 - Boundaries are stored in the same comment: `%%box%%` frames the node and its branch, `%%box=3%%` also takes in the next two siblings, and `%%box "Title"%%` adds a title.
 - Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **Deepest heading level** setting.
 - Paragraphs and code blocks under a node are kept as-is as its note, and the node shows a ≡ icon you can click to view it.
@@ -105,7 +106,9 @@ A paragraph here becomes the central topic's note.
 | Alt+↑↓ / Alt+←→ | Reorder among siblings / promote or demote |
 | Shift+click / ⌘+click / Shift+drag / ⌘A | Add to selection / toggle / box-select / select all |
 | Drag node | Change parent or reorder |
-| / | Fold, unfold |
+| / | Fold or unfold the selected node |
+| 1–9 / 0 | Show down to level N (1 = main topics only) and fit the view / expand everything |
+| ⌘⇧0 | Zoom to the selected branch |
 | Arrow keys | Move between nodes |
 | ⌘Z / ⌘⇧Z | Undo / redo |
 | Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |

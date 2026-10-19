@@ -444,3 +444,16 @@ test("节点宽度 %%w=N%%：与其他标记共存、往返不变、超范围收
   assert.equal(out, md.replace("w=90000", "w=1200"));
   assert.equal(serializeMarkdown(parseMarkdown(out)), out);
 });
+
+test("主主题左右标记 %%left%% / %%right%% 往返不变", () => {
+  const md = `# 根
+
+## A %%red left%%
+
+## B %%w=200 right box%%
+`;
+  const doc = parseMarkdown(md);
+  assert.equal(findByPath(doc.root, "0")!.side, "left");
+  assert.equal(findByPath(doc.root, "1")!.side, "right");
+  assert.equal(serializeMarkdown(doc), md.replace("w=200 right box", "w=200 right box"));
+});

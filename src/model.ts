@@ -22,6 +22,8 @@ export interface MindNode {
   box?: Boundary;
   /** 手动拖出来的节点宽度（px），文字按它换行；用 %%w=240%% 持久化，没有就按内容自适应 */
   width?: number;
+  /** 思维导图结构里主主题固定在哪一边；%%left%% / %%right%%，没有就按数量自动分 */
+  side?: "left" | "right";
   kind: NodeKind;
   /** 标题节点的级别 1..6；合成根节点为最小标题级别 - 1 */
   level: number;
@@ -82,6 +84,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     folded: init.folded ?? false,
     box: init.box,
     width: init.width,
+    side: init.side,
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
@@ -275,6 +278,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     folded: node.folded,
     box: node.box && { ...node.box },
     width: node.width,
+    side: node.side,
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,

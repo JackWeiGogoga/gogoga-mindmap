@@ -207,3 +207,19 @@ test("外框：框住子树，同层兄弟让出留白不重叠，各结构都�
     for (const b of res.boxes) assert.ok(inside(b, res.bounds), structure);
   }
 });
+
+test("左右分布：%%left%% / %%right%% 固定在那边，其余按数量补齐；没标时和以前一样前一半在右", async () => {
+  const { splitSides } = await import("../../src/layout");
+  const names = (xs: { text: string }[]) => xs.map((x) => x.text).join("");
+  const plain = parseMarkdown("# R\n\n## A\n\n## B\n\n## C\n\n## D\n");
+  let s = splitSides(plain.root.children);
+  assert.equal(names(s.right) + "|" + names(s.left), "AB|CD");
+  const marked = parseMarkdown("# R\n\n## A %%left%%\n\n## B\n\n## C\n\n## D\n");
+  s = splitSides(marked.root.children);
+  assert.equal(names(s.right) + "|" + names(s.left), "BC|AD");
+  const allLeft = parseMarkdown("# R\n\n## A %%left%%\n\n## B %%left%%\n\n## C %%left%%\n");
+  s = splitSides(allLeft.root.children);
+  assert.equal(names(s.right) + "|" + names(s.left), "|ABC");
+  const res = layoutTree(allLeft.root, measure, { ...DEFAULT_LAYOUT, structure: "mindmap" });
+  for (const c of allLeft.root.children) assert.equal(res.placed.get(c.id)!.side, "left");
+});
