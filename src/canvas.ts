@@ -79,6 +79,8 @@ export interface CanvasHost {
   getDraggedFiles?: () => DroppedFile[] | null;
   /** 把二进制存成附件，返回可用于 ![[…]] 的链接文字 */
   saveBinary?: (name: string, data: ArrayBuffer) => Promise<string>;
+  /** 编辑节点时输入 [[ 弹出的候选：vault 里的文件，按最近修改排序 */
+  listLinkTargets?: () => LinkTarget[];
   /** 当前文件名（不含扩展名），复制节点链接用 */
   fileBasename?: () => string;
   notice?: (message: string) => void;
@@ -87,6 +89,17 @@ export interface CanvasHost {
 }
 
 export type TooltipPlacement = "top" | "right" | "bottom" | "left";
+
+export interface LinkTarget {
+  /** 列表里显示的名字 */
+  name: string;
+  /** 所在文件夹，帮着区分重名 */
+  folder: string;
+  /** 写进 [[ ]] 的文字 */
+  linktext: string;
+  /** Markdown 笔记；匹配程度一样时排在图片等附件前面 */
+  isNote: boolean;
+}
 
 export interface MenuEntry {
   title?: string;
@@ -276,6 +289,7 @@ export class MindMapCanvas {
   private themeButton: HTMLButtonElement | null = null;
   private themeMenu: HTMLElement | null = null;
   private edgeButton: HTMLButtonElement | null = null;
+  private linkSuggest: { el: HTMLElement; items: LinkTarget[]; index: number; open: number } | null = null;
   private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
@@ -1812,7 +1826,10 @@ export class MindMapCanvas {
     });
 
     this.on(el, "input", (ev) => {
-      if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) this.reflow(this.editing);
+      if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) {
+        this.updateLinkSuggest();
+        this.reflow(this.editing);
+      }
     });
 
     this.on(
@@ -1862,6 +1879,25 @@ export class MindMapCanvas {
         this.el.focus({ preventScroll: true });
       }
       return;
+    }
+    if (this.editing && this.linkSuggest && !ev.isComposing) {
+      const s = this.linkSuggest;
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        s.index = (s.index + (ev.key === "ArrowDown" ? 1 : -1) + s.items.length) % s.items.length;
+        this.paintLinkSuggest();
+        return;
+      }
+      if (ev.key === "Enter" || ev.key === "Tab") {
+        ev.preventDefault();
+        this.chooseLinkSuggest(s.index);
+        return;
+      }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.closeLinkSuggest();
+        return;
+      }
     }
     if (this.editing) {
       if (ev.key === "Enter" && !ev.shiftKey) {
@@ -2525,6 +2561,7 @@ export class MindMapCanvas {
   commitEdit(cancel = false, refocus = true): void {
     const node = this.editing;
     if (!node) return;
+    this.closeLinkSuggest();
     const isNew = this.editingIsNew;
     this.editing = null;
     this.editingIsNew = false;
@@ -2552,6 +2589,134 @@ export class MindMapCanvas {
     this.render();
     if (refocus) this.el.focus({ preventScroll: true });
     if (changed) this.notify();
+  }
+
+  // ---------- 编辑时的 [[ 链接补全 ----------
+
+  private editingLabel(): HTMLElement | null {
+    return this.editing ? (this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label") ?? null) : null;
+  }
+
+  /** 光标在 label 纯文本里的位置 */
+  private caretOffset(label: HTMLElement): number | null {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.anchorNode || !label.contains(sel.anchorNode)) return null;
+    const r = document.createRange();
+    r.selectNodeContents(label);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    return r.toString().length;
+  }
+
+  private setCaret(label: HTMLElement, offset: number): void {
+    const node = label.firstChild ?? label;
+    const sel = window.getSelection();
+    sel?.collapse(node, Math.min(offset, node.textContent?.length ?? 0));
+  }
+
+  /**
+   * 输入后看光标前有没有一段还没闭合的 [[：有就弹候选。
+   * 中文输入法下打出来的「【【」先换成 [[（别的笔记插件也这么做，省得切输入法）。
+   */
+  private updateLinkSuggest(): void {
+    const label = this.editingLabel();
+    const host = this.opts.host;
+    if (!label || !host?.listLinkTargets) return this.closeLinkSuggest();
+    const caret = this.caretOffset(label);
+    if (caret === null) return this.closeLinkSuggest();
+    let text = label.textContent ?? "";
+    // 光标前最后一个「【【」（后面没有更晚的 [[）换成 [[；紧挨光标的「】】」换成 ]]。长度不变，光标不用挪
+    const cn = text.slice(0, caret).lastIndexOf("【【");
+    if (cn >= 0 && text.slice(0, caret).lastIndexOf("[[") < cn) text = text.slice(0, cn) + "[[" + text.slice(cn + 2);
+    if (text.slice(0, caret).endsWith("】】")) text = text.slice(0, caret - 2) + "]]" + text.slice(caret);
+    if (text !== label.textContent) {
+      label.textContent = text;
+      this.setCaret(label, caret);
+    }
+    const before = text.slice(0, caret);
+    const open = before.lastIndexOf("[[");
+    const query = open < 0 ? "" : before.slice(open + 2);
+    if (open < 0 || query.includes("]]") || /[\n|#^]/.test(query)) return this.closeLinkSuggest();
+    const q = query.trim().toLowerCase();
+    const scored: { t: LinkTarget; s: number }[] = [];
+    for (const t of host.listLinkTargets()) {
+      const name = t.name.toLowerCase();
+      const m = !q ? 2 : name.startsWith(q) ? 0 : name.includes(q) ? 1 : `${t.folder}/${name}`.toLowerCase().includes(q) ? 2 : -1;
+      if (m >= 0) scored.push({ t, s: m + (t.isNote ? 0 : 0.5) });
+      if (!q && scored.length >= 8) break;
+    }
+    // 排序稳定：同分保持「最近修改」的先后
+    const items = scored.sort((a, b) => a.s - b.s).slice(0, 8).map((x) => x.t);
+    if (!items.length) return this.closeLinkSuggest();
+    if (!this.linkSuggest) {
+      const el = createDiv();
+      el.className = "mm-menu mm-link-suggest";
+      // 按下就选，并且不让编辑框失焦（失焦会提交编辑）
+      el.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const item = (ev.target as HTMLElement).closest<HTMLElement>("[data-index]");
+        if (item) this.chooseLinkSuggest(Number(item.dataset.index));
+      });
+      this.el.append(el);
+      this.linkSuggest = { el, items, index: 0, open };
+    } else {
+      this.linkSuggest.items = items;
+      this.linkSuggest.open = open;
+      this.linkSuggest.index = Math.min(this.linkSuggest.index, items.length - 1);
+    }
+    this.paintLinkSuggest();
+    // 跟着光标走
+    const sel = window.getSelection();
+    const host_ = this.el.getBoundingClientRect();
+    let rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+    if (!rect || (!rect.width && !rect.height)) rect = label.getBoundingClientRect();
+    const el = this.linkSuggest.el;
+    el.style.left = `${Math.max(4, Math.min(rect.left - host_.left, host_.width - el.offsetWidth - 4))}px`;
+    const below = rect.bottom - host_.top + 6;
+    el.style.top = `${below + el.offsetHeight > host_.height - 4 ? Math.max(4, rect.top - host_.top - el.offsetHeight - 6) : below}px`;
+  }
+
+  private paintLinkSuggest(): void {
+    const s = this.linkSuggest;
+    if (!s) return;
+    s.el.replaceChildren();
+    s.items.forEach((t, i) => {
+      const row = createDiv();
+      row.className = "mm-link-suggest-item" + (i === s.index ? " is-active" : "");
+      row.dataset.index = String(i);
+      const name = createSpan();
+      name.className = "mm-link-suggest-name";
+      name.textContent = t.name;
+      row.append(name);
+      if (t.folder) {
+        const folder = createSpan();
+        folder.className = "mm-link-suggest-folder";
+        folder.textContent = t.folder;
+        row.append(folder);
+      }
+      s.el.append(row);
+    });
+  }
+
+  private chooseLinkSuggest(index: number): void {
+    const s = this.linkSuggest;
+    const label = this.editingLabel();
+    const target = s?.items[index];
+    if (!s || !label || !target) return;
+    const caret = this.caretOffset(label) ?? (label.textContent ?? "").length;
+    const text = label.textContent ?? "";
+    // 光标后面已经有 ]]（比如自动补的）就一起吞掉，不留重复的括号
+    const end = text.slice(caret).startsWith("]]") ? caret + 2 : caret;
+    const link = `[[${target.linktext}]]`;
+    label.textContent = text.slice(0, s.open) + link + text.slice(end);
+    this.setCaret(label, s.open + link.length);
+    this.closeLinkSuggest();
+    if (this.editing) this.reflow(this.editing);
+  }
+
+  private closeLinkSuggest(): void {
+    this.linkSuggest?.el.remove();
+    this.linkSuggest = null;
   }
 
   // ---------- 折叠层级 ----------

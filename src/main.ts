@@ -631,6 +631,16 @@ export default class MindMapPlugin extends Plugin {
             this.app.workspace.trigger("hover-link", { event, source: HOVER_SOURCE, hoverParent, targetEl, linktext, sourcePath: sourcePath() });
           }
         : undefined,
+      listLinkTargets: () =>
+        this.app.vault
+          .getFiles()
+          .sort((a, b) => b.stat.mtime - a.stat.mtime)
+          .map((f) => ({
+            name: f.extension === "md" ? f.basename : f.name,
+            folder: f.parent && f.parent.path !== "/" ? f.parent.path : "",
+            linktext: this.app.metadataCache.fileToLinktext(f, sourcePath(), true),
+            isNote: f.extension === "md",
+          })),
       pickNote: (suggested) =>
         new Promise<string | null>((resolve) => {
           new NotePickerModal(this.app, suggested, (item) => {

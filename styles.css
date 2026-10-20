@@ -791,6 +791,22 @@
 
 /* ---------- 折叠菜单 ---------- */
 
+/* 编辑节点时 [[ 的链接候选 */
+.mm-root .mm-link-suggest { min-width: 220px; max-width: 360px; z-index: 6; }
+.mm-link-suggest-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--mm-font);
+}
+.mm-link-suggest-item:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.05)); }
+.mm-link-suggest-item.is-active { background: var(--background-modifier-active-hover, rgba(21, 93, 255, 0.1)); }
+.mm-link-suggest-name { font-size: 14px; color: var(--text-normal, #1f1f1f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-link-suggest-folder { font-size: 11.5px; color: var(--text-faint, #999); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .mm-menu {
   position: absolute;
   z-index: 4;
