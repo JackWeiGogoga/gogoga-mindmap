@@ -223,3 +223,13 @@ test("左右分布：%%left%% / %%right%% 固定在那边，其余按数量补�
   const res = layoutTree(allLeft.root, measure, { ...DEFAULT_LAYOUT, structure: "mindmap" });
   for (const c of allLeft.root.children) assert.equal(res.placed.get(c.id)!.side, "left");
 });
+
+test("折线拐角：默认圆角，半径 0 时拐点就是直角", async () => {
+  const { edgePath } = await import("../../src/layout");
+  const parent = { node: null as never, x: 0, y: 0, w: 40, h: 20, side: "right" as const };
+  const child = { node: null as never, x: 100, y: 80, w: 40, h: 20, side: "right" as const };
+  const g = { parent, child, x1: 40, y1: 10, x2: 100, y2: 90 };
+  assert.match(edgePath(g, "elbow"), /Q70,10 70,18/);
+  const sharp = edgePath(g, "elbow", 0);
+  assert.match(sharp, /L70,10 Q70,10 70,10 L70,90/);
+});

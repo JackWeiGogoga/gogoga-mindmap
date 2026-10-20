@@ -238,10 +238,11 @@ console.log("hello");
 
 ### 连线样式 %%fold%%
 
-工具栏调色盘旁边的连线按钮，和主题配色分开选，写进 `mindmap-edge` / `mindmap-edge-dash`。
+工具栏调色盘旁边的连线按钮，和主题配色分开选，写进 `mindmap-edge` / `mindmap-edge-dash` / `mindmap-edge-corner`。
 
 - 跟随主题 · 曲线 · 直角折线 · 直线
-- 再勾一个虚线
+- 虚线开关
+- 圆角拐角开关：关掉就是尖角
 
 ### 四种结构 %%fold%%
 

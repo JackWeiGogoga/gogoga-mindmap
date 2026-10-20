@@ -490,6 +490,7 @@ export class MindMapCanvas {
           run: () => pick({ ...cur, shape }),
         })),
         { label: t("edge.dashed"), active: !!cur.dashed, run: () => pick({ ...cur, dashed: !cur.dashed }) },
+        { label: t("edge.rounded"), active: !cur.sharp, run: () => pick({ ...cur, sharp: !cur.sharp }) },
       ],
       anchor,
       () => this.closeEdgeMenu(),
@@ -983,7 +984,7 @@ export class MindMapCanvas {
       const tail = anchorBottom(child)
         ? ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`
         : "";
-      const d = edgePath(g, style) + tail;
+      const d = edgePath(g, style, this.opts.edge?.sharp ? 0 : 8) + tail;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;

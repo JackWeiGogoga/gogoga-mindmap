@@ -486,6 +486,7 @@ export default class MindMapPlugin extends Plugin {
           if (!d) return;
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge", e.shape ?? null);
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed ? "true" : null);
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-corner", e.sharp ? "sharp" : null);
           writeBack(serializeMarkdown(d));
         },
         onLayout: (bounds) => {

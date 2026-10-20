@@ -12,13 +12,15 @@ export function isEdgeStyle(s: unknown): s is EdgeStyle {
 export function edgeFromFrontmatter(get: (key: string) => string | null | undefined): EdgeOptions {
   const shape = get("mindmap-edge");
   const dash = get("mindmap-edge-dash");
-  return { shape: isEdgeStyle(shape) ? shape : undefined, dashed: dash === "true" };
+  return { shape: isEdgeStyle(shape) ? shape : undefined, dashed: dash === "true", sharp: get("mindmap-edge-corner") === "sharp" };
 }
 
 /** 单篇覆盖主题的连线：形状不设就跟主题，dashed 为虚线 */
 export interface EdgeOptions {
   shape?: EdgeStyle;
   dashed?: boolean;
+  /** 折线拐角不倒圆角 */
+  sharp?: boolean;
 }
 
 export interface Theme {

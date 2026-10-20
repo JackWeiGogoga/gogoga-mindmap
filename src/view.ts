@@ -295,6 +295,7 @@ export class MindMapView extends TextFileView {
     if (!this.doc) return;
     this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-edge", edge.shape ?? null);
     this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-edge-dash", edge.dashed ? "true" : null);
+    this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-edge-corner", edge.sharp ? "sharp" : null);
     if (!this.doc.frontmatter) this.doc.frontmatter = setFrontmatterValue("", "mindmap", "true");
     this.onDocChange(this.doc);
   }
