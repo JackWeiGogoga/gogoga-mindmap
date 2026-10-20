@@ -46,6 +46,7 @@ export class XmindView extends FileView {
       structure: this.plugin.settings.defaultStructure,
       theme: this.plugin.settings.defaultTheme,
       editable: false,
+      resizableNotes: () => this.plugin.settings.resizableNotes,
       host: this.plugin.canvasHost(() => this.file?.path ?? "", this),
     });
   }

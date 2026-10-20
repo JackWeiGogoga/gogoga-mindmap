@@ -32,6 +32,8 @@ export interface MindMapSettings {
   wheelAction: "pan" | "zoom";
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
+  /** 可选：允许拖拽调整备注预览和编辑窗口的宽高 */
+  resizableNotes: boolean;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   toolbarPosition: "bottom",
   wheelAction: "pan",
   rememberView: true,
+  resizableNotes: false,
   listIcon: MINDMAP_LIST_ICON,
 };
 
@@ -216,6 +219,16 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.wheelAction = v as MindMapSettings["wheelAction"];
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.resizableNotes.name"))
+      .setDesc(t("settings.resizableNotes.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.resizableNotes).onChange(async (v) => {
+          this.plugin.settings.resizableNotes = v;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)
