@@ -12,9 +12,9 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 
 ## Usage
 
-> [!tip] For a quick start, copy the two Chinese-language example notes in `docs/` into your vault.
-> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) (Mind Map user guide), opened as a mind map, is a clickable, foldable map of the plugin's features: every capability is on it, demonstrated by the plugin itself. The note it links to,
-> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (Mind map code block example), is an ordinary note with two `mindmap` blocks embedded in it.
+> [!tip] For a quick start, copy the [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) folder into your vault (the notes are in Chinese).
+> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) (Mind Map user guide), opened as a mind map, is a clickable, foldable map of every feature, demonstrated by the plugin itself.
+> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (code block example) is an ordinary note with `mindmap` blocks embedded in it. The folder also has a typical mind map, a meeting note with an embedded map, and an `.xmind` file to try the import.
 
 1. Command palette → **New mind map**, or add `mindmap: true` to the frontmatter of any note.
 2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **Toggle between mind map and Markdown**, or the file context menu.
@@ -26,6 +26,51 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
    Both `content.json` (XMind Zen / 2020 and later) and `content.xml` (XMind 8) are supported. Boundaries come along; floating topics, relationships, summaries, and comments aren't supported yet, and a note in the top-right corner says how many were left out.
 5. From the view menu (⋯ in the top-right corner) or the command palette: **Export as PNG**, **Export as SVG**, **Copy as image**.
    PNG is exported at 2× resolution, and Obsidian's bundled Inter font is embedded, so the export matches what you see on screen.
+
+### Embedding a mind map in a note
+
+Any note can hold a small mind map: write a `mindmap` code block with the same Markdown a mind map note uses. It renders in Reading view and Live Preview, and you can edit it in place (click the pencil or double-click a node).
+
+````markdown
+```mindmap
+# This week
+
+## Product %%blue%%
+
+- 1️⃣ Requirements review
+- 2️⃣ Prototype walkthrough
+
+## Engineering %%green%%
+
+- ⏳ API integration
+- ✅ Analytics shipped
+
+## Risks %%red%%
+
+- ❗ Design not final
+```
+````
+
+A block can carry its own frontmatter that applies only to that block, for example a different structure and theme:
+
+````markdown
+```mindmap
+---
+mindmap-structure: org-down
+mindmap-theme: business
+---
+
+# Release
+
+## Test
+
+## Regression
+
+## Canary
+
+## Rollout
+```
+````
 
 ### Editing
 

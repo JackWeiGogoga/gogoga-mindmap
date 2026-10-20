@@ -13,10 +13,9 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 
 ## 用法
 
-> [!tip] 想快速上手，把 `docs/` 下的两篇复制进 vault：
-> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) 用脑图打开就是一张可以点开、可以折叠的功能地图，
-> 插件的每个能力都在上面，而且用它自己演示了一遍；它链到的
-> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) 则是一篇插了两块 `mindmap` 的普通笔记。
+> [!tip] 想快速上手，把 [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) 整个文件夹复制进 vault：
+> [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) 用脑图打开就是一张可以点开、可以折叠的功能地图，插件的每个能力都在上面，而且用它自己演示了一遍；
+> [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) 是一篇插了几块 `mindmap` 的普通笔记。另外还有一张常规脑图、一篇带小脑图的会议纪要，和一个用来试导入的 `.xmind` 文件。
 
 1. 命令面板 → **新建思维导图**，或者给任意笔记的 frontmatter 加上 `mindmap: true`。
 2. 带这个键的笔记默认以脑图打开；视图右上角的按钮、命令 **在思维导图和 Markdown 之间切换**、
@@ -30,6 +29,51 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
    XMind Zen / 2020 之后的 content.json 和 XMind 8 的 content.xml 都支持。
 5. 视图菜单（右上角 ⋯）或命令面板：**导出为 PNG**、**导出为 SVG**、**复制为图片**。
    PNG 是 2 倍分辨率，Obsidian 自带的 Inter 字体会内嵌，导出和屏幕上看到的一致。
+
+### 在笔记里嵌入脑图
+
+任何一篇普通笔记都能插一张小脑图：写一个 `mindmap` 代码块，块里放和脑图笔记同一套 Markdown。阅读模式和实时预览都会渲染，点铅笔或双击节点就能就地编辑，改动直接写回代码块。
+
+````markdown
+```mindmap
+# 本周计划
+
+## 产品 %%blue%%
+
+- 1️⃣ 需求评审
+- 2️⃣ 原型走查
+
+## 研发 %%green%%
+
+- ⏳ 接口联调
+- ✅ 埋点上线
+
+## 风险 %%red%%
+
+- ❗ 设计稿还没定
+```
+````
+
+块里还可以再写一层 frontmatter，只对这一块生效，比如换个结构和主题：
+
+````markdown
+```mindmap
+---
+mindmap-structure: org-down
+mindmap-theme: business
+---
+
+# 发布流程
+
+## 提测
+
+## 回归
+
+## 灰度
+
+## 全量
+```
+````
 
 ### 编辑
 
