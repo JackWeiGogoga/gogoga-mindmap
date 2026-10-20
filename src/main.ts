@@ -36,7 +36,7 @@ import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
-import { isThemeName } from "./theme";
+import { edgeFromFrontmatter, isThemeName } from "./theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
@@ -460,6 +460,7 @@ export default class MindMapPlugin extends Plugin {
       const canvas = new MindMapCanvas(wrap, {
         structure: isStructure(structure) ? structure : this.settings.defaultStructure,
         theme: isThemeName(theme) ? theme : this.settings.defaultTheme,
+        edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
         editable: state.editable,
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,
@@ -478,6 +479,13 @@ export default class MindMapPlugin extends Plugin {
           const d = canvas.getDoc();
           if (!d) return;
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-structure", s === this.settings.defaultStructure ? null : s);
+          writeBack(serializeMarkdown(d));
+        },
+        onEdgeChange: (e) => {
+          const d = canvas.getDoc();
+          if (!d) return;
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge", e.shape ?? null);
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed ? "true" : null);
           writeBack(serializeMarkdown(d));
         },
         onLayout: (bounds) => {

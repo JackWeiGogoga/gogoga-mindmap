@@ -360,8 +360,9 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
 }
 
 /** 按子节点方向选路径：水平/垂直 S 曲线、圆角折线、树形图的竖干折线 */
-export function edgePath(e: EdgeGeometry, style: "curve" | "elbow"): string {
+export function edgePath(e: EdgeGeometry, style: "curve" | "elbow" | "straight"): string {
   if (e.child.side === "tree") return treePath(e);
+  if (style === "straight") return `M${r(e.x1)},${r(e.y1)} L${r(e.x2)},${r(e.y2)}`;
   if (e.child.side === "down") return style === "curve" ? curvePathVertical(e) : elbowPathVertical(e);
   return style === "curve" ? curvePath(e) : elbowPath(e);
 }

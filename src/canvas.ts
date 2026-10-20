@@ -53,7 +53,7 @@ import {
   toggleTask,
   wikilinkOf,
 } from "./inline";
-import { BRANCH_COLOR_COUNT, THEME_LIST, themeLabel, themeShortLabel, ThemeName, THEMES } from "./theme";
+import { BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, THEME_LIST, themeLabel, themeShortLabel, ThemeName, THEMES } from "./theme";
 import { Key, t } from "./i18n";
 import { COLOR_NAMES, convertLevelKind, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -115,6 +115,9 @@ export interface CanvasOptions {
   onRedo?: () => void;
   onStructureChange?: (structure: Structure) => void;
   onThemeChange?: (theme: ThemeName) => void;
+  /** 单篇的连线样式（覆盖主题），改了之后回调去写 frontmatter */
+  edge?: EdgeOptions;
+  onEdgeChange?: (edge: EdgeOptions) => void;
   /** 每次布局完成后调用，可用来按内容定高度 */
   onLayout?: (bounds: Bounds) => void;
   /** 每次整体渲染完成后（树结构可能变了） */
@@ -184,6 +187,7 @@ const ICONS: Record<string, string> = {
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
+  edge: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 12h4V5h6M11 12v7h6"/></svg>',
   box: '<svg viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg>',
 };
 
@@ -271,6 +275,8 @@ export class MindMapCanvas {
   private structureMenu: HTMLElement | null = null;
   private themeButton: HTMLButtonElement | null = null;
   private themeMenu: HTMLElement | null = null;
+  private edgeButton: HTMLButtonElement | null = null;
+  private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
 
@@ -375,6 +381,7 @@ export class MindMapCanvas {
     this.viewport.className = "mm-viewport";
     this.svg = createSvg("svg");
     this.svg.setAttribute("class", "mm-edges");
+    if (opts.edge?.dashed) this.svg.classList.add("is-dashed");
     this.boxLayer = createSvg("g");
     this.boxLayer.setAttribute("class", "mm-boxes");
     this.svg.append(this.boxLayer);
@@ -436,6 +443,48 @@ export class MindMapCanvas {
     this.el.dataset.branchColors = THEMES[theme].branchColors ? "true" : "false";
     if (this.themeButton) this.tip(this.themeButton, this.themeTipText(), "toolbar");
     this.render();
+  }
+
+  setEdge(edge: EdgeOptions): void {
+    this.opts.edge = { ...edge };
+    this.svg.classList.toggle("is-dashed", !!edge.dashed);
+    if (this.edgeButton) this.tip(this.edgeButton, this.edgeTipText(), "toolbar");
+    if (this.doc) this.reflow();
+  }
+
+  private edgeTipText(): string {
+    const shape = this.opts.edge?.shape;
+    return t("canvas.edgeTip", { name: shape ? t(`edge.${shape}`) : t("edge.theme") });
+  }
+
+  private toggleEdgeMenu(anchor: HTMLElement): void {
+    if (this.edgeMenu) {
+      this.closeEdgeMenu();
+      return;
+    }
+    const cur = this.opts.edge ?? {};
+    const pick = (next: EdgeOptions) => {
+      this.setEdge(next);
+      this.opts.onEdgeChange?.(next);
+    };
+    const shapes: (EdgeStyle | undefined)[] = [undefined, "curve", "elbow", "straight"];
+    this.edgeMenu = this.buildMenu(
+      [
+        ...shapes.map((shape) => ({
+          label: shape ? t(`edge.${shape}`) : t("edge.theme"),
+          active: cur.shape === shape,
+          run: () => pick({ ...cur, shape }),
+        })),
+        { label: t("edge.dashed"), active: !!cur.dashed, run: () => pick({ ...cur, dashed: !cur.dashed }) },
+      ],
+      anchor,
+      () => this.closeEdgeMenu(),
+    );
+  }
+
+  private closeEdgeMenu(): void {
+    this.edgeMenu?.remove();
+    this.edgeMenu = null;
   }
 
   private themeTipText(): string {
@@ -528,6 +577,7 @@ export class MindMapCanvas {
     this.el.classList.toggle("is-editable", editable);
     this.structureButton?.classList.toggle("is-hidden", !editable);
     this.themeButton?.classList.toggle("is-hidden", !editable);
+    this.edgeButton?.classList.toggle("is-hidden", !editable);
     this.structureSep?.classList.toggle("is-hidden", !editable);
     if (this.editToggle) {
       this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
@@ -587,6 +637,8 @@ export class MindMapCanvas {
     this.structureMenu = null;
     this.themeMenu = null;
     this.themeButton = null;
+    this.edgeMenu = null;
+    this.edgeButton = null;
     this.markerPicker = null;
     this.markerPickerCleanup = null;
     this.edgePaths = [];
@@ -902,7 +954,7 @@ export class MindMapCanvas {
         if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
         if (anchorBottom(child)) g.y2 = child.y + child.h;
       }
-      const style = parentNode === base ? theme.rootEdge : theme.edge;
+      const style = this.opts.edge?.shape ?? (parentNode === base ? theme.rootEdge : theme.edge);
       // 复用已有的 path，只改变了的属性；重新创建几千个 SVG 元素会让布局整体失效
       let path = this.edgePaths[edgeIndex];
       if (!path) {
@@ -1302,6 +1354,10 @@ export class MindMapCanvas {
       this.tip(tb, this.themeTipText(), "toolbar");
       tb.classList.toggle("is-hidden", !this.opts.editable);
       this.themeButton = tb;
+      const eb = btn("edge", "", () => this.toggleEdgeMenu(eb));
+      this.tip(eb, this.edgeTipText(), "toolbar");
+      eb.classList.toggle("is-hidden", !this.opts.editable);
+      this.edgeButton = eb;
       const sep = createSpan();
       sep.className = "mm-tool-sep";
       sep.classList.toggle("is-hidden", !this.opts.editable);

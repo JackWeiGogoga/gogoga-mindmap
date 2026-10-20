@@ -143,7 +143,8 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
   const paths = [...edges.querySelectorAll("path")].map((p) => {
     const cs = getComputedStyle(p);
     const d = p.getAttribute("d") ?? "";
-    return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}" stroke-linejoin="${cs.strokeLinejoin}"/>`;
+    const dash = cs.strokeDasharray && cs.strokeDasharray !== "none" ? ` stroke-dasharray="${cs.strokeDasharray}"` : "";
+    return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}" stroke-linejoin="${cs.strokeLinejoin}"${dash}/>`;
   });
 
   const clone = nodes.cloneNode(true) as HTMLElement;

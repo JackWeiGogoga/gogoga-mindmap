@@ -2,7 +2,24 @@ import { t } from "./i18n";
 import { LayoutOptions } from "./layout";
 
 export type ThemeName = "snow" | "rainbow" | "business" | "warm" | "mono" | "line" | "forest";
-export type EdgeStyle = "curve" | "elbow";
+export type EdgeStyle = "curve" | "elbow" | "straight";
+export const EDGE_STYLES: EdgeStyle[] = ["curve", "elbow", "straight"];
+export function isEdgeStyle(s: unknown): s is EdgeStyle {
+  return EDGE_STYLES.includes(s as EdgeStyle);
+}
+
+/** frontmatter 里的 mindmap-edge / mindmap-edge-dash → EdgeOptions */
+export function edgeFromFrontmatter(get: (key: string) => string | null | undefined): EdgeOptions {
+  const shape = get("mindmap-edge");
+  const dash = get("mindmap-edge-dash");
+  return { shape: isEdgeStyle(shape) ? shape : undefined, dashed: dash === "true" };
+}
+
+/** 单篇覆盖主题的连线：形状不设就跟主题，dashed 为虚线 */
+export interface EdgeOptions {
+  shape?: EdgeStyle;
+  dashed?: boolean;
+}
 
 export interface Theme {
   name: ThemeName;

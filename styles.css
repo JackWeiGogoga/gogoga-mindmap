@@ -129,6 +129,7 @@
   stroke-width: var(--mm-edge-w3);
 }
 .mm-edge[data-depth="1"] { stroke-width: var(--mm-edge-w1); }
+.mm-edges.is-dashed .mm-edge { stroke-dasharray: 6 5; }
 .mm-edge[data-depth="2"] { stroke-width: var(--mm-edge-w2); }
 
 /* 外框：虚线圆角框 + 淡底色，开分支色的主题跟随起始节点的分支色 */

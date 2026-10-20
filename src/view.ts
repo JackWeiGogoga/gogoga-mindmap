@@ -8,8 +8,8 @@ import { History } from "./history";
 import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import type { MindDoc } from "./model";
-import type { ThemeName } from "./theme";
-import { isThemeName } from "./theme";
+import type { EdgeOptions, ThemeName } from "./theme";
+import { edgeFromFrontmatter, isThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import { indentString, ToolbarPosition } from "./settings";
 
@@ -131,6 +131,7 @@ export class MindMapView extends TextFileView {
       onRedo: () => this.redo(),
       onStructureChange: (s) => this.persistStructure(s),
       onThemeChange: (t) => this.persistTheme(t),
+      onEdgeChange: (e) => this.persistEdge(e),
       onRender: () => this.outline?.refresh(),
       onSelectionChange: (primary) => this.outline?.syncSelection(primary),
       onToggleOutline: () => void this.toggleOutline(),
@@ -271,6 +272,7 @@ export class MindMapView extends TextFileView {
     this.canvas.setStructure(isStructure(structure) ? structure : this.plugin.settings.defaultStructure);
     const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
     this.canvas.setTheme(isThemeName(theme) ? theme : this.plugin.settings.defaultTheme);
+    this.canvas.setEdge(edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)));
   }
 
   private onDocChange(doc: MindDoc): void {
@@ -285,6 +287,14 @@ export class MindMapView extends TextFileView {
     if (!this.doc) return;
     const value = theme === this.plugin.settings.defaultTheme ? null : theme;
     this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-theme", value);
+    if (!this.doc.frontmatter) this.doc.frontmatter = setFrontmatterValue("", "mindmap", "true");
+    this.onDocChange(this.doc);
+  }
+
+  private persistEdge(edge: EdgeOptions): void {
+    if (!this.doc) return;
+    this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-edge", edge.shape ?? null);
+    this.doc.frontmatter = setFrontmatterValue(this.doc.frontmatter, "mindmap-edge-dash", edge.dashed ? "true" : null);
     if (!this.doc.frontmatter) this.doc.frontmatter = setFrontmatterValue("", "mindmap", "true");
     this.onDocChange(this.doc);
   }
