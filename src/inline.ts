@@ -117,12 +117,16 @@ export const TOKEN_RE = new RegExp(
     String.raw`|(?<![\w_])_([^_\s][^_]*?)_(?![\w_])` +
     String.raw`|(?<![\w#&])#([\p{L}\p{N}_\/-]*[\p{L}_\/-][\p{L}\p{N}_\/-]*)` +
     `|${BARE_URL}` +
-    `|${IFRAME}`,
+    `|${IFRAME}` +
+    // 反斜杠转义：\<td\>、\*、\[ 之类只显示后面那个标点。反斜杠在被转义的符号前面，
+    // 最左优先保证它先于以那个符号开头的标记被匹配到
+    String.raw`|\\([!-/:-@[-\x60{-~])`,
   "gu",
 );
 
 // 分组含义：1-2 ![[图片|参数]]  3-4 ![alt](url)  5 $公式$  6-7 [[链接|别名]]  8-9 [文字](url)
 // 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签  18 裸 URL  19 <iframe> 的属性串
+// 20 被反斜杠转义的标点
 
 const BR_RE = /<br\s*\/?>/i;
 
@@ -194,6 +198,8 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       el.appendChild(link(m[18], m[18], false, opts));
     } else if (m[19] !== undefined) {
       el.appendChild(frame(m[19], m[0], opts));
+    } else if (m[20] !== undefined) {
+      el.appendChild(document.createTextNode(m[20]));
     }
   }
   if (last < rest.length) el.appendChild(document.createTextNode(rest.slice(last)));
@@ -416,5 +422,6 @@ export function plainText(text: string): string {
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_: string, a: string, b?: string) => b ?? a)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_: string, a?: string, b?: string, c?: string, d?: string, e?: string) => a ?? b ?? c ?? d ?? e ?? "");
+    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_: string, a?: string, b?: string, c?: string, d?: string, e?: string) => a ?? b ?? c ?? d ?? e ?? "")
+    .replace(/\\([!-/:-@[-`{-~])/g, "$1");
 }

@@ -162,3 +162,15 @@ test("公式：$…$ 与 $$…$$ 都识别成一个公式，金额里的 $ 不�
     [5, "$$\\int_0^1 x\\,dx$$"],
   ]);
 });
+
+test("反斜杠转义：只留后面的标点，并且先于以那个标点开头的标记", () => {
+  const ESC = 20;
+  assert.deepEqual(tokens(String.raw`行内块元素：\<td\>表格中的特例`), [[ESC, "\\<"], [ESC, "\\>"]]);
+  // \* 不会开启斜体，\[\[ 不会变成双链
+  assert.deepEqual(tokens(String.raw`\*不是斜体*`), [[ESC, "\\*"]]);
+  assert.deepEqual(tokens(String.raw`\[\[不是链接]]`), [[ESC, "\\["], [ESC, "\\["]]);
+  // 反斜杠后面不是标点就原样留着；行内代码和公式里的反斜杠不动
+  assert.deepEqual(tokens(String.raw`C:\Users`), []);
+  assert.deepEqual(tokens("`a\\*b`"), [[12, "`a\\*b`"]]);
+  assert.deepEqual(tokens(String.raw`$\frac{1}{2}$`), [[5, String.raw`$\frac{1}{2}$`]]);
+});
