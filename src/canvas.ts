@@ -1585,8 +1585,10 @@ export class MindMapCanvas {
     this.nodebar.classList.remove("is-hidden");
     // 窄屏（手机）放不下一整行就折行：颜色一行、按钮一行
     this.nodebar.style.maxWidth = `${Math.max(160, this.el.clientWidth - 8)}px`;
-    const group = this.nodebar.querySelector<HTMLElement>(".mm-nodebar-group");
-    this.nodebar.classList.toggle("is-wrapped", !!group && this.nodebar.offsetHeight > group.offsetHeight * 1.6);
+    // 按钮组掉到颜色组下面一行了，就是折行：藏掉两组之间的竖分隔线
+    this.nodebar.classList.remove("is-wrapped");
+    const [colors, tools] = this.nodebar.querySelectorAll<HTMLElement>(".mm-nodebar-group");
+    this.nodebar.classList.toggle("is-wrapped", !!colors && !!tools && tools.offsetTop >= colors.offsetTop + colors.offsetHeight);
     const bw = this.nodebar.offsetWidth;
     const bh = this.nodebar.offsetHeight;
     const left = Math.max(4, Math.min(r.x + r.width / 2 - bw / 2, this.el.clientWidth - bw - 4));
