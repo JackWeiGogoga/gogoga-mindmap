@@ -5,6 +5,7 @@
  * 落地方式：画布根元素仍挂内置主题的 data-theme（配色兜底），另挂 data-custom="<id>"；
  * 这里生成一段样式表（浅色 + 自动推算的深色）注入页面，用更高的选择器优先级盖掉对应部分。
  * 节点颜色标记（has-color）、手动拖出来的宽度（has-width）、每篇的连线设置仍然优先。
+ * 「同层对齐」靠量出来的宽度，CSS 做不到，由画布在布局时处理（alignedTiers）。
  */
 
 import type { EdgeStyle, ThemeName } from "./theme";
@@ -24,8 +25,10 @@ export interface TierStyle {
   borderStyle: "none" | "solid" | "dashed";
   borderWidth: number;
   borderColor: string;
-  /** 固定宽度；null 为按内容自适应 */
-  width: number | null;
+  /** 最大宽度：内容短就按内容，超过就在这里换行；null 为沿用默认上限 */
+  maxWidth: number | null;
+  /** 同层对齐：这一层的节点统一成同层最宽那个的实际宽度 */
+  align: boolean;
   /** 连到这一层的线；中心主题这一档不用 */
   lineColor: string;
   lineWidth: number;
@@ -72,6 +75,31 @@ export function setPreviewTheme(theme: CustomTheme | null): void {
 export function getCustomTheme(id: string): CustomTheme | undefined {
   if (id === PREVIEW_ID) return preview ?? undefined;
   return registry.find((t) => t.id === id);
+}
+
+/**
+ * 旧版的「固定宽度」（width）换成「最大宽度 + 同层对齐」：最接近原来整齐的效果，
+ * 只是短内容的层不再被撑到那么宽
+ */
+export function normalizeCustomTheme(theme: CustomTheme): CustomTheme {
+  const tiers = theme.tiers.map((t) => {
+    const legacy = (t as TierStyle & { width?: number | null }).width;
+    const { width: _drop, ...rest } = t as TierStyle & { width?: number | null };
+    void _drop;
+    return {
+      ...rest,
+      maxWidth: rest.maxWidth ?? legacy ?? null,
+      align: rest.align ?? !!legacy,
+    } as TierStyle;
+  });
+  return { ...theme, tiers };
+}
+
+/** 哪几档开了同层对齐；不是自定义主题就没有 */
+export function alignedTiers(themeId: string): boolean[] | null {
+  const th = getCustomTheme(themeId);
+  if (!th || !th.tiers.some((t) => t.align)) return null;
+  return th.tiers.map((t) => t.align);
 }
 
 export function newCustomThemeId(): string {
@@ -138,7 +166,7 @@ function tierRules(sel: string, t: TierStyle, depth: number, theme: CustomTheme,
       `${node} { font-size: ${t.fontSize}px; font-weight: ${t.bold ? 600 : 400}; font-style: ${t.italic ? "italic" : "normal"}; }`,
       `${node}:not(.is-underline) { border-radius: ${t.radius}px; border: ${border}; }`,
     );
-    if (t.width) out.push(`${node}:not(.has-width) { width: ${t.width}px; max-width: none; }`);
+    if (t.maxWidth) out.push(`${node}:not(.has-width):not(.has-image) { max-width: ${t.maxWidth}px; }`);
   } else if (t.borderStyle !== "none" && !t.underline) {
     out.push(`${node}:not(.is-underline) { border-color: ${col(t.borderColor, "stroke")}; }`);
   }

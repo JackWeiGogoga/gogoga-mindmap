@@ -37,7 +37,7 @@ import { CanvasHost, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
-import { customThemeCss, getCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
+import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
@@ -125,6 +125,7 @@ export default class MindMapPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<MindMapSettings> | null) };
+    this.settings.customThemes = this.settings.customThemes.map(normalizeCustomTheme);
     // 0.3.x 用的是借来的 lucide:git-fork；裸的 mindmap-tree 又不被文件列表插件认，统一迁到带前缀的值
     if (this.settings.listIcon === "lucide:git-fork" || this.settings.listIcon === MINDMAP_ICON) {
       this.settings.listIcon = MINDMAP_LIST_ICON;

@@ -55,6 +55,7 @@ import {
 } from "./inline";
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
+import { alignedTiers, tierOf } from "./custom-theme";
 import { COLOR_NAMES, convertLevelKind, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
@@ -301,6 +302,10 @@ export class MindMapCanvas {
   private layout: LayoutResult | null = null;
   private els = new Map<string, HTMLElement>();
   private sizes = new Map<string, Size>();
+  /** 撤掉同层对齐之前量到的宽高；对齐在它的基础上算 */
+  private naturalSizes = new Map<string, Size>();
+  /** 被同层对齐写过 style.width 的节点 */
+  private alignedEls = new Set<HTMLElement>();
   /** 节点内容的签名，用来判断能否原样复用元素 */
   private elSigs = new WeakMap<HTMLElement, string>();
   /** 只跟「节点里画什么」有关的签名；它没变就别动 DOM 子节点（iframe 重新插入会重新加载） */
@@ -952,6 +957,39 @@ export class MindMapCanvas {
   }
 
   /**
+   * 自定义主题的「同层对齐」：同一层（相对当前根的深度）里，没手动拖过宽度、不是图片节点的，
+   * 统一成这一层最宽那个的自然宽度。只会变宽、不会变窄，所以换行不变，高度直接沿用
+   */
+  private alignWidths(base: MindNode): void {
+    const tiers = alignedTiers(this.opts.theme);
+    if (!tiers) return;
+    const byDepth = new Map<number, { el: HTMLElement; id: string }[]>();
+    walk(base, (n) => {
+      const el = this.els.get(n.id);
+      if (!el || el.classList.contains("has-width") || el.classList.contains("has-image")) return;
+      const rel = n.depth - base.depth;
+      if (!tiers[tierOf(rel)]) return;
+      const list = byDepth.get(rel) ?? [];
+      list.push({ el, id: n.id });
+      byDepth.set(rel, list);
+    });
+    for (const list of byDepth.values()) {
+      const max = Math.max(...list.map((x) => this.naturalSizes.get(x.id)?.w ?? 0));
+      for (const { el, id } of list) {
+        const size = this.naturalSizes.get(id);
+        if (!size) continue;
+        if (size.w < max) {
+          el.style.width = `${max}px`;
+          this.alignedEls.add(el);
+          this.sizes.set(id, { w: max, h: size.h });
+        } else if (this.alignedEls.delete(el)) {
+          el.style.width = "";
+        }
+      }
+    }
+  }
+
+  /**
    * 测量 → 布局 → 定位 → 画线。编辑中输入文字时也会调用，所以不重建 DOM。
    * remeasure 传入某个节点时只重新测量它：打字只改变这一个节点的尺寸，
    * 读全部 3000 个节点的 offsetWidth 会触发整页强制布局（约 30ms）。
@@ -959,15 +997,23 @@ export class MindMapCanvas {
   private reflow(remeasure?: MindNode): void {
     const doc = this.doc!;
     const theme = resolveTheme(this.opts.theme);
-    if (remeasure && this.sizes.size === this.els.size) {
-      const el = this.els.get(remeasure.id);
-      if (el) this.sizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
-    } else {
-      this.sizes.clear();
-      for (const [id, el] of this.els) this.sizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
-    }
-    const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
     const base = this.focusRoot ?? doc.root;
+    // 量的是自然宽度：先把上一轮对齐写上去的宽度撤掉（先统一写、再统一读，免得一来一回反复强制布局）
+    if (remeasure && this.naturalSizes.size === this.els.size) {
+      const el = this.els.get(remeasure.id);
+      if (el) {
+        if (this.alignedEls.delete(el)) el.style.width = "";
+        this.naturalSizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
+      }
+    } else {
+      for (const el of this.alignedEls) el.style.width = "";
+      this.alignedEls.clear();
+      this.naturalSizes.clear();
+      for (const [id, el] of this.els) this.naturalSizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
+    }
+    this.sizes = new Map(this.naturalSizes);
+    this.alignWidths(base);
+    const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
     this.layout = layoutTree(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts);
 
     for (const p of this.layout.placed.values()) {

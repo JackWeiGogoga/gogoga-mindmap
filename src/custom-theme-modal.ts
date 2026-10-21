@@ -65,7 +65,8 @@ export function themeFromBase(base: ThemeName, name: string, id: string): Custom
         borderStyle,
         borderWidth: borderStyle === "none" ? 1 : parseFloat(cs.borderTopWidth) || 1,
         borderColor: borderStyle === "none" ? "#8a8a8a" : toHex(cs.borderTopColor),
-        width: null,
+        maxWidth: null,
+        align: false,
         lineColor: ps.stroke && ps.stroke !== "none" ? toHex(ps.stroke) : "#2b2b2b",
         lineWidth: parseFloat(ps.strokeWidth) || 1.5,
       });
@@ -332,14 +333,23 @@ export class CustomThemeModal extends Modal {
       .setDesc(t("customTheme.widthDesc"))
       .addDropdown((x) =>
         x
-          .addOptions({ auto: t("customTheme.width.auto"), fixed: t("customTheme.width.fixed") })
-          .setValue(tier.width ? "fixed" : "auto")
+          .addOptions({ auto: t("customTheme.width.auto"), custom: t("customTheme.width.custom") })
+          .setValue(tier.maxWidth ? "custom" : "auto")
           .onChange((v) => {
-            tier.width = v === "fixed" ? (tier.width ?? 200) : null;
+            tier.maxWidth = v === "custom" ? (tier.maxWidth ?? (this.tier === 0 ? 440 : 300)) : null;
             this.changed(true);
           }),
       );
-    if (tier.width) slider(new Setting(el).setName(t("customTheme.widthPx")), 60, 600, 10, () => tier.width ?? 200, (v) => (tier.width = v));
+    if (tier.maxWidth) slider(new Setting(el).setName(t("customTheme.widthPx")), 60, 1200, 10, () => tier.maxWidth ?? 300, (v) => (tier.maxWidth = v));
+    new Setting(el)
+      .setName(t("customTheme.align"))
+      .setDesc(t("customTheme.alignDesc"))
+      .addToggle((x) =>
+        x.setValue(tier.align).onChange((v) => {
+          tier.align = v;
+          this.changed();
+        }),
+      );
     if (this.tier > 0) {
       color(new Setting(el).setName(t("customTheme.lineColor")), () => tier.lineColor, (v) => (tier.lineColor = v));
       slider(new Setting(el).setName(t("customTheme.lineWidth")), 0.5, 6, 0.5, () => tier.lineWidth, (v) => (tier.lineWidth = v));
