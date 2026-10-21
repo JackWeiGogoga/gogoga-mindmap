@@ -96,6 +96,7 @@ export class CustomThemeModal extends Modal {
   }
 
   onOpen(): void {
+    this.plugin.openThemeEditors.add(this);
     this.modalEl.addClass("mm-theme-modal");
     this.setTitle(t("customTheme.editTitle"));
     const body = this.contentEl.createDiv({ cls: "mm-theme-editor" });
@@ -119,6 +120,7 @@ export class CustomThemeModal extends Modal {
   }
 
   onClose(): void {
+    this.plugin.openThemeEditors.delete(this);
     this.canvas?.destroy();
     this.canvas = null;
     setPreviewTheme(null);
@@ -218,16 +220,21 @@ export class CustomThemeModal extends Modal {
 
     const tier = d.tiers[this.tier];
     const slider = (s: Setting, min: number, max: number, step: number, get: () => number, set: (v: number) => void) =>
-      s.addSlider((x) =>
-        x
-          .setLimits(min, max, step)
+      s.addSlider((x) => {
+        x.setLimits(min, max, step)
           .setValue(get())
           .setDynamicTooltip()
           .onChange((v) => {
             set(v);
             this.changed();
-          }),
-      );
+          });
+        // Obsidian 的滑块松手才回调；拖动过程中也跟着刷新预览
+        x.sliderEl.addEventListener("input", () => {
+          set(Number(x.sliderEl.value));
+          this.changed();
+        });
+        return x;
+      });
     const color = (s: Setting, get: () => string, set: (v: string) => void) =>
       s.addColorPicker((x) =>
         x.setValue(get()).onChange((v) => {

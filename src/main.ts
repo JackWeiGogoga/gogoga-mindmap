@@ -65,6 +65,7 @@ export default class MindMapPlugin extends Plugin {
     this.applyCustomThemes();
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
     this.register(() => {
+      for (const m of [...this.openThemeEditors]) m.close();
       for (const el of this.customCssEls) el.remove();
       this.customCssEls = [];
     });
@@ -138,6 +139,8 @@ export default class MindMapPlugin extends Plugin {
   // ---------- 自定义主题 ----------
 
   private customCssEls: HTMLStyleElement[] = [];
+  /** 打开着的主题编辑器：插件卸载 / 重载时一并关掉，免得旧代码继续往样式表里写 */
+  openThemeEditors = new Set<{ close(): void }>();
 
   /** 设置里的自定义主题 → 注册表 + 样式表，并让已打开的脑图重画 */
   applyCustomThemes(): void {
