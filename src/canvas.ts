@@ -979,11 +979,11 @@ export class MindMapCanvas {
         const size = this.naturalSizes.get(id);
         if (!size) continue;
         if (size.w < max) {
-          el.style.width = `${max}px`;
+          el.setCssStyles({ width: `${max}px` });
           this.alignedEls.add(el);
           this.sizes.set(id, { w: max, h: size.h });
         } else if (this.alignedEls.delete(el)) {
-          el.style.width = "";
+          el.setCssStyles({ width: "" });
         }
       }
     }
@@ -1002,11 +1002,11 @@ export class MindMapCanvas {
     if (remeasure && this.naturalSizes.size === this.els.size) {
       const el = this.els.get(remeasure.id);
       if (el) {
-        if (this.alignedEls.delete(el)) el.style.width = "";
+        if (this.alignedEls.delete(el)) el.setCssStyles({ width: "" });
         this.naturalSizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
       }
     } else {
-      for (const el of this.alignedEls) el.style.width = "";
+      for (const el of this.alignedEls) el.setCssStyles({ width: "" });
       this.alignedEls.clear();
       this.naturalSizes.clear();
       for (const [id, el] of this.els) this.naturalSizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
@@ -2034,12 +2034,8 @@ export class MindMapCanvas {
   private openLightbox(img: HTMLImageElement): void {
     if (this.lightbox) return;
     const doc = this.el.ownerDocument;
-    const box = doc.createElement("div");
-    box.className = "mm-lightbox";
-    const big = doc.createElement("img");
-    big.src = img.currentSrc || img.src;
-    big.alt = img.alt;
-    box.append(big);
+    const box = doc.body.createDiv({ cls: "mm-lightbox" });
+    box.createEl("img", { attr: { src: img.currentSrc || img.src, alt: img.alt } });
     const close = () => {
       box.remove();
       doc.removeEventListener("keydown", onKey, true);
@@ -2054,7 +2050,6 @@ export class MindMapCanvas {
     };
     box.addEventListener("click", close);
     doc.addEventListener("keydown", onKey, true);
-    doc.body.append(box);
     this.lightbox = box;
   }
 

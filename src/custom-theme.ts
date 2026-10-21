@@ -82,15 +82,14 @@ export function getCustomTheme(id: string): CustomTheme | undefined {
  * 只是短内容的层不再被撑到那么宽
  */
 export function normalizeCustomTheme(theme: CustomTheme): CustomTheme {
-  const tiers = theme.tiers.map((t) => {
-    const legacy = (t as TierStyle & { width?: number | null }).width;
-    const { width: _drop, ...rest } = t as TierStyle & { width?: number | null };
-    void _drop;
+  // 存档里可能是旧格式：有 width、没有 maxWidth / align
+  const tiers = theme.tiers.map((t: Partial<TierStyle> & { width?: number | null }): TierStyle => {
+    const { width: legacy, ...rest } = t;
     return {
-      ...rest,
+      ...(rest as TierStyle),
       maxWidth: rest.maxWidth ?? legacy ?? null,
       align: rest.align ?? !!legacy,
-    } as TierStyle;
+    };
   });
   return { ...theme, tiers };
 }
