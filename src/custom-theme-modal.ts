@@ -84,6 +84,7 @@ export class CustomThemeModal extends Modal {
   private tier = 1;
   private canvas: MindMapCanvas | null = null;
   private controls!: HTMLElement;
+  private relayout = 0;
 
   constructor(
     app: App,
@@ -122,6 +123,7 @@ export class CustomThemeModal extends Modal {
   }
 
   onClose(): void {
+    if (this.relayout) window.cancelAnimationFrame(this.relayout);
     this.plugin.openThemeEditors.delete(this);
     this.canvas?.destroy();
     this.canvas = null;
@@ -133,6 +135,9 @@ export class CustomThemeModal extends Modal {
   private updatePreviewTheme(): void {
     setPreviewTheme(this.draft);
     this.plugin.refreshCustomCss();
+    // 设置页可能开在单独的窗口里：样式要同步写进这个窗口，否则主窗口的样式要过一会儿才镜像过来，
+    // 预览按旧样式量了尺寸，新样式一到宽度就变了，子节点位置对不上
+    this.plugin.injectCustomCss(this.modalEl.ownerDocument);
   }
 
   /** 改了任何一项：刷新预览主题的样式表，画布按新行为（连线、间距、下划线）重画 */
@@ -142,6 +147,13 @@ export class CustomThemeModal extends Modal {
       this.canvas.setEdge({});
       this.canvas.setTheme(PREVIEW_ID);
       this.canvas.fit();
+      // 保险：下一帧再量一次，样式哪怕晚到一步布局也能跟上
+      if (this.relayout) window.cancelAnimationFrame(this.relayout);
+      this.relayout = window.requestAnimationFrame(() => {
+        this.relayout = 0;
+        this.canvas?.render();
+        this.canvas?.fit();
+      });
     }
     if (rerenderControls) this.renderControls();
   }

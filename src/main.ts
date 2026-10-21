@@ -158,7 +158,8 @@ export default class MindMapPlugin extends Plugin {
     for (const doc of docs) this.injectCustomCss(doc);
   }
 
-  private injectCustomCss(doc: Document): void {
+  /** 写进指定窗口的样式表；设置页开在单独窗口时，主题编辑器要把样式直接写进那个窗口 */
+  injectCustomCss(doc: Document): void {
     const preview = getCustomTheme(PREVIEW_ID);
     const css = customThemeCss([...this.settings.customThemes, ...(preview ? [preview] : [])]);
     // 同一个 id 只留一份（插件重载前留下的旧元素直接接管）
