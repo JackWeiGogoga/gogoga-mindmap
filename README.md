@@ -75,7 +75,7 @@ mindmap-theme: business
 ### Editing
 
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
-- **Drag a node** onto another node to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side.
+- **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color and delete apply to the whole group.
 - Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back.
 - ⌘F searches nodes: matches are highlighted, Enter / Shift+Enter jump between results and center them, and collapsed ancestors expand automatically.
@@ -158,7 +158,7 @@ A paragraph here becomes the central topic's note.
 | ⌘⇧0 | Zoom to the selected branch |
 
 These keys are handled by the map itself. Folding, showing down to a level, zooming to a branch and toggling a boundary are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map").
-| Arrow keys | Move between nodes |
+| Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch) |
 | ⌘Z / ⌘⇧Z | Undo / redo |
 | Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |

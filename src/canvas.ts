@@ -289,6 +289,8 @@ export class MindMapCanvas {
   private themeButton: HTMLButtonElement | null = null;
   private themeMenu: HTMLElement | null = null;
   private edgeButton: HTMLButtonElement | null = null;
+  /** 拖节点 / 拖宽度时贴近画布边缘自动平移；tick 在每帧平移后重算拖拽状态 */
+  private autoScroll: { raf: number; vx: number; vy: number; tick: () => void } | null = null;
   private linkSuggest: { el: HTMLElement; items: LinkTarget[]; index: number; open: number } | null = null;
   private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
@@ -349,7 +351,7 @@ export class MindMapCanvas {
   private dropHover: HTMLElement | null = null;
   private imgHandle: HTMLElement | null = null;
   private widthHandle: HTMLElement | null = null;
-  private widthResize: { node: MindNode; el: HTMLElement; startX: number; startW: number; dir: 1 | -1 } | null = null;
+  private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1 } | null = null;
   private imgResize: {
     node: MindNode;
     /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
@@ -1664,6 +1666,8 @@ export class MindMapCanvas {
       }
       if (this.drag) {
         this.updateDrag(ev);
+        const at = { clientX: ev.clientX, clientY: ev.clientY };
+        this.updateAutoScroll(ev.clientX, ev.clientY, () => this.updateDrag(at));
         return;
       }
       if (this.touchPress && this.pan && Math.hypot(ev.clientX - this.pan.x, ev.clientY - this.pan.y) >= DRAG_THRESHOLD) {
@@ -2161,7 +2165,42 @@ export class MindMapCanvas {
       }
       return;
     }
-    this.selectNearest(p, key === "ArrowUp" ? "up" : "down");
+    this.selectVertical(node, p, key === "ArrowUp" ? -1 : 1);
+  }
+
+  /**
+   * 横向结构里的上下键：先在同一父节点、同一侧的兄弟里按屏幕顺序走；走到头再去相邻分支找
+   * 同一层、最近的节点。对齐按节点贴着父节点的那条边算，不用中心点 —— 兄弟左对齐，
+   * 文字长短不一时中心点会偏得很远，以前就因此从 2-2 跳去了别的分支。
+   */
+  private selectVertical(node: MindNode, p: Placed, dir: -1 | 1): void {
+    if (!this.layout || !node.parent) return;
+    const placed = this.layout.placed;
+    const sibs = visibleChildren(node.parent)
+      .map((c) => placed.get(c.id))
+      .filter((q): q is Placed => !!q && q.side === p.side)
+      .sort((a, b) => a.y - b.y);
+    const next = sibs[sibs.indexOf(p) + dir];
+    if (next) {
+      this.select(next.node);
+      return;
+    }
+    const edge = (q: Placed) => (q.side === "left" ? q.x + q.w : q.x);
+    const cy = p.y + p.h / 2;
+    let best: Placed | null = null;
+    let bestScore = Infinity;
+    for (const q of placed.values()) {
+      if (q === p || q.side !== p.side) continue;
+      const qy = q.y + q.h / 2;
+      if (dir < 0 ? qy >= cy - 1 : qy <= cy + 1) continue;
+      // 同层优先：层级不同的加一大截惩罚；其次纵向最近，再次贴边对齐
+      const score = Math.abs(q.node.depth - node.depth) * 10000 + Math.abs(qy - cy) + Math.abs(edge(q) - edge(p)) * 0.5;
+      if (score < bestScore) {
+        bestScore = score;
+        best = q;
+      }
+    }
+    if (best) this.select(best.node);
   }
 
   /** 朝某个方向找最近的节点（主轴距离为主，侧向偏移加权） */
@@ -2257,7 +2296,7 @@ export class MindMapCanvas {
     this.updateDrag(ev);
   }
 
-  private updateDrag(ev: PointerEvent): void {
+  private updateDrag(ev: { clientX: number; clientY: number }): void {
     if (!this.drag) return;
     const host = this.el.getBoundingClientRect();
     this.drag.ghost.style.left = `${ev.clientX - host.left + 12}px`;
@@ -2307,6 +2346,8 @@ export class MindMapCanvas {
   private findDropTarget(wx: number, wy: number, exclude: Set<MindNode>): DropTarget | null {
     if (!this.layout) return null;
     const placed = [...this.layout.placed.values()].filter((p) => !exclude.has(p.node));
+    const behind = this.behindTarget(placed, wx, wy);
+    if (behind) return behind;
     // 先看子节点列之间的空隙：插入到指定位置
     for (const p of placed) {
       const kids = visibleChildren(p.node).filter((c) => !exclude.has(c)).map((c) => this.layout!.placed.get(c.id)!).filter(Boolean);
@@ -2335,6 +2376,36 @@ export class MindMapCanvas {
   }
 
   /**
+   * 节点「屁股后面」：在它那一行（纵向不超出节点本身）、子节点会长出来的那一侧的空白处，
+   * 拖到这里就挂成它的最后一个子节点。已经有子节点的，范围只到子节点那一列为止，
+   * 再往外就是在子节点之间插入了。先于「兄弟之间的空隙」判断 —— 同一列里有很长的兄弟时，
+   * 那一列的空隙范围会把短节点后面的空白也包进去。
+   */
+  private behindTarget(placed: Placed[], wx: number, wy: number): DropTarget | null {
+    const base = this.focusRoot ?? this.doc?.root;
+    let best: { p: Placed; d: number } | null = null;
+    for (const p of placed) {
+      if (p.node === base) continue;
+      const kids = visibleChildren(p.node).map((c) => this.layout!.placed.get(c.id)).filter((k): k is Placed => !!k);
+      let d = -1;
+      if (p.side === "right" || p.side === "left") {
+        if (wy < p.y || wy > p.y + p.h) continue;
+        const outer = p.side === "right" ? p.x + p.w : p.x;
+        d = p.side === "right" ? wx - outer : outer - wx;
+        const kidEdge = kids.length ? Math.min(...kids.map((k) => (p.side === "right" ? k.x - outer : outer - (k.x + k.w)))) : Infinity;
+        if (d <= 4 || d > Math.min(96, kidEdge - 4)) continue;
+      } else {
+        if (wx < p.x || wx > p.x + p.w) continue;
+        d = wy - (p.y + p.h);
+        const kidEdge = kids.length ? Math.min(...kids.map((k) => k.y - (p.y + p.h))) : Infinity;
+        if (d <= 4 || d > Math.min(64, kidEdge - 4)) continue;
+      }
+      if (!best || d < best.d) best = { p, d };
+    }
+    return best ? { parent: best.p.node, index: best.p.node.children.length, kind: "node" } : null;
+  }
+
+  /**
    * 思维导图结构里中心主题两侧的落点：按鼠标在中心主题哪边决定 side，只在那一侧的主主题之间找位置。
    * 左侧是倒序排的（文档里靠后的在上面），所以插入下标要反过来算。
    */
@@ -2355,6 +2426,7 @@ export class MindMapCanvas {
   }
 
   private endDrag(commit: boolean): void {
+    this.stopAutoScroll();
     if (!this.drag) return;
     const { node, ghost, indicator, target } = this.drag;
     ghost.remove();
@@ -2590,6 +2662,37 @@ export class MindMapCanvas {
     this.render();
     if (refocus) this.el.focus({ preventScroll: true });
     if (changed) this.notify();
+  }
+
+  // ---------- 拖拽时贴边自动平移 ----------
+
+  /** 指针离画布边缘 48px 以内就朝那边平移，越靠边越快；离开边缘区就停 */
+  private updateAutoScroll(clientX: number, clientY: number, tick: () => void): void {
+    const r = this.el.getBoundingClientRect();
+    const zone = 48;
+    const speed = (d: number) => (d < zone ? Math.min(1, (zone - Math.max(0, d)) / zone) * 16 : 0);
+    const vx = speed(clientX - r.left) - speed(r.right - clientX);
+    const vy = speed(clientY - r.top) - speed(r.bottom - clientY);
+    if (!vx && !vy) return this.stopAutoScroll();
+    if (this.autoScroll) {
+      Object.assign(this.autoScroll, { vx, vy, tick });
+      return;
+    }
+    const step = () => {
+      const a = this.autoScroll;
+      if (!a) return;
+      this.tx += a.vx;
+      this.ty += a.vy;
+      this.applyTransform();
+      a.tick();
+      a.raf = window.requestAnimationFrame(step);
+    };
+    this.autoScroll = { raf: window.requestAnimationFrame(step), vx, vy, tick };
+  }
+
+  private stopAutoScroll(): void {
+    if (this.autoScroll) window.cancelAnimationFrame(this.autoScroll.raf);
+    this.autoScroll = null;
   }
 
   // ---------- 编辑时的 [[ 链接补全 ----------
@@ -3379,27 +3482,36 @@ export class MindMapCanvas {
     handle.addEventListener("pointerdown", (ev) => {
       ev.stopPropagation();
       ev.preventDefault();
-      this.widthResize = { node, el, startX: ev.clientX, startW: el.offsetWidth, dir };
+      this.widthResize = { node, el, startWorldX: this.toWorld(ev.clientX, ev.clientY).x, startW: el.offsetWidth, dir };
       try {
         handle.setPointerCapture(ev.pointerId);
       } catch {
         // 合成事件
       }
     });
-    handle.addEventListener("pointermove", (ev) => {
+    // 按世界坐标算：贴边自动平移时指针不动、画布在动，宽度照样跟着长
+    const apply = (clientX: number, clientY: number) => {
       const r = this.widthResize;
       if (!r) return;
-      ev.stopPropagation();
-      const w = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, r.startW + (r.dir * (ev.clientX - r.startX)) / this.k));
+      const dx = this.toWorld(clientX, clientY).x - r.startWorldX;
+      const w = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, r.startW + r.dir * dx));
       r.el.classList.add("has-width");
       r.el.style.width = `${Math.round(w)}px`;
       this.reflow(r.node);
       this.positionNodebar();
+    };
+    handle.addEventListener("pointermove", (ev) => {
+      if (!this.widthResize) return;
+      ev.stopPropagation();
+      apply(ev.clientX, ev.clientY);
+      const { clientX, clientY } = ev;
+      this.updateAutoScroll(clientX, clientY, () => apply(clientX, clientY));
     });
     const finish = (ev: PointerEvent) => {
       const r = this.widthResize;
       if (!r) return;
       ev.stopPropagation();
+      this.stopAutoScroll();
       this.widthResize = null;
       const w = Math.round(r.el.offsetWidth);
       if (w === r.startW) return;
