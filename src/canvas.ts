@@ -2016,6 +2016,7 @@ export class MindMapCanvas {
       else if (ev.key === "ArrowDown") this.moveSibling(sel, 1);
       else if (ev.key === "ArrowLeft") this.outdentNode(sel);
       else this.indentNode(sel);
+      this.ensureVisible(this.primary);
       return;
     }
     switch (ev.key) {
@@ -2025,6 +2026,7 @@ export class MindMapCanvas {
       case "ArrowDown":
         ev.preventDefault();
         this.navigate(sel, ev.key);
+        this.ensureVisible(this.primary);
         return;
       case " ":
       case "F2":
@@ -2628,6 +2630,7 @@ export class MindMapCanvas {
     const node = addChild(sel, this.doc.style, "");
     this.select(node);
     this.render();
+    this.ensureVisible(node);
     this.startEdit(node, true);
   }
 
@@ -2639,6 +2642,7 @@ export class MindMapCanvas {
     if (sel.side) node.side = sel.side;
     this.select(node);
     this.render();
+    this.ensureVisible(node);
     this.startEdit(node, true);
   }
 
@@ -3054,6 +3058,23 @@ export class MindMapCanvas {
     this.select(node);
     this.centerOn(node);
     s.input.focus();
+  }
+
+  /** 节点出了画布（或贴得太近）就平移最小距离把它带回来，留 56px 余量；已经在视野里就不动 */
+  ensureVisible(node: MindNode | null): void {
+    const p = node && this.layout?.placed.get(node.id);
+    if (!p) return;
+    const m = 56;
+    const cw = this.el.clientWidth;
+    const ch = this.el.clientHeight;
+    const shift = (lo: number, hi: number, max: number) => (hi - lo > max - 2 * m ? m - lo : lo < m ? m - lo : hi > max - m ? max - m - hi : 0);
+    const dx = shift(this.tx + p.x * this.k, this.tx + (p.x + p.w) * this.k, cw);
+    const dy = shift(this.ty + p.y * this.k, this.ty + (p.y + p.h) * this.k, ch);
+    if (!dx && !dy) return;
+    this.tx += dx;
+    this.ty += dy;
+    this.applyTransform();
+    this.positionNodebar();
   }
 
   centerOn(node: MindNode): void {

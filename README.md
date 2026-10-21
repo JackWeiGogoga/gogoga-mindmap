@@ -158,7 +158,7 @@ A paragraph here becomes the central topic's note.
 | ⌘⇧0 | Zoom to the selected branch |
 
 These keys are handled by the map itself. Folding, showing down to a level, zooming to a branch and toggling a boundary are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map").
-| Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch) |
+| Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch; the view follows when the selection leaves the screen) |
 | ⌘Z / ⌘⇧Z | Undo / redo |
 | Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
