@@ -291,6 +291,7 @@ export class MindMapCanvas {
   private edgeButton: HTMLButtonElement | null = null;
   /** 拖节点 / 拖宽度时贴近画布边缘自动平移；tick 在每帧平移后重算拖拽状态 */
   private autoScroll: { raf: number; vx: number; vy: number; tick: () => void } | null = null;
+  private compositionSel: { start: number; end: number; text: string } | null = null;
   private linkSuggest: { el: HTMLElement; items: LinkTarget[]; index: number; open: number } | null = null;
   private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
@@ -1832,9 +1833,44 @@ export class MindMapCanvas {
 
     this.on(el, "input", (ev) => {
       if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) {
-        this.updateLinkSuggest();
+        // 输入法组字中不要改文字：Windows 输入法打「【」也走组字，中途把【【换成 [[ 的话，
+        // 组字结束时输入法会再补一个【，就成了 [[【。等 compositionend 再处理
+        if (!(ev as InputEvent).isComposing) this.updateLinkSuggest();
         this.reflow(this.editing);
       }
+    });
+    // 选中文字再打【或 [：包成【文字】/[文字]，再打一次变成 [[文字]] 链接（同 Easy Typing 的习惯）
+    this.on(el, "beforeinput", (ev) => {
+      const ie = ev;
+      if (!this.editing || ie.isComposing || ie.inputType !== "insertText" || (ie.data !== "【" && ie.data !== "[")) return;
+      const label = this.editingLabel();
+      const range = label && this.selectionRange(label);
+      if (!label || !range || range.start === range.end) return;
+      ev.preventDefault();
+      this.wrapSelection(label, range.start, range.end, ie.data);
+    });
+    this.on(el, "compositionstart", () => {
+      const label = this.editingLabel();
+      const range = label && this.selectionRange(label);
+      this.compositionSel = label && range && range.start !== range.end ? { ...range, text: (label.textContent ?? "").slice(range.start, range.end) } : null;
+    });
+    this.on(el, "compositionend", (ev) => {
+      const label = this.editingLabel();
+      const saved = this.compositionSel;
+      this.compositionSel = null;
+      if (!label || !this.editing) return;
+      const data = ev.data;
+      if (saved && (data === "【" || data === "[")) {
+        // 组字开始时选中的文字已经被输入法替换成了「【」，按原来的选区复原再包起来
+        const cur = label.textContent ?? "";
+        if (cur.slice(saved.start, saved.start + data.length) === data) {
+          label.textContent = cur.slice(0, saved.start) + saved.text + cur.slice(saved.start + data.length);
+          this.wrapSelection(label, saved.start, saved.start + saved.text.length, data);
+          return;
+        }
+      }
+      this.updateLinkSuggest();
+      this.reflow(this.editing);
     });
 
     this.on(
@@ -2762,6 +2798,50 @@ export class MindMapCanvas {
     r.selectNodeContents(label);
     r.setEnd(sel.anchorNode, sel.anchorOffset);
     return r.toString().length;
+  }
+
+  /** 选区在 label 纯文本里的起止 */
+  private selectionRange(label: HTMLElement): { start: number; end: number } | null {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return null;
+    const r = sel.getRangeAt(0);
+    if (!label.contains(r.startContainer) || !label.contains(r.endContainer)) return null;
+    const pre = document.createRange();
+    pre.selectNodeContents(label);
+    pre.setEnd(r.startContainer, r.startOffset);
+    const start = pre.toString().length;
+    return { start, end: start + r.toString().length };
+  }
+
+  /**
+   * 把 [start, end) 包起来并保持选中：【→【文字】，[→[文字]；
+   * 已经被【】或 [] 包着时再打一次，就升级成 [[文字]] 链接
+   */
+  private wrapSelection(label: HTMLElement, start: number, end: number, ch: string): void {
+    const text = label.textContent ?? "";
+    let before = text.slice(0, start);
+    let after = text.slice(end);
+    const inner = text.slice(start, end);
+    let open = ch === "【" ? "【" : "[";
+    let close = ch === "【" ? "】" : "]";
+    const wrapped = (o: string, c: string) => before.endsWith(o) && after.startsWith(c);
+    if (wrapped("【", "】") || (wrapped("[", "]") && !wrapped("[[", "]]"))) {
+      before = before.slice(0, -1);
+      after = after.slice(1);
+      open = "[[";
+      close = "]]";
+    }
+    label.textContent = before + open + inner + close + after;
+    const s = before.length + open.length;
+    const node = label.firstChild ?? label;
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.setStart(node, s);
+    r.setEnd(node, s + inner.length);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    this.closeLinkSuggest();
+    if (this.editing) this.reflow(this.editing);
   }
 
   private setCaret(label: HTMLElement, offset: number): void {
