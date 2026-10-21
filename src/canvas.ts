@@ -421,6 +421,7 @@ export class MindMapCanvas {
           return;
         }
         if (!this.hasView && this.fit()) this.hasView = true;
+        this.updateBottomInset();
         this.positionNodebar();
       });
       this.ro.observe(this.el);
@@ -734,6 +735,7 @@ export class MindMapCanvas {
       this.pendingSelectPath = null;
       this.selectPath(path);
     }
+    this.updateBottomInset();
     this.positionNodebar();
     this.opts.onRender?.();
   }
@@ -1494,6 +1496,11 @@ export class MindMapCanvas {
     const bar = createDiv();
     bar.className = "mm-nodebar";
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    // 颜色、按钮各成一组：窄屏折行时整组换行，不会从按钮中间断开
+    const colors = createDiv();
+    colors.className = "mm-nodebar-group";
+    const tools = createDiv();
+    tools.className = "mm-nodebar-group";
     const swatch = (color: string | null) => {
       const b = createEl("button");
       b.type = "button";
@@ -1505,13 +1512,13 @@ export class MindMapCanvas {
         ev.stopPropagation();
         this.applyColor(color);
       });
-      bar.append(b);
+      colors.append(b);
     };
     swatch(null);
     for (const c of COLOR_NAMES) swatch(c);
     const sep = createSpan();
     sep.className = "mm-tool-sep";
-    bar.append(sep);
+    bar.append(colors, sep, tools);
     const tool = (name: string, title: string, onClick: () => void) => {
       const b = createEl("button");
       b.type = "button";
@@ -1523,7 +1530,7 @@ export class MindMapCanvas {
         ev.stopPropagation();
         onClick();
       });
-      bar.append(b);
+      tools.append(b);
     };
     tool("child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
     tool("sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
@@ -1537,6 +1544,26 @@ export class MindMapCanvas {
     tool("paste", t("canvas.pasteTip", { key: sc("Mod", "V") }), () => void this.pasteFromClipboard());
     tool("trash", t("canvas.deleteTip", { key: "Delete" }), () => this.deleteSelected());
     return bar;
+  }
+
+  /**
+   * 手机版 Obsidian 底部有一条悬浮导航栏（.mobile-navbar），会盖住画布底部。
+   * 量出它压住画布的高度，写进 --mm-bottom-inset，底部工具栏和搜索框据此抬高。
+   */
+  private updateBottomInset(): void {
+    const doc = this.el.ownerDocument;
+    const bars = [...doc.querySelectorAll<HTMLElement>(".mobile-navbar, .mobile-toolbar")].filter((b) => b.offsetParent !== null);
+    const r = this.el.getBoundingClientRect();
+    let inset = 0;
+    for (const b of bars) {
+      const br = b.getBoundingClientRect();
+      if (br.top < r.bottom && br.bottom > r.top && br.left < r.right && br.right > r.left) inset = Math.max(inset, r.bottom - br.top);
+    }
+    const v = inset > 0 ? `${Math.round(inset + 8)}px` : "";
+    if (this.el.style.getPropertyValue("--mm-bottom-inset") !== v) {
+      if (v) this.el.style.setProperty("--mm-bottom-inset", v);
+      else this.el.style.removeProperty("--mm-bottom-inset");
+    }
   }
 
   private positionNodebar(): void {
@@ -1556,6 +1583,10 @@ export class MindMapCanvas {
     if (!r) return;
     // 先取消隐藏再测量，display:none 时 offsetHeight 是 0，算出来的位置会压在节点上
     this.nodebar.classList.remove("is-hidden");
+    // 窄屏（手机）放不下一整行就折行：颜色一行、按钮一行
+    this.nodebar.style.maxWidth = `${Math.max(160, this.el.clientWidth - 8)}px`;
+    const group = this.nodebar.querySelector<HTMLElement>(".mm-nodebar-group");
+    this.nodebar.classList.toggle("is-wrapped", !!group && this.nodebar.offsetHeight > group.offsetHeight * 1.6);
     const bw = this.nodebar.offsetWidth;
     const bh = this.nodebar.offsetHeight;
     const left = Math.max(4, Math.min(r.x + r.width / 2 - bw / 2, this.el.clientWidth - bw - 4));

@@ -545,6 +545,9 @@
   position: absolute;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 4px;
   align-items: center;
   gap: 3px;
   padding: 4px 5px;
@@ -555,6 +558,8 @@
   cursor: default;
 }
 .mm-nodebar.is-hidden { display: none; }
+.mm-nodebar-group { display: flex; align-items: center; gap: inherit; }
+.mm-nodebar.is-wrapped .mm-tool-sep { display: none; }
 .mm-nodebar .mm-tool {
   width: 24px;
   height: 24px;
@@ -1029,7 +1034,14 @@
 /* ---------- 工具栏位置 ---------- */
 
 /* 主视图里底部工具栏抬高，避开 Obsidian 右下角的状态栏 */
-.mm-root:not(.is-embedded) .mm-toolbar[data-pos="bottom"] { bottom: 44px; }
+.mm-root:not(.is-embedded) .mm-toolbar[data-pos="bottom"] { bottom: var(--mm-bottom-inset, 44px); }
+/* 窄屏放不下所有按钮时横向滑动，不被截掉 */
+.mm-toolbar[data-pos="bottom"],
+.mm-toolbar[data-pos="top"] { max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; }
+.mm-toolbar[data-pos="left"],
+.mm-toolbar[data-pos="right"] { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; }
+.mm-toolbar::-webkit-scrollbar { display: none; }
+.mm-toolbar > * { flex-shrink: 0; }
 .mm-toolbar[data-pos="top"] { top: 12px; bottom: auto; }
 .mm-toolbar[data-pos="left"],
 .mm-toolbar[data-pos="right"] {
@@ -1047,7 +1059,7 @@
 .mm-toolbar[data-pos="right"] .mm-zoom-label { min-width: 0; width: 34px; padding: 0; font-size: 11px; }
 /* 工具栏在上方时，搜索栏让到下方 */
 .mm-root[data-toolbar="top"] .mm-search { top: auto; bottom: 12px; }
-.mm-root:not(.is-embedded)[data-toolbar="top"] .mm-search { bottom: 44px; }
+.mm-root:not(.is-embedded)[data-toolbar="top"] .mm-search { bottom: var(--mm-bottom-inset, 44px); }
 /* 垂直工具栏靠右时，搜索栏往左让一点，避免高窗口里挨着 */
 .mm-root[data-toolbar="right"] .mm-search { right: 60px; }
 
