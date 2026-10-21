@@ -105,7 +105,9 @@ export class CustomThemeModal extends Modal {
     previewWrap.createDiv({ cls: "mm-theme-preview-label", text: t("customTheme.preview") });
     const host = previewWrap.createDiv({ cls: "mm-theme-preview-canvas" });
     this.updatePreviewTheme();
+    host.tabIndex = -1;
     this.canvas = new MindMapCanvas(host, { structure: "logic-right", theme: PREVIEW_ID, editable: false, embedded: true });
+    host.tabIndex = -1;
     this.canvas.setDoc(parseMarkdown(SAMPLE, { fallbackTitle: "" }));
     window.setTimeout(() => this.canvas?.fit(), 50);
 
