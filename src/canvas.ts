@@ -1653,7 +1653,7 @@ export class MindMapCanvas {
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar")) return;
       // 双击有两条路（原生 dblclick 和 pointerup 自判定），两条都得知道有没有落在挡板上
       this.downOnShield = !!target.closest(".mm-frame-shield");
-      this.downOnImage = target.closest<HTMLImageElement>("img.mm-img");
+      this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
       const nodeEl = target.closest<HTMLElement>(".mm-node");
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
@@ -1811,7 +1811,7 @@ export class MindMapCanvas {
     if (this.opts.embedded) {
       this.on(el, "mousedown", (ev) => {
         // 外层的 cm-content 本身就是 contenteditable，只看画布里面的输入框和正在编辑的标签
-        const field = (ev.target as HTMLElement).closest("input, textarea, select, [contenteditable='true']");
+        const field = (ev.target as HTMLElement).closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])");
         if (field && el.contains(field)) return;
         ev.preventDefault();
       });
@@ -1823,7 +1823,7 @@ export class MindMapCanvas {
       const node = nodeEl && this.nodeFromEl(nodeEl);
       if (!node) return;
       ev.preventDefault();
-      const img = (ev.target as HTMLElement).closest<HTMLImageElement>("img.mm-img");
+      const img = this.imageAt(ev.target as HTMLElement, ev.clientX, ev.clientY);
       if ((ev.target as HTMLElement).closest(".mm-frame-shield")) this.setLiveFrame(node.id);
       else if (img) this.openLightbox(img);
       else this.editOnDoubleTap(node);
@@ -1970,6 +1970,20 @@ export class MindMapCanvas {
   }
 
   /** 双击节点：可编辑就进入编辑；只读的嵌入图先打开编辑开关 */
+  /**
+   * 指针下的节点图片。图片设了 pointer-events: none（免得浏览器原生拖图片和拖节点抢），
+   * 事件目标永远是外面的 label，所以按坐标判断落没落在图片上
+   */
+  private imageAt(target: HTMLElement, x: number, y: number): HTMLImageElement | null {
+    const nodeEl = target.closest<HTMLElement>(".mm-node");
+    if (!nodeEl) return null;
+    for (const img of nodeEl.querySelectorAll<HTMLImageElement>("img.mm-img")) {
+      const r = img.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return img;
+    }
+    return null;
+  }
+
   /** 全窗口看原图：暗底、按窗口大小居中，点任意处或 Esc 关 */
   private openLightbox(img: HTMLImageElement): void {
     if (this.lightbox) return;
