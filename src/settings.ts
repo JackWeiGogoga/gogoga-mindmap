@@ -4,14 +4,18 @@ import { MINDMAP_LIST_ICON } from "./icon";
 import { IconPickerModal, storedValue } from "./icon-picker";
 import { displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
 import { t } from "./i18n";
-import { THEME_LIST, themeLabel, type ThemeName } from "./theme";
+import { themeIds, themeLabel, type ThemeId } from "./theme";
+import { newCustomThemeId, type CustomTheme } from "./custom-theme";
+import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
+import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
 export interface MindMapSettings {
   defaultStructure: Structure;
-  defaultTheme: ThemeName;
+  defaultTheme: ThemeId;
+  customThemes: CustomTheme[];
   /** 深于此级别的标题节点，新建子节点时改用列表 */
   maxHeadingLevel: number;
   /** 新文件的列表缩进 */
@@ -53,6 +57,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   toolbarPosition: "bottom",
   wheelAction: "pan",
   rememberView: true,
+  customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
 
@@ -97,10 +102,10 @@ export class MindMapSettingTab extends PluginSettingTab {
       .setDesc(t("settings.theme.desc"))
       .addDropdown((d) =>
         d
-          .addOptions(Object.fromEntries(THEME_LIST.map((th) => [th.name, themeLabel(th.name)])))
+          .addOptions(Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])))
           .setValue(this.plugin.settings.defaultTheme)
           .onChange(async (v) => {
-            this.plugin.settings.defaultTheme = v as ThemeName;
+            this.plugin.settings.defaultTheme = v as ThemeId;
             await this.plugin.saveSettings();
           }),
       );
@@ -235,6 +240,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         }),
       );
 
+    this.renderCustomThemes(containerEl);
+
     new Setting(containerEl)
       .setName(t("settings.support.name"))
       .setDesc(t("settings.support.desc"))
@@ -242,6 +249,67 @@ export class MindMapSettingTab extends PluginSettingTab {
         b.setButtonText(t("settings.support.button")).onClick(() => {
           window.open(FUNDING_URL);
         }),
+      );
+  }
+
+  /** 自定义主题：列表（编辑 / 复制 / 删除）+ 选基础主题新建 */
+  private renderCustomThemes(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName(t("customTheme.heading")).setHeading();
+    const plugin = this.plugin;
+    const save = async (theme: CustomTheme) => {
+      const list = plugin.settings.customThemes;
+      const i = list.findIndex((x) => x.id === theme.id);
+      if (i >= 0) list[i] = theme;
+      else list.push(theme);
+      await plugin.saveSettings();
+      plugin.applyCustomThemes();
+      this.display();
+    };
+    for (const theme of plugin.settings.customThemes) {
+      new Setting(containerEl)
+        .setName(theme.name)
+        .setDesc(t("customTheme.basedOn", { base: themeShortLabel(theme.base) }))
+        .addButton((b) => b.setButtonText(t("customTheme.edit")).onClick(() => new CustomThemeModal(this.app, plugin, theme, (x) => void save(x)).open()))
+        .addButton((b) =>
+          b.setButtonText(t("customTheme.duplicate")).onClick(() => {
+            const copy = { ...structuredClone(theme), id: newCustomThemeId(), name: t("customTheme.copyName", { name: theme.name }) };
+            void save(copy);
+          }),
+        )
+        .addExtraButton((b) =>
+          b
+            .setIcon("trash")
+            .setTooltip(t("customTheme.delete"))
+            .onClick(() =>
+              new ConfirmModal(this.app, t("customTheme.deleteConfirm", { name: theme.name }), () => {
+                plugin.settings.customThemes = plugin.settings.customThemes.filter((x) => x.id !== theme.id);
+                if (plugin.settings.defaultTheme === theme.id) plugin.settings.defaultTheme = "snow";
+                void plugin.saveSettings().then(() => {
+                  plugin.applyCustomThemes();
+                  this.display();
+                });
+              }).open(),
+            ),
+        );
+    }
+    let base: ThemeName = "snow";
+    new Setting(containerEl)
+      .setName(t("customTheme.new"))
+      .setDesc(t("customTheme.newDesc"))
+      .addDropdown((d) =>
+        d
+          .addOptions(Object.fromEntries(THEME_LIST.map((th) => [th.name, themeShortLabel(th.name)])))
+          .setValue(base)
+          .onChange((v) => (base = v as ThemeName)),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText(t("customTheme.create"))
+          .setCta()
+          .onClick(() => {
+            const name = t("customTheme.defaultName", { n: plugin.settings.customThemes.length + 1 });
+            new CustomThemeModal(this.app, plugin, themeFromBase(base, name, newCustomThemeId()), (x) => void save(x)).open();
+          }),
       );
   }
 }

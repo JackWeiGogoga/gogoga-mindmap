@@ -1457,3 +1457,33 @@
 .metadata-property.mm-icon-prop .metadata-property-value {
   min-height: var(--metadata-input-height, 22px);
 }
+
+/* ---------- 自定义主题编辑器 ---------- */
+.modal.mm-theme-modal { width: min(1100px, 94vw); max-width: none; }
+.mm-theme-editor {
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  gap: 16px;
+  height: min(620px, 70vh);
+}
+.mm-theme-controls { overflow-y: auto; padding-right: 8px; }
+.mm-theme-controls .setting-item { padding: 8px 0; }
+.mm-theme-section { margin: 14px 0 4px; font-size: var(--font-ui-small, 13px); color: var(--text-muted); }
+.mm-theme-tiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.mm-theme-tiers button.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.mm-theme-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mm-theme-preview-label { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; color: var(--text-faint); }
+.mm-theme-preview-canvas { position: relative; flex: 1; min-height: 0; }
+@media (max-width: 760px) {
+  .mm-theme-editor { grid-template-columns: 1fr; height: auto; }
+  .mm-theme-controls { max-height: 45vh; }
+  .mm-theme-preview-canvas { height: 280px; flex: none; }
+}
+.mm-theme-preview .mm-toolbar { display: none; }

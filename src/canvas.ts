@@ -53,7 +53,7 @@ import {
   toggleTask,
   wikilinkOf,
 } from "./inline";
-import { BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, THEME_LIST, themeLabel, themeShortLabel, ThemeName, THEMES } from "./theme";
+import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
 import { COLOR_NAMES, convertLevelKind, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -119,7 +119,7 @@ export interface DroppedFile {
 
 export interface CanvasOptions {
   structure: Structure;
-  theme: ThemeName;
+  theme: ThemeId;
   editable: boolean;
   host?: CanvasHost;
   /** 树被编辑后调用（折叠、改文字、增删移节点、颜色、备注） */
@@ -127,7 +127,7 @@ export interface CanvasOptions {
   onUndo?: () => void;
   onRedo?: () => void;
   onStructureChange?: (structure: Structure) => void;
-  onThemeChange?: (theme: ThemeName) => void;
+  onThemeChange?: (theme: ThemeId) => void;
   /** 单篇的连线样式（覆盖主题），改了之后回调去写 frontmatter */
   edge?: EdgeOptions;
   onEdgeChange?: (edge: EdgeOptions) => void;
@@ -386,8 +386,7 @@ export class MindMapCanvas {
     this.el = container;
     this.el.classList.add("mm-root");
     this.el.tabIndex = 0;
-    this.el.dataset.theme = opts.theme;
-    this.el.dataset.branchColors = THEMES[opts.theme].branchColors ? "true" : "false";
+    this.applyThemeAttrs();
     this.el.dataset.structure = opts.structure;
     this.el.classList.toggle("is-editable", opts.editable);
     this.el.classList.toggle("is-embedded", !!opts.embedded);
@@ -401,7 +400,7 @@ export class MindMapCanvas {
     this.viewport.className = "mm-viewport";
     this.svg = createSvg("svg");
     this.svg.setAttribute("class", "mm-edges");
-    if (opts.edge?.dashed) this.svg.classList.add("is-dashed");
+    this.applyThemeAttrs();
     this.boxLayer = createSvg("g");
     this.boxLayer.setAttribute("class", "mm-boxes");
     this.svg.append(this.boxLayer);
@@ -458,17 +457,31 @@ export class MindMapCanvas {
     this.render();
   }
 
-  setTheme(theme: ThemeName): void {
+  /** 根元素上的主题属性：data-theme 用内置主题（自定义主题取它的基础），自定义的另挂 data-custom */
+  private applyThemeAttrs(): void {
+    const id = this.opts.theme;
+    this.el.dataset.theme = baseThemeOf(id);
+    if (isThemeName(id)) delete this.el.dataset.custom;
+    else this.el.dataset.custom = id;
+    const th = resolveTheme(id);
+    this.el.dataset.branchColors = th.branchColors ? "true" : "false";
+    this.svg?.classList.toggle("is-dashed", this.opts.edge?.dashed ?? !!th.dashed);
+  }
+
+  getTheme(): ThemeId {
+    return this.opts.theme;
+  }
+
+  setTheme(theme: ThemeId): void {
     this.opts.theme = theme;
-    this.el.dataset.theme = theme;
-    this.el.dataset.branchColors = THEMES[theme].branchColors ? "true" : "false";
+    this.applyThemeAttrs();
     if (this.themeButton) this.tip(this.themeButton, this.themeTipText(), "toolbar");
     this.render();
   }
 
   setEdge(edge: EdgeOptions): void {
     this.opts.edge = { ...edge };
-    this.svg.classList.toggle("is-dashed", !!edge.dashed);
+    this.svg.classList.toggle("is-dashed", edge.dashed ?? !!resolveTheme(this.opts.theme).dashed);
     if (this.edgeButton) this.tip(this.edgeButton, this.edgeTipText(), "toolbar");
     if (this.doc) this.reflow();
   }
@@ -484,6 +497,9 @@ export class MindMapCanvas {
       return;
     }
     const cur = this.opts.edge ?? {};
+    const th = resolveTheme(this.opts.theme);
+    const dashed = cur.dashed ?? !!th.dashed;
+    const sharp = cur.sharp ?? !!th.sharp;
     const pick = (next: EdgeOptions) => {
       this.setEdge(next);
       this.opts.onEdgeChange?.(next);
@@ -496,8 +512,8 @@ export class MindMapCanvas {
           active: cur.shape === shape,
           run: () => pick({ ...cur, shape }),
         })),
-        { label: t("edge.dashed"), active: !!cur.dashed, run: () => pick({ ...cur, dashed: !cur.dashed }) },
-        { label: t("edge.rounded"), active: !cur.sharp, run: () => pick({ ...cur, sharp: !cur.sharp }) },
+        { label: t("edge.dashed"), active: dashed, run: () => pick({ ...cur, dashed: !dashed }) },
+        { label: t("edge.rounded"), active: !sharp, run: () => pick({ ...cur, sharp: !sharp }) },
       ],
       anchor,
       () => this.closeEdgeMenu(),
@@ -519,12 +535,12 @@ export class MindMapCanvas {
       return;
     }
     this.themeMenu = this.buildMenu(
-      THEME_LIST.map((th) => ({
-        label: themeLabel(th.name),
-        active: th.name === this.opts.theme,
+      themeIds().map((id) => ({
+        label: themeLabel(id),
+        active: id === this.opts.theme,
         run: () => {
-          this.setTheme(th.name);
-          this.opts.onThemeChange?.(th.name);
+          this.setTheme(id);
+          this.opts.onThemeChange?.(id);
         },
       })),
       anchor,
@@ -756,7 +772,7 @@ export class MindMapCanvas {
    */
   private rebuild(): void {
     const doc = this.doc!;
-    const theme = THEMES[this.opts.theme];
+    const theme = resolveTheme(this.opts.theme);
     const branchOf = new Map<string, number>();
     doc.root.children.forEach((c, i) => walk(c, (n) => branchOf.set(n.id, i % BRANCH_COLOR_COUNT)));
     const base = this.focusRoot ?? doc.root;
@@ -768,11 +784,12 @@ export class MindMapCanvas {
       const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
       // 内容签名管子节点，整体签名再叠上纯表现的部分（选中、配色、层级）；
       // 只有前者变了才重建 DOM，选一下节点不该把里面的 iframe 打回重载
-      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, theme.name].join("\u0001");
+      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, this.opts.theme].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
         node.width ?? "",
+        isUnderlineAt(theme, rel) ? "u" : "",
         rel,
         branch ?? "",
         this.selected.has(node) ? "s" : "",
@@ -814,7 +831,7 @@ export class MindMapCanvas {
         el.classList.add("has-width");
         el.style.width = `${node.width}px`;
       }
-      if (theme.underlineFromDepth !== null && rel >= theme.underlineFromDepth && !node.color) {
+      if (isUnderlineAt(theme, rel) && !node.color) {
         el.classList.add("is-underline");
       }
       if (this.selected.has(node)) el.classList.add("is-selected");
@@ -941,7 +958,7 @@ export class MindMapCanvas {
    */
   private reflow(remeasure?: MindNode): void {
     const doc = this.doc!;
-    const theme = THEMES[this.opts.theme];
+    const theme = resolveTheme(this.opts.theme);
     if (remeasure && this.sizes.size === this.els.size) {
       const el = this.els.get(remeasure.id);
       if (el) this.sizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
@@ -967,8 +984,7 @@ export class MindMapCanvas {
     }
 
     let edgeIndex = 0;
-    const underline = theme.underlineFromDepth;
-    const anchorBottom = (p: Placed) => underline !== null && p.node.depth - base.depth >= underline && !p.node.color;
+    const anchorBottom = (p: Placed) => isUnderlineAt(theme, p.node.depth - base.depth) && !p.node.color;
     for (const child of this.layout.placed.values()) {
       const parentNode = child.node.parent;
       if (!parentNode) continue;
@@ -994,7 +1010,7 @@ export class MindMapCanvas {
       const tail = anchorBottom(child)
         ? ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`
         : "";
-      const d = edgePath(g, style, this.opts.edge?.sharp ? 0 : 8) + tail;
+      const d = edgePath(g, style, (this.opts.edge?.sharp ?? theme.sharp) ? 0 : 8) + tail;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;

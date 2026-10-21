@@ -36,7 +36,8 @@ import { History } from "./history";
 import { CanvasHost, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
-import { edgeFromFrontmatter, isThemeName } from "./theme";
+import { edgeFromFrontmatter, isThemeId } from "./theme";
+import { customThemeCss, getCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 
@@ -61,6 +62,12 @@ export default class MindMapPlugin extends Plugin {
     setLocale(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
+    this.applyCustomThemes();
+    this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
+    this.register(() => {
+      for (const el of this.customCssEls) el.remove();
+      this.customCssEls = [];
+    });
     // 公式和代码高亮的引擎按需加载；失败也不影响其他功能
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
     void loadPrism().catch(() => undefined);
@@ -126,6 +133,41 @@ export default class MindMapPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  // ---------- 自定义主题 ----------
+
+  private customCssEls: HTMLStyleElement[] = [];
+
+  /** 设置里的自定义主题 → 注册表 + 样式表，并让已打开的脑图重画 */
+  applyCustomThemes(): void {
+    setCustomThemes(this.settings.customThemes);
+    this.refreshCustomCss();
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      if (leaf.view instanceof MindMapView) leaf.view.refreshTheme();
+    }
+  }
+
+  /** 重新生成样式表（含编辑器里的预览主题），主窗口和弹出窗口都写一份 */
+  refreshCustomCss(): void {
+    this.customCssEls = this.customCssEls.filter((el) => el.isConnected);
+    const docs = new Set<Document>([document, ...this.customCssEls.map((el) => el.ownerDocument)]);
+    for (const doc of docs) this.injectCustomCss(doc);
+  }
+
+  private injectCustomCss(doc: Document): void {
+    const preview = getCustomTheme(PREVIEW_ID);
+    const css = customThemeCss([...this.settings.customThemes, ...(preview ? [preview] : [])]);
+    // 同一个 id 只留一份（插件重载前留下的旧元素直接接管）
+    let el = this.customCssEls.find((e) => e.ownerDocument === doc) ?? (doc.getElementById("gogoga-mindmap-custom-themes") as HTMLStyleElement | null) ?? undefined;
+    if (el && !this.customCssEls.includes(el)) this.customCssEls.push(el);
+    if (!el) {
+      el = doc.createElement("style");
+      el.id = "gogoga-mindmap-custom-themes";
+      doc.head.append(el);
+      this.customCssEls.push(el);
+    }
+    if (el.textContent !== css) el.textContent = css;
   }
 
   /** 给所有还没有 icon 属性的脑图笔记补上，返回处理数量 */
@@ -459,7 +501,7 @@ export default class MindMapPlugin extends Plugin {
 
       const canvas = new MindMapCanvas(wrap, {
         structure: isStructure(structure) ? structure : this.settings.defaultStructure,
-        theme: isThemeName(theme) ? theme : this.settings.defaultTheme,
+        theme: isThemeId(theme) ? theme : this.settings.defaultTheme,
         edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
         editable: state.editable,
         embedded: true,
@@ -485,8 +527,8 @@ export default class MindMapPlugin extends Plugin {
           const d = canvas.getDoc();
           if (!d) return;
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge", e.shape ?? null);
-          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed ? "true" : null);
-          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-corner", e.sharp ? "sharp" : null);
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed === undefined ? null : String(e.dashed));
+          d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-corner", e.sharp === undefined ? null : e.sharp ? "sharp" : "round");
           writeBack(serializeMarkdown(d));
         },
         onLayout: (bounds) => {
