@@ -2343,36 +2343,85 @@ export class MindMapCanvas {
     ind.setCssStyles({ display: "block", left: `${x}px`, top: `${y - 2}px` });
   }
 
+  /**
+   * 拖拽落点，按优先级：
+   *   1. 正落在某个节点的方框里 → 成为它的子节点（不再往里缩，下划线主题的细节点也好对准）
+   *   2. 某个节点「屁股后面」的空白 → 成为它的最后一个子节点
+   *   3. 左右分布结构里中心主题两侧的主主题列
+   *   4. 相邻两个兄弟之间的那条窄带 → 插到它们之间
+   * 第 4 步只看相邻两个兄弟本身的方框围出来的带子，多个命中取最窄的。以前用整列子节点的外接矩形，
+   * 列里有一个很宽的节点、某个兄弟的分支又很高时，这个矩形会罩住大片深层节点，祖先先被查到，
+   * 落点就被截走了 —— 子节点一多就「选不中」。
+   */
   private findDropTarget(wx: number, wy: number, exclude: Set<MindNode>): DropTarget | null {
     if (!this.layout) return null;
     const placed = [...this.layout.placed.values()].filter((p) => !exclude.has(p.node));
+    let hit: Placed | null = null;
+    for (const p of placed) {
+      if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h && (!hit || p.w * p.h < hit.w * hit.h)) hit = p;
+    }
+    if (hit) return { parent: hit.node, index: hit.node.children.length, kind: "node" };
     const behind = this.behindTarget(placed, wx, wy);
     if (behind) return behind;
-    // 先看子节点列之间的空隙：插入到指定位置
-    for (const p of placed) {
-      const kids = visibleChildren(p.node).filter((c) => !exclude.has(c)).map((c) => this.layout!.placed.get(c.id)!).filter(Boolean);
-      if (!kids.length) continue;
-      const gap = p.node.depth === 0 ? DEFAULT_LAYOUT.gapMain : DEFAULT_LAYOUT.gapSibling;
-      const horizontal = kids[0].side === "down";
-      const minX = Math.min(...kids.map((k) => k.x)) - (horizontal ? gap : 12);
-      const maxX = Math.max(...kids.map((k) => k.x + k.w)) + (horizontal ? gap : 12);
-      const minY = Math.min(...kids.map((k) => k.y)) - (horizontal ? 12 : gap);
-      const maxY = Math.max(...kids.map((k) => k.y + k.h)) + (horizontal ? 12 : gap);
-      if (wx < minX || wx > maxX || wy < minY || wy > maxY) continue;
-      // 落在某个子节点自己的盒子里 → 成为它的子节点
-      const hit = kids.find((k) => wx >= k.x + 4 && wx <= k.x + k.w - 4 && wy >= k.y + 4 && wy <= k.y + k.h - 4);
-      if (hit) return { parent: hit.node, index: hit.node.children.length, kind: "node" };
-      if (this.opts.structure === "mindmap" && p.node === (this.focusRoot ?? this.doc?.root)) return this.sideDropTarget(p, kids, wx, wy);
-      const before = horizontal ? kids.filter((k) => k.x + k.w / 2 < wx).length : kids.filter((k) => k.y + k.h / 2 < wy).length;
-      const index = before < kids.length ? p.node.children.indexOf(kids[before].node) : p.node.children.length;
-      return { parent: p.node, index, kind: "gap" };
+
+    const base = this.focusRoot ?? this.doc?.root;
+    const kidsOf = (p: Placed) =>
+      visibleChildren(p.node)
+        .filter((c) => !exclude.has(c))
+        .map((c) => this.layout!.placed.get(c.id))
+        .filter((k): k is Placed => !!k);
+    if (this.opts.structure === "mindmap" && base) {
+      const rp = this.layout.placed.get(base.id);
+      const kids = rp ? kidsOf(rp) : [];
+      const side = rp && wx < rp.x + rp.w / 2 ? "left" : "right";
+      const col = kids.filter((k) => k.side === side);
+      const pad = DEFAULT_LAYOUT.gapMain;
+      const inCol =
+        col.length &&
+        wx >= Math.min(...col.map((k) => k.x)) - 12 &&
+        wx <= Math.max(...col.map((k) => k.x + k.w)) + 12 &&
+        wy >= Math.min(...col.map((k) => k.y)) - pad &&
+        wy <= Math.max(...col.map((k) => k.y + k.h)) + pad;
+      const nearRoot = rp && !col.length && Math.abs(wy - (rp.y + rp.h / 2)) < 80 && (side === "left" ? wx < rp.x : wx > rp.x + rp.w);
+      if (rp && (inCol || nearRoot)) return this.sideDropTarget(rp, kids, wx, wy);
     }
+
+    let best: { t: DropTarget; size: number } | null = null;
     for (const p of placed) {
-      if (wx >= p.x - 8 && wx <= p.x + p.w + 8 && wy >= p.y - 8 && wy <= p.y + p.h + 8) {
-        return { parent: p.node, index: p.node.children.length, kind: "node" };
+      if (this.opts.structure === "mindmap" && p.node === base) continue;
+      const kids = kidsOf(p);
+      if (!kids.length) continue;
+      const across = kids[0].side === "down";
+      // 沿堆叠方向排好：纵向排的按 y，横向排的（组织结构图）按 x
+      kids.sort((a, b) => (across ? a.x - b.x : a.y - b.y));
+      const edgeGap = p.node === base ? DEFAULT_LAYOUT.gapMain : 24;
+      for (let i = 0; i <= kids.length; i++) {
+        const a = kids[i - 1];
+        const b = kids[i];
+        const two = [a, b].filter((k): k is Placed => !!k);
+        let inBand: boolean;
+        let size: number;
+        if (!across) {
+          const top = a ? a.y + a.h : b.y - edgeGap;
+          const bottom = b ? b.y : a.y + a.h + edgeGap;
+          const left = Math.min(...two.map((k) => k.x)) - 12;
+          const right = Math.max(...two.map((k) => k.x + k.w)) + 12;
+          inBand = wy >= top && wy <= bottom && wx >= left && wx <= right;
+          size = bottom - top;
+        } else {
+          const left = a ? a.x + a.w : b.x - edgeGap;
+          const right = b ? b.x : a.x + a.w + edgeGap;
+          const top = Math.min(...two.map((k) => k.y)) - 12;
+          const bottom = Math.max(...two.map((k) => k.y + k.h)) + 12;
+          inBand = wx >= left && wx <= right && wy >= top && wy <= bottom;
+          size = right - left;
+        }
+        if (!inBand || (best && size >= best.size)) continue;
+        const index = b ? p.node.children.indexOf(b.node) : p.node.children.indexOf(a.node) + 1;
+        best = { t: { parent: p.node, index, kind: "gap" }, size };
       }
     }
-    return null;
+    return best?.t ?? null;
   }
 
   /**
