@@ -144,6 +144,8 @@ export class CustomThemeModal extends Modal {
 
   private renderControls(): void {
     const el = this.controls;
+    // 外形 / 边框 / 宽度这类下拉会增减下面的选项，只能整列重画；重画前记住滚动位置，画完放回去，免得跳回顶部
+    const scroll = el.scrollTop;
     el.empty();
     const d = this.draft;
 
@@ -294,6 +296,7 @@ export class CustomThemeModal extends Modal {
       color(new Setting(el).setName(t("customTheme.lineColor")), () => tier.lineColor, (v) => (tier.lineColor = v));
       slider(new Setting(el).setName(t("customTheme.lineWidth")), 0.5, 6, 0.5, () => tier.lineWidth, (v) => (tier.lineWidth = v));
     }
+    el.scrollTop = scroll;
   }
 }
 
