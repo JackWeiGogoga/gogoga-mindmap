@@ -1469,6 +1469,8 @@
 .mm-theme-controls { overflow-y: auto; padding-right: 8px; }
 .mm-theme-controls .setting-item { padding: 8px 0; }
 .mm-theme-section { margin: 14px 0 4px; font-size: var(--font-ui-small, 13px); color: var(--text-muted); }
+.mm-theme-controls input.mm-theme-num { width: 64px; text-align: right; }
+.mm-theme-controls .setting-item-control:has(.mm-theme-num) .slider-value { display: none; }
 .mm-theme-tiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
 .mm-theme-tiers button.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
 .mm-theme-preview {

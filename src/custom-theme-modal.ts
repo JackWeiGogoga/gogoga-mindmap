@@ -233,22 +233,49 @@ export class CustomThemeModal extends Modal {
     });
 
     const tier = d.tiers[this.tier];
-    const slider = (s: Setting, min: number, max: number, step: number, get: () => number, set: (v: number) => void) =>
+    // 滑块旁边带一个数字框：拖滑块粗调，直接输入精确值（不受步长限制，超出范围会夹回去）
+    const slider = (s: Setting, min: number, max: number, step: number, get: () => number, set: (v: number) => void) => {
+      let num: HTMLInputElement | null = null;
       s.addSlider((x) => {
-        x.setLimits(min, max, step)
-          .setValue(get())
-          .setDynamicTooltip()
-          .onChange((v) => {
-            set(v);
-            this.changed();
-          });
-        // Obsidian 的滑块松手才回调；拖动过程中也跟着刷新预览
-        x.sliderEl.addEventListener("input", () => {
-          set(Number(x.sliderEl.value));
+        const sync = (v: number) => {
+          set(v);
+          if (num) num.value = String(v);
           this.changed();
+        };
+        x.setLimits(min, max, step).setValue(get()).onChange(sync);
+        // Obsidian 的滑块松手才回调；拖动过程中也跟着刷新预览
+        x.sliderEl.addEventListener("input", () => sync(Number(x.sliderEl.value)));
+        s.addText((tx) => {
+          num = tx.inputEl;
+          num.type = "number";
+          num.min = String(min);
+          num.max = String(max);
+          num.step = "any";
+          num.addClass("mm-theme-num");
+          num.value = String(get());
+          const commit = () => {
+            const raw = Number(num!.value);
+            if (!num!.value.trim() || !Number.isFinite(raw)) {
+              num!.value = String(get());
+              return;
+            }
+            const v = Math.min(max, Math.max(min, Math.round(raw * 10) / 10));
+            num!.value = String(v);
+            if (v === get()) return;
+            set(v);
+            x.setValue(v);
+            this.changed();
+          };
+          num.addEventListener("change", commit);
+          num.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+          });
         });
-        return x;
       });
+    };
     const color = (s: Setting, get: () => string, set: (v: string) => void) =>
       s.addColorPicker((x) =>
         x.setValue(get()).onChange((v) => {
