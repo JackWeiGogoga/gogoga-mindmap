@@ -338,6 +338,9 @@ export class MindMapCanvas {
   private lastTap: { node: MindNode; time: number } | null = null;
   /** 这次按下是不是落在播放器挡板上；双击挡板是「激活播放器」，不是「编辑文字」 */
   private downOnShield = false;
+  /** 按下时落在图片上：双击 / 连点两下就看大图，不进编辑 */
+  private downOnImage: HTMLImageElement | null = null;
+  private lightbox: HTMLElement | null = null;
   private pendingSelectPath: string | null = null;
   /** 触屏：按住节点不动一段时间才进入拖拽，期间手指移动视为平移 */
   private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
@@ -657,6 +660,8 @@ export class MindMapCanvas {
     this.themeButton = null;
     this.edgeMenu = null;
     this.edgeButton = null;
+    this.lightbox?.remove();
+    this.lightbox = null;
     this.markerPicker = null;
     this.markerPickerCleanup = null;
     this.edgePaths = [];
@@ -1599,6 +1604,7 @@ export class MindMapCanvas {
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar")) return;
       // 双击有两条路（原生 dblclick 和 pointerup 自判定），两条都得知道有没有落在挡板上
       this.downOnShield = !!target.closest(".mm-frame-shield");
+      this.downOnImage = target.closest<HTMLImageElement>("img.mm-img");
       const nodeEl = target.closest<HTMLElement>(".mm-node");
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
@@ -1709,6 +1715,7 @@ export class MindMapCanvas {
         if (this.lastTap && this.lastTap.node === tapped && now - this.lastTap.time < 400) {
           this.lastTap = null;
           if (this.downOnShield) this.setLiveFrame(tapped.id);
+          else if (this.downOnImage) this.openLightbox(this.downOnImage);
           else this.editOnDoubleTap(tapped);
         } else {
           this.lastTap = { node: tapped, time: now };
@@ -1756,7 +1763,9 @@ export class MindMapCanvas {
       const node = nodeEl && this.nodeFromEl(nodeEl);
       if (!node) return;
       ev.preventDefault();
+      const img = (ev.target as HTMLElement).closest<HTMLImageElement>("img.mm-img");
       if ((ev.target as HTMLElement).closest(".mm-frame-shield")) this.setLiveFrame(node.id);
+      else if (img) this.openLightbox(img);
       else this.editOnDoubleTap(node);
     });
 
@@ -1901,6 +1910,34 @@ export class MindMapCanvas {
   }
 
   /** 双击节点：可编辑就进入编辑；只读的嵌入图先打开编辑开关 */
+  /** 全窗口看原图：暗底、按窗口大小居中，点任意处或 Esc 关 */
+  private openLightbox(img: HTMLImageElement): void {
+    if (this.lightbox) return;
+    const doc = this.el.ownerDocument;
+    const box = doc.createElement("div");
+    box.className = "mm-lightbox";
+    const big = doc.createElement("img");
+    big.src = img.currentSrc || img.src;
+    big.alt = img.alt;
+    box.append(big);
+    const close = () => {
+      box.remove();
+      doc.removeEventListener("keydown", onKey, true);
+      this.lightbox = null;
+      this.el.focus({ preventScroll: true });
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      close();
+    };
+    box.addEventListener("click", close);
+    doc.addEventListener("keydown", onKey, true);
+    doc.body.append(box);
+    this.lightbox = box;
+  }
+
   private editOnDoubleTap(node: MindNode): void {
     if (!this.opts.editable) {
       if (!this.opts.embedded) return;

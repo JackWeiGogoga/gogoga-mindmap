@@ -1074,6 +1074,25 @@
 .mm-width-handle.is-left { right: auto; left: -5px; }
 @media (pointer: coarse) { .mm-width-handle { width: 14px; right: -8px; } .mm-width-handle.is-left { left: -8px; } }
 
+/* 双击图片看大图 */
+.mm-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal, 50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: zoom-out;
+}
+.mm-lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
 .mm-img-handle {
   position: absolute;
   z-index: 2;
