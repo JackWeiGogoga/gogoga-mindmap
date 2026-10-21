@@ -268,6 +268,8 @@ const en = {
   "settings.wheel.pan": "Pan",
   "settings.wheel.zoom": "Zoom",
   "settings.hover.name": "Hover preview for linked nodes",
+  "settings.resizableNotes.name": "Resizable note popups",
+  "settings.resizableNotes.desc": "Drag the bottom-right corner to resize note previews and editors. Previews keep their original opening size and position until dragged. Applies the next time a note popup opens; sizes are not remembered.",
   "settings.hover.desc":
     "Ctrl-hover (⌘-hover on macOS) over a node that links to a note to see a preview of the note, as elsewhere in Obsidian. " +
     "To show it without holding a key, find \"{source}\" in the settings of the Page preview core plugin.",
@@ -522,6 +524,8 @@ const zh: Record<Key, string> = {
   "settings.wheel.pan": "平移",
   "settings.wheel.zoom": "缩放",
   "settings.hover.name": "链接节点的悬停预览",
+  "settings.resizableNotes.name": "允许调整备注窗口大小",
+  "settings.resizableNotes.desc": "拖动右下角可调整备注预览和编辑窗口的宽高。预览打开时保持原始尺寸与定位，仅在拖拽后放宽限制。重新打开备注窗口时生效，不记忆尺寸。",
   "settings.hover.desc":
     "按住 ⌘ / Ctrl 把鼠标停在链接到笔记的节点上，会弹出笔记预览，和 Obsidian 其他地方一致。" +
     "想不按键就显示，去核心插件「页面预览」的设置里找「{source}」那一项。",

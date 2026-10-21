@@ -125,6 +125,7 @@ export class MindMapView extends TextFileView {
       structure: this.plugin.settings.defaultStructure,
       theme: this.plugin.settings.defaultTheme,
       editable: true,
+      resizableNotes: () => this.plugin.settings.resizableNotes,
       host: this.plugin.canvasHost(() => this.file?.path ?? "", this, this),
       onChange: (doc) => this.onDocChange(doc),
       onUndo: () => this.undo(),

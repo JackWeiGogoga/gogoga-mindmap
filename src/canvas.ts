@@ -144,6 +144,8 @@ export interface CanvasOptions {
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
   /** 返回 true 时滚轮直接缩放、Shift+滚轮平移；每次滚动时读取，改设置立即生效 */
   wheelZoom?: () => boolean;
+  /** 每次打开备注时读取，未提供或返回 false 则完全沿用原行为 */
+  resizableNotes?: () => boolean;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -3889,11 +3891,20 @@ export class MindMapCanvas {
       this.closePopover();
       return;
     }
+    const resizableNotes = !!this.opts.resizableNotes?.();
+    // 启用备注增强时，预览切换编辑始终保留外框；首次打开仍走原定位。
+    const previousPreview = sameNode && edit && !alreadyEditing && resizableNotes ? this.popover : null;
+    const inheritedSize = previousPreview ? {
+      bounds: previousPreview.getBoundingClientRect(),
+      left: previousPreview.style.left,
+      top: previousPreview.style.top,
+    } : null;
     this.closePopover();
     const nodeEl = this.els.get(node.id);
     if (!nodeEl) return;
     const pop = createDiv();
     pop.className = "mm-popover";
+    if (resizableNotes) pop.classList.add("is-note-resizable");
     pop.dataset.id = node.id;
     pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     pop.addEventListener("wheel", (ev) => ev.stopPropagation());
@@ -3933,7 +3944,15 @@ export class MindMapCanvas {
       this.popoverApply = apply;
       pop.append(ta);
       this.el.append(pop);
-      this.placePopover(pop, nodeEl);
+      if (inheritedSize) {
+        pop.classList.add("is-note-size-inherited");
+        pop.style.width = `${inheritedSize.bounds.width}px`;
+        pop.style.height = `${inheritedSize.bounds.height}px`;
+        pop.style.left = inheritedSize.left;
+        pop.style.top = inheritedSize.top;
+      } else {
+        this.placePopover(pop, nodeEl);
+      }
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     } else {

@@ -462,6 +462,7 @@ export default class MindMapPlugin extends Plugin {
         theme: isThemeName(theme) ? theme : this.settings.defaultTheme,
         edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
         editable: state.editable,
+        resizableNotes: () => this.settings.resizableNotes,
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
