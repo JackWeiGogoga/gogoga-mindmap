@@ -1806,6 +1806,17 @@ export class MindMapCanvas {
       { passive: false },
     );
 
+    // 实时预览里代码块嵌在 CodeMirror 的可编辑区域中，mousedown 的默认行为会把焦点从画布上拿走，
+    // 之后回车、Tab 就没反应了。画布自己在 pointerdown 时已经拿了焦点，这里只拦默认行为
+    if (this.opts.embedded) {
+      this.on(el, "mousedown", (ev) => {
+        // 外层的 cm-content 本身就是 contenteditable，只看画布里面的输入框和正在编辑的标签
+        const field = (ev.target as HTMLElement).closest("input, textarea, select, [contenteditable='true']");
+        if (field && el.contains(field)) return;
+        ev.preventDefault();
+      });
+    }
+
     this.on(el, "dblclick", (ev) => {
       if (this.opts.embedded) ev.stopPropagation();
       const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");

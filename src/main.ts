@@ -475,7 +475,7 @@ export default class MindMapPlugin extends Plugin {
       const child = new MarkdownRenderChild(wrap);
       const info = ctx.getSectionInfo(el);
       const key = `${ctx.sourcePath}:${info?.lineStart ?? "?"}`;
-      const state: BlockState = this.blockStates.get(key) ?? { view: null, selected: null, editable: false, history: new History() };
+      const state: BlockState = this.blockStates.get(key) ?? { view: null, selected: null, editable: false, focused: false, history: new History() };
       this.blockStates.set(key, state);
 
       const style = { maxHeadingLevel: this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) };
@@ -494,6 +494,7 @@ export default class MindMapPlugin extends Plugin {
         current = next;
         state.selected = canvas.getSelectedPath();
         state.view = canvas.getViewState();
+        state.focused = wrap.contains(wrap.ownerDocument.activeElement);
         writing = writing.then(async () => {
           try {
             await this.replaceCodeBlock(ctx, el, prev, next);
@@ -557,9 +558,21 @@ export default class MindMapPlugin extends Plugin {
       if (state.view) canvas.setViewState(state.view);
       canvas.setDoc(doc);
       if (state.selected) canvas.selectPath(state.selected);
+      if (state.focused) {
+        // 写回后 Obsidian 会把整个代码块重新渲染成新元素，旧画布上的焦点跟着没了；
+        // 新元素挂进页面之后再把焦点给它（处理器跑的时候它可能还没进 DOM）
+        state.focused = false;
+        let tries = 0;
+        const refocus = () => {
+          if (wrap.isConnected) canvas.focus();
+          else if (++tries < 10) window.requestAnimationFrame(refocus);
+        };
+        window.requestAnimationFrame(refocus);
+      }
       child.register(() => {
         state.selected = canvas.getSelectedPath();
         state.view = canvas.getViewState();
+        if (wrap.contains(wrap.ownerDocument.activeElement)) state.focused = true;
         canvas.destroy();
       });
       ctx.addChild(child);
@@ -726,6 +739,8 @@ interface BlockState {
   view: { tx: number; ty: number; k: number } | null;
   selected: string | null;
   editable: boolean;
+  /** 重新渲染前画布有焦点：新画布接着拿焦点，键盘操作不断 */
+  focused: boolean;
   history: History;
 }
 
