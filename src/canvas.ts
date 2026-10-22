@@ -3511,9 +3511,32 @@ export class MindMapCanvas {
   // ---------- 右键菜单 ----------
 
   private showContextMenu(entries: MenuEntry[], ev: MouseEvent): void {
-    // 右键节点要先选中它，选中又会弹出浮动工具栏，和菜单叠在一起；菜单开着时先藏起来
+    // 右键节点要先选中它，选中又会弹出浮动工具栏，和菜单叠在一起；菜单开着时先藏起来。
+    // 点空白处关菜单时，菜单在按下那一刻就关了，画布却要等抬起才取消选中，中间工具栏会闪一下，
+    // 所以是被按下关掉的就等这次点击结束、选中状态定了再放出来
     this.el.classList.add("is-menu-open");
-    const onClose = () => this.el.classList.remove("is-menu-open");
+    const doc = this.el.ownerDocument;
+    let pressed = false;
+    const onDown = () => (pressed = true);
+    const onUp = () => (pressed = false);
+    doc.addEventListener("pointerdown", onDown, true);
+    doc.addEventListener("pointerup", onUp, true);
+    const reveal = () => this.el.classList.remove("is-menu-open");
+    const onClose = () => {
+      doc.removeEventListener("pointerdown", onDown, true);
+      doc.removeEventListener("pointerup", onUp, true);
+      if (!pressed) return reveal();
+      // 万一抬起发生在窗口外收不到，过一会儿也放出来
+      const fallback = window.setTimeout(reveal, 1500);
+      doc.addEventListener(
+        "pointerup",
+        () => {
+          window.clearTimeout(fallback);
+          window.requestAnimationFrame(reveal);
+        },
+        { once: true },
+      );
+    };
     if (this.opts.host?.showMenu) {
       this.opts.host.showMenu(entries, ev, onClose);
       return;
