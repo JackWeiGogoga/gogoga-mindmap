@@ -457,3 +457,30 @@ test("主主题左右标记 %%left%% / %%right%% 往返不变", () => {
   assert.equal(findByPath(doc.root, "1")!.side, "right");
   assert.equal(serializeMarkdown(doc), md.replace("w=200 right box", "w=200 right box"));
 });
+
+test("概要标记：summary / summary=N / 带文字，与外框、颜色共存且往返不变；跨度超出时收窄", () => {
+  const md = `# R
+
+## A %%box summary=2 "核心卖点"%%
+
+- a1 %%red summary%%
+- a2
+
+## B
+
+## C %%summary=5 "超出"%%
+`;
+  const doc = parseMarkdown(md, { fallbackTitle: "R" });
+  const [a, b, c] = doc.root.children;
+  assert.deepEqual(a.summary, { span: 2, text: "核心卖点" });
+  assert.deepEqual(a.box, { span: 1, title: "" });
+  assert.equal(a.text, "A");
+  assert.deepEqual(a.children[0].summary, { span: 1, text: "" });
+  assert.equal(a.children[0].color, "red");
+  assert.equal(b.summary, undefined);
+  assert.deepEqual(c.summary, { span: 5, text: "超出" });
+  // C 后面没有兄弟了，写回时跨度收窄成 1
+  assert.equal(serializeMarkdown(doc), md.replace('summary=5 "超出"', 'summary "超出"'));
+  // 不认识的词不算标记
+  assert.equal(splitMarker("x %%summaryx%%").text, "x %%summaryx%%");
+});

@@ -400,6 +400,7 @@ export default class MindMapPlugin extends Plugin {
     for (const n of [1, 2, 3, 4, 5]) exportCommand(`show-level-${n}`, t("command.showLevel", { n }), async (v) => v.showLevelFromSelected(n));
     exportCommand("fit-branch", t("command.fitBranch"), async (v) => v.fitSelectedBranch());
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
+    exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));

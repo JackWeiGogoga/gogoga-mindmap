@@ -17,6 +17,7 @@ import {
   NODE_MIN_WIDTH,
   pathOf,
   removeNode,
+  summaryGroups,
   visibleChildren,
   walk,
 } from "./model";
@@ -30,6 +31,7 @@ import {
   LayoutOptions,
   LayoutResult,
   Placed,
+  PlacedSummary,
   Size,
   Structure,
   STRUCTURES,
@@ -342,6 +344,11 @@ export class MindMapCanvas {
   private boxTitles = new Map<string, HTMLElement>();
   private boxTitleStart = new WeakMap<HTMLElement, MindNode>();
   private editingBox: MindNode | null = null;
+  private summaryLayer!: SVGGElement;
+  private summaryPaths: SVGPathElement[] = [];
+  private summaryLabels = new Map<string, HTMLElement>();
+  private summaryStart = new WeakMap<HTMLElement, MindNode>();
+  private editingSummary: MindNode | null = null;
 
   private tx = 0;
   private ty = 0;
@@ -427,6 +434,9 @@ export class MindMapCanvas {
     this.boxLayer = createSvg("g");
     this.boxLayer.setAttribute("class", "mm-boxes");
     this.svg.append(this.boxLayer);
+    this.summaryLayer = createSvg("g");
+    this.summaryLayer.setAttribute("class", "mm-summaries");
+    this.svg.append(this.summaryLayer);
     this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
     this.overlay = createDiv();
@@ -1035,7 +1045,11 @@ export class MindMapCanvas {
     this.sizes = new Map(this.naturalSizes);
     this.alignWidths(base);
     const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
-    this.layout = layoutTree(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts);
+    this.syncSummaryLabels(base);
+    this.layout = layoutTree(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts, (start) => {
+      const el = this.summaryLabels.get(start.id);
+      return el ? { w: el.offsetWidth, h: el.offsetHeight } : { w: 0, h: 0 };
+    });
 
     for (const p of this.layout.placed.values()) {
       const el = this.els.get(p.node.id);
@@ -1090,6 +1104,7 @@ export class MindMapCanvas {
       if (!this.edgePaths[i].style.display) this.edgePaths[i].setCssStyles({ display: "none" });
     }
     this.drawBoxes();
+    this.drawSummaries();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
   }
@@ -1262,6 +1277,234 @@ export class MindMapCanvas {
     start.box = undefined;
     this.render();
     this.notify();
+  }
+
+  // ---------- 概要 ----------
+
+  /** 布局前先把要显示的概要文字建好（布局要量它的尺寸）；看不见的（父节点折叠了）删掉 */
+  private syncSummaryLabels(base: MindNode): void {
+    const need = new Set<string>();
+    const visit = (n: MindNode) => {
+      for (const c of visibleChildren(n)) {
+        if (c.summary) {
+          need.add(c.id);
+          let el = this.summaryLabels.get(c.id);
+          if (!el) {
+            el = this.createSummaryLabel();
+            this.summaryLabels.set(c.id, el);
+          }
+          this.summaryStart.set(el, c);
+          if (this.editingSummary !== c) {
+            const text = c.summary.text || t("canvas.summaryDefault");
+            if (el.textContent !== text) el.textContent = text;
+            el.classList.toggle("is-empty", !c.summary.text);
+          }
+        }
+        visit(c);
+      }
+    };
+    visit(base);
+    for (const [id, el] of this.summaryLabels) {
+      if (need.has(id)) continue;
+      el.remove();
+      this.summaryLabels.delete(id);
+    }
+  }
+
+  private createSummaryLabel(): HTMLElement {
+    const el = createDiv();
+    el.className = "mm-summary";
+    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const start = this.summaryStart.get(el);
+      if (start && this.editingSummary !== start) this.selectMembers(start, start.summary?.span ?? 1);
+    });
+    el.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const start = this.summaryStart.get(el);
+      if (start && this.opts.editable) this.editSummary(start);
+    });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const start = this.summaryStart.get(el);
+      if (!start || this.editingSummary === start || !this.opts.editable) return;
+      this.showContextMenu(this.summaryMenuEntries(start), ev);
+    });
+    this.nodesEl.append(el);
+    return el;
+  }
+
+  /** 大括号：right / tree 尖朝右，left 尖朝左，down 横着、尖朝下 */
+  private static bracePath(s: PlacedSummary): string {
+    const { x, y, w, h } = s.brace;
+    const r = (v: number) => round2(v);
+    if (s.side === "down") {
+      const q = Math.min(h / 2, w / 4);
+      const ym = y + h / 2;
+      const mid = x + w / 2;
+      return `M${r(x)},${r(y)} Q${r(x)},${r(ym)} ${r(x + q)},${r(ym)} L${r(mid - q)},${r(ym)} Q${r(mid)},${r(ym)} ${r(mid)},${r(y + h)} Q${r(mid)},${r(ym)} ${r(mid + q)},${r(ym)} L${r(x + w - q)},${r(ym)} Q${r(x + w)},${r(ym)} ${r(x + w)},${r(y)}`;
+    }
+    const q = Math.min(w / 2, h / 4);
+    const mid = y + h / 2;
+    const xm = x + w / 2;
+    // 开口那一侧的 x 和尖的 x
+    const open = s.side === "left" ? x + w : x;
+    const tip = s.side === "left" ? x : x + w;
+    return `M${r(open)},${r(y)} Q${r(xm)},${r(y)} ${r(xm)},${r(y + q)} L${r(xm)},${r(mid - q)} Q${r(xm)},${r(mid)} ${r(tip)},${r(mid)} Q${r(xm)},${r(mid)} ${r(xm)},${r(mid + q)} L${r(xm)},${r(y + h - q)} Q${r(xm)},${r(y + h)} ${r(open)},${r(y + h)}`;
+  }
+
+  private drawSummaries(): void {
+    const list = this.layout!.summaries;
+    list.forEach((s, i) => {
+      let path = this.summaryPaths[i];
+      if (!path) {
+        path = createSvg("path");
+        path.setAttribute("class", "mm-summary-brace");
+        this.summaryLayer.append(path);
+        this.summaryPaths.push(path);
+      }
+      const d = MindMapCanvas.bracePath(s);
+      if (path.getAttribute("d") !== d) path.setAttribute("d", d);
+      if (path.style.display) path.setCssStyles({ display: "" });
+      if (!s.label) return;
+      const el = this.summaryLabels.get(s.start.id);
+      if (!el) return;
+      el.setCssStyles({ left: `${round2(s.label.x)}px`, top: `${round2(s.label.y)}px` });
+    });
+    for (let i = list.length; i < this.summaryPaths.length; i++) {
+      if (!this.summaryPaths[i].style.display) this.summaryPaths[i].setCssStyles({ display: "none" });
+    }
+  }
+
+  /** node 所在概要的起始节点 */
+  private summaryOf(node: MindNode): MindNode | null {
+    if (!node.parent) return null;
+    return summaryGroups(node.parent.children).get(node.id) ?? null;
+  }
+
+  private selectMembers(start: MindNode, span: number): void {
+    const siblings = start.parent?.children ?? [start];
+    const i = siblings.indexOf(start);
+    const members = siblings.slice(i, i + Math.max(1, span));
+    this.select(members[0]);
+    for (const m of members.slice(1)) this.select(m, "add");
+    this.positionNodebar();
+  }
+
+  private summaryMenuEntries(start: MindNode): MenuEntry[] {
+    return [
+      { title: t("menu.editSummary"), icon: "type", run: () => this.editSummary(start) },
+      { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
+    ];
+  }
+
+  /** 给选中的节点加概要：同一父节点下相邻的合成一个；已在概要里的跳过。加完直接进入编辑文字 */
+  addSummaryToSelected(): void {
+    if (!this.opts.editable) return;
+    const byParent = new Map<MindNode, number[]>();
+    for (const n of this.selected) {
+      if (!n.parent || this.summaryOf(n)) continue;
+      const arr = byParent.get(n.parent) ?? [];
+      arr.push(n.parent.children.indexOf(n));
+      byParent.set(n.parent, arr);
+    }
+    if (!byParent.size) return;
+    let first: MindNode | null = null;
+    for (const [parent, idx] of byParent) {
+      idx.sort((a, b) => a - b);
+      for (let i = 0; i < idx.length; ) {
+        let j = i;
+        while (j + 1 < idx.length && idx[j + 1] === idx[j] + 1) j++;
+        const start = parent.children[idx[i]];
+        start.summary = { span: idx[j] - idx[i] + 1, text: "" };
+        first ??= start;
+        i = j + 1;
+      }
+    }
+    this.render();
+    if (first) this.editSummary(first, true);
+  }
+
+  /** 命令：选中的有在概要里的就移除，否则加 */
+  toggleSummaryOnSelected(): void {
+    if (!this.opts.editable || !this.selected.size) return;
+    const starts = new Set<MindNode>();
+    for (const n of this.selected) {
+      const s = this.summaryOf(n);
+      if (s) starts.add(s);
+    }
+    if (!starts.size) {
+      this.addSummaryToSelected();
+      return;
+    }
+    for (const s of starts) s.summary = undefined;
+    this.render();
+    this.notify();
+  }
+
+  removeSummary(start: MindNode): void {
+    if (!this.opts.editable || !start.summary) return;
+    start.summary = undefined;
+    this.render();
+    this.notify();
+  }
+
+  /** 原地编辑概要文字。isNew：刚加上的，按 Esc 或清空就当没加 */
+  editSummary(start: MindNode, isNew = false): void {
+    if (!this.opts.editable || !start.summary) return;
+    const before = start.summary.text;
+    const el = this.summaryLabels.get(start.id);
+    if (!el) return;
+    this.editingSummary = start;
+    el.classList.remove("is-empty");
+    el.textContent = before || t("canvas.summaryDefault");
+    el.classList.add("is-editing");
+    el.setAttribute("contenteditable", "plaintext-only");
+    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+
+    let done = false;
+    const finish = (commit: boolean) => {
+      if (done) return;
+      done = true;
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("blur", onBlur);
+      el.removeEventListener("input", onInput);
+      el.removeAttribute("contenteditable");
+      el.classList.remove("is-editing");
+      this.editingSummary = null;
+      if (!start.summary) return;
+      const text = commit ? (el.textContent ?? "").replace(/["%\r\n]/g, "").trim() : before;
+      // 概要就是为了那段文字：清空了（或新加的按了 Esc）就整个去掉
+      if (!text && (commit || isNew)) start.summary = undefined;
+      else start.summary.text = text;
+      this.render();
+      if (isNew || text !== before) this.notify();
+      this.el.focus({ preventScroll: true });
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter" && !ev.isComposing) {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish(false);
+      }
+    };
+    // 文字变长变短要重新排位置（括号不动，文字跟着尖走）
+    const onInput = () => this.reflow();
+    const onBlur = () => finish(true);
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("blur", onBlur);
+    el.addEventListener("input", onInput);
   }
 
   /** 原地编辑外框标题；没有标题时先给个默认字样并全选，清空即去掉标题 */
@@ -3675,6 +3918,9 @@ export class MindMapCanvas {
       const box = this.boxOf(node);
       if (box) entries.push(...this.boxMenuEntries(box));
       else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent, run: () => this.addBoxToSelected() });
+      const summary = this.summaryOf(node);
+      if (summary) entries.push(...this.summaryMenuEntries(summary));
+      else entries.push({ title: t("menu.addSummary"), icon: "brackets", disabled: !node.parent, run: () => this.addSummaryToSelected() });
       entries.push(sep);
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;

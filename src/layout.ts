@@ -8,7 +8,7 @@
  */
 
 import { t } from "./i18n";
-import { boxGroups, MindNode, visibleChildren } from "./model";
+import { boxGroups, MindNode, summaryGroups, visibleChildren } from "./model";
 
 export type Structure = "logic-right" | "mindmap" | "org-down" | "tree-right";
 /** label 是 getter：模块加载时界面语言还没定，用到时再取 */
@@ -57,6 +57,11 @@ export const TREE_INDENT = 32;
 export const BOX_PAD = 10;
 export const BOX_TITLE_H = 24;
 
+/** 概要：括号离被括内容的距离、括号的厚度、括号尖到文字的距离 */
+export const SUMMARY_GAP = 10;
+export const BRACE_W = 12;
+export const SUMMARY_LABEL_GAP = 6;
+
 export interface Placed {
   node: MindNode;
   x: number;
@@ -80,10 +85,25 @@ export interface PlacedBox extends Bounds {
   side: Side;
 }
 
+/**
+ * 概要：括号画在一组兄弟（连同分支、外框）的外侧，文字跟在括号尖后面。
+ * 这一组在堆叠方向上独占一段，所以放在外侧不会压到别的节点，也不用改节点的位置
+ */
+export interface PlacedSummary {
+  start: MindNode;
+  members: MindNode[];
+  side: Side;
+  /** 括号所占的矩形；right / tree 朝右开口在左，left 镜像，down 横着画在下方 */
+  brace: Bounds;
+  /** 文字的位置；同一个概要在思维导图里被左右拆开时只有第一段有文字 */
+  label: Bounds | null;
+}
+
 export interface LayoutResult {
   placed: Map<string, Placed>;
   /** 由内向外排列：先画外层再画内层时倒着遍历 */
   boxes: PlacedBox[];
+  summaries: PlacedSummary[];
   bounds: Bounds;
 }
 
@@ -107,7 +127,13 @@ export function splitSides(kids: MindNode[]): { right: MindNode[]; left: MindNod
   return { right, left };
 }
 
-export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, opts: LayoutOptions): LayoutResult {
+export function layoutTree(
+  root: MindNode,
+  measure: (node: MindNode) => Size,
+  opts: LayoutOptions,
+  /** 概要文字的尺寸（起始节点）；不给就按空文字算 */
+  measureSummary?: (start: MindNode) => Size,
+): LayoutResult {
   const sizes = new Map<string, Size>();
   const extents = new Map<string, number>();
   const placed = new Map<string, Placed>();
@@ -153,24 +179,41 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
     const gs = list.map(groupOf);
     return gs.reduce((sum, g, i) => sum + (g && g !== gs[i - 1] ? 2 * BOX_PAD : 0), 0);
   };
-  /** 父节点 id → 它子节点里的外框（按排布顺序，一段连续的同组兄弟为一个） */
-  const runs = new Map<string, { start: MindNode; members: MindNode[]; side: Side }[]>();
-  function recordRuns(parent: MindNode, list: MindNode[], side: Side): void {
-    let cur: { start: MindNode; members: MindNode[]; side: Side } | null = null;
+  /** 父节点 id → 它子节点里的外框 / 概要（按排布顺序，一段连续的同组兄弟为一个） */
+  type Run = { start: MindNode; members: MindNode[]; side: Side };
+  const runs = new Map<string, Run[]>();
+  const summaryRuns = new Map<string, Run[]>();
+  const summaryCache = new Map<string, Map<string, MindNode>>();
+  const summaryOf = (n: MindNode): MindNode | undefined => {
+    const p = n.parent;
+    if (!p || n === root) return undefined;
+    let g = summaryCache.get(p.id);
+    if (!g) {
+      g = summaryGroups(p.children);
+      summaryCache.set(p.id, g);
+    }
+    return g.get(n.id);
+  };
+  function collect(into: Map<string, Run[]>, of: (n: MindNode) => MindNode | undefined, parent: MindNode, list: MindNode[], side: Side): void {
+    let cur: Run | null = null;
     for (const c of list) {
-      const g = groupOf(c);
+      const g = of(c);
       if (!g) {
         cur = null;
         continue;
       }
       if (!cur || cur.start !== g) {
         cur = { start: g, members: [], side };
-        const arr = runs.get(parent.id) ?? [];
+        const arr = into.get(parent.id) ?? [];
         arr.push(cur);
-        runs.set(parent.id, arr);
+        into.set(parent.id, arr);
       }
       cur.members.push(c);
     }
+  }
+  function recordRuns(parent: MindNode, list: MindNode[], side: Side): void {
+    collect(runs, groupOf, parent, list, side);
+    collect(summaryRuns, summaryOf, parent, list, side);
   }
 
   const rs = sizeOf(root);
@@ -320,12 +363,46 @@ export function layoutTree(root: MindNode, measure: (node: MindNode) => Size, op
         h: inner.h + top + BOX_PAD,
       };
       boxes.push(box);
+      for (const m of run.members) boxBounds.set(m.id, box);
       b = union(b, box);
+    }
+    // 概要在外框之后：括住的内容含成员的分支和套在它们外面的外框；算进 b，外层外框和适应画布都会带上它
+    for (const run of summaryRuns.get(n.id) ?? []) {
+      let inner: Bounds | null = null;
+      for (const m of run.members) inner = union(inner, union(subtree.get(m.id) ?? null, boxBounds.get(m.id) ?? null));
+      if (!inner) continue;
+      const first = !labelled.has(run.start.id);
+      labelled.add(run.start.id);
+      const ls = first ? (measureSummary?.(run.start) ?? { w: 0, h: 0 }) : null;
+      const s = placeSummary(run, inner, ls);
+      summaries.push(s);
+      b = union(union(b, s.brace), s.label);
     }
     return b;
   }
+  /** 外框成员 id → 外框（成员被外框套住时，概要要括到外框外面） */
+  const boxBounds = new Map<string, Bounds>();
+  const summaries: PlacedSummary[] = [];
+  const labelled = new Set<string>();
+  function placeSummary(run: Run, inner: Bounds, ls: Size | null): PlacedSummary {
+    const base = { start: run.start, members: run.members, side: run.side };
+    if (run.side === "down") {
+      const brace = { x: inner.x, y: inner.y + inner.h + SUMMARY_GAP, w: inner.w, h: BRACE_W };
+      const label = ls && { x: inner.x + inner.w / 2 - ls.w / 2, y: brace.y + BRACE_W + SUMMARY_LABEL_GAP, w: ls.w, h: ls.h };
+      return { ...base, brace, label };
+    }
+    const cy = inner.y + inner.h / 2;
+    if (run.side === "left") {
+      const brace = { x: inner.x - SUMMARY_GAP - BRACE_W, y: inner.y, w: BRACE_W, h: inner.h };
+      const label = ls && { x: brace.x - SUMMARY_LABEL_GAP - ls.w, y: cy - ls.h / 2, w: ls.w, h: ls.h };
+      return { ...base, brace, label };
+    }
+    const brace = { x: inner.x + inner.w + SUMMARY_GAP, y: inner.y, w: BRACE_W, h: inner.h };
+    const label = ls && { x: brace.x + BRACE_W + SUMMARY_LABEL_GAP, y: cy - ls.h / 2, w: ls.w, h: ls.h };
+    return { ...base, brace, label };
+  }
   const all = boundsOf(root) ?? { x: 0, y: 0, w: 0, h: 0 };
-  return { placed, boxes, bounds: all };
+  return { placed, boxes, summaries, bounds: all };
 }
 
 export interface EdgeGeometry {

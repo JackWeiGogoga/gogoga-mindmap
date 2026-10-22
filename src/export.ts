@@ -140,7 +140,8 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
       const a = (k: string) => r.getAttribute(k) ?? "0";
       return `<rect x="${a("x")}" y="${a("y")}" width="${a("width")}" height="${a("height")}" rx="${a("rx")}" fill="${cs.fill}" fill-opacity="${cs.fillOpacity}" stroke="${cs.stroke}" stroke-opacity="${cs.strokeOpacity}" stroke-width="${cs.strokeWidth}" stroke-dasharray="${cs.strokeDasharray}"/>`;
     });
-  const paths = [...edges.querySelectorAll("path")].map((p) => {
+  // 连线和概要的括号；用不上的 path 只是藏起来（display: none）留着复用，不能导出去
+  const paths = [...edges.querySelectorAll<SVGPathElement>("path")].filter((p) => p.style.display !== "none").map((p) => {
     const cs = getComputedStyle(p);
     const d = p.getAttribute("d") ?? "";
     const dash = cs.strokeDasharray && cs.strokeDasharray !== "none" ? ` stroke-dasharray="${cs.strokeDasharray}"` : "";

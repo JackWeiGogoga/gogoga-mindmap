@@ -132,6 +132,43 @@
 .mm-edges.is-dashed .mm-edge { stroke-dasharray: 6 5; }
 .mm-edge[data-depth="2"] { stroke-width: var(--mm-edge-w2); }
 
+/* 概要：大括号 + 一段比节点轻一档的文字，括号和文字都不接收画布的拖拽 */
+.mm-summary-brace {
+  fill: none;
+  stroke: var(--mm-line);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mm-summary {
+  position: absolute;
+  box-sizing: border-box;
+  max-width: 240px;
+  padding: 3px 9px;
+  border: 1.5px solid var(--mm-line);
+  border-radius: 6px;
+  background: var(--mm-bg, transparent);
+  font-family: var(--mm-font);
+  font-size: 13px;
+  line-height: 18px;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  user-select: none;
+}
+.mm-summary.is-empty { opacity: 0.5; }
+.mm-root.is-editable .mm-summary { cursor: pointer; }
+.mm-summary.is-editing {
+  overflow: visible;
+  text-overflow: clip;
+  cursor: text;
+  user-select: text;
+  outline: 2px solid var(--mm-selection);
+  outline-offset: 1px;
+}
+
 /* 外框：虚线圆角框 + 淡底色，开分支色的主题跟随起始节点的分支色 */
 .mm-box {
   fill: var(--mm-box-color, var(--mm-line));

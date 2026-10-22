@@ -133,7 +133,7 @@ mindmap: true
   );
 });
 
-test("外框转成 %%box%%，不支持的内容计数提示", async () => {
+test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数提示", async () => {
   const json = JSON.stringify([
     {
       title: "S",
@@ -142,10 +142,18 @@ test("外框转成 %%box%%，不支持的内容计数提示", async () => {
         id: "root",
         title: "根",
         boundaries: [{ range: "(1,2)", title: "后两个" }, { range: "(0,0)" }],
-        summaries: [{ range: "(0,1)" }],
+        summaries: [
+          { range: "(0,1)", topicId: "s1" },
+          { range: "(2,2)", topicId: "s2" },
+        ],
         children: {
           attached: [{ id: "a", title: "A", boundaries: [{ range: "master" }] }, { id: "b", title: "B" }, { id: "c", title: "C" }],
           detached: [{ id: "f", title: "自由" }],
+          summary: [
+            { id: "s1", title: "前两个" },
+            // 概要主题下面还挂着子主题：子主题显示不了，算丢掉一项
+            { id: "s2", title: "最后", children: { attached: [{ id: "s2a", title: "x" }] } },
+          ],
         },
       },
     },
@@ -160,11 +168,11 @@ mindmap: true
 
 # 根
 
-## A %%box%%
+## A %%box summary=2 "前两个"%%
 
 ## B %%box=2 "后两个"%%
 
-## C
+## C %%summary "最后"%%
 `,
   );
   assert.ok(describeLost(sheet.lost).length > 0);
@@ -173,13 +181,15 @@ mindmap: true
   const xml = `<xmap-content><sheet id="s"><title>X</title>
     <topic id="t1"><title>根</title>
       <children><topics type="attached"><topic id="t2"><title>甲</title></topic><topic id="t3"><title>乙</title></topic></topics>
-      <topics type="detached"><topic id="t9"><title>浮</title></topic></topics></children>
+      <topics type="detached"><topic id="t9"><title>浮</title></topic></topics>
+      <topics type="summary"><topic id="sm"><title>概括</title></topic></topics></children>
       <boundaries><boundary range="(0,1)"><title>两个</title></boundary></boundaries>
+      <summaries><summary range="(0,1)" topic-ref="sm"/></summaries>
     </topic>
     <relationships><relationship end1="t2" end2="t3"/></relationships>
   </sheet></xmap-content>`;
   const comments = `<comments><comment object-id="t2" author="a"><content>hi</content></comment><comment object-id="zz"/></comments>`;
   const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
   assert.deepEqual(x.lost, { detached: 1, relationships: 1, summaries: 0, comments: 1 });
-  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个"%%/);
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个" summary=2 "概括"%%/);
 });

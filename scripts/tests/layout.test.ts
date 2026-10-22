@@ -233,3 +233,50 @@ test("折线拐角：默认圆角，半径 0 时拐点就是直角", async () =>
   const sharp = edgePath(g, "elbow", 0);
   assert.match(sharp, /L70,10 Q70,10 70,10 L70,90/);
 });
+
+test("概要：括号在被括分支外侧，不压节点、不挪节点，整体范围包含括号和文字，各结构都成立", () => {
+  const md = `# Root
+
+## A %%summary=2 "AB"%%
+- a1 %%summary "一"%%
+- a2
+
+## B
+- b1 %%box%%
+
+## C
+- c1
+`;
+  const plain = md.replace(/ %%summary[^%]*%%/g, "");
+  const ms = () => ({ w: 40, h: 20 });
+  for (const structure of ["logic-right", "mindmap", "org-down", "tree-right"] as const) {
+    const res = layoutTree(parseMarkdown(md).root, measure, { ...DEFAULT_LAYOUT, structure }, ms);
+    const base = layoutTree(parseMarkdown(plain).root, measure, { ...DEFAULT_LAYOUT, structure });
+    const pos = (r: typeof res) => [...r.placed.values()].map((p) => `${p.node.text}@${p.x},${p.y}`).sort().join(" ");
+    assert.equal(pos(res), pos(base), `${structure}: 加概要不应挪动节点`);
+    assert.equal(res.summaries.length, 2, structure);
+    const hit = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const inside = (p: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+      p.x >= b.x && p.y >= b.y && p.x + p.w <= b.x + b.w && p.y + p.h <= b.y + b.h;
+    for (const s of res.summaries) {
+      for (const p of res.placed.values()) {
+        assert.ok(!hit(s.brace, p), `${structure}: 括号压到了 ${p.node.text}`);
+        if (s.label) assert.ok(!hit(s.label, p), `${structure}: 概要文字压到了 ${p.node.text}`);
+      }
+      assert.ok(inside(s.brace, res.bounds), structure);
+      if (s.label) assert.ok(inside(s.label, res.bounds), structure);
+    }
+    // A、B 的概要括住 A、B 两整支（含 b1 的外框）：括号在它们最外侧
+    const ab = res.summaries.find((s) => s.start.text === "A")!;
+    const members: { x: number; y: number; w: number; h: number }[] = [];
+    for (const m of ab.members) walk(m, (n) => {
+      const p = res.placed.get(n.id);
+      if (p) members.push(p);
+    });
+    for (const b of res.boxes) members.push(b);
+    if (ab.side === "down") for (const p of members) assert.ok(ab.brace.y >= p.y + p.h, `${structure}: 括号应在下方`);
+    else if (ab.side === "left") for (const p of members) assert.ok(ab.brace.x + ab.brace.w <= p.x, `${structure}: 括号应在左侧`);
+    else for (const p of members) assert.ok(ab.brace.x >= p.x + p.w, `${structure}: 括号应在右侧`);
+  }
+});

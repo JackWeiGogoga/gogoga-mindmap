@@ -15,6 +15,8 @@ export interface XmindTopic {
   folded?: boolean;
   /** 外框：XMind 的 boundary 挂在父主题上、按子主题下标框一段；这里换算成挂在起始子主题上 */
   box?: { span: number; title: string };
+  /** 概要：同外框，按子主题下标括一段，文字取自 XMind 的概要主题 */
+  summary?: { span: number; text: string };
   children: XmindTopic[];
 }
 
@@ -46,6 +48,19 @@ function applyBoundary(topic: XmindTopic, range: string | undefined, title: stri
   const b = Math.min(Number(m[2]), topic.children.length - 1);
   const start = topic.children[a];
   if (start && b >= a && !start.box) start.box = box(b - a + 1);
+}
+
+/**
+ * XMind 的概要：父主题上记 range "(0,2)" 和概要主题的 id，概要主题本身放在 children.summary 里。
+ * 概要主题下面还挂着子主题的，那些子主题这边还显示不了，算进「丢掉的内容」
+ */
+function applySummary(topic: XmindTopic, range: string | undefined, text: string): void {
+  const m = /^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(range ?? "");
+  if (!m) return;
+  const a = Number(m[1]);
+  const b = Math.min(Number(m[2]), topic.children.length - 1);
+  const start = topic.children[a];
+  if (start && b >= a && !start.summary) start.summary = { span: b - a + 1, text: cleanTitle(text).replace(/["%]/g, "") };
 }
 
 function collectIds(t: XmindTopic, out: Set<string>): void {
@@ -100,10 +115,10 @@ interface JsonTopic {
   id?: string;
   title?: string;
   boundaries?: { range?: string; title?: string }[];
-  summaries?: unknown[];
+  summaries?: { range?: string; topicId?: string }[];
   comments?: unknown[];
   notes?: { plain?: { content?: string } };
-  children?: { attached?: JsonTopic[]; detached?: JsonTopic[] };
+  children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[] };
   branch?: string;
   style?: { properties?: Record<string, string> };
   labels?: string[];
@@ -127,7 +142,6 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss()): XmindTopic {
   if (plain) notes.push(plain);
   if (t.labels?.length) notes.push(t.labels.map((l) => `#${l.replace(/\s+/g, "-")}`).join(" "));
   lost.detached += t.children?.detached?.length ?? 0;
-  lost.summaries += t.summaries?.length ?? 0;
   lost.comments += t.comments?.length ?? 0;
   const topic: XmindTopic = {
     id: t.id,
@@ -138,6 +152,11 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss()): XmindTopic {
     children: (t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
   };
   for (const b of t.boundaries ?? []) applyBoundary(topic, b.range, b.title ?? "");
+  for (const s of t.summaries ?? []) {
+    const st = t.children?.summary?.find((x) => x.id === s.topicId);
+    applySummary(topic, s.range, st?.title ?? "");
+    if (st?.children?.attached?.length) lost.summaries += 1;
+  }
   return topic;
 }
 
@@ -251,10 +270,21 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss()): XmindTopic {
       for (const t of childrenByName(topics, "topic")) children.push(fromXmlTopic(t, lost));
     }
   }
-  for (const s of childrenByName(el, "summaries")) lost.summaries += childrenByName(s, "summary").length;
   const topic: XmindTopic = { id: el.attrs["id"], title, note: plain || undefined, folded: el.attrs["branch"] === "folded" || undefined, children };
   for (const bs of childrenByName(el, "boundaries")) {
     for (const b of childrenByName(bs, "boundary")) applyBoundary(topic, b.attrs["range"], childrenByName(b, "title")[0]?.text ?? "");
+  }
+  // 概要主题在 <children><topics type="summary"> 里，<summaries> 用 topic-ref 指过去
+  const summaryTopics = childrenByName(el, "children")
+    .flatMap((ch) => childrenByName(ch, "topics"))
+    .filter((ts) => ts.attrs["type"] === "summary")
+    .flatMap((ts) => childrenByName(ts, "topic"));
+  for (const s of childrenByName(el, "summaries")) {
+    for (const sm of childrenByName(s, "summary")) {
+      const st = summaryTopics.find((x) => x.attrs["id"] === sm.attrs["topic-ref"]);
+      applySummary(topic, sm.attrs["range"], st ? (childrenByName(st, "title")[0]?.text ?? "") : "");
+      if (st && childrenByName(st, "children").some((ch) => childrenByName(ch, "topics").some((ts) => childrenByName(ts, "topic").length))) lost.summaries += 1;
+    }
   }
   return topic;
 }
@@ -315,6 +345,7 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       color: t.color,
       folded: !!t.folded,
       box: t.box && { ...t.box },
+      summary: t.summary && { ...t.summary },
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });

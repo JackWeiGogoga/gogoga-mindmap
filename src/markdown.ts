@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { Boundary, createNode, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { Boundary, createNode, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -48,12 +48,13 @@ interface Marker {
   color?: string;
   folded: boolean;
   box?: Boundary;
+  summary?: Summary;
   width?: number;
   side?: "left" | "right";
 }
 
-/** 标记里的一项：box、box=3 可带一个 "标题"（标题里不能有 " 和 %），其余按空白切 */
-const MARKER_TOKEN_RE = /box(?:=(\d+))?(?:[ \t]*"([^"%]*)")?(?=\s|$)|\S+/g;
+/** 标记里的一项：box、box=3、summary=2 可带一个 "文字"（文字里不能有 " 和 %），其余按空白切 */
+const MARKER_TOKEN_RE = /(box|summary)(?:=(\d+))?(?:[ \t]*"([^"%]*)")?(?=\s|$)|\S+/g;
 
 /** 从标签末尾摘出我们认识的 %% 标记；不认识的注释原样留在文本里 */
 export function splitMarker(text: string): { text: string; marker: Marker } {
@@ -65,8 +66,10 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   for (const tok of tokens) {
     const t = tok[0];
     const lower = t.toLowerCase();
-    if (t.startsWith("box") && (t === "box" || /^box[=\s"]/.test(t))) {
-      marker.box = { span: Math.max(1, Number(tok[1] ?? 1)), title: tok[2]?.trim() ?? "" };
+    if (tok[1] === "box") {
+      marker.box = { span: Math.max(1, Number(tok[2] ?? 1)), title: tok[3]?.trim() ?? "" };
+    } else if (tok[1] === "summary") {
+      marker.summary = { span: Math.max(1, Number(tok[2] ?? 1)), text: tok[3]?.trim() ?? "" };
     } else if (/^w=\d{1,6}$/.test(lower)) {
       marker.width = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(2))));
     } else if (lower === "left" || lower === "right") {
@@ -80,7 +83,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "width" | "side">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
@@ -89,6 +92,10 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
   if (node.box) {
     const title = node.box.title.replace(/["%]/g, "").trim();
     parts.push(`box${node.box.span > 1 ? `=${node.box.span}` : ""}${title ? ` "${title}"` : ""}`);
+  }
+  if (node.summary) {
+    const text = node.summary.text.replace(/["%]/g, "").trim();
+    parts.push(`summary${node.summary.span > 1 ? `=${node.summary.span}` : ""}${text ? ` "${text}"` : ""}`);
   }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
@@ -297,6 +304,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.color = marker.color;
         root.folded = marker.folded;
         root.box = marker.box;
+        root.summary = marker.summary;
         root.width = marker.width;
         root.level = 1;
         root.kind = "heading";
@@ -308,7 +316,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width, side: marker.side });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side });
         parent.children.push(node);
         headingStack.push(node);
         target = { node, buf: noteBuf };
@@ -327,7 +335,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, width: marker.width, side: marker.side, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       target = { node, buf: noteBuf };

@@ -102,6 +102,10 @@ export class MindMapView extends TextFileView {
     this.canvas?.toggleBoxOnSelected();
   }
 
+  toggleSummaryOnSelected(): void {
+    this.canvas?.toggleSummaryOnSelected();
+  }
+
   /** 自定义主题改了之后重画（主题 id 不变，样式和行为可能变了） */
   refreshTheme(): void {
     const c = this.canvas;

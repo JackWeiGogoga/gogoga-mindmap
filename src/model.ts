@@ -20,6 +20,8 @@ export interface MindNode {
   folded: boolean;
   /** 外框：框住本节点及其后 span-1 个兄弟（连同各自的分支），用 %%box%% / %%box=3 "标题"%% 持久化 */
   box?: Boundary;
+  /** 概要：本节点及其后 span-1 个兄弟外侧画一个大括号，挂一段概括文字；%%summary=3 "文字"%% */
+  summary?: Summary;
   /** 手动拖出来的节点宽度（px），文字按它换行；用 %%w=240%% 持久化，没有就按内容自适应 */
   width?: number;
   /** 思维导图结构里主主题固定在哪一边；%%left%% / %%right%%，没有就按数量自动分 */
@@ -43,6 +45,12 @@ export interface Boundary {
   /** 框住的兄弟数，含本节点，至少 1 */
   span: number;
   title: string;
+}
+
+export interface Summary {
+  /** 括住的兄弟数，含本节点，至少 1 */
+  span: number;
+  text: string;
 }
 
 export interface DocStyle {
@@ -83,6 +91,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     color: init.color,
     folded: init.folded ?? false,
     box: init.box,
+    summary: init.summary,
     width: init.width,
     side: init.side,
     kind: init.kind ?? "list",
@@ -102,13 +111,14 @@ export function walk(node: MindNode, fn: (n: MindNode) => void): void {
   for (const c of node.children) walk(c, fn);
 }
 
-/** 外框跨度不能超出后面剩下的兄弟（删掉兄弟后收窄）；根节点没有兄弟 */
+/** 外框 / 概要的跨度不能超出后面剩下的兄弟（删掉兄弟后收窄）；根节点没有兄弟 */
 export function normalizeBoxes(root: MindNode): void {
   walk(root, (n) => {
-    if (!n.box) return;
+    if (!n.box && !n.summary) return;
     const siblings = n.parent?.children;
     const rest = siblings ? siblings.length - siblings.indexOf(n) : 1;
-    n.box.span = Math.max(1, Math.min(n.box.span, rest));
+    if (n.box) n.box.span = Math.max(1, Math.min(n.box.span, rest));
+    if (n.summary) n.summary.span = Math.max(1, Math.min(n.summary.span, rest));
   });
 }
 
@@ -122,6 +132,18 @@ export function boxGroups(siblings: MindNode[]): Map<string, MindNode> {
     const start = siblings[i];
     if (!start.box || out.has(start.id)) continue;
     const end = Math.min(siblings.length, i + Math.max(1, start.box.span));
+    for (let j = i; j < end; j++) out.set(siblings[j].id, start);
+  }
+  return out;
+}
+
+/** 同 boxGroups，换成概要：节点 id → 所属概要的起始节点 */
+export function summaryGroups(siblings: MindNode[]): Map<string, MindNode> {
+  const out = new Map<string, MindNode>();
+  for (let i = 0; i < siblings.length; i++) {
+    const start = siblings[i];
+    if (!start.summary || out.has(start.id)) continue;
+    const end = Math.min(siblings.length, i + Math.max(1, start.summary.span));
     for (let j = i; j < end; j++) out.set(siblings[j].id, start);
   }
   return out;
@@ -277,6 +299,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     color: node.color,
     folded: node.folded,
     box: node.box && { ...node.box },
+    summary: node.summary && { ...node.summary },
     width: node.width,
     side: node.side,
     kind: node.kind,
