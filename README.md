@@ -158,7 +158,7 @@ A paragraph here becomes the central topic's note.
 | Shift+click / ⌘+click / Shift+drag / ⌘A | Add to selection / toggle / box-select / select all |
 | Drag node | Change parent or reorder |
 | / | Fold or unfold the selected node |
-| 1–9 / 0 | Show down to level N (1 = main topics only) and fit the view / expand everything |
+| 1–9 / 0 | Show only N levels below the selected node / expand its whole branch; other branches stay as they are. With the central topic (or nothing) selected it applies to the whole map and fits the view |
 | ⌘⇧0 | Zoom to the selected branch |
 
 These keys are handled by the map itself. Folding, showing down to a level, zooming to a branch and toggling a boundary are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map").

@@ -112,6 +112,11 @@ export class MindMapView extends TextFileView {
     this.canvas?.setFoldLevel(level);
   }
 
+  /** 和数字键一样：从选中的节点往下算 */
+  showLevelFromSelected(level: number): void {
+    this.canvas?.setFoldLevel(level, this.canvas.getPrimary());
+  }
+
   getViewType(): string {
     return VIEW_TYPE_MINDMAP;
   }

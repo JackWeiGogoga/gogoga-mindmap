@@ -2313,11 +2313,12 @@ export class MindMapCanvas {
       if (this.primary) this.fitBranch(this.primary);
       return;
     }
-    // 数字键：只显示到第 N 层（1 = 只看主主题），0 = 全部展开。⌘1–9 是 Obsidian 切标签页，不占
+    // 数字键：选中节点往下只显示 N 层，0 = 这一支全部展开；选中的是根或没选就是整张图。
+    // ⌘1–9 是 Obsidian 切标签页，不占
     if (!mod && !ev.altKey && !ev.shiftKey && /^Digit[0-9]$/.test(ev.code)) {
       ev.preventDefault();
       const n = Number(ev.code.slice(5));
-      this.setFoldLevel(n === 0 ? null : n);
+      this.setFoldLevel(n === 0 ? null : n, this.primary);
       return;
     }
     if (mod && ev.key === "0") {
@@ -3262,15 +3263,21 @@ export class MindMapCanvas {
 
   /** level 为 null 展开全部；否则深度 ≥ level 的节点折叠（1 = 只看主主题） */
   /** 只显示到第 level 层（相对当前聚焦的根；null 为全部展开），然后适应画布 */
-  setFoldLevel(level: number | null): void {
+  /**
+   * 只显示到第 level 层（null = 全部展开）。from 给了某个节点就只动它这一支：层数从它算起，
+   * 别的分支不受影响，视野也不跳，只保证它还在画面里；不给或给的是根，就是整张图并适应画布
+   */
+  setFoldLevel(level: number | null, from?: MindNode | null): void {
     if (!this.doc) return;
     if (this.editing) this.commitEdit();
-    const base = this.focusRoot ?? this.doc.root;
+    const top = this.focusRoot ?? this.doc.root;
+    const base = from && from !== top && isAncestor(top, from) ? from : top;
     walk(base, (n) => {
       if (n.children.length) n.folded = level !== null && n.depth - base.depth >= level;
     });
     this.render();
-    this.fit();
+    if (base === top) this.fit();
+    else this.ensureVisible(base);
     if (this.opts.editable) this.notify();
   }
 
