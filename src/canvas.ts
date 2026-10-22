@@ -1155,6 +1155,17 @@ export class MindMapCanvas {
     return el;
   }
 
+  /**
+   * 指针下最里层的外框（起始节点）。外框画在不接收鼠标的连线层里，标题以外的地方
+   * 只能按坐标判断；layout.boxes 由内向外，第一个命中的就是最里层
+   */
+  private boxAt(clientX: number, clientY: number): MindNode | null {
+    if (!this.layout) return null;
+    const p = this.toWorld(clientX, clientY);
+    const hit = this.layout.boxes.find((b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h);
+    return hit?.start ?? null;
+  }
+
   /** node 所在外框的起始节点 */
   private boxOf(node: MindNode): MindNode | null {
     if (!node.parent) return null;
@@ -1203,6 +1214,20 @@ export class MindMapCanvas {
     }
     this.render();
     this.notify();
+  }
+
+  /**
+   * 浮动工具栏的外框按钮：还没外框就加；已经在外框里就弹出外框菜单（加 / 改标题、移除），
+   * 不再一点就删，标题也就有了显眼的入口。⌘⇧B 仍是直接切换
+   */
+  private boxButton(ev: MouseEvent): void {
+    if (!this.opts.editable || !this.selected.size) return;
+    const start = [...this.selected].map((n) => this.boxOf(n)).find((s): s is MindNode => !!s);
+    if (!start) {
+      this.addBoxToSelected();
+      return;
+    }
+    this.showContextMenu(this.boxMenuEntries(start), ev);
   }
 
   /** 工具栏按钮 / ⌘⇧B：选中的节点有在外框里的就移除这些外框，否则加外框 */
@@ -1594,7 +1619,7 @@ export class MindMapCanvas {
     const sep = createSpan();
     sep.className = "mm-tool-sep";
     bar.append(colors, sep, tools);
-    const tool = (name: string, title: string, onClick: () => void) => {
+    const tool = (name: string, title: string, onClick: (ev: MouseEvent) => void) => {
       const b = createEl("button");
       b.type = "button";
       b.className = "mm-tool";
@@ -1603,7 +1628,7 @@ export class MindMapCanvas {
       b.append(icon(name));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        onClick();
+        onClick(ev);
       });
       tools.append(b);
     };
@@ -1613,7 +1638,7 @@ export class MindMapCanvas {
     tool("note", t("canvas.noteTip"), () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
-    tool("box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), () => this.toggleBoxOnSelected());
+    tool("box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), (ev) => this.boxButton(ev));
     if (this.opts.host?.pickNote) tool("link", t("canvas.linkTip", { key: sc("Mod", "K") }), () => void this.linkSelectedToNote());
     tool("copy", t("canvas.copyTip", { key: sc("Mod", "C") }), () => this.copySelection());
     tool("paste", t("canvas.pasteTip", { key: sc("Mod", "V") }), () => void this.pasteFromClipboard());
@@ -1884,7 +1909,17 @@ export class MindMapCanvas {
       if (this.opts.embedded) ev.stopPropagation();
       const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
       const node = nodeEl && this.nodeFromEl(nodeEl);
-      if (!node) return;
+      if (!node) {
+        // 双击外框里的空白处：直接编辑外框标题（没有标题就加一个）
+        const box = this.opts.editable && !(ev.target as HTMLElement).closest(".mm-toolbar, .mm-nodebar, .mm-popover, .mm-menu, .mm-box-title")
+          ? this.boxAt(ev.clientX, ev.clientY)
+          : null;
+        if (box) {
+          ev.preventDefault();
+          this.editBoxTitle(box);
+        }
+        return;
+      }
       ev.preventDefault();
       const img = this.imageAt(ev.target as HTMLElement, ev.clientX, ev.clientY);
       if ((ev.target as HTMLElement).closest(".mm-frame-shield")) this.setLiveFrame(node.id);
@@ -1917,9 +1952,16 @@ export class MindMapCanvas {
         if (!this.selected.has(node)) this.select(node);
         else this.setPrimary(node);
         this.showContextMenu(this.nodeMenuEntries(node), ev);
-      } else {
-        this.showContextMenu(this.backgroundMenuEntries(), ev);
+        return;
       }
+      // 外框里的空白处：外框自己的菜单（加 / 改标题、移除）
+      const box = this.opts.editable ? this.boxAt(ev.clientX, ev.clientY) : null;
+      if (box && this.editingBox !== box) {
+        this.selectBoxMembers(box);
+        this.showContextMenu(this.boxMenuEntries(box), ev);
+        return;
+      }
+      this.showContextMenu(this.backgroundMenuEntries(), ev);
     });
 
     // 拖入笔记 / 图片文件
