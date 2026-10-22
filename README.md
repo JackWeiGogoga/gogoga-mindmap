@@ -72,6 +72,8 @@ mindmap-theme: business
 ```
 ````
 
+To show a mind map you already have, embed the file like any other note: `![[Product launch]]` for a mind map note, or `![[Competitors.xmind]]` for an XMind file. It shows a read-only preview that follows the file as it changes; click the open button in its toolbar, or double-click a node, to open the file and edit it. Notes without `mindmap: true` and links to a heading or block (`![[Note#Heading]]`) embed as usual.
+
 ### Editing
 
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.

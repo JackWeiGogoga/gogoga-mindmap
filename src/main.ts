@@ -40,6 +40,7 @@ import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
+import { registerMindMapEmbeds } from "./embed";
 
 const FRONTMATTER_KEY = "mindmap";
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
@@ -79,6 +80,7 @@ export default class MindMapPlugin extends Plugin {
     this.addSettingTab(new MindMapSettingTab(this.app, this));
     this.patchSetViewState();
     this.registerCodeBlock();
+    registerMindMapEmbeds(this);
     this.registerCommands();
 
     this.registerEvent(

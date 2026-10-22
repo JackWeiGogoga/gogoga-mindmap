@@ -150,6 +150,11 @@ export interface CanvasOptions {
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
   onViewChange?: (state: ViewState) => void;
   onEditableChange?: (editable: boolean) => void;
+  /**
+   * 嵌入的是一个文件（![[脑图]]）而不是代码块：没有地方写回，工具栏的「编辑」换成「打开」，
+   * 双击也是打开原文件
+   */
+  onOpenFile?: () => void;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -199,6 +204,7 @@ const ICONS: Record<string, string> = {
   focus: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M3 9V5a2 2 0 0 1 2-2h4M15 3h4a2 2 0 0 1 2 2v4M21 15v4a2 2 0 0 1-2 2h-4M9 21H5a2 2 0 0 1-2-2v-4"/></svg>',
   paste: '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+  open: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
   edge: '<svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c6 0 4-12 10-12" stroke-dasharray="0"/></svg>',
@@ -1426,7 +1432,10 @@ export class MindMapCanvas {
       sep0.className = "mm-tool-sep";
       bar.append(sep0);
     }
-    if (this.opts.embedded) {
+    if (this.opts.embedded && this.opts.onOpenFile) {
+      const open = this.opts.onOpenFile;
+      btn("open", t("canvas.openEmbeddedFile"), () => open());
+    } else if (this.opts.embedded) {
       this.editToggle = btn(this.opts.editable ? "check" : "pencil", this.opts.editable ? t("canvas.doneEditing") : t("canvas.editEmbedded"), () =>
         this.setEditable(!this.opts.editable),
       );
@@ -2054,6 +2063,10 @@ export class MindMapCanvas {
   }
 
   private editOnDoubleTap(node: MindNode): void {
+    if (this.opts.onOpenFile) {
+      this.opts.onOpenFile();
+      return;
+    }
     if (!this.opts.editable) {
       if (!this.opts.embedded) return;
       this.setEditable(true);
