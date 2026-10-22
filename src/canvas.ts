@@ -1148,7 +1148,6 @@ export class MindMapCanvas {
       ev.stopPropagation();
       const start = this.boxTitleStart.get(el);
       if (!start || this.editingBox === start) return;
-      this.selectBoxMembers(start);
       this.showContextMenu(this.opts.editable ? this.boxMenuEntries(start) : [], ev);
     });
     this.nodesEl.append(el);
@@ -1956,8 +1955,8 @@ export class MindMapCanvas {
       }
       // 外框里的空白处：外框自己的菜单（加 / 改标题、移除）
       const box = this.opts.editable ? this.boxAt(ev.clientX, ev.clientY) : null;
+      // 只弹菜单不改选中：选中会把节点浮动工具栏也带出来，和菜单叠在一起
       if (box && this.editingBox !== box) {
-        this.selectBoxMembers(box);
         this.showContextMenu(this.boxMenuEntries(box), ev);
         return;
       }
