@@ -1494,3 +1494,36 @@
 
 /* 右键菜单开着时藏起节点浮动工具栏，关掉菜单再回来 */
 .mm-root.is-menu-open .mm-nodebar { visibility: hidden; }
+
+/* ---------- 背诵模式（只改显示，不写文件） ---------- */
+/* 复习时用不上编辑工具栏，点题目也不让它盖住选项 */
+.mm-root.is-recite .mm-nodebar { visibility: hidden; }
+/* ==高亮== 遮成一道横线，点一下揭开 */
+.mm-root.is-recite .mm-label mark:not(.is-revealed) {
+  color: transparent;
+  background: rgba(127, 127, 127, 0.12);
+  box-shadow: inset 0 -1.5px 0 var(--mm-selection);
+  cursor: pointer;
+}
+.mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
+.mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
+/* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
+.mm-root.is-recite .mm-node.is-question { cursor: pointer; }
+.mm-root.is-recite .mm-task { cursor: default; }
+.mm-root.is-recite .mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }
+.mm-root.is-recite .mm-node.is-option.is-option-shown.is-correct { box-shadow: 0 0 0 2px #2fb344; }
+.mm-root.is-recite .mm-node.is-option.is-option-shown.is-correct .mm-task { background: #2fb344; border-color: #2fb344; opacity: 1; }
+.mm-root.is-recite .mm-node.is-option.is-option-shown:not(.is-correct) { opacity: 0.4; }
+.mm-root.is-recite .mm-node.is-question[data-multi]::after {
+  content: attr(data-multi);
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--mm-selection);
+  background: color-mix(in srgb, var(--mm-selection) 14%, transparent);
+}
+

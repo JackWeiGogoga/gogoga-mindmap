@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { noAutoplay, setFrameSize, TOKEN_RE } from "../../src/inline";
+import { noAutoplay, setFrameSize, taskState, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -173,4 +173,14 @@ test("反斜杠转义：只留后面的标点，并且先于以那个标点开�
   assert.deepEqual(tokens(String.raw`C:\Users`), []);
   assert.deepEqual(tokens("`a\\*b`"), [[12, "`a\\*b`"]]);
   assert.deepEqual(tokens(String.raw`$\frac{1}{2}$`), [[5, String.raw`$\frac{1}{2}$`]]);
+});
+
+test("选择题选项：[x] 正确、[ ] 错误，前面可以有标记 emoji，其余不算选项", () => {
+  assert.equal(taskState("[x] 鲸鱼"), "done");
+  assert.equal(taskState("[X] 鲸鱼"), "done");
+  assert.equal(taskState("[ ] 鲨鱼"), "todo");
+  assert.equal(taskState("🚩 [x] 蝙蝠"), "done");
+  assert.equal(taskState("鲸鱼"), null);
+  assert.equal(taskState("[x]没有空格"), null);
+  assert.equal(taskState("[[链接]]"), null);
 });

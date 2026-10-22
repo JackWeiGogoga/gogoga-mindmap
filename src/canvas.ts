@@ -48,6 +48,7 @@ import {
   setFrameSize,
   setImageWidth,
   splitMarkers,
+  taskState,
   toEditableText,
   toggleMarker,
   toggleTask,
@@ -194,6 +195,7 @@ const ICONS: Record<string, string> = {
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
   down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
@@ -313,6 +315,11 @@ export class MindMapCanvas {
   private layout: LayoutResult | null = null;
   private els = new Map<string, HTMLElement>();
   private sizes = new Map<string, Size>();
+  private recite = false;
+  private reciteButton: HTMLElement | null = null;
+  /** 背诵模式下已揭晓答案的题目 */
+  private revealedQuestions = new Set<string>();
+  private reciteDown: { x: number; y: number } | null = null;
   /** 撤掉同层对齐之前量到的宽高；对齐在它的基础上算 */
   private naturalSizes = new Map<string, Size>();
   /** 被同层对齐写过 style.width 的节点 */
@@ -758,6 +765,8 @@ export class MindMapCanvas {
     this.closePopover();
     this.editing = null;
     this.rebuild();
+    // 背诵模式的「多选」标签会改变节点宽度，得在测量之前挂上
+    if (this.recite) this.applyRecite();
     this.reflow();
     // 代码块嵌入首次渲染时容器高度还是 0（真正的高度要等 onLayout 下一帧才写上去），
     // 这时 fit 量不出东西。失败就别置 hasView，等 ResizeObserver 拿到高度再适应一次。
@@ -867,7 +876,8 @@ export class MindMapCanvas {
           onImageLoad: () => this.scheduleReflow(),
           onTag: (tag) => this.opts.host?.openTag?.(tag),
           onTaskToggle: () => {
-            if (!this.opts.editable) return;
+            // 背诵模式下勾选框是题目的答案，点了不能改
+            if (!this.opts.editable || this.recite) return;
             node.text = toggleTask(node.text);
             this.render();
             this.notify();
@@ -1512,9 +1522,72 @@ export class MindMapCanvas {
       bar.append(sep3);
     }
     btn("search", t("canvas.search", { key: sc("Mod", "F") }), () => this.openSearch());
+    this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
+    this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
     this.el.append(bar);
     this.updateZoomLabel();
+  }
+
+  // ---------- 背诵模式 ----------
+
+  /**
+   * 背诵模式：只改显示，不写进文件。==高亮== 遮成横线，点一下揭开；子节点带 [x] / [ ] 的节点
+   * 是选择题，选项一律显示成没勾的样子，点题目揭晓（[x] 变绿、[ ] 变淡），两个以上正确选项标「多选」
+   */
+  isRecite(): boolean {
+    return this.recite;
+  }
+
+  setRecite(on: boolean): void {
+    if (this.recite === on) return;
+    this.recite = on;
+    this.revealedQuestions.clear();
+    this.el.classList.toggle("is-recite", on);
+    this.reciteButton?.classList.toggle("is-active", on);
+    for (const m of this.el.querySelectorAll(".mm-label mark.is-revealed")) m.classList.remove("is-revealed");
+    this.render();
+  }
+
+  /** 按当前的树给题目和选项挂上 class；只在背诵模式下有样式，关掉后留着也不影响 */
+  private applyRecite(): void {
+    if (!this.doc) return;
+    walk(this.doc.root, (q) => {
+      const qEl = this.els.get(q.id);
+      const options = q.children.map((c) => ({ c, state: taskState(c.text) })).filter((o) => o.state);
+      if (qEl) {
+        qEl.classList.toggle("is-question", options.length > 0);
+        const multi = options.filter((o) => o.state === "done").length > 1;
+        if (multi) qEl.dataset.multi = t("canvas.multiChoice");
+        else delete qEl.dataset.multi;
+      }
+      const shown = this.revealedQuestions.has(q.id);
+      for (const { c, state } of options) {
+        const el = this.els.get(c.id);
+        if (!el) continue;
+        el.classList.add("is-option");
+        el.classList.toggle("is-correct", state === "done");
+        el.classList.toggle("is-option-shown", shown);
+      }
+    });
+  }
+
+  /** 背诵模式下的单击：点到遮住的高亮就揭开 / 盖回；点到题目就揭晓 / 收起答案 */
+  private onReciteClick(ev: MouseEvent): void {
+    if (!this.recite || this.editing) return;
+    const down = this.reciteDown;
+    if (down && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > DRAG_THRESHOLD) return;
+    const target = ev.target as HTMLElement;
+    const mark = target.closest<HTMLElement>(".mm-label mark");
+    if (mark) {
+      mark.classList.toggle("is-revealed");
+      return;
+    }
+    const nodeEl = target.closest<HTMLElement>(".mm-node.is-question");
+    const q = nodeEl ? this.nodeFromEl(nodeEl) : null;
+    if (!q) return;
+    if (!this.revealedQuestions.delete(q.id)) this.revealedQuestions.add(q.id);
+    this.applyRecite();
   }
 
   private changeStructure(s: Structure): void {
@@ -1938,6 +2011,10 @@ export class MindMapCanvas {
     });
 
     this.on(el, "keydown", (ev) => this.onKeyDown(ev));
+
+    // 背诵模式：单击揭开遮住的高亮或题目答案；拖动过的不算
+    this.on(el, "pointerdown", (ev) => (this.reciteDown = { x: ev.clientX, y: ev.clientY }), { capture: true });
+    this.on(el, "click", (ev) => this.onReciteClick(ev));
 
     this.on(el, "contextmenu", (ev) => {
       const target = ev.target as HTMLElement;

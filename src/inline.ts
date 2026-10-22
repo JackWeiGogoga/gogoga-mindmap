@@ -75,6 +75,12 @@ export function toggleTask(text: string, mode: "cycle" | "add-remove" = "cycle")
   return [...markers, body].join(" ");
 }
 
+/** 节点是不是一个选择题选项：[x] 是正确选项，[ ] 是错误选项，不是选项返回 null */
+export function taskState(text: string): "done" | "todo" | null {
+  const m = TASK_RE.exec(splitMarkers(text).rest);
+  return m ? (m[1] === " " ? "todo" : "done") : null;
+}
+
 const WIKILINK_ONLY = /^\s*\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*$/;
 
 /** 标签整个就是一个 wiki 链接时，返回目标与别名 */

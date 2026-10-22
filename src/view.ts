@@ -89,6 +89,10 @@ export class MindMapView extends TextFileView {
     if (n?.children.length) this.canvas?.toggleFold(n);
   }
 
+  toggleRecite(): void {
+    this.canvas?.setRecite(!this.canvas.isRecite());
+  }
+
   fitSelectedBranch(): void {
     const n = this.canvas?.getPrimary();
     if (n) this.canvas?.fitBranch(n);
