@@ -797,7 +797,7 @@
 /* ---------- 折叠菜单 ---------- */
 
 /* 编辑节点时 [[ 的链接候选 */
-.mm-root .mm-link-suggest { min-width: 220px; max-width: 360px; z-index: 6; }
+.mm-root .mm-link-suggest { min-width: 220px; max-width: 360px; max-height: 320px; overflow-y: auto; z-index: 6; }
 .mm-link-suggest-item {
   display: flex;
   flex-direction: column;

@@ -172,6 +172,10 @@ export interface ViewState {
   k: number;
 }
 
+/** 链接补全最多列多少条；超出一屏的滚动查看 */
+const LINK_SUGGEST_MAX = 50;
+const NAME_COLLATOR = new Intl.Collator("zh-Hans-u-co-pinyin", { numeric: true, sensitivity: "base" });
+
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3;
 const FIT_PADDING = 48;
@@ -3042,12 +3046,16 @@ export class MindMapCanvas {
     const scored: { t: LinkTarget; s: number }[] = [];
     for (const t of host.listLinkTargets()) {
       const name = t.name.toLowerCase();
-      const m = !q ? 2 : name.startsWith(q) ? 0 : name.includes(q) ? 1 : `${t.folder}/${name}`.toLowerCase().includes(q) ? 2 : -1;
+      // 完全同名 → 以输入开头 → 包含输入 → 路径里包含；附件排在同档笔记后面
+      const m = !q ? 0 : name === q ? 0 : name.startsWith(q) ? 1 : name.includes(q) ? 2 : `${t.folder}/${name}`.toLowerCase().includes(q) ? 3 : -1;
       if (m >= 0) scored.push({ t, s: m + (t.isNote ? 0 : 0.5) });
-      if (!q && scored.length >= 8) break;
+      if (!q && scored.length >= LINK_SUGGEST_MAX) break;
     }
-    // 排序稳定：同分保持「最近修改」的先后
-    const items = scored.sort((a, b) => a.s - b.s).slice(0, 8).map((x) => x.t);
+    // 没输入时按最近修改（listLinkTargets 已排好，sort 稳定）；有输入时同档按名称，中文按拼音
+    const items = scored
+      .sort((a, b) => a.s - b.s || (q ? NAME_COLLATOR.compare(a.t.name, b.t.name) : 0))
+      .slice(0, LINK_SUGGEST_MAX)
+      .map((x) => x.t);
     if (!items.length) return this.closeLinkSuggest();
     if (!this.linkSuggest) {
       const el = createDiv();
@@ -3098,6 +3106,12 @@ export class MindMapCanvas {
       }
       s.el.append(row);
     });
+    // 列表能滚动：上下键选到哪儿就滚到哪儿。只滚列表自己，scrollIntoView 会连画布一起挪
+    const active = s.el.children[s.index] as HTMLElement | undefined;
+    if (active) {
+      if (active.offsetTop < s.el.scrollTop) s.el.scrollTop = active.offsetTop;
+      else if (active.offsetTop + active.offsetHeight > s.el.scrollTop + s.el.clientHeight) s.el.scrollTop = active.offsetTop + active.offsetHeight - s.el.clientHeight;
+    }
   }
 
   private chooseLinkSuggest(index: number): void {
