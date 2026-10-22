@@ -1491,3 +1491,6 @@
   .mm-theme-preview-canvas { height: 280px; flex: none; }
 }
 .mm-theme-preview .mm-toolbar { display: none; }
+
+/* 右键菜单开着时藏起节点浮动工具栏，关掉菜单再回来 */
+.mm-root.is-menu-open .mm-nodebar { visibility: hidden; }

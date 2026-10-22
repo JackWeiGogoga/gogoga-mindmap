@@ -73,7 +73,8 @@ export interface CanvasHost {
   /** 把图片链接解析成 src */
   resolveImage?: (link: string) => string | null;
   /** 原生右键菜单（Obsidian 的 Menu）；没有就用画布自带的 */
-  showMenu?: (entries: MenuEntry[], ev: MouseEvent) => void;
+  /** onClose：菜单关掉时调用（画布借此在菜单开着时藏起节点浮动工具栏） */
+  showMenu?: (entries: MenuEntry[], ev: MouseEvent, onClose?: () => void) => void;
   /** 点了 #标签 */
   openTag?: (tag: string) => void;
   /** 正在被拖进来的 vault 文件（Obsidian 内部拖拽没有标准 dataTransfer） */
@@ -3510,8 +3511,11 @@ export class MindMapCanvas {
   // ---------- 右键菜单 ----------
 
   private showContextMenu(entries: MenuEntry[], ev: MouseEvent): void {
+    // 右键节点要先选中它，选中又会弹出浮动工具栏，和菜单叠在一起；菜单开着时先藏起来
+    this.el.classList.add("is-menu-open");
+    const onClose = () => this.el.classList.remove("is-menu-open");
     if (this.opts.host?.showMenu) {
-      this.opts.host.showMenu(entries, ev);
+      this.opts.host.showMenu(entries, ev, onClose);
       return;
     }
     const items = entries.filter((e) => !e.separator && e.title && !e.disabled).map((e) => ({ label: e.title!, active: e.checked, run: () => e.run?.() }));
@@ -3520,6 +3524,7 @@ export class MindMapCanvas {
     this.contextMenu = this.buildMenu(items, null, () => {
       this.contextMenu?.remove();
       this.contextMenu = null;
+      onClose();
     }, { x: ev.clientX - host.left, y: ev.clientY - host.top });
   }
   private contextMenu: HTMLElement | null = null;

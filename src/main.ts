@@ -639,8 +639,9 @@ export default class MindMapPlugin extends Plugin {
         const file = this.app.metadataCache.getFirstLinkpathDest(link.split("#")[0], sourcePath());
         return file ? this.app.vault.getResourcePath(file) : null;
       },
-      showMenu: (entries, ev) => {
+      showMenu: (entries, ev, onClose) => {
         const menu = new Menu();
+        if (onClose) menu.onHide(onClose);
         for (const e of entries) {
           if (e.separator) {
             menu.addSeparator();
