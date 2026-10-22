@@ -1844,7 +1844,11 @@ export class MindMapCanvas {
       el,
       "wheel",
       (ev) => {
-        if ((ev.target as HTMLElement).closest(".mm-popover")) return;
+        // 备注弹窗、链接补全这类菜单自己能滚，滚轮留给它们，不拿去平移缩放画布
+        if ((ev.target as HTMLElement).closest(".mm-popover, .mm-menu")) {
+          if (this.opts.embedded) ev.stopPropagation();
+          return;
+        }
         ev.preventDefault();
         if (this.opts.embedded) ev.stopPropagation();
         const scale = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
