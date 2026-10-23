@@ -152,17 +152,40 @@
   font-size: 13px;
   line-height: 18px;
   color: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: default;
   user-select: none;
 }
+/* 省略号放在里面的文字上：外层不能裁切，不然边缘的拖动竖条会被切掉 */
+.mm-summary-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mm-summary.is-empty { opacity: 0.5; }
+/* 拖过宽度的：按宽度换行，不再省略号 */
+.mm-summary.has-width { max-width: none; }
+.mm-summary.has-width .mm-summary-text { white-space: normal; overflow-wrap: anywhere; }
+.mm-summary .mm-link { color: var(--link-color, var(--mm-selection)); }
+.mm-summary-handle {
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 6px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 3px;
+  background: var(--mm-selection);
+  cursor: ew-resize;
+  opacity: 0;
+}
+.mm-summary[data-side="left"] .mm-summary-handle { right: auto; left: -4px; }
+.mm-root.is-editable .mm-summary:hover .mm-summary-handle { opacity: 0.8; }
+.mm-summary.is-editing .mm-summary-handle { display: none; }
 .mm-root.is-editable .mm-summary { cursor: pointer; }
+.mm-summary.is-editing .mm-summary-text { overflow: visible; text-overflow: clip; }
 .mm-summary.is-editing {
-  overflow: visible;
-  text-overflow: clip;
+  max-width: none;
   cursor: text;
   user-select: text;
   outline: 2px solid var(--mm-selection);

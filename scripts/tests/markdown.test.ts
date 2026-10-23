@@ -484,3 +484,24 @@ test("概要标记：summary / summary=N / 带文字，与外框、颜色共存�
   // 不认识的词不算标记
   assert.equal(splitMarker("x %%summaryx%%").text, "x %%summaryx%%");
 });
+
+test("概要文字可以是 Markdown（链接里的 %E4 编码不截断标记），sw=宽度往返；%% 和 \" 写不进去", async () => {
+  const { markerText, formatMarker } = await import("../../src/markdown");
+  const md = `# R
+
+## A %%summary=2 "看 [说明](https://a.cn/%E4%B8%AD) 和 **重点**" sw=240%%
+
+## B
+`;
+  const doc = parseMarkdown(md, { fallbackTitle: "R" });
+  const a = doc.root.children[0];
+  assert.equal(a.text, "A");
+  assert.deepEqual(a.summary, { span: 2, text: "看 [说明](https://a.cn/%E4%B8%AD) 和 **重点**", width: 240 });
+  assert.equal(serializeMarkdown(doc), md);
+  // 正文里本来就有的百分号不受影响
+  const p = parseMarkdown("# R\n\n## 涨了 50% %%red%%\n", { fallbackTitle: "R" }).root.children[0];
+  assert.equal(p.text, "涨了 50%");
+  assert.equal(p.color, "red");
+  assert.equal(markerText('a"b%%c%d'), "ab%c%d");
+  assert.equal(formatMarker({ folded: false, summary: { span: 1, text: 'x"%%y' } }), ' %%summary "x%y"%%');
+});

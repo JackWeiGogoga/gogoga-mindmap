@@ -59,7 +59,7 @@ import {
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
-import { COLOR_NAMES, convertLevelKind, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
+import { COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
@@ -1295,10 +1295,17 @@ export class MindMapCanvas {
           }
           this.summaryStart.set(el, c);
           if (this.editingSummary !== c) {
-            const text = c.summary.text || t("canvas.summaryDefault");
-            if (el.textContent !== text) el.textContent = text;
+            const raw = c.summary.text || t("canvas.summaryDefault");
+            const textEl = el.querySelector<HTMLElement>(".mm-summary-text")!;
+            if (el.dataset.raw !== raw) {
+              el.dataset.raw = raw;
+              renderInline(textEl, raw, this.summaryInlineOptions());
+            }
             el.classList.toggle("is-empty", !c.summary.text);
           }
+          const w = c.summary.width;
+          el.classList.toggle("has-width", !!w);
+          el.setCssStyles({ width: w ? `${w}px` : "" });
         }
         visit(c);
       }
@@ -1311,15 +1318,43 @@ export class MindMapCanvas {
     }
   }
 
+  /** 概要文字和节点文字用同一套行内 Markdown：链接能点、能悬停预览，公式、图片也照样渲染 */
+  private summaryInlineOptions(): Parameters<typeof renderInline>[2] {
+    return {
+      onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
+      onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
+      renderMath: this.opts.host?.renderMath,
+      resolveImage: this.opts.host?.resolveImage,
+      onImageLoad: () => this.scheduleReflow(),
+      onTag: (tag) => this.opts.host?.openTag?.(tag),
+    };
+  }
+
   private createSummaryLabel(): HTMLElement {
     const el = createDiv();
     el.className = "mm-summary";
-    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    el.addEventListener("click", (ev) => {
+    el.createSpan({ cls: "mm-summary-text" });
+    // 外侧边缘的小竖条：拖动改宽度，双击恢复自适应
+    const handle = el.createDiv({ cls: "mm-summary-handle" });
+    handle.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const start = this.summaryStart.get(el);
+      if (start && this.opts.editable) this.dragSummaryWidth(start, el, handle, ev);
+    });
+    // 拖完松手那一下的 click 别冒到文字框上（那会选中括住的节点、弹出工具栏）
+    handle.addEventListener("click", (ev) => ev.stopPropagation());
+    handle.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
       const start = this.summaryStart.get(el);
-      if (start && this.editingSummary !== start) this.selectMembers(start, start.summary?.span ?? 1);
+      if (!start?.summary?.width || !this.opts.editable) return;
+      start.summary.width = undefined;
+      this.render();
+      this.notify();
     });
+    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    // 单击不选中括住的节点：选中会弹出节点工具栏，常常正好盖在概要上，双击的第二下就点到工具栏去了
+    el.addEventListener("click", (ev) => ev.stopPropagation());
     el.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
       const start = this.summaryStart.get(el);
@@ -1371,6 +1406,7 @@ export class MindMapCanvas {
       if (!s.label) return;
       const el = this.summaryLabels.get(s.start.id);
       if (!el) return;
+      if (el.dataset.side !== s.side) el.dataset.side = s.side;
       el.setCssStyles({ left: `${round2(s.label.x)}px`, top: `${round2(s.label.y)}px` });
     });
     for (let i = list.length; i < this.summaryPaths.length; i++) {
@@ -1382,15 +1418,6 @@ export class MindMapCanvas {
   private summaryOf(node: MindNode): MindNode | null {
     if (!node.parent) return null;
     return summaryGroups(node.parent.children).get(node.id) ?? null;
-  }
-
-  private selectMembers(start: MindNode, span: number): void {
-    const siblings = start.parent?.children ?? [start];
-    const i = siblings.indexOf(start);
-    const members = siblings.slice(i, i + Math.max(1, span));
-    this.select(members[0]);
-    for (const m of members.slice(1)) this.select(m, "add");
-    this.positionNodebar();
   }
 
   private summaryMenuEntries(start: MindNode): MenuEntry[] {
@@ -1455,12 +1482,15 @@ export class MindMapCanvas {
   editSummary(start: MindNode, isNew = false): void {
     if (!this.opts.editable || !start.summary) return;
     const before = start.summary.text;
-    const el = this.summaryLabels.get(start.id);
-    if (!el) return;
+    const label = this.summaryLabels.get(start.id);
+    const el = label?.querySelector<HTMLElement>(".mm-summary-text");
+    if (!label || !el) return;
     this.editingSummary = start;
-    el.classList.remove("is-empty");
+    label.classList.remove("is-empty");
+    // 编辑时显示 Markdown 原文，改完再渲染
     el.textContent = before || t("canvas.summaryDefault");
-    el.classList.add("is-editing");
+    delete label.dataset.raw;
+    label.classList.add("is-editing");
     el.setAttribute("contenteditable", "plaintext-only");
     if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
     el.focus();
@@ -1478,10 +1508,10 @@ export class MindMapCanvas {
       el.removeEventListener("blur", onBlur);
       el.removeEventListener("input", onInput);
       el.removeAttribute("contenteditable");
-      el.classList.remove("is-editing");
+      label.classList.remove("is-editing");
       this.editingSummary = null;
       if (!start.summary) return;
-      const text = commit ? (el.textContent ?? "").replace(/["%\r\n]/g, "").trim() : before;
+      const text = commit ? markerText(el.textContent ?? "") : before;
       // 概要就是为了那段文字：清空了（或新加的按了 Esc）就整个去掉
       if (!text && (commit || isNew)) start.summary = undefined;
       else start.summary.text = text;
@@ -1505,6 +1535,34 @@ export class MindMapCanvas {
     el.addEventListener("keydown", onKey);
     el.addEventListener("blur", onBlur);
     el.addEventListener("input", onInput);
+  }
+
+  /** 拖概要文字框外侧的竖条改宽度；朝外拖变宽。组织结构图里文字居中，两边一起长，所以按两倍算 */
+  private dragSummaryWidth(start: MindNode, el: HTMLElement, handle: HTMLElement, down: PointerEvent): void {
+    if (!start.summary) return;
+    const side = el.dataset.side;
+    const dir = side === "left" ? -1 : 1;
+    const factor = side === "down" ? 2 : 1;
+    const startW = el.offsetWidth;
+    const before = start.summary.width;
+    handle.setPointerCapture(down.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (!start.summary) return;
+      const dx = ((ev.clientX - down.clientX) / this.k) * dir * factor;
+      start.summary.width = Math.round(Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, startW + dx)));
+      el.classList.add("has-width");
+      el.setCssStyles({ width: `${start.summary.width}px` });
+      this.reflow();
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      if (start.summary && start.summary.width !== before) this.notify();
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
   }
 
   /** 原地编辑外框标题；没有标题时先给个默认字样并全选，清空即去掉标题 */

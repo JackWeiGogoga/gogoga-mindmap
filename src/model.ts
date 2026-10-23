@@ -50,7 +50,10 @@ export interface Boundary {
 export interface Summary {
   /** 括住的兄弟数，含本节点，至少 1 */
   span: number;
+  /** 行内 Markdown（链接、加粗……），不能含 " 和 %% */
   text: string;
+  /** 拖出来的文字框宽度（px），文字按它换行；没有就按内容自适应。%%sw=240%% */
+  width?: number;
 }
 
 export interface DocStyle {

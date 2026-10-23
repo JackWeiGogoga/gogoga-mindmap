@@ -20,7 +20,8 @@ export type ColorName = (typeof COLOR_NAMES)[number];
 const HEADING_RE = /^(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
 const LIST_RE = /^([ \t]*)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
 const FENCE_RE = /^[ \t]{0,3}(`{3,}|~{3,})/;
-const MARKER_RE = /[ \t]*%%[ \t]*([^%]*?)[ \t]*%%[ \t]*$/;
+// 标记里允许单个 %（概要文字里的链接会有 %E4 这种编码），只有 %% 才是注释的结尾
+const MARKER_RE = /[ \t]*%%[ \t]*((?:[^%]|%(?!%))*?)[ \t]*%%[ \t]*$/;
 const BLOCK_ID_RE = /[ \t]+\^([A-Za-z0-9-]+)[ \t]*$/;
 
 /** 摘出行尾的 Obsidian 块 id（^abc123） */
@@ -53,8 +54,13 @@ interface Marker {
   side?: "left" | "right";
 }
 
-/** 标记里的一项：box、box=3、summary=2 可带一个 "文字"（文字里不能有 " 和 %），其余按空白切 */
-const MARKER_TOKEN_RE = /(box|summary)(?:=(\d+))?(?:[ \t]*"([^"%]*)")?(?=\s|$)|\S+/g;
+/** 标记里的一项：box、box=3、summary=2 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
+const MARKER_TOKEN_RE = /(box|summary)(?:=(\d+))?(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|\S+/g;
+
+/** 写进标记的文字：去掉会截断标记的 " 和 %%（单个 % 留着） */
+export function markerText(s: string): string {
+  return s.replace(/"/g, "").replace(/%{2,}/g, "%").replace(/[\r\n]+/g, " ").trim();
+}
 
 /** 从标签末尾摘出我们认识的 %% 标记；不认识的注释原样留在文本里 */
 export function splitMarker(text: string): { text: string; marker: Marker } {
@@ -63,6 +69,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   if (!m) return { text: text.trimEnd(), marker };
   const tokens = [...m[1].matchAll(MARKER_TOKEN_RE)];
   if (tokens.length === 0) return { text: text.trimEnd(), marker };
+  let sw: number | undefined;
   for (const tok of tokens) {
     const t = tok[0];
     const lower = t.toLowerCase();
@@ -70,6 +77,8 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       marker.box = { span: Math.max(1, Number(tok[2] ?? 1)), title: tok[3]?.trim() ?? "" };
     } else if (tok[1] === "summary") {
       marker.summary = { span: Math.max(1, Number(tok[2] ?? 1)), text: tok[3]?.trim() ?? "" };
+    } else if (/^sw=\d{1,6}$/.test(lower)) {
+      sw = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(3))));
     } else if (/^w=\d{1,6}$/.test(lower)) {
       marker.width = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(2))));
     } else if (lower === "left" || lower === "right") {
@@ -80,6 +89,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
     else if (HEX_RE.test(t)) marker.color = lower.startsWith("#") ? lower : `#${lower}`;
     else return { text: text.trimEnd(), marker: { folded: false } };
   }
+  if (sw && marker.summary) marker.summary.width = sw;
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
@@ -94,8 +104,9 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
     parts.push(`box${node.box.span > 1 ? `=${node.box.span}` : ""}${title ? ` "${title}"` : ""}`);
   }
   if (node.summary) {
-    const text = node.summary.text.replace(/["%]/g, "").trim();
+    const text = markerText(node.summary.text);
     parts.push(`summary${node.summary.span > 1 ? `=${node.summary.span}` : ""}${text ? ` "${text}"` : ""}`);
+    if (node.summary.width) parts.push(`sw=${Math.round(node.summary.width)}`);
   }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
