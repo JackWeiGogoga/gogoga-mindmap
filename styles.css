@@ -1591,3 +1591,6 @@
   background: color-mix(in srgb, var(--mm-selection) 14%, transparent);
 }
 
+/* 白板卡片里的嵌入脑图：铺满卡片 */
+.mm-file-embed.mm-in-canvas { height: 100%; }
+.mm-file-embed.mm-in-canvas > .mm-codeblock { height: 100% !important; }
