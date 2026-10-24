@@ -169,7 +169,7 @@ A paragraph here becomes the central topic's note.
 | Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
 
-These keys are handled by the map itself. Adding a child or sibling, inserting before, editing, deleting, deleting only the node, moving up or down, promoting, demoting and expanding all sub-branches, as well as folding, showing down to a level, zooming to a branch, boundaries and summaries, are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map"), for example to match XMind. The built-in keys keep working. Enter and Tab combined with ⌘ / Ctrl / Alt are left free for your own bindings.
+These keys are handled by the map itself. Adding a child or sibling, inserting before, editing, deleting, deleting only the node, moving up or down, promoting, demoting and expanding all sub-branches, as well as folding, showing down to a level, zooming to a branch, boundaries and summaries, are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map"), for example to match XMind. The built-in keys keep working; a key you bind to one of these commands takes priority, even Tab or Enter.
 
 The node context menu also has "Insert sibling before", "Expand all sub-branches", "Show next level only" and "Delete this node only", so you don't need to remember the keys.
 
