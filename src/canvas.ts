@@ -152,6 +152,8 @@ export interface CanvasOptions {
   wheelZoom?: () => boolean;
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
   marqueeDrag?: () => boolean;
+  /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
+  ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -2536,6 +2538,8 @@ export class MindMapCanvas {
     const mod = ev.metaKey || ev.ctrlKey;
     const target = ev.target as HTMLElement;
     if (target.closest(".mm-search")) return;
+    // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
+    if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {
       if (ev.key === "Escape" || (ev.key === "Enter" && mod)) {
         ev.preventDefault();
@@ -2564,8 +2568,6 @@ export class MindMapCanvas {
       }
     }
     if (this.editing) {
-      // 带 ⌘/Ctrl/Alt 的 Enter、Tab 不占，留给用户在快捷键设置里绑的命令（命令会先提交编辑）
-      if ((ev.key === "Enter" || ev.key === "Tab") && (mod || ev.altKey)) return;
       if (ev.key === "Enter" && !ev.shiftKey) {
         ev.preventDefault();
         this.commitEdit();
@@ -2697,20 +2699,19 @@ export class MindMapCanvas {
         this.startEdit(sel);
         return;
       case "Tab":
-        if (!this.opts.editable || mod || ev.altKey) return;
+        if (!this.opts.editable) return;
         ev.preventDefault();
         this.addChildToSelected();
         return;
       case "Enter":
-        // 带 ⌘/Ctrl/Alt 的组合不占，用户可以把它们绑给命令
-        if (!this.opts.editable || mod || ev.altKey) return;
+        if (!this.opts.editable) return;
         ev.preventDefault();
         if (!sel.parent) this.addChildToSelected();
         else this.addSiblingToSelected(ev.shiftKey);
         return;
       case "Delete":
       case "Backspace":
-        if (!this.opts.editable || ev.altKey) return;
+        if (!this.opts.editable) return;
         ev.preventDefault();
         // ⌘⌫ 只删这一个节点，子节点接到它原来的位置
         if (mod) this.deleteOnlySelected();

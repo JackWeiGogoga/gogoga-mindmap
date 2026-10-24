@@ -632,6 +632,28 @@ export default class MindMapPlugin extends Plugin {
     if (failed) throw new Error(t("error.blockNotFound"));
   }
 
+  /**
+   * 按键是否命中用户给本插件命令设的快捷键。读的是 Obsidian 内部的 hotkeyManager（没有公开 API），
+   * 读不到就当没有，画布按原来的方式处理
+   */
+  isOwnHotkey(ev: KeyboardEvent): boolean {
+    const hm = (this.app as unknown as { hotkeyManager?: { bakedIds?: string[]; bakedHotkeys?: { modifiers: string; key: string }[] } }).hotkeyManager;
+    const ids = hm?.bakedIds;
+    const keys = hm?.bakedHotkeys;
+    if (!ids || !keys) return false;
+    const mods = [ev.altKey && "Alt", ev.ctrlKey && "Ctrl", ev.metaKey && "Meta", ev.shiftKey && "Shift"].filter(Boolean).join(",");
+    const key = ev.key.toLowerCase();
+    // Alt 组合在 macOS 上 ev.key 是变形字符，再按物理键比一次
+    const code = ev.code.replace(/^(Key|Digit)/, "").toLowerCase();
+    const prefix = `${this.manifest.id}:`;
+    return ids.some((id, i) => {
+      const hk = keys[i];
+      if (!id.startsWith(prefix) || !hk || hk.modifiers !== mods) return false;
+      const k = hk.key.toLowerCase();
+      return k === key || k === code;
+    });
+  }
+
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
       renderNote: (el, markdown) => {
