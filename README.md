@@ -79,6 +79,7 @@ To show a mind map you already have, embed the file like any other note: `![[Pro
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color and delete apply to the whole group.
+  Coming from XMind? Set Settings → Left-drag on empty space to "Select": a plain left-drag draws the selection box, right- or middle-drag pans, and a right-click on empty space still opens the menu.
 - Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back.
 - ⌘F searches nodes: matches are highlighted, Enter / Shift+Enter jump between results and center them, and collapsed ancestors expand automatically.
 - ⌘C / ⌘X / ⌘V copy, cut, and paste subtrees. The clipboard holds Markdown as an indented list, so you can paste it anywhere.
@@ -150,6 +151,7 @@ A paragraph here becomes the central topic's note.
 | Enter | Add sibling node (adds a child on the root node); Shift+Enter inserts before |
 | Double-click / Space / F2 | Edit; Enter to commit, Esc to cancel |
 | Delete / Backspace | Delete the selected nodes and their subtrees |
+| ⌘⌫ | Delete only the selected node; its children move up into its place |
 | ⌘F | Search nodes; Enter / Shift+Enter to jump |
 | ⌘C / ⌘X / ⌘V | Copy / cut / paste subtree |
 | Shift+Enter (while editing) | Line break inside a node |
@@ -162,11 +164,14 @@ A paragraph here becomes the central topic's note.
 | 1–9 / 0 | Show only N levels below the selected node / expand its whole branch; other branches stay as they are. With the central topic (or nothing) selected it applies to the whole map and fits the view |
 | ⌘⇧0 | Zoom to the selected branch |
 
-These keys are handled by the map itself. Folding, showing down to a level, zooming to a branch and toggling a boundary are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map").
 | Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch; the view follows when the selection leaves the screen) |
 | ⌘Z / ⌘⇧Z | Undo / redo |
 | Scroll wheel / drag empty space | Pan (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
+
+These keys are handled by the map itself. Adding a child or sibling, inserting before, editing, deleting, deleting only the node, moving up or down, promoting, demoting and expanding all sub-branches, as well as folding, showing down to a level, zooming to a branch, boundaries and summaries, are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map"), for example to match XMind. The built-in keys keep working. Enter and Tab combined with ⌘ / Ctrl / Alt are left free for your own bindings.
+
+The node context menu also has "Insert sibling before", "Expand all sub-branches", "Show next level only" and "Delete this node only", so you don't need to remember the keys.
 
 ## Development
 

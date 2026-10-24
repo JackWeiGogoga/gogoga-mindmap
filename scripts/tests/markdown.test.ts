@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseMarkdown, serializeMarkdown, splitMarker } from "../../src/markdown";
-import { addChild, addSibling, moveNode, pathOf, findByPath } from "../../src/model";
+import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren } from "../../src/model";
 
 const canonical = `---
 mindmap: true
@@ -504,4 +504,47 @@ test("概要文字可以是 Markdown（链接里的 %E4 编码不截断标记）
   assert.equal(p.color, "red");
   assert.equal(markerText('a"b%%c%d'), "ab%c%d");
   assert.equal(formatMarker({ folded: false, summary: { span: 1, text: 'x"%%y' } }), ' %%summary "x%y"%%');
+});
+
+test("仅删除节点：子节点按顺序接到原位置，标题降成的列表跟随兄弟，外框跨度跟着变", () => {
+  const src = `# 根
+
+## 甲 %%box=3%%
+
+## 乙
+- 乙一
+	- 乙一一
+- 乙二
+
+## 丙
+`;
+  const doc = parseMarkdown(src);
+  const yi = findByPath(doc.root, "1")!;
+  const kids = removeNodeKeepChildren(yi, doc.style);
+  assert.deepEqual(kids.map((k) => k.text), ["乙一", "乙二"]);
+  assert.deepEqual(doc.root.children.map((c) => c.text), ["甲", "乙一", "乙二", "丙"]);
+  assert.equal(doc.root.children[0].box?.span, 4);
+  assert.equal(kids[0].depth, 1);
+  assert.equal(kids[0].children[0].depth, 2);
+  assert.equal(
+    serializeMarkdown(doc),
+    `# 根
+
+## 甲 %%box=4%%
+
+## 乙一
+- 乙一一
+
+## 乙二
+
+## 丙
+`,
+  );
+});
+
+test("仅删除没有子节点的节点等于普通删除", () => {
+  const doc = parseMarkdown(`# 根\n- 甲\n- 乙\n`);
+  const kids = removeNodeKeepChildren(findByPath(doc.root, "0")!, doc.style);
+  assert.equal(kids.length, 0);
+  assert.deepEqual(doc.root.children.map((c) => c.text), ["乙"]);
 });

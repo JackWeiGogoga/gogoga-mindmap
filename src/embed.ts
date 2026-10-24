@@ -114,6 +114,7 @@ class MindMapEmbed extends Component {
         embedded: true,
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
+        marqueeDrag: () => settings.leftDrag === "select",
         host: this.plugin.canvasHost(() => this.ctx.sourcePath, this),
         onOpenFile: () => void this.plugin.app.workspace.openLinkText(this.file.path, this.ctx.sourcePath),
         onLayout: (bounds) => {

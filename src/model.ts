@@ -243,6 +243,26 @@ export function removeNode(node: MindNode): boolean {
   return true;
 }
 
+/**
+ * 只删节点本身：子节点按原顺序接到父节点下、它原来的位置。
+ * 前面兄弟的外框 / 概要要是罩着它，改成罩住接上来的这几个。返回接上来的子节点
+ */
+export function removeNodeKeepChildren(node: MindNode, style: DocStyle): MindNode[] {
+  const parent = node.parent;
+  if (!parent) return [];
+  const idx = parent.children.indexOf(node);
+  const kids = [...node.children];
+  const extra = kids.length - 1;
+  parent.children.forEach((s, i) => {
+    if (i >= idx) return;
+    if (s.box && i + s.box.span > idx) s.box.span = Math.max(1, s.box.span + extra);
+    if (s.summary && i + s.summary.span > idx) s.summary.span = Math.max(1, s.summary.span + extra);
+  });
+  kids.forEach((c, i) => moveNode(c, parent, idx + 1 + i, style));
+  removeNode(node);
+  return kids;
+}
+
 /** 移动节点到新父节点的 index 位置；禁止移到自己的子树里 */
 export function moveNode(node: MindNode, newParent: MindNode, index: number, style: DocStyle): boolean {
   if (node === newParent || isAncestor(node, newParent) || !node.parent) return false;

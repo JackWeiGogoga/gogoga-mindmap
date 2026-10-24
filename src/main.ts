@@ -26,14 +26,14 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
-import { setLocale, t } from "./i18n";
+import { Key, setLocale, t } from "./i18n";
 import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, MindMapCanvas } from "./canvas";
+import { CanvasHost, MindMapCanvas, NodeCommand } from "./canvas";
 import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -402,6 +402,21 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
+    // 画布里的基础按键（Tab、Enter、Delete…）也注册成命令，用户可以绑成 XMind 的习惯；原来的按键照常可用
+    const nodeCommands: [string, NodeCommand, Key][] = [
+      ["add-child", "add-child", "command.addChild"],
+      ["add-sibling", "add-sibling", "command.addSibling"],
+      ["insert-before", "insert-before", "command.insertBefore"],
+      ["edit-node", "edit", "command.editNode"],
+      ["delete-node", "delete", "command.deleteNode"],
+      ["delete-node-only", "delete-only", "command.deleteNodeOnly"],
+      ["move-up", "move-up", "command.moveUp"],
+      ["move-down", "move-down", "command.moveDown"],
+      ["outdent", "outdent", "command.outdent"],
+      ["indent", "indent", "command.indent"],
+      ["expand-branch", "expand-branch", "command.expandBranch"],
+    ];
+    for (const [id, cmd, name] of nodeCommands) exportCommand(id, t(name), async (v) => v.runNodeCommand(cmd));
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
     exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());
@@ -517,6 +532,7 @@ export default class MindMapPlugin extends Plugin {
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
+        marqueeDrag: () => this.settings.leftDrag === "select",
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),
         onUndo: () => {

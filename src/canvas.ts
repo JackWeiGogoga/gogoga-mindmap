@@ -17,6 +17,7 @@ import {
   NODE_MIN_WIDTH,
   pathOf,
   removeNode,
+  removeNodeKeepChildren,
   summaryGroups,
   visibleChildren,
   walk,
@@ -149,6 +150,8 @@ export interface CanvasOptions {
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
   /** 返回 true 时滚轮直接缩放、Shift+滚轮平移；每次滚动时读取，改设置立即生效 */
   wheelZoom?: () => boolean;
+  /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
+  marqueeDrag?: () => boolean;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -162,6 +165,21 @@ export interface CanvasOptions {
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
+
+/** 画布里按键能做的节点操作，另外注册成命令，用户可以在快捷键设置里换成自己的习惯 */
+export type NodeCommand =
+  | "add-child"
+  | "add-sibling"
+  | "insert-before"
+  | "edit"
+  | "delete"
+  | "delete-only"
+  | "move-up"
+  | "move-down"
+  | "outdent"
+  | "indent"
+  | "expand-branch";
+
 /** label 用 getter：模块加载时界面语言还没定，用到时再查字典 */
 const TOOLBAR_POSITION_LABELS: { id: ToolbarPosition; readonly label: string }[] = [
   { id: "bottom", get label() { return t("toolbarPos.bottom"); } },
@@ -362,7 +380,11 @@ export class MindMapCanvas {
   private editingIsNew = false;
 
   private pointers = new Map<number, { x: number; y: number }>();
-  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean; onNode?: boolean } | null = null;
+  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean; onNode?: boolean; button?: number } | null = null;
+  /** 框选模式下右键按住拖动平移：macOS 按下就发 contextmenu，先存着，松开没拖动才弹菜单 */
+  private pendingMenu: MouseEvent | null = null;
+  /** Windows 上 contextmenu 在松开之后才来；刚拖完平移的那一下不弹菜单 */
+  private suppressMenuUntil = 0;
   private pinch: { dist: number; k: number } | null = null;
   private pendingDrag: { node: MindNode; x: number; y: number } | null = null;
   private lastTap: { node: MindNode; time: number } | null = null;
@@ -2152,16 +2174,19 @@ export class MindMapCanvas {
         }
         return;
       }
-      if (ev.button !== 0 && ev.button !== 1) return;
+      // 框选模式（XMind 的习惯）：鼠标左键拖空白处框选，右键 / 中键拖动平移；触屏、触控笔照旧拖动平移
+      const marqueeMode = ev.pointerType === "mouse" && !!this.opts.marqueeDrag?.();
+      if (ev.button !== 0 && ev.button !== 1 && !(marqueeMode && ev.button === 2)) return;
       if (this.editing) this.commitEdit();
       this.closePopover();
       this.el.focus({ preventScroll: true });
       this.capture(ev);
-      if (ev.shiftKey && ev.button === 0) {
-        this.startMarquee(ev);
+      this.pendingMenu = null;
+      if (ev.button === 0 && (ev.shiftKey || marqueeMode)) {
+        this.startMarquee(ev, ev.shiftKey || ev.metaKey || ev.ctrlKey);
         return;
       }
-      this.pan = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false };
+      this.pan = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false, button: ev.button };
     });
 
     this.on(el, "pointermove", (ev) => {
@@ -2231,8 +2256,14 @@ export class MindMapCanvas {
         this.lastTap = null;
       }
       if (this.pan) {
-        if (!this.pan.moved && !this.pan.onNode) this.select(null, "replace");
+        const { moved, onNode, button } = this.pan;
         this.pan = null;
+        if (button === 2) {
+          const menu = this.pendingMenu;
+          this.pendingMenu = null;
+          if (moved) this.suppressMenuUntil = performance.now() + 500;
+          else if (menu && ev.type === "pointerup") this.showBackgroundMenu(menu);
+        } else if (!moved && !onNode) this.select(null, "replace");
       }
       if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
     };
@@ -2332,14 +2363,13 @@ export class MindMapCanvas {
         this.showContextMenu(this.nodeMenuEntries(node), ev);
         return;
       }
-      // 外框里的空白处：外框自己的菜单（加 / 改标题、移除）
-      const box = this.opts.editable ? this.boxAt(ev.clientX, ev.clientY) : null;
-      // 只弹菜单不改选中：选中会把节点浮动工具栏也带出来，和菜单叠在一起
-      if (box && this.editingBox !== box) {
-        this.showContextMenu(this.boxMenuEntries(box), ev);
+      // 右键正按着、可能要拖动平移：等松开再决定弹不弹
+      if (this.pan?.button === 2) {
+        this.pendingMenu = ev;
         return;
       }
-      this.showContextMenu(this.backgroundMenuEntries(), ev);
+      if (performance.now() < this.suppressMenuUntil) return;
+      this.showBackgroundMenu(ev);
     });
 
     // 拖入笔记 / 图片文件
@@ -2534,6 +2564,8 @@ export class MindMapCanvas {
       }
     }
     if (this.editing) {
+      // 带 ⌘/Ctrl/Alt 的 Enter、Tab 不占，留给用户在快捷键设置里绑的命令（命令会先提交编辑）
+      if ((ev.key === "Enter" || ev.key === "Tab") && (mod || ev.altKey)) return;
       if (ev.key === "Enter" && !ev.shiftKey) {
         ev.preventDefault();
         this.commitEdit();
@@ -2665,21 +2697,24 @@ export class MindMapCanvas {
         this.startEdit(sel);
         return;
       case "Tab":
-        if (!this.opts.editable) return;
+        if (!this.opts.editable || mod || ev.altKey) return;
         ev.preventDefault();
         this.addChildToSelected();
         return;
       case "Enter":
-        if (!this.opts.editable) return;
+        // 带 ⌘/Ctrl/Alt 的组合不占，用户可以把它们绑给命令
+        if (!this.opts.editable || mod || ev.altKey) return;
         ev.preventDefault();
         if (!sel.parent) this.addChildToSelected();
         else this.addSiblingToSelected(ev.shiftKey);
         return;
       case "Delete":
       case "Backspace":
-        if (!this.opts.editable) return;
+        if (!this.opts.editable || ev.altKey) return;
         ev.preventDefault();
-        this.deleteSelected();
+        // ⌘⌫ 只删这一个节点，子节点接到它原来的位置
+        if (mod) this.deleteOnlySelected();
+        else this.deleteSelected();
         return;
       case "/":
         ev.preventDefault();
@@ -2861,7 +2896,9 @@ export class MindMapCanvas {
 
   // ---------- 框选 ----------
 
-  private startMarquee(ev: PointerEvent): void {
+  /** additive：在已有选中上追加（Shift 拖动）；否则从空选开始，点一下空白处等于取消选中 */
+  private startMarquee(ev: PointerEvent, additive = true): void {
+    if (!additive) this.select(null, "replace");
     const host = this.el.getBoundingClientRect();
     const box = createDiv();
     box.className = "mm-marquee";
@@ -3285,6 +3322,72 @@ export class MindMapCanvas {
     for (const v of victims) removeNode(v);
     const next = parent.children[Math.min(idx, parent.children.length - 1)] ?? parent;
     this.select(next);
+    this.render();
+    this.notify();
+  }
+
+  /** 命令入口：和画布里的按键做同一件事；正在编辑的文字先提交 */
+  runNodeCommand(cmd: NodeCommand): void {
+    const sel = this.primary;
+    if (!sel) return;
+    if (cmd === "expand-branch") {
+      this.setFoldLevel(null, sel);
+      return;
+    }
+    if (!this.opts.editable) return;
+    if (this.editing) this.commitEdit();
+    switch (cmd) {
+      case "add-child":
+        return this.addChildToSelected();
+      case "add-sibling":
+        if (!sel.parent) return this.addChildToSelected();
+        return this.addSiblingToSelected(false);
+      case "insert-before":
+        return this.addSiblingToSelected(true);
+      case "edit":
+        return this.startEdit(sel);
+      case "delete":
+        return this.deleteSelected();
+      case "delete-only":
+        return this.deleteOnlySelected();
+      case "move-up":
+        this.moveSibling(sel, -1);
+        break;
+      case "move-down":
+        this.moveSibling(sel, 1);
+        break;
+      case "outdent":
+        this.outdentNode(sel);
+        break;
+      case "indent":
+        this.indentNode(sel);
+        break;
+    }
+    this.ensureVisible(this.primary);
+  }
+
+  /** 只删选中的节点本身，它的子节点按原顺序接到父节点下、它原来的位置 */
+  private deleteOnlySelected(): void {
+    if (!this.doc) return;
+    const victims = [...this.selected].filter((n) => n.parent);
+    if (!victims.length) return;
+    const primary = this.primary && victims.includes(this.primary) ? this.primary : victims[0];
+    let next: MindNode | null = null;
+    for (const v of victims) {
+      const parent = v.parent;
+      if (!parent) continue;
+      const idx = parent.children.indexOf(v);
+      const kids = removeNodeKeepChildren(v, this.doc.style);
+      if (v === primary) next = kids[0] ?? parent.children[Math.min(idx, parent.children.length - 1)] ?? parent;
+    }
+    // 多选时接上来的子节点自己也可能被删了，挂不回根上的就退回根
+    const root = this.doc.root;
+    const alive = (n: MindNode | null): n is MindNode => {
+      let x = n;
+      while (x?.parent) x = x.parent;
+      return x === root;
+    };
+    this.select(alive(next) ? next : root);
     this.render();
     this.notify();
   }
@@ -3937,6 +4040,17 @@ export class MindMapCanvas {
   }
   private contextMenu: HTMLElement | null = null;
 
+  /** 空白处的右键菜单；落在外框里就是外框自己的菜单（加 / 改标题、移除） */
+  private showBackgroundMenu(ev: MouseEvent): void {
+    const box = this.opts.editable ? this.boxAt(ev.clientX, ev.clientY) : null;
+    // 只弹菜单不改选中：选中会把节点浮动工具栏也带出来，和菜单叠在一起
+    if (box && this.editingBox !== box) {
+      this.showContextMenu(this.boxMenuEntries(box), ev);
+      return;
+    }
+    this.showContextMenu(this.backgroundMenuEntries(), ev);
+  }
+
   private nodeMenuEntries(node: MindNode): MenuEntry[] {
     const editable = this.opts.editable;
     const link = wikilinkOf(node.text);
@@ -3945,8 +4059,9 @@ export class MindMapCanvas {
     if (editable) {
       entries.push(
         { title: t("menu.edit"), icon: "pencil", run: () => this.startEdit(node) },
-        { title: t("menu.addChild"), icon: "corner-down-right", run: () => this.addChildToSelected() },
-        { title: t("menu.addSibling"), icon: "list-plus", disabled: !node.parent, run: () => this.addSiblingToSelected(false) },
+        { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
+        { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent, run: () => this.addSiblingToSelected(false) },
+        { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", disabled: !node.parent, run: () => this.addSiblingToSelected(true) },
         sep,
       );
     }
@@ -3955,7 +4070,14 @@ export class MindMapCanvas {
         ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
         : { title: t("menu.focusBranch"), icon: "focus", disabled: !node.children.length, run: () => this.focusOn(node) },
     );
-    if (node.children.length) entries.push({ title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) });
+    if (node.children.length) {
+      entries.push(
+        { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) },
+        // 和数字键一样从这个节点往下算：0 = 全部展开，1 = 只露出下一级
+        { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
+        { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", run: () => this.setFoldLevel(1, node) },
+      );
+    }
     entries.push({ title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) });
     entries.push(sep);
     if (editable) {
@@ -3993,7 +4115,10 @@ export class MindMapCanvas {
       ...(editable ? [{ title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() } as MenuEntry, { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() } as MenuEntry] : []),
       { title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) },
     );
-    if (editable && node.parent) entries.push(sep, { title: t("menu.delete"), icon: "trash", run: () => this.deleteSelected() });
+    if (editable && node.parent) {
+      entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
+      if (node.children.length) entries.push({ title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });
+    }
     return entries;
   }
 

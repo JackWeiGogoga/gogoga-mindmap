@@ -34,6 +34,8 @@ export interface MindMapSettings {
   toolbarPosition: ToolbarPosition;
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
+  /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
+  leftDrag: "pan" | "select";
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
 }
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineOpen: false,
   toolbarPosition: "bottom",
   wheelAction: "pan",
+  leftDrag: "pan",
   rememberView: true,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
@@ -219,6 +222,19 @@ export class MindMapSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.wheelAction)
           .onChange(async (v) => {
             this.plugin.settings.wheelAction = v as MindMapSettings["wheelAction"];
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.leftDrag.name"))
+      .setDesc(t("settings.leftDrag.desc"))
+      .addDropdown((d) =>
+        d
+          .addOptions({ pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") })
+          .setValue(this.plugin.settings.leftDrag)
+          .onChange(async (v) => {
+            this.plugin.settings.leftDrag = v as MindMapSettings["leftDrag"];
             await this.plugin.saveSettings();
           }),
       );

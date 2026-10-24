@@ -1,6 +1,6 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
-import { MindMapCanvas } from "./canvas";
+import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
@@ -106,6 +106,10 @@ export class MindMapView extends TextFileView {
     this.canvas?.toggleSummaryOnSelected();
   }
 
+  runNodeCommand(cmd: NodeCommand): void {
+    this.canvas?.runNodeCommand(cmd);
+  }
+
   /** 自定义主题改了之后重画（主题 id 不变，样式和行为可能变了） */
   refreshTheme(): void {
     const c = this.canvas;
@@ -156,6 +160,7 @@ export class MindMapView extends TextFileView {
       onToggleOutline: () => void this.toggleOutline(),
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
+      marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       onToolbarPositionChange: (pos) => {
         this.plugin.settings.toolbarPosition = pos;
         void this.plugin.saveSettings();
