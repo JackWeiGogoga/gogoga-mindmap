@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseMarkdown, serializeMarkdown, splitMarker } from "../../src/markdown";
-import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren } from "../../src/model";
+import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange } from "../../src/model";
 
 const canonical = `---
 mindmap: true
@@ -547,4 +547,31 @@ test("仅删除没有子节点的节点等于普通删除", () => {
   const kids = removeNodeKeepChildren(findByPath(doc.root, "0")!, doc.style);
   assert.equal(kids.length, 0);
   assert.deepEqual(doc.root.children.map((c) => c.text), ["乙"]);
+});
+
+test("调整概要 / 外框范围：两头都能伸缩，标记挪到新起点，文字和宽度不变，不越过同类邻居", () => {
+  const doc = parseMarkdown(`# 根\n- A %%box\n- B\n- C %%summary=2 "小结" sw=120%%\n- D\n- E %%summary%%\n- F\n`.replace(/%%box\n/, "%%box%%\n"));
+  const kids = doc.root.children;
+  const c = kids[2];
+  assert.deepEqual(groupRange(c, "summary"), [2, 3]);
+  assert.deepEqual(groupLimits(c, "summary"), { lo: 0, hi: 3 });
+  // 起点往前挪到 B：标记换到 B 上
+  let start = setGroupRange(c, "summary", 1, 3);
+  assert.equal(start, kids[1]);
+  assert.equal(c.summary, undefined);
+  assert.deepEqual(kids[1].summary, { span: 3, text: "小结", width: 120 });
+  // 末端想伸到 F，被后面 E 的概要挡住，只到 D
+  start = setGroupRange(start, "summary", 1, 5);
+  assert.deepEqual(groupRange(start, "summary"), [1, 3]);
+  // 缩到只剩 D（拖起点越过终点也行）
+  start = setGroupRange(start, "summary", 3, 3);
+  assert.equal(start, kids[3]);
+  assert.equal(kids[3].summary?.span, 1);
+  // 外框和概要互不限制
+  const a = setGroupRange(kids[0], "box", 0, 5);
+  assert.deepEqual(groupRange(a, "box"), [0, 5]);
+  assert.equal(
+    serializeMarkdown(doc),
+    `# 根\n- A %%box=6%%\n- B\n- C\n- D %%summary "小结" sw=120%%\n- E %%summary%%\n- F\n`,
+  );
 });

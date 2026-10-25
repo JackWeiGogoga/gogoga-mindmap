@@ -182,7 +182,39 @@
 .mm-summary[data-side="left"] .mm-summary-handle { right: auto; left: -4px; }
 .mm-root.is-editable .mm-summary:hover .mm-summary-handle { opacity: 0.8; }
 .mm-summary.is-editing .mm-summary-handle { display: none; }
+
+/* 外框 / 概要两端的范围手柄：选中里面的节点或停在概要文字上才显示，拖动改括住的范围 */
+.mm-range-handle {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 8px;
+  margin: -4px 0 0 -9px;
+  border-radius: 4px;
+  background: var(--mm-selection);
+  box-shadow: 0 0 0 2px var(--mm-bg, var(--background-primary));
+  cursor: ns-resize;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.mm-range-handle[data-orient="h"] {
+  width: 8px;
+  height: 18px;
+  margin: -9px 0 0 -4px;
+  cursor: ew-resize;
+}
+.mm-range-handle.is-active,
+.mm-range-handle:hover {
+  opacity: 0.9;
+  pointer-events: auto;
+}
+.mm-root.is-range-dragging,
+.mm-root.is-range-dragging * { cursor: ns-resize !important; }
+.mm-root.is-range-dragging-h,
+.mm-root.is-range-dragging-h * { cursor: ew-resize !important; }
 .mm-root.is-editable .mm-summary { cursor: pointer; }
+.mm-summary.is-active { border-color: var(--mm-selection); box-shadow: 0 0 0 1px var(--mm-selection); }
 .mm-summary.is-editing .mm-summary-text { overflow: visible; text-overflow: clip; }
 .mm-summary.is-editing {
   max-width: none;
@@ -200,6 +232,11 @@
   stroke-opacity: 0.55;
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
+}
+.mm-box.is-active {
+  stroke: var(--mm-selection);
+  stroke-opacity: 1;
+  stroke-width: 2;
 }
 .mm-box-title {
   position: absolute;

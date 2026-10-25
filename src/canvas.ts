@@ -13,6 +13,10 @@ import {
   MindNode,
   moveNode,
   boxGroups,
+  GroupKind,
+  groupLimits,
+  groupRange,
+  setGroupRange,
   NODE_MAX_WIDTH,
   NODE_MIN_WIDTH,
   pathOf,
@@ -366,6 +370,11 @@ export class MindMapCanvas {
   private editingBox: MindNode | null = null;
   private summaryLayer!: SVGGElement;
   private summaryPaths: SVGPathElement[] = [];
+  /** 外框 / 概要两端的范围手柄（池子按序号复用） */
+  private rangeHandles: HTMLElement[] = [];
+  private rangeHandleInfo = new WeakMap<HTMLElement, { kind: GroupKind; start: MindNode; end: "start" | "end" }>();
+  /** 鼠标停在哪个概要文字上：它的范围手柄跟着显示 */
+  private hoverGroup: MindNode | null = null;
   private summaryLabels = new Map<string, HTMLElement>();
   private summaryStart = new WeakMap<HTMLElement, MindNode>();
   private editingSummary: MindNode | null = null;
@@ -423,7 +432,7 @@ export class MindMapCanvas {
   } | null = null;
   private clipboardText = "";
   private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
-  private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode> } | null = null;
+  private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode>; moved?: boolean } | null = null;
   private popover: HTMLElement | null = null;
   private popoverSave: (() => void) | null = null;
   /** 备注编辑中：把文本框内容同步到节点上，返回是否有变化 */
@@ -1129,6 +1138,7 @@ export class MindMapCanvas {
     }
     this.drawBoxes();
     this.drawSummaries();
+    this.drawRangeHandles();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
   }
@@ -1152,6 +1162,7 @@ export class MindMapCanvas {
       const color = branch !== undefined ? `var(--mm-branch-${branch})` : "";
       if (rect.style.getPropertyValue("--mm-box-color") !== color) rect.style.setProperty("--mm-box-color", color);
       if (rect.style.display) rect.setCssStyles({ display: "" });
+      if (rect.dataset.start !== b.start.id) rect.dataset.start = b.start.id;
 
       // 思维导图结构里一组兄弟可能被左右拆开，标题只挂第一段
       const title = b.start.box?.title ?? "";
@@ -1237,8 +1248,224 @@ export class MindMapCanvas {
   private boxMenuEntries(start: MindNode): MenuEntry[] {
     return [
       { title: start.box?.title ? t("menu.editBoxTitle") : t("menu.addBoxTitle"), icon: "type", run: () => this.editBoxTitle(start) },
+      ...this.rangeMenuEntries(start, "box"),
       { title: t("menu.removeBox"), icon: "square-dashed", run: () => this.removeBox(start) },
     ];
+  }
+
+  /** 外框 / 概要菜单里的「范围多括一个 / 少括一个」：都从末尾那一端改，拖两端的手柄可以随意改 */
+  private rangeMenuEntries(start: MindNode, kind: GroupKind): MenuEntry[] {
+    const [from, to] = groupRange(start, kind);
+    const { hi } = groupLimits(start, kind);
+    return [
+      { title: t("menu.extendRange"), icon: "unfold-vertical", disabled: to >= hi, run: () => this.resizeGroup(start, kind, from, to + 1) },
+      { title: t("menu.shrinkRange"), icon: "fold-vertical", disabled: to <= from, run: () => this.resizeGroup(start, kind, from, to - 1) },
+    ];
+  }
+
+  private resizeGroup(start: MindNode, kind: GroupKind, from: number, to: number): void {
+    if (!this.opts.editable) return;
+    setGroupRange(start, kind, from, to);
+    this.render();
+    this.notify();
+  }
+
+  // ---------- 外框 / 概要的范围手柄 ----------
+
+  /**
+   * 每个外框、概要在括住范围的两头各放一个小手柄，拖到哪个兄弟上范围就伸缩到哪。
+   * 平时看不见：选中了里面的节点、或鼠标停在概要文字 / 手柄上时才显示
+   */
+  private drawRangeHandles(): void {
+    const layout = this.layout!;
+    let n = 0;
+    const place = (kind: GroupKind, start: MindNode, end: "start" | "end", x: number, y: number, horizontal: boolean) => {
+      let el = this.rangeHandles[n];
+      if (!el) {
+        el = this.createRangeHandle();
+        this.rangeHandles.push(el);
+      }
+      n++;
+      this.rangeHandleInfo.set(el, { kind, start, end });
+      el.dataset.orient = horizontal ? "h" : "v";
+      el.setCssStyles({ display: "", left: `${round2(x)}px`, top: `${round2(y)}px` });
+    };
+    if (this.opts.editable) {
+      const groups: { kind: GroupKind; start: MindNode; segs: { rect: Bounds; side: string; members: MindNode[] }[] }[] = [];
+      const add = (kind: GroupKind, start: MindNode, rect: Bounds, side: string, members: MindNode[]) => {
+        let g = groups.find((x) => x.kind === kind && x.start === start);
+        if (!g) groups.push((g = { kind, start, segs: [] }));
+        g.segs.push({ rect, side, members });
+      };
+      for (const b of layout.boxes) add("box", b.start, b, b.side, b.members);
+      for (const sm of layout.summaries) add("summary", sm.start, sm.brace, sm.side, sm.members);
+      for (const g of groups) {
+        const sibs = g.start.parent?.children ?? [];
+        const [from, to] = groupRange(g.start, g.kind);
+        const first = sibs[from];
+        const last = sibs[to];
+        const segStart = g.segs.find((x) => x.members.includes(first)) ?? g.segs[0];
+        const segEnd = g.segs.find((x) => x.members.includes(last)) ?? g.segs[g.segs.length - 1];
+        const ends = (seg: (typeof g.segs)[number]) => {
+          const { x, y, w, h } = seg.rect;
+          const horizontal = seg.side === "down";
+          const a = horizontal ? { x, y: y + h / 2 } : { x: x + w / 2, y };
+          const b = horizontal ? { x: x + w, y: y + h / 2 } : { x: x + w / 2, y: y + h };
+          return { a, b, horizontal };
+        };
+        // 哪一头离第一个 / 最后一个成员近，手柄就放哪头（左侧、向下等结构不用逐个分情况）
+        const near = (node: MindNode, e: ReturnType<typeof ends>) => {
+          const p = layout.placed.get(node.id);
+          if (!p) return e.a;
+          const cx = p.x + p.w / 2;
+          const cy = p.y + p.h / 2;
+          return Math.hypot(e.a.x - cx, e.a.y - cy) <= Math.hypot(e.b.x - cx, e.b.y - cy) ? e.a : e.b;
+        };
+        const es = ends(segStart);
+        const pStart = near(first, es);
+        let pEnd: { x: number; y: number };
+        const ee = ends(segEnd);
+        if (segEnd === segStart) pEnd = pStart === es.a ? es.b : es.a;
+        else pEnd = near(last, ee);
+        place(g.kind, g.start, "start", pStart.x, pStart.y, es.horizontal);
+        place(g.kind, g.start, "end", pEnd.x, pEnd.y, ee.horizontal);
+      }
+    }
+    for (let i = n; i < this.rangeHandles.length; i++) {
+      if (this.rangeHandles[i].style.display !== "none") this.rangeHandles[i].setCssStyles({ display: "none" });
+    }
+    this.syncRangeHandles();
+  }
+
+  /** 选中了外框 / 概要里的节点、或鼠标停在它的概要文字上，它的手柄才显示 */
+  private syncRangeHandles(): void {
+    for (const el of this.rangeHandles) {
+      const info = this.rangeHandleInfo.get(el);
+      if (!info || el.style.display === "none") continue;
+      const on = this.hoverGroup === info.start || this.rangeDragging === info.start || this.activeGroup === info.start;
+      el.classList.toggle("is-active", on);
+    }
+    const active = this.rangeDragging ?? this.activeGroup;
+    for (const [id, el] of this.summaryLabels) el.classList.toggle("is-active", active?.id === id);
+    for (const rect of this.boxRects) rect.classList.toggle("is-active", !!active && rect.dataset.start === active.id && rect.style.display !== "none");
+  }
+
+  private rangeDragging: MindNode | null = null;
+  /** 单击概要文字 / 外框里的空白处选中的那个外框或概要（起始节点）；点别处、选中节点就取消 */
+  private activeGroup: MindNode | null = null;
+
+  private activateGroup(start: MindNode | null): void {
+    if (start) this.select(null, "replace");
+    this.activeGroup = start;
+    this.syncRangeHandles();
+  }
+  private hoverTimer = 0;
+
+  /** 离开时晚一点再藏：从概要文字挪到括号端点的手柄上要经过一段空白 */
+  private setHoverGroup(start: MindNode | null): void {
+    window.clearTimeout(this.hoverTimer);
+    if (start) {
+      this.hoverGroup = start;
+      this.syncRangeHandles();
+      return;
+    }
+    this.hoverTimer = window.setTimeout(() => {
+      this.hoverGroup = null;
+      this.syncRangeHandles();
+    }, 700);
+  }
+
+  private createRangeHandle(): HTMLElement {
+    const el = createDiv();
+    el.className = "mm-range-handle";
+    el.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      if (ev.button !== 0) return;
+      const info = this.rangeHandleInfo.get(el);
+      if (info && this.opts.editable) this.dragGroupRange(info, el.dataset.orient === "h");
+    });
+    el.addEventListener("click", (ev) => ev.stopPropagation());
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    el.addEventListener("pointerenter", () => this.setHoverGroup(this.rangeHandleInfo.get(el)?.start ?? null));
+    el.addEventListener("pointerleave", () => this.setHoverGroup(null));
+    this.nodesEl.append(el);
+    return el;
+  }
+
+  /**
+   * 拖范围手柄：另一头不动，这一头跟着指针落到最近的兄弟（按整条分支的范围算）上。
+   * 拖的时候实时重排，松手才写回；渲染会换掉手柄元素，所以监听挂在 document 上
+   */
+  private dragGroupRange(info: { kind: GroupKind; start: MindNode; end: "start" | "end" }, horizontal: boolean): void {
+    if (this.editing) this.commitEdit();
+    const kind = info.kind;
+    let start = info.start;
+    const sibs = start.parent?.children;
+    if (!sibs) return;
+    const [from0, to0] = groupRange(start, kind);
+    const fixed = info.end === "start" ? to0 : from0;
+    const { lo, hi } = groupLimits(start, kind);
+    const doc = this.el.ownerDocument;
+    let changed = false;
+    this.rangeDragging = start;
+    const dragCls = horizontal ? "is-range-dragging-h" : "is-range-dragging";
+    this.el.classList.add(dragCls);
+    const branchBounds = (node: MindNode): Bounds | null => {
+      let b: Bounds | null = null;
+      walk(node, (m) => {
+        const p = this.layout?.placed.get(m.id);
+        if (!p) return;
+        if (!b) b = { x: p.x, y: p.y, w: p.w, h: p.h };
+        else {
+          const x = Math.min(b.x, p.x);
+          const y = Math.min(b.y, p.y);
+          b = { x, y, w: Math.max(b.x + b.w, p.x + p.w) - x, h: Math.max(b.y + b.h, p.y + p.h) - y };
+        }
+      });
+      return b;
+    };
+    const move = (ev: PointerEvent) => {
+      const p = this.toWorld(ev.clientX, ev.clientY);
+      let best = -1;
+      let bestD = Infinity;
+      for (let k = lo; k <= hi; k++) {
+        const b = branchBounds(sibs[k]);
+        if (!b) continue;
+        const dx = Math.max(b.x - p.x, 0, p.x - (b.x + b.w));
+        const dy = Math.max(b.y - p.y, 0, p.y - (b.y + b.h));
+        const d = Math.hypot(dx, dy);
+        if (d < bestD) {
+          bestD = d;
+          best = k;
+        }
+      }
+      if (best < 0) return;
+      const [a, b] = [Math.min(best, fixed), Math.max(best, fixed)];
+      const [ca, cb] = groupRange(start, kind);
+      if (a === ca && b === cb) return;
+      start = setGroupRange(start, kind, a, b);
+      this.rangeDragging = start;
+      changed = true;
+      this.render();
+    };
+    const up = () => {
+      doc.removeEventListener("pointermove", move);
+      doc.removeEventListener("pointerup", up);
+      doc.removeEventListener("pointercancel", up);
+      this.rangeDragging = null;
+      this.activeGroup = start;
+      this.el.classList.remove(dragCls);
+      this.syncRangeHandles();
+      if (changed) this.notify();
+    };
+    doc.addEventListener("pointermove", move);
+    doc.addEventListener("pointerup", up);
+    doc.addEventListener("pointercancel", up);
+    this.syncRangeHandles();
   }
 
   /** 给选中的节点加外框：同一父节点下相邻的合成一个，其余各自一个；已在外框里的跳过 */
@@ -1377,8 +1604,15 @@ export class MindMapCanvas {
       this.notify();
     });
     el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    // 单击不选中括住的节点：选中会弹出节点工具栏，常常正好盖在概要上，双击的第二下就点到工具栏去了
-    el.addEventListener("click", (ev) => ev.stopPropagation());
+    el.addEventListener("pointerenter", () => this.setHoverGroup(this.summaryStart.get(el) ?? null));
+    el.addEventListener("pointerleave", () => this.setHoverGroup(null));
+    // 单击不选中括住的节点：选中会弹出节点工具栏，常常正好盖在概要上，双击的第二下就点到工具栏去了。
+    // 改成选中概要本身：高亮出来，两端出现范围手柄
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const start = this.summaryStart.get(el);
+      if (start && this.opts.editable && this.editingSummary !== start) this.activateGroup(start);
+    });
     el.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
       const start = this.summaryStart.get(el);
@@ -1447,6 +1681,7 @@ export class MindMapCanvas {
   private summaryMenuEntries(start: MindNode): MenuEntry[] {
     return [
       { title: t("menu.editSummary"), icon: "type", run: () => this.editSummary(start) },
+      ...this.rangeMenuEntries(start, "summary"),
       { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
     ];
   }
@@ -2184,6 +2419,7 @@ export class MindMapCanvas {
       this.el.focus({ preventScroll: true });
       this.capture(ev);
       this.pendingMenu = null;
+      if (ev.button === 0) this.activateGroup(null);
       if (ev.button === 0 && (ev.shiftKey || marqueeMode)) {
         this.startMarquee(ev, ev.shiftKey || ev.metaKey || ev.ctrlKey);
         return;
@@ -2238,7 +2474,12 @@ export class MindMapCanvas {
     const endPointer = (ev: PointerEvent) => {
       this.pointers.delete(ev.pointerId);
       if (this.pointers.size < 2) this.pinch = null;
-      if (this.marquee) this.endMarquee();
+      if (this.marquee) {
+        const tap = !this.marquee.moved && ev.type === "pointerup";
+        this.endMarquee();
+        // 框选模式下没拖动的单击：和平移模式一样，点在外框空白处就选中外框
+        if (tap && this.opts.editable && !this.selected.size) this.activateGroup(this.boxAt(ev.clientX, ev.clientY));
+      }
       if (this.drag) this.endDrag(ev.type === "pointerup");
       const touched = this.touchPress?.node ?? null;
       this.cancelTouchPress();
@@ -2265,7 +2506,11 @@ export class MindMapCanvas {
           this.pendingMenu = null;
           if (moved) this.suppressMenuUntil = performance.now() + 500;
           else if (menu && ev.type === "pointerup") this.showBackgroundMenu(menu);
-        } else if (!moved && !onNode) this.select(null, "replace");
+        } else if (!moved && !onNode) {
+          this.select(null, "replace");
+          // 点在外框里的空白处：选中这个外框，两端出现范围手柄
+          this.activateGroup(this.opts.editable && ev.type === "pointerup" ? this.boxAt(ev.clientX, ev.clientY) : null);
+        }
       }
       if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
     };
@@ -2669,6 +2914,7 @@ export class MindMapCanvas {
         return;
       }
       this.select(null, "replace");
+      this.activateGroup(null);
       return;
     }
     const sel = this.primary;
@@ -2778,6 +3024,8 @@ export class MindMapCanvas {
       for (const s of this.selected) if (s.id === id) node = s;
       el.classList.toggle("is-selected", node !== null);
     }
+    if (this.selected.size) this.activeGroup = null;
+    this.syncRangeHandles();
     this.positionNodebar();
     this.opts.onSelectionChange?.(this.primary, [...this.selected]);
   }
@@ -2911,6 +3159,8 @@ export class MindMapCanvas {
   private updateMarquee(ev: PointerEvent): void {
     if (!this.marquee) return;
     const host = this.el.getBoundingClientRect();
+    if (!this.marquee.moved && Math.hypot(ev.clientX - host.left - this.marquee.x, ev.clientY - host.top - this.marquee.y) < 3) return;
+    this.marquee.moved = true;
     const x2 = ev.clientX - host.left;
     const y2 = ev.clientY - host.top;
     const left = Math.min(this.marquee.x, x2);

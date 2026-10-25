@@ -286,6 +286,8 @@ const en = {
   "menu.copyNodeLink": "Copy node link",
   "menu.delete": "Delete",
   "menu.deleteOnly": "Delete this node only",
+  "menu.extendRange": "Extend range by one node",
+  "menu.shrinkRange": "Shrink range by one node",
   "menu.paste": "Paste",
   "menu.fit": "Fit to canvas",
 
@@ -633,6 +635,8 @@ const zh: Record<Key, string> = {
   "menu.copyNodeLink": "复制节点链接",
   "menu.delete": "删除",
   "menu.deleteOnly": "仅删除此节点（保留子节点）",
+  "menu.extendRange": "范围多括一个节点",
+  "menu.shrinkRange": "范围少括一个节点",
   "menu.paste": "粘贴",
   "menu.fit": "适应画布",
 

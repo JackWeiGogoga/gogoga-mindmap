@@ -140,6 +140,57 @@ export function boxGroups(siblings: MindNode[]): Map<string, MindNode> {
   return out;
 }
 
+export type GroupKind = "box" | "summary";
+
+/** 外框 / 概要从起始节点算起括住的兄弟下标 [from, to]（含两端） */
+export function groupRange(start: MindNode, kind: GroupKind): [number, number] {
+  const sibs = start.parent?.children ?? [start];
+  const i = sibs.indexOf(start);
+  const span = Math.max(1, start[kind]?.span ?? 1);
+  return [i, Math.min(sibs.length - 1, i + span - 1)];
+}
+
+/** 外框 / 概要能伸到的兄弟下标范围 [lo, hi]：不越过同一层里同类的其他外框 / 概要 */
+export function groupLimits(start: MindNode, kind: GroupKind): { lo: number; hi: number } {
+  const sibs = start.parent?.children ?? [start];
+  const me = sibs.indexOf(start);
+  let lo = 0;
+  let hi = sibs.length - 1;
+  for (let i = 0; i < sibs.length; i++) {
+    const g = sibs[i][kind];
+    if (!g || i === me) continue;
+    const end = i + Math.max(1, g.span) - 1;
+    if (end < me) lo = Math.max(lo, end + 1);
+    else if (i > me) hi = Math.min(hi, i - 1);
+  }
+  return { lo, hi };
+}
+
+/**
+ * 把 start 上的外框 / 概要改成括住兄弟 [from, to]（含两端，超出同类邻居的部分收回来），
+ * 标题、文字、宽度不变；起点变了标记就挪到新的起始节点上。返回新的起始节点
+ */
+export function setGroupRange(start: MindNode, kind: GroupKind, from: number, to: number): MindNode {
+  const sibs = start.parent?.children;
+  if (!sibs || !start[kind]) return start;
+  const { lo, hi } = groupLimits(start, kind);
+  const a = Math.max(lo, Math.min(from, to));
+  const b = Math.min(hi, Math.max(from, to));
+  if (a > b) return start;
+  const next = sibs[a];
+  const span = b - a + 1;
+  if (kind === "box") {
+    const g = start.box!;
+    start.box = undefined;
+    next.box = { ...g, span };
+  } else {
+    const g = start.summary!;
+    start.summary = undefined;
+    next.summary = { ...g, span };
+  }
+  return next;
+}
+
 /** 同 boxGroups，换成概要：节点 id → 所属概要的起始节点 */
 export function summaryGroups(siblings: MindNode[]): Map<string, MindNode> {
   const out = new Map<string, MindNode>();
