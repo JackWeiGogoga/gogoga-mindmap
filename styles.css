@@ -570,6 +570,16 @@
   -webkit-user-select: text;
   cursor: auto;
 }
+/* 查看备注：默认更大一些，右下角可以拖动改大小（拖过的尺寸会记住） */
+.mm-popover.is-view {
+  max-width: min(520px, calc(100% - 16px));
+  max-height: min(480px, calc(100% - 16px));
+  min-width: 160px;
+  min-height: 48px;
+  box-sizing: border-box;
+  resize: both;
+}
+.gg-mm-root .mm-popover-body img { max-width: 100%; height: auto; cursor: zoom-in; -webkit-user-drag: none; }
 .mm-popover-body.is-plain { white-space: pre-wrap; }
 .gg-mm-root .mm-popover-body { font-size: 13px; line-height: 1.55; }
 .gg-mm-root .mm-popover-body > :first-child { margin-top: 0; }

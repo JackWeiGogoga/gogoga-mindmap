@@ -159,6 +159,8 @@ export interface CanvasOptions {
   marqueeDrag?: () => boolean;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
+  /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
+  notePopoverSize?: { get: () => PopoverSize | undefined; set: (size: PopoverSize) => void };
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -172,6 +174,10 @@ export interface CanvasOptions {
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
+export interface PopoverSize {
+  w: number;
+  h: number;
+}
 
 /** 画布里按键能做的节点操作，另外注册成命令，用户可以在快捷键设置里换成自己的习惯 */
 export type NodeCommand =
@@ -1353,6 +1359,8 @@ export class MindMapCanvas {
   }
 
   private rangeDragging: MindNode | null = null;
+  /** 正在拖的东西来自备注弹窗 */
+  private dragFromPopover = false;
   /** 单击概要文字 / 外框里的空白处选中的那个外框或概要（起始节点）；点别处、选中节点就取消 */
   private activeGroup: MindNode | null = null;
 
@@ -2641,6 +2649,13 @@ export class MindMapCanvas {
     this.on(el, "drop", (ev) => {
       if (!this.opts.editable) return;
       ev.preventDefault();
+      // 从自己的备注弹窗里拖出来的（图片、选中的文字）不算拖入，免得一失手就多出节点
+      if (this.dragFromPopover) {
+        this.dragFromPopover = false;
+        this.dropHover?.classList.remove("is-drop-target");
+        this.dropHover = null;
+        return;
+      }
       if (this.opts.embedded) ev.stopPropagation();
       const targetEl = this.dropHover ?? (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
       this.dropHover?.classList.remove("is-drop-target");
@@ -4878,6 +4893,8 @@ export class MindMapCanvas {
     pop.dataset.id = node.id;
     pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     pop.addEventListener("wheel", (ev) => ev.stopPropagation());
+    pop.addEventListener("dragstart", () => (this.dragFromPopover = true));
+    pop.addEventListener("dragend", () => (this.dragFromPopover = false));
     const editable = this.opts.editable && (edit || !node.note);
     if (editable) {
       const ta = createEl("textarea");
@@ -4918,8 +4935,17 @@ export class MindMapCanvas {
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     } else {
+      pop.classList.add("is-view");
       const body = createDiv();
       body.className = "mm-popover-body";
+      // 备注里的图片弹窗里太小，单击（或双击）就全屏看原图
+      body.addEventListener("click", (ev) => {
+        const img = (ev.target as HTMLElement).closest("img");
+        if (!img) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.openLightbox(img);
+      });
       if (this.opts.host?.renderNote) {
         body.classList.add("markdown-rendered");
         this.opts.host.renderNote(body, unescapeNote(node.note));
@@ -4937,9 +4963,49 @@ export class MindMapCanvas {
         pop.append(editBtn);
       }
       this.el.append(pop);
+      this.applyPopoverSize(pop);
       this.placePopover(pop, nodeEl);
+      // 图片晚到会把弹窗撑大，再摆一次免得出了画布
+      body.addEventListener("load", () => this.placePopover(pop, nodeEl), true);
     }
     this.popover = pop;
+  }
+
+  /**
+   * 查看备注的弹窗右下角可以拖动改大小（CSS resize）。用过的尺寸记下来，下次打开直接用；
+   * 默认的最大宽高是为了不撑满画布，拖动时放开到画布大小
+   */
+  private applyPopoverSize(pop: HTMLElement): void {
+    const store = this.opts.notePopoverSize;
+    const host = this.el.getBoundingClientRect();
+    // 画布还没量出尺寸（刚打开、被折叠）时不按它收窄，免得记住的尺寸被压成最小
+    const room = (v: number, fallback: number) => (v > 50 ? v - 16 : fallback);
+    const lift = () => pop.setCssStyles({ maxWidth: `${room(host.width, 4000)}px`, maxHeight: `${room(host.height, 4000)}px` });
+    const saved = store?.get();
+    // 太小的值是坏数据（比如拖到一半弹窗被关掉量成 0），当没记过
+    if (saved && saved.w >= 160 && saved.h >= 48) {
+      lift();
+      pop.setCssStyles({ width: `${Math.min(saved.w, room(host.width, saved.w))}px`, height: `${Math.min(saved.h, room(host.height, saved.h))}px` });
+    }
+    if (!store) return;
+    pop.addEventListener("pointerdown", (ev) => {
+      const r = pop.getBoundingClientRect();
+      // 只认右下角的拖动柄那一小块
+      if (ev.clientX < r.right - 18 || ev.clientY < r.bottom - 18) return;
+      // 先把当前尺寸钉成显式宽高再放开上限，否则内容宽的弹窗（大图）一按就自己撑大
+      const w0 = pop.offsetWidth;
+      const h0 = pop.offsetHeight;
+      pop.setCssStyles({ width: `${w0}px`, height: `${h0}px` });
+      lift();
+      const doc = this.el.ownerDocument;
+      const up = () => {
+        doc.removeEventListener("pointerup", up, true);
+        // 松手前弹窗可能已经被关掉了（量出来是 0），那次不算
+        if (!pop.isConnected || pop.offsetWidth < 160 || pop.offsetHeight < 48) return;
+        if (pop.offsetWidth !== w0 || pop.offsetHeight !== h0) store.set({ w: pop.offsetWidth, h: pop.offsetHeight });
+      };
+      doc.addEventListener("pointerup", up, true);
+    });
   }
 
   private placePopover(pop: HTMLElement, nodeEl: HTMLElement): void {

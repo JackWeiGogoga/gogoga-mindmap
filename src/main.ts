@@ -534,6 +534,7 @@ export default class MindMapPlugin extends Plugin {
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
         marqueeDrag: () => this.settings.leftDrag === "select",
+        notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),
         onUndo: () => {
@@ -640,6 +641,15 @@ export default class MindMapPlugin extends Plugin {
    * 按键是否命中用户给本插件命令设的快捷键。读的是 Obsidian 内部的 hotkeyManager（没有公开 API），
    * 读不到就当没有，画布按原来的方式处理
    */
+  /** 各处画布共用的备注弹窗尺寸存取 */
+  readonly notePopoverSize = {
+    get: () => this.settings.notePopoverSize,
+    set: (size: { w: number; h: number }) => {
+      this.settings.notePopoverSize = size;
+      void this.saveSettings();
+    },
+  };
+
   isOwnHotkey(ev: KeyboardEvent): boolean {
     return this.ownHotkeyCommand(ev) !== null;
   }

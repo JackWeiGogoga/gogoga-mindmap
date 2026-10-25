@@ -24,6 +24,8 @@ export interface MindMapSettings {
   codeBlockMaxHeight: number;
   /** 是否接管 ```mindmap 代码块；关掉就只认 ```gogoga-mindmap，把 mindmap 让给 Markmind 等同名插件 */
   claimMindmapBlock: boolean;
+  /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
+  notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
   outlineOpen: boolean;
   /**
