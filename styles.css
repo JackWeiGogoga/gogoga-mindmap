@@ -8,7 +8,7 @@
   overflow: hidden !important;
 }
 
-.mm-root {
+.gg-mm-root {
   --mm-font: var(--font-interface, "Inter", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif);
   --mm-bg: var(--background-primary, #ffffff);
   --mm-line: #2b2b2b;
@@ -78,7 +78,7 @@
   cursor: grab;
 }
 
-.theme-dark .mm-root {
+.theme-dark .gg-mm-root {
   --mm-line: #c9c9d1;
   --mm-root-bg: #5c6bc0;
   --mm-main-bg: #30303a;
@@ -180,7 +180,7 @@
   opacity: 0;
 }
 .mm-summary[data-side="left"] .mm-summary-handle { right: auto; left: -4px; }
-.mm-root.is-editable .mm-summary:hover .mm-summary-handle { opacity: 0.8; }
+.gg-mm-root.is-editable .mm-summary:hover .mm-summary-handle { opacity: 0.8; }
 .mm-summary.is-editing .mm-summary-handle { display: none; }
 
 /* 外框 / 概要两端的范围手柄：选中里面的节点或停在概要文字上才显示，拖动改括住的范围 */
@@ -209,11 +209,11 @@
   opacity: 0.9;
   pointer-events: auto;
 }
-.mm-root.is-range-dragging,
-.mm-root.is-range-dragging * { cursor: ns-resize !important; }
-.mm-root.is-range-dragging-h,
-.mm-root.is-range-dragging-h * { cursor: ew-resize !important; }
-.mm-root.is-editable .mm-summary { cursor: pointer; }
+.gg-mm-root.is-range-dragging,
+.gg-mm-root.is-range-dragging * { cursor: ns-resize !important; }
+.gg-mm-root.is-range-dragging-h,
+.gg-mm-root.is-range-dragging-h * { cursor: ew-resize !important; }
+.gg-mm-root.is-editable .mm-summary { cursor: pointer; }
 .mm-summary.is-active { border-color: var(--mm-selection); box-shadow: 0 0 0 1px var(--mm-selection); }
 .mm-summary.is-editing .mm-summary-text { overflow: visible; text-overflow: clip; }
 .mm-summary.is-editing {
@@ -257,7 +257,7 @@
   cursor: default;
   user-select: none;
 }
-.mm-root.is-editable .mm-box-title { cursor: pointer; }
+.gg-mm-root.is-editable .mm-box-title { cursor: pointer; }
 .mm-box-title.is-editing,
 .mm-box-title:hover { opacity: 1; }
 .mm-box-title.is-editing {
@@ -278,7 +278,7 @@
 
 /* ---------- 节点 ---------- */
 
-.mm-node {
+.gg-mm-node {
   position: absolute;
   box-sizing: border-box;
   display: flex;
@@ -300,7 +300,7 @@
   transition: box-shadow 0.12s ease;
 }
 
-.mm-node[data-depth="1"] {
+.gg-mm-node[data-depth="1"] {
   background: var(--mm-main-bg);
   color: var(--mm-main-fg);
   padding: var(--mm-main-pad);
@@ -309,7 +309,7 @@
   font-weight: var(--mm-main-weight);
 }
 
-.mm-node[data-depth="0"] {
+.gg-mm-node[data-depth="0"] {
   background: var(--mm-root-bg);
   color: var(--mm-root-fg);
   padding: var(--mm-root-pad);
@@ -320,27 +320,27 @@
   border: var(--mm-root-border);
 }
 
-.mm-node[data-color="red"]    { --mm-node-bg: var(--mm-c-red);    --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="orange"] { --mm-node-bg: var(--mm-c-orange); --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="yellow"] { --mm-node-bg: var(--mm-c-yellow); --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="green"]  { --mm-node-bg: var(--mm-c-green);  --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="teal"]   { --mm-node-bg: var(--mm-c-teal);   --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="blue"]   { --mm-node-bg: var(--mm-c-blue);   --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="purple"] { --mm-node-bg: var(--mm-c-purple); --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="pink"]   { --mm-node-bg: var(--mm-c-pink);   --mm-node-fg: var(--mm-c-fg); }
-.mm-node[data-color="gray"]   { --mm-node-bg: var(--mm-c-gray);   --mm-node-fg: var(--mm-c-fg); }
-.mm-node.has-color {
+.gg-mm-node[data-color="red"]    { --mm-node-bg: var(--mm-c-red);    --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="orange"] { --mm-node-bg: var(--mm-c-orange); --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="yellow"] { --mm-node-bg: var(--mm-c-yellow); --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="green"]  { --mm-node-bg: var(--mm-c-green);  --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="teal"]   { --mm-node-bg: var(--mm-c-teal);   --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="blue"]   { --mm-node-bg: var(--mm-c-blue);   --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="purple"] { --mm-node-bg: var(--mm-c-purple); --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="pink"]   { --mm-node-bg: var(--mm-c-pink);   --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node[data-color="gray"]   { --mm-node-bg: var(--mm-c-gray);   --mm-node-fg: var(--mm-c-fg); }
+.gg-mm-node.has-color {
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
 }
 
-.mm-node:hover:not(.is-selected):not(.is-editing) {
+.gg-mm-node:hover:not(.is-selected):not(.is-editing) {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--mm-selection) 40%, transparent);
 }
-.mm-node.is-selected {
+.gg-mm-node.is-selected {
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
 }
-.mm-node.is-editing {
+.gg-mm-node.is-editing {
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
 }
 
@@ -349,7 +349,7 @@
   min-width: 1ch;
   outline: none;
 }
-.mm-node.is-editing .mm-label {
+.gg-mm-node.is-editing .mm-label {
   cursor: text;
   user-select: text;
   -webkit-user-select: text;
@@ -375,7 +375,7 @@
   cursor: pointer;
 }
 .mm-link:hover { text-decoration: underline; }
-.mm-node[data-depth="0"] .mm-link { color: inherit; text-decoration: underline; }
+.gg-mm-node[data-depth="0"] .mm-link { color: inherit; text-decoration: underline; }
 
 .mm-task {
   display: inline-block;
@@ -453,49 +453,49 @@
   border-color: var(--mm-selection);
   color: var(--mm-selection);
 }
-.mm-node:hover .mm-toggle,
-.mm-node.is-selected .mm-toggle,
+.gg-mm-node:hover .mm-toggle,
+.gg-mm-node.is-selected .mm-toggle,
 .mm-toggle.is-folded {
   opacity: 1;
 }
-.mm-node[data-side="left"] .mm-toggle {
+.gg-mm-node[data-side="left"] .mm-toggle {
   left: auto;
   right: 100%;
   transform: translate(-10px, -50%);
 }
-.mm-node[data-side="left"] .mm-toggle::before {
+.gg-mm-node[data-side="left"] .mm-toggle::before {
   right: auto;
   left: 100%;
 }
-.mm-node.is-underline .mm-toggle { top: 100%; }
+.gg-mm-node.is-underline .mm-toggle { top: 100%; }
 
 /* ---------- 彩虹主题 ---------- */
 
-.mm-node[data-branch="0"] { --mm-branch: var(--mm-branch-0); }
-.mm-node[data-branch="1"] { --mm-branch: var(--mm-branch-1); }
-.mm-node[data-branch="2"] { --mm-branch: var(--mm-branch-2); }
-.mm-node[data-branch="3"] { --mm-branch: var(--mm-branch-3); }
-.mm-node[data-branch="4"] { --mm-branch: var(--mm-branch-4); }
-.mm-node[data-branch="5"] { --mm-branch: var(--mm-branch-5); }
+.gg-mm-node[data-branch="0"] { --mm-branch: var(--mm-branch-0); }
+.gg-mm-node[data-branch="1"] { --mm-branch: var(--mm-branch-1); }
+.gg-mm-node[data-branch="2"] { --mm-branch: var(--mm-branch-2); }
+.gg-mm-node[data-branch="3"] { --mm-branch: var(--mm-branch-3); }
+.gg-mm-node[data-branch="4"] { --mm-branch: var(--mm-branch-4); }
+.gg-mm-node[data-branch="5"] { --mm-branch: var(--mm-branch-5); }
 
-.mm-root[data-branch-colors="true"] .mm-node[data-depth="1"] {
+.gg-mm-root[data-branch-colors="true"] .gg-mm-node[data-depth="1"] {
   background: var(--mm-branch);
   color: var(--mm-branch-fg);
 }
-.mm-root[data-branch-colors="true"] .mm-node.has-color {
+.gg-mm-root[data-branch-colors="true"] .gg-mm-node.has-color {
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
 }
 /* 底下那条线由连线画（见 canvas.ts 的 tail），这里只留出位置 */
-.mm-node.is-underline {
+.gg-mm-node.is-underline {
   background: transparent;
   color: var(--text-normal, #1f1f1f);
   border: none;
   border-radius: 0;
   padding: 2px 6px 5px;
 }
-.mm-node.is-underline.is-selected,
-.mm-node.is-underline.is-editing {
+.gg-mm-node.is-underline.is-selected,
+.gg-mm-node.is-underline.is-editing {
   border-radius: 4px;
 }
 
@@ -571,23 +571,23 @@
   cursor: auto;
 }
 .mm-popover-body.is-plain { white-space: pre-wrap; }
-.mm-root .mm-popover-body { font-size: 13px; line-height: 1.55; }
-.mm-root .mm-popover-body > :first-child { margin-top: 0; }
-.mm-root .mm-popover-body > :last-child { margin-bottom: 0; }
-.mm-root .mm-popover-body p { margin: 0 0 0.5em; }
-.mm-root .mm-popover-body ul,
-.mm-root .mm-popover-body ol { margin: 0.2em 0 0.5em; padding-left: 1.4em; }
-.mm-root .mm-popover-body li { margin: 0.1em 0; }
-.mm-root .mm-popover-body li > p { margin: 0; }
-.mm-root .mm-popover-body h1,
-.mm-root .mm-popover-body h2,
-.mm-root .mm-popover-body h3,
-.mm-root .mm-popover-body h4 { margin: 0.5em 0 0.25em; font-size: 1.05em; font-weight: 600; line-height: 1.4; }
-.mm-root .mm-popover-body pre { margin: 0.4em 0; padding: 6px 8px; font-size: 12px; }
-.mm-root .mm-popover-body blockquote { margin: 0.3em 0; padding: 0 0 0 0.8em; border-left: 2px solid var(--background-modifier-border, #ddd); }
-.mm-root .mm-popover-body .callout { margin: 0.3em 0; }
-.mm-root .mm-popover-body table { font-size: 12px; }
-.mm-root .mm-popover-body img { max-width: 100%; }
+.gg-mm-root .mm-popover-body { font-size: 13px; line-height: 1.55; }
+.gg-mm-root .mm-popover-body > :first-child { margin-top: 0; }
+.gg-mm-root .mm-popover-body > :last-child { margin-bottom: 0; }
+.gg-mm-root .mm-popover-body p { margin: 0 0 0.5em; }
+.gg-mm-root .mm-popover-body ul,
+.gg-mm-root .mm-popover-body ol { margin: 0.2em 0 0.5em; padding-left: 1.4em; }
+.gg-mm-root .mm-popover-body li { margin: 0.1em 0; }
+.gg-mm-root .mm-popover-body li > p { margin: 0; }
+.gg-mm-root .mm-popover-body h1,
+.gg-mm-root .mm-popover-body h2,
+.gg-mm-root .mm-popover-body h3,
+.gg-mm-root .mm-popover-body h4 { margin: 0.5em 0 0.25em; font-size: 1.05em; font-weight: 600; line-height: 1.4; }
+.gg-mm-root .mm-popover-body pre { margin: 0.4em 0; padding: 6px 8px; font-size: 12px; }
+.gg-mm-root .mm-popover-body blockquote { margin: 0.3em 0; padding: 0 0 0 0.8em; border-left: 2px solid var(--background-modifier-border, #ddd); }
+.gg-mm-root .mm-popover-body .callout { margin: 0.3em 0; }
+.gg-mm-root .mm-popover-body table { font-size: 12px; }
+.gg-mm-root .mm-popover-body img { max-width: 100%; }
 
 /* ---------- 代码块嵌入 ---------- */
 
@@ -617,8 +617,8 @@
   background: var(--mm-selection);
   box-shadow: 0 0 0 2px var(--mm-bg);
 }
-.mm-node.is-dragging { opacity: 0.35; }
-.mm-node.is-drop-target {
+.gg-mm-node.is-dragging { opacity: 0.35; }
+.gg-mm-node.is-drop-target {
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
   filter: brightness(0.96);
 }
@@ -630,8 +630,8 @@
   transform-origin: 0 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
-.mm-root.is-dragging-node,
-.mm-root.is-dragging-node .mm-node { cursor: grabbing; }
+.gg-mm-root.is-dragging-node,
+.gg-mm-root.is-dragging-node .gg-mm-node { cursor: grabbing; }
 
 .mm-marquee {
   position: absolute;
@@ -752,12 +752,12 @@
 }
 
 /* rainbow 主题深色模式：分支色本身已压暗，主主题改用浅色文字 */
-.theme-dark .mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] { color: #f5f5f5; }
-.theme-dark .mm-root[data-theme="rainbow"] .mm-node[data-depth="1"] .mm-link { color: inherit; text-decoration: underline; }
+.theme-dark .gg-mm-root[data-theme="rainbow"] .gg-mm-node[data-depth="1"] { color: #f5f5f5; }
+.theme-dark .gg-mm-root[data-theme="rainbow"] .gg-mm-node[data-depth="1"] .mm-link { color: inherit; text-decoration: underline; }
 
 /* ---------- 压过 Obsidian 的 button:not(.clickable-icon) 默认样式 ----------
    那条规则的优先级是 (0,1,1)，比单个类名高，会把色板、工具栏、折叠徽章的背景和阴影都改掉。 */
-.mm-root button.mm-swatch {
+.gg-mm-root button.mm-swatch {
   width: 18px;
   height: 18px;
   padding: 0;
@@ -768,11 +768,11 @@
   box-shadow: none;
   font-size: 12px;
 }
-.mm-root button.mm-swatch:hover {
+.gg-mm-root button.mm-swatch:hover {
   background: var(--swatch, transparent);
   transform: scale(1.2);
 }
-.mm-root button.mm-tool {
+.gg-mm-root button.mm-tool {
   width: 28px;
   height: 28px;
   padding: 0;
@@ -786,24 +786,24 @@
   font-weight: 400;
   line-height: 1;
 }
-.mm-root button.mm-tool:hover {
+.gg-mm-root button.mm-tool:hover {
   background: var(--background-modifier-hover, #f0f0f0);
   color: var(--text-normal, #1f1f1f);
 }
-.mm-root button.mm-tool.is-active {
+.gg-mm-root button.mm-tool.is-active {
   color: var(--mm-selection);
   background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
 }
-.mm-root button.mm-zoom-label {
+.gg-mm-root button.mm-zoom-label {
   width: auto;
   min-width: 40px;
   padding: 0 4px;
 }
-.mm-root .mm-nodebar button.mm-tool {
+.gg-mm-root .mm-nodebar button.mm-tool {
   width: 24px;
   height: 24px;
 }
-.mm-root button.mm-toggle {
+.gg-mm-root button.mm-toggle {
   width: 16px;
   height: 16px;
   padding: 0;
@@ -817,12 +817,12 @@
   font-weight: 500;
   line-height: 1;
 }
-.mm-root button.mm-toggle:hover {
+.gg-mm-root button.mm-toggle:hover {
   background: var(--mm-toggle-bg);
   border-color: var(--mm-selection);
   color: var(--mm-selection);
 }
-.mm-root button.mm-popover-edit {
+.gg-mm-root button.mm-popover-edit {
   height: auto;
   padding: 0;
   margin: 8px 0 0;
@@ -832,7 +832,7 @@
   color: var(--mm-selection);
   font-size: 12px;
 }
-.mm-root .mm-sheets button {
+.gg-mm-root .mm-sheets button {
   height: auto;
   padding: 3px 10px;
   border: none;
@@ -841,22 +841,26 @@
   color: var(--text-muted, #666);
   font-size: 12px;
 }
-.mm-root .mm-sheets button:hover {
+.gg-mm-root .mm-sheets button:hover {
   background: var(--background-modifier-hover, #f0f0f0);
 }
-.mm-root .mm-sheets button.is-active {
+.gg-mm-root .mm-sheets button.is-active {
   color: var(--mm-selection);
   background: color-mix(in srgb, var(--mm-selection) 12%, transparent);
 }
 
 /* ---------- 嵌入代码块的编辑态 ---------- */
-.mm-root .mm-tool.is-hidden,
-.mm-root .mm-tool-sep.is-hidden { display: none; }
+.gg-mm-root .mm-tool.is-hidden,
+.gg-mm-root .mm-tool-sep.is-hidden { display: none; }
 .mm-codeblock.is-editable { border-color: color-mix(in srgb, var(--interactive-accent, #155dff) 45%, var(--background-modifier-border, #e3e3e3)); }
+/* 实时预览里 Obsidian 会给代码块画一圈悬停框，再叠一层自己的边框就成了两道线；这里只留 Obsidian 那圈。
+   编辑开关看工具栏上的 ✓ 按钮 */
+.cm-preview-code-block .mm-codeblock,
+.cm-preview-code-block .mm-codeblock.is-editable { border-color: transparent; }
 
 /* ---------- 搜索 ---------- */
 
-.mm-search {
+.gg-mm-search {
   position: absolute;
   right: 12px;
   top: 12px;
@@ -871,7 +875,7 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: default;
 }
-.mm-root input.mm-search-input {
+.gg-mm-root input.gg-mm-search-input {
   width: 180px;
   height: 26px;
   padding: 0 4px;
@@ -890,15 +894,15 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-.mm-search .mm-tool { width: 24px; height: 24px; }
-.mm-node.is-match { box-shadow: 0 0 0 2px color-mix(in srgb, #f5b400 70%, transparent); }
-.mm-node.is-current-match,
-.mm-node.is-current-match.is-selected { box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px #f5b400; }
+.gg-mm-search .mm-tool { width: 24px; height: 24px; }
+.gg-mm-node.is-match { box-shadow: 0 0 0 2px color-mix(in srgb, #f5b400 70%, transparent); }
+.gg-mm-node.is-current-match,
+.gg-mm-node.is-current-match.is-selected { box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px #f5b400; }
 
 /* ---------- 折叠菜单 ---------- */
 
 /* 编辑节点时 [[ 的链接候选 */
-.mm-root .mm-link-suggest { min-width: 220px; max-width: 360px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; z-index: 6; }
+.gg-mm-root .mm-link-suggest { min-width: 220px; max-width: 360px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; z-index: 6; }
 .mm-link-suggest-item {
   display: flex;
   flex-direction: column;
@@ -925,7 +929,7 @@
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
-.mm-root button.mm-menu-item {
+.gg-mm-root button.mm-menu-item {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -943,7 +947,7 @@
   cursor: pointer;
 }
 /* 左侧固定一条勾选位，勾出现在同一列，标签永远对齐 */
-.mm-root button.mm-menu-item::before {
+.gg-mm-root button.mm-menu-item::before {
   content: "";
   flex: none;
   width: 16px;
@@ -952,30 +956,30 @@
   font-size: 12px;
   text-align: center;
 }
-.mm-root button.mm-menu-item:hover { background: var(--background-modifier-hover, #f0f0f0); }
+.gg-mm-root button.mm-menu-item:hover { background: var(--background-modifier-hover, #f0f0f0); }
 
 /* ---------- 触屏：放大点击目标 ---------- */
 
 @media (pointer: coarse) {
-  .mm-root button.mm-toggle { width: 22px; height: 22px; font-size: 12px; transform: translate(12px, -50%); }
-  .mm-node[data-side="left"] .mm-toggle { transform: translate(-12px, -50%); }
+  .gg-mm-root button.mm-toggle { width: 22px; height: 22px; font-size: 12px; transform: translate(12px, -50%); }
+  .gg-mm-node[data-side="left"] .mm-toggle { transform: translate(-12px, -50%); }
   .mm-toggle::before { width: 12px; }
-  .mm-node:not(:hover) .mm-toggle { opacity: 1; }
-  .mm-root button.mm-tool { width: 34px; height: 34px; }
-  .mm-root .mm-nodebar button.mm-tool { width: 30px; height: 30px; }
-  .mm-root button.mm-swatch { width: 24px; height: 24px; }
+  .gg-mm-node:not(:hover) .mm-toggle { opacity: 1; }
+  .gg-mm-root button.mm-tool { width: 34px; height: 34px; }
+  .gg-mm-root .mm-nodebar button.mm-tool { width: 30px; height: 30px; }
+  .gg-mm-root button.mm-swatch { width: 24px; height: 24px; }
   .mm-nodebar { gap: 5px; padding: 6px; }
-  .mm-root button.mm-menu-item { padding: 10px 12px; font-size: 14px; }
+  .gg-mm-root button.mm-menu-item { padding: 10px 12px; font-size: 14px; }
 }
 
 /* ---------- 向下 / 树形结构 ---------- */
 
-.mm-node[data-side="down"] .mm-toggle {
+.gg-mm-node[data-side="down"] .mm-toggle {
   left: 50%;
   top: 100%;
   transform: translate(-50%, 10px);
 }
-.mm-node[data-side="down"] .mm-toggle::before {
+.gg-mm-node[data-side="down"] .mm-toggle::before {
   right: auto;
   left: 50%;
   top: auto;
@@ -985,11 +989,11 @@
   margin: 0 0 0 -0.75px;
 }
 .mm-drop-indicator.is-vertical { width: 4px; height: 40px; }
-.mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
-.mm-root button.mm-menu-item.is-active::before { content: "✓"; }
+.gg-mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
+.gg-mm-root button.mm-menu-item.is-active::before { content: "✓"; }
 
 /* ---------- 节点 ⇄ 笔记链接 ---------- */
-.mm-node.is-linked .mm-label .mm-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+.gg-mm-node.is-linked .mm-label .mm-link { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
 .mm-picker-new { color: var(--interactive-accent, #155dff); }
 
 /* ---------- 公式与图片 ---------- */
@@ -1006,9 +1010,9 @@
 }
 /* 有明确宽度的图片不受缩略图上限约束；含图片的节点也不受文字换行宽度限制 */
 .mm-label img.mm-img.has-size { max-width: none; max-height: none; }
-.mm-node.has-image { align-items: flex-start; max-width: none; }
-.mm-node.has-image .mm-label { display: block; text-align: center; }
-.mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
+.gg-mm-node.has-image { align-items: flex-start; max-width: none; }
+.gg-mm-node.has-image .mm-label { display: block; text-align: center; }
+.gg-mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
 
 /* <iframe> 嵌入：视频这类东西自己要吃走鼠标事件，所以节点留一圈边距当把手，
    不然整个节点被 iframe 盖住，既选不中也拖不动 */
@@ -1032,8 +1036,8 @@
   cursor: pointer;
 }
 /* 激活按钮：跟双击画面等效，多一条不用猜的路。
-   Obsidian 的 button:not(.clickable-icon) 会盖掉单类名按钮样式，所以带上 .mm-root */
-.mm-root button.mm-frame-activate {
+   Obsidian 的 button:not(.clickable-icon) 会盖掉单类名按钮样式，所以带上 .gg-mm-root */
+.gg-mm-root button.mm-frame-activate {
   position: absolute;
   right: 7px;
   bottom: 7px;
@@ -1051,23 +1055,23 @@
   opacity: 0;
   transition: opacity 0.12s;
 }
-.mm-root button.mm-frame-activate:hover { background: rgba(0, 0, 0, 0.82); }
+.gg-mm-root button.mm-frame-activate:hover { background: rgba(0, 0, 0, 0.82); }
 /* 悬停画面时出现；节点被选中时常驻，免得完全发现不了 */
 .mm-frame-shield:hover .mm-frame-activate,
-.mm-node.is-selected .mm-frame-activate { opacity: 1; }
-.mm-node.is-frame-live .mm-frame-shield { display: none; }
+.gg-mm-node.is-selected .mm-frame-activate { opacity: 1; }
+.gg-mm-node.is-frame-live .mm-frame-shield { display: none; }
 /* 放开之后加一圈虚线，免得不知道现在点下去是会跳走的。
    用 outline 不用 box-shadow —— 选中态已经占了 box-shadow，两者要能叠加 */
-.mm-node.is-frame-live {
+.gg-mm-node.is-frame-live {
   outline: 2px dashed var(--mm-selection);
   outline-offset: 3px;
 }
-.mm-node.has-frame {
+.gg-mm-node.has-frame {
   align-items: flex-start;
   max-width: none;
   padding: 10px;
 }
-.mm-node.has-frame .mm-label { display: block; text-align: center; }
+.gg-mm-node.has-frame .mm-label { display: block; text-align: center; }
 
 /* ---------- 大纲面板 ---------- */
 
@@ -1135,7 +1139,7 @@
 /* ---------- 工具栏位置 ---------- */
 
 /* 主视图里底部工具栏抬高，避开 Obsidian 右下角的状态栏 */
-.mm-root:not(.is-embedded) .mm-toolbar[data-pos="bottom"] { bottom: var(--mm-bottom-inset, 44px); }
+.gg-mm-root:not(.is-embedded) .mm-toolbar[data-pos="bottom"] { bottom: var(--mm-bottom-inset, 44px); }
 /* 窄屏放不下所有按钮时横向滑动，不被截掉 */
 .mm-toolbar[data-pos="bottom"],
 .mm-toolbar[data-pos="top"] { max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; }
@@ -1159,14 +1163,14 @@
 .mm-toolbar[data-pos="left"] .mm-zoom-label,
 .mm-toolbar[data-pos="right"] .mm-zoom-label { min-width: 0; width: 34px; padding: 0; font-size: 11px; }
 /* 工具栏在上方时，搜索栏让到下方 */
-.mm-root[data-toolbar="top"] .mm-search { top: auto; bottom: 12px; }
-.mm-root:not(.is-embedded)[data-toolbar="top"] .mm-search { bottom: var(--mm-bottom-inset, 44px); }
+.gg-mm-root[data-toolbar="top"] .gg-mm-search { top: auto; bottom: 12px; }
+.gg-mm-root:not(.is-embedded)[data-toolbar="top"] .gg-mm-search { bottom: var(--mm-bottom-inset, 44px); }
 /* 垂直工具栏靠右时，搜索栏往左让一点，避免高窗口里挨着 */
-.mm-root[data-toolbar="right"] .mm-search { right: 60px; }
+.gg-mm-root[data-toolbar="right"] .gg-mm-search { right: 60px; }
 
 /* ---------- 图片缩放手柄 ---------- */
 /* 手动宽度：节点不再受最大宽度限制，文字按设定宽度换行 */
-.mm-root .mm-node.has-width { max-width: none; }
+.gg-mm-root .gg-mm-node.has-width { max-width: none; }
 .mm-width-handle {
   position: absolute;
   z-index: 2;
@@ -1237,8 +1241,8 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 12px;
 }
-.mm-root:not(.is-embedded).has-outline .mm-crumbs { left: 12px; }
-.mm-root button.mm-crumb {
+.gg-mm-root:not(.is-embedded).has-outline .mm-crumbs { left: 12px; }
+.gg-mm-root button.mm-crumb {
   height: auto;
   padding: 3px 8px;
   border: none;
@@ -1253,10 +1257,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mm-root button.mm-crumb:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
-.mm-root button.mm-crumb.is-current { color: var(--text-normal, #1f1f1f); font-weight: 600; }
+.gg-mm-root button.mm-crumb:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
+.gg-mm-root button.mm-crumb.is-current { color: var(--text-normal, #1f1f1f); font-weight: 600; }
 .mm-crumb-sep { color: var(--text-faint, #aaa); }
-.mm-root[data-toolbar="top"] .mm-crumbs { top: auto; bottom: 12px; }
+.gg-mm-root[data-toolbar="top"] .mm-crumbs { top: auto; bottom: 12px; }
 
 /* ---------- 标签、标记、任务 ---------- */
 .mm-label a.mm-tag {
@@ -1271,7 +1275,7 @@
   vertical-align: baseline;
 }
 .mm-label a.mm-tag:hover { background: color-mix(in srgb, var(--mm-selection) 22%, transparent); }
-.mm-node[data-depth="0"] .mm-label a.mm-tag { background: rgba(255, 255, 255, 0.2); color: inherit; }
+.gg-mm-node[data-depth="0"] .mm-label a.mm-tag { background: rgba(255, 255, 255, 0.2); color: inherit; }
 .mm-markers { margin-right: 0.35em; font-size: 1.05em; letter-spacing: 0.15em; }
 .mm-task { cursor: pointer; }
 .mm-task:hover { opacity: 1; }
@@ -1280,7 +1284,7 @@
 .mm-marker-picker { gap: 4px; padding: 8px; }
 .mm-marker-row { display: flex; align-items: center; gap: 3px; }
 .mm-marker-label { width: 44px; color: var(--text-muted, #666); font-size: 11px; }
-.mm-root button.mm-marker-btn {
+.gg-mm-root button.mm-marker-btn {
   width: 30px;
   height: 28px;
   padding: 0;
@@ -1292,8 +1296,8 @@
   line-height: 1;
   cursor: pointer;
 }
-.mm-root button.mm-marker-btn:hover { background: var(--background-modifier-hover, #f0f0f0); }
-.mm-root button.mm-marker-btn.is-active { border-color: var(--mm-selection); background: color-mix(in srgb, var(--mm-selection) 12%, transparent); }
+.gg-mm-root button.mm-marker-btn:hover { background: var(--background-modifier-hover, #f0f0f0); }
+.gg-mm-root button.mm-marker-btn.is-active { border-color: var(--mm-selection); background: color-mix(in srgb, var(--mm-selection) 12%, transparent); }
 .mm-marker-picker .mm-menu-item { margin-top: 4px; justify-content: center; font-size: 12px; color: var(--text-muted, #666); }
 .mm-marker-picker .mm-menu-item::before { display: none; }
 
@@ -1304,7 +1308,7 @@
    ========================================================================== */
 
 /* ---------- 彩虹：中心主题无底色，主主题用分支色 ---------- */
-.mm-root[data-theme="rainbow"] {
+.gg-mm-root[data-theme="rainbow"] {
   --mm-root-bg: transparent;
   --mm-root-fg: var(--text-normal, #1f1f1f);
   --mm-root-size: 28px;
@@ -1317,7 +1321,7 @@
 }
 
 /* ---------- 商务：深蓝中心，实心蓝主主题，直角折线 ---------- */
-.mm-root[data-theme="business"] {
+.gg-mm-root[data-theme="business"] {
   --mm-line: #64748b;
   --mm-root-bg: #1e3a5f;
   --mm-root-fg: #ffffff;
@@ -1337,7 +1341,7 @@
   --mm-edge-w2: 1.5px;
   --mm-edge-w3: 1.25px;
 }
-.theme-dark .mm-root[data-theme="business"] {
+.theme-dark .gg-mm-root[data-theme="business"] {
   --mm-line: #7d8da3;
   --mm-root-bg: #24405f;
   --mm-main-bg: #2c5282;
@@ -1346,7 +1350,7 @@
 }
 
 /* ---------- 暖阳：橙调，大圆角 ---------- */
-.mm-root[data-theme="warm"] {
+.gg-mm-root[data-theme="warm"] {
   --mm-line: #a3714f;
   --mm-root-bg: #c2410c;
   --mm-root-fg: #fff7ed;
@@ -1363,7 +1367,7 @@
   --mm-toggle-border: #c08457;
   --mm-toggle-fg: #8a5a3b;
 }
-.theme-dark .mm-root[data-theme="warm"] {
+.theme-dark .gg-mm-root[data-theme="warm"] {
   --mm-line: #c08d6a;
   --mm-root-bg: #9a3412;
   --mm-main-bg: #57320f;
@@ -1373,7 +1377,7 @@
 }
 
 /* ---------- 极简：黑白描边，发丝线 ---------- */
-.mm-root[data-theme="mono"] {
+.gg-mm-root[data-theme="mono"] {
   --mm-line: #a1a1aa;
   --mm-root-bg: #18181b;
   --mm-root-fg: #fafafa;
@@ -1395,7 +1399,7 @@
   --mm-edge-w3: 1px;
   --mm-toggle-border: #a1a1aa;
 }
-.theme-dark .mm-root[data-theme="mono"] {
+.theme-dark .gg-mm-root[data-theme="mono"] {
   --mm-line: #71717a;
   --mm-root-bg: #fafafa;
   --mm-root-fg: #18181b;
@@ -1406,7 +1410,7 @@
 }
 
 /* ---------- 森林：绿调分支 ---------- */
-.mm-root[data-theme="forest"] {
+.gg-mm-root[data-theme="forest"] {
   --mm-line: #4d7c0f;
   --mm-root-bg: #14532d;
   --mm-root-fg: #ecfdf5;
@@ -1424,7 +1428,7 @@
   --mm-branch-5: #c7e3b8;
   --mm-toggle-border: #86a86b;
 }
-.theme-dark .mm-root[data-theme="forest"] {
+.theme-dark .gg-mm-root[data-theme="forest"] {
   --mm-line: #7aa04a;
   --mm-root-bg: #1a4d33;
   --mm-node-bg: #1f2c22;
@@ -1439,7 +1443,7 @@
 }
 
 /* ---------- 线条：除中心主题外都是纯文字，统一细度的圆角折线 ---------- */
-.mm-root[data-theme="line"] {
+.gg-mm-root[data-theme="line"] {
   --mm-line: #52525b;
   --mm-root-bg: #e4e4e7;
   --mm-root-fg: #18181b;
@@ -1465,7 +1469,7 @@
   --mm-edge-w3: 1.5px;
   --mm-toggle-border: #a1a1aa;
 }
-.theme-dark .mm-root[data-theme="line"] {
+.theme-dark .gg-mm-root[data-theme="line"] {
   --mm-line: #d4d4d8;
   --mm-root-bg: #52525b;
   --mm-root-fg: #fafafa;
@@ -1594,28 +1598,28 @@
 .mm-theme-preview .mm-toolbar { display: none; }
 
 /* 右键菜单开着时藏起节点浮动工具栏，关掉菜单再回来 */
-.mm-root.is-menu-open .mm-nodebar { visibility: hidden; }
+.gg-mm-root.is-menu-open .mm-nodebar { visibility: hidden; }
 
 /* ---------- 背诵模式（只改显示，不写文件） ---------- */
 /* 复习时用不上编辑工具栏，点题目也不让它盖住选项 */
-.mm-root.is-recite .mm-nodebar { visibility: hidden; }
+.gg-mm-root.is-recite .mm-nodebar { visibility: hidden; }
 /* ==高亮== 遮成一道横线，点一下揭开 */
-.mm-root.is-recite .mm-label mark:not(.is-revealed) {
+.gg-mm-root.is-recite .mm-label mark:not(.is-revealed) {
   color: transparent;
   background: rgba(127, 127, 127, 0.12);
   box-shadow: inset 0 -1.5px 0 var(--mm-selection);
   cursor: pointer;
 }
-.mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
-.mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
+.gg-mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
+.gg-mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
 /* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
-.mm-root.is-recite .mm-node.is-question { cursor: pointer; }
-.mm-root.is-recite .mm-task { cursor: default; }
-.mm-root.is-recite .mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }
-.mm-root.is-recite .mm-node.is-option.is-option-shown.is-correct { box-shadow: 0 0 0 2px #2fb344; }
-.mm-root.is-recite .mm-node.is-option.is-option-shown.is-correct .mm-task { background: #2fb344; border-color: #2fb344; opacity: 1; }
-.mm-root.is-recite .mm-node.is-option.is-option-shown:not(.is-correct) { opacity: 0.4; }
-.mm-root.is-recite .mm-node.is-question[data-multi]::after {
+.gg-mm-root.is-recite .gg-mm-node.is-question { cursor: pointer; }
+.gg-mm-root.is-recite .mm-task { cursor: default; }
+.gg-mm-root.is-recite .gg-mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }
+.gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown.is-correct { box-shadow: 0 0 0 2px #2fb344; }
+.gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown.is-correct .mm-task { background: #2fb344; border-color: #2fb344; opacity: 1; }
+.gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown:not(.is-correct) { opacity: 0.4; }
+.gg-mm-root.is-recite .gg-mm-node.is-question[data-multi]::after {
   content: attr(data-multi);
   flex: none;
   margin-left: 6px;

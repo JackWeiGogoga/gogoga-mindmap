@@ -31,6 +31,8 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 
 Any note can hold a small mind map: write a `mindmap` code block with the same Markdown a mind map note uses. It renders in Reading view and Live Preview, and you can edit it in place (click the pencil or double-click a node).
 
+The block can also be named `gogoga-mindmap`; it works the same. If you also use Markmind, which claims `mindmap` blocks too, turn off "Render ```mindmap code blocks" in settings to leave `mindmap` to Markmind and use `gogoga-mindmap` for your own maps.
+
 ````markdown
 ```mindmap
 # This week

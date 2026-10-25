@@ -1,9 +1,9 @@
 /**
- * 嵌入脑图的写回：在宿主笔记文本里找到 ```mindmap 代码块并替换其内容。
+ * 嵌入脑图的写回：在宿主笔记文本里找到 ```mindmap（或 ```gogoga-mindmap）代码块并替换其内容。
  * 优先用渲染时拿到的行号，行号对不上（上文被编辑过、块被移动）就按内容找唯一匹配。
  */
 
-const OPEN_RE = /^\s{0,3}(`{3,}|~{3,})\s*mindmap\b/;
+const OPEN_RE = /^\s{0,3}(`{3,}|~{3,})\s*(?:gogoga-)?mindmap(?![\w-])/;
 const CLOSE_RE = /^\s{0,3}(`{3,}|~{3,})\s*$/;
 
 export interface BlockRange {

@@ -447,7 +447,7 @@ export class MindMapCanvas {
   constructor(container: HTMLElement, opts: CanvasOptions) {
     this.opts = { ...opts };
     this.el = container;
-    this.el.classList.add("mm-root");
+    this.el.classList.add("gg-mm-root");
     this.el.tabIndex = 0;
     this.applyThemeAttrs();
     this.el.dataset.structure = opts.structure;
@@ -736,7 +736,7 @@ export class MindMapCanvas {
     if (this.touchPress) window.clearTimeout(this.touchPress.timer);
     for (const d of this.disposers) d();
     this.el.replaceChildren();
-    this.el.classList.remove("mm-root");
+    this.el.classList.remove("gg-mm-root");
     this.crumbs = null;
     this.structureMenu = null;
     this.themeMenu = null;
@@ -881,7 +881,7 @@ export class MindMapCanvas {
       }
       this.elSigs.set(el, sig);
       this.elContent.set(el, contentSig);
-      el.className = "mm-node";
+      el.className = "gg-mm-node";
       el.dataset.id = node.id;
       el.dataset.depth = String(Math.min(rel, 3));
       if (branch !== undefined) el.dataset.branch = String(branch);
@@ -2143,7 +2143,7 @@ export class MindMapCanvas {
       mark.classList.toggle("is-revealed");
       return;
     }
-    const nodeEl = target.closest<HTMLElement>(".mm-node.is-question");
+    const nodeEl = target.closest<HTMLElement>(".gg-mm-node.is-question");
     const q = nodeEl ? this.nodeFromEl(nodeEl) : null;
     if (!q) return;
     if (!this.revealedQuestions.delete(q.id)) this.revealedQuestions.add(q.id);
@@ -2371,7 +2371,7 @@ export class MindMapCanvas {
       // 双击有两条路（原生 dblclick 和 pointerup 自判定），两条都得知道有没有落在挡板上
       this.downOnShield = !!target.closest(".mm-frame-shield");
       this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
-      const nodeEl = target.closest<HTMLElement>(".mm-node");
+      const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
@@ -2559,7 +2559,7 @@ export class MindMapCanvas {
 
     this.on(el, "dblclick", (ev) => {
       if (this.opts.embedded) ev.stopPropagation();
-      const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
+      const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
       const node = nodeEl && this.nodeFromEl(nodeEl);
       if (!node) {
         // 双击外框里的空白处：直接编辑外框标题（没有标题就加一个）
@@ -2583,7 +2583,7 @@ export class MindMapCanvas {
     this.on(el, "mouseover", (ev) => {
       const target = ev.target as HTMLElement;
       if (target.closest("a.internal-link")) return;
-      const nodeEl = target.closest<HTMLElement>(".mm-node.is-linked");
+      const nodeEl = target.closest<HTMLElement>(".gg-mm-node.is-linked");
       const linktext = nodeEl?.dataset.link;
       // 预览插件会盯着 targetEl 判断鼠标是否还停着，所以传节点本身
       if (nodeEl && linktext) this.opts.host?.hoverLink?.(ev, linktext, nodeEl);
@@ -2597,10 +2597,10 @@ export class MindMapCanvas {
 
     this.on(el, "contextmenu", (ev) => {
       const target = ev.target as HTMLElement;
-      if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar, .mm-search, .mm-menu, .mm-crumbs")) return;
+      if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar, .gg-mm-search, .mm-menu, .mm-crumbs")) return;
       ev.preventDefault();
       if (this.opts.embedded) ev.stopPropagation();
-      const nodeEl = target.closest<HTMLElement>(".mm-node");
+      const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
       const node = nodeEl ? this.nodeFromEl(nodeEl) : null;
       if (node) {
         if (this.editing === node) return;
@@ -2624,7 +2624,7 @@ export class MindMapCanvas {
       if (!this.opts.editable) return;
       ev.preventDefault();
       if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
-      const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
+      const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
       if (this.dropHover !== nodeEl) {
         this.dropHover?.classList.remove("is-drop-target");
         this.dropHover = nodeEl;
@@ -2640,7 +2640,7 @@ export class MindMapCanvas {
       if (!this.opts.editable) return;
       ev.preventDefault();
       if (this.opts.embedded) ev.stopPropagation();
-      const targetEl = this.dropHover ?? (ev.target as HTMLElement).closest<HTMLElement>(".mm-node");
+      const targetEl = this.dropHover ?? (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
       this.dropHover?.classList.remove("is-drop-target");
       this.dropHover = null;
       const target = (targetEl && this.nodeFromEl(targetEl)) ?? this.primary ?? this.doc?.root ?? null;
@@ -2735,7 +2735,7 @@ export class MindMapCanvas {
    * 事件目标永远是外面的 label，所以按坐标判断落没落在图片上
    */
   private imageAt(target: HTMLElement, x: number, y: number): HTMLImageElement | null {
-    const nodeEl = target.closest<HTMLElement>(".mm-node");
+    const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
     if (!nodeEl) return null;
     for (const img of nodeEl.querySelectorAll<HTMLImageElement>("img.mm-img")) {
       const r = img.getBoundingClientRect();
@@ -2782,7 +2782,7 @@ export class MindMapCanvas {
   private handleKey(ev: KeyboardEvent): void {
     const mod = ev.metaKey || ev.ctrlKey;
     const target = ev.target as HTMLElement;
-    if (target.closest(".mm-search")) return;
+    if (target.closest(".gg-mm-search")) return;
     // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
     if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {
@@ -3987,11 +3987,11 @@ export class MindMapCanvas {
       return;
     }
     const bar = createDiv();
-    bar.className = "mm-search";
+    bar.className = "gg-mm-search";
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     const input = createEl("input");
     input.type = "text";
-    input.className = "mm-search-input";
+    input.className = "gg-mm-search-input";
     input.placeholder = t("canvas.searchPlaceholder");
     input.spellcheck = false;
     const count = createSpan();
@@ -4817,7 +4817,7 @@ export class MindMapCanvas {
     // iframe 外面还包了一层定位的 .mm-frame-box，offsetLeft 是相对最近的定位祖先，得一路加回节点
     let left = box.offsetWidth;
     let top = box.offsetHeight;
-    for (let n: HTMLElement | null = box; n && !n.classList.contains("mm-node"); n = n.offsetParent as HTMLElement | null) {
+    for (let n: HTMLElement | null = box; n && !n.classList.contains("gg-mm-node"); n = n.offsetParent as HTMLElement | null) {
       left += n.offsetLeft;
       top += n.offsetTop;
     }

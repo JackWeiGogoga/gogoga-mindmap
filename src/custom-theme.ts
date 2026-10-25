@@ -157,7 +157,7 @@ export function darkVariant(c: string, role: "fill" | "text" | "stroke"): string
 
 function tierRules(sel: string, t: TierStyle, depth: number, theme: CustomTheme, dark: boolean): string {
   const col = (c: string, role: "fill" | "text" | "stroke") => (dark ? darkVariant(c, role) : c);
-  const node = `${sel} .mm-node[data-depth="${depth}"]`;
+  const node = `${sel} .gg-mm-node[data-depth="${depth}"]`;
   const out: string[] = [];
   if (!dark) {
     const border = t.borderStyle === "none" || t.underline ? "none" : `${t.borderWidth}px ${t.borderStyle} ${t.borderColor}`;
@@ -182,7 +182,7 @@ function tierRules(sel: string, t: TierStyle, depth: number, theme: CustomTheme,
 export function customThemeCss(themes: CustomTheme[]): string {
   const parts: string[] = [];
   for (const th of themes) {
-    const sel = `.mm-root[data-custom="${th.id}"]`;
+    const sel = `.gg-mm-root[data-custom="${th.id}"]`;
     th.tiers.forEach((t, depth) => {
       parts.push(tierRules(sel, t, depth, th, false));
       parts.push(tierRules(`.theme-dark ${sel}`, t, depth, th, true));

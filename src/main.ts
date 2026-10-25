@@ -490,7 +490,7 @@ export default class MindMapPlugin extends Plugin {
   private blockStates = new Map<string, BlockState>();
 
   private registerCodeBlock(): void {
-    this.registerMarkdownCodeBlockProcessor("mindmap", (source, el, ctx) => {
+    const processor = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
       const wrap = el.createDiv({ cls: "mm-codeblock" });
       const child = new MarkdownRenderChild(wrap);
       const info = ctx.getSectionInfo(el);
@@ -597,7 +597,10 @@ export default class MindMapPlugin extends Plugin {
         canvas.destroy();
       });
       ctx.addChild(child);
-    });
+    };
+    // gogoga-mindmap 是专属名字，总能用；mindmap 和 Markmind 撞名，设置里可以让给它（改了重新加载插件生效）
+    this.registerMarkdownCodeBlockProcessor("gogoga-mindmap", processor);
+    if (this.settings.claimMindmapBlock) this.registerMarkdownCodeBlockProcessor("mindmap", processor);
   }
 
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */

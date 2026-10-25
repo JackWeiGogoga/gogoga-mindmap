@@ -13,13 +13,13 @@ const theme: CustomTheme = {
 
 test("自定义主题样式表：按层级出规则，颜色标记和手动宽度优先，下划线层不画边框", () => {
   const css = customThemeCss([theme]);
-  assert.match(css, /\.mm-root\[data-custom="custom-abc"\] \.mm-node\[data-depth="1"\]:not\(\.has-width\):not\(\.has-image\) \{ max-width: 120px; \}/);
-  assert.match(css, /\.mm-node\[data-depth="0"\]:not\(\.has-color\):not\(\.is-underline\) \{ background: #3c3489; color: #ffffff; \}/);
+  assert.match(css, /\.gg-mm-root\[data-custom="custom-abc"\] \.gg-mm-node\[data-depth="1"\]:not\(\.has-width\):not\(\.has-image\) \{ max-width: 120px; \}/);
+  assert.match(css, /\.gg-mm-node\[data-depth="0"\]:not\(\.has-color\):not\(\.is-underline\) \{ background: #3c3489; color: #ffffff; \}/);
   assert.match(css, /\.mm-edge\[data-depth="2"\] \{ stroke: #7f77dd; stroke-width: 2px; \}/);
   assert.ok(!/\.mm-edge\[data-depth="0"\]/.test(css), "中心主题没有入线");
-  assert.match(css, /\.mm-node\[data-depth="2"\]:not\(\.is-underline\) \{ border-radius: 6px; border: none; \}/);
+  assert.match(css, /\.gg-mm-node\[data-depth="2"\]:not\(\.is-underline\) \{ border-radius: 6px; border: none; \}/);
   // 深色版本
-  assert.match(css, /\.theme-dark \.mm-root\[data-custom="custom-abc"\] \.mm-node\[data-depth="1"\]:not\(\.has-color\)/);
+  assert.match(css, /\.theme-dark \.gg-mm-root\[data-custom="custom-abc"\] \.gg-mm-node\[data-depth="1"\]:not\(\.has-color\)/);
   // 彩虹分支时主主题底色让给分支色
   const rainbow = customThemeCss([{ ...theme, branchColors: true }]);
   assert.ok(!/data-depth="1"\]:not\(\.has-color\):not\(\.is-underline\) \{ background/.test(rainbow));

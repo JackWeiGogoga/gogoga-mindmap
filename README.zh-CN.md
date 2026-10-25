@@ -34,6 +34,8 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 
 任何一篇普通笔记都能插一张小脑图：写一个 `mindmap` 代码块，块里放和脑图笔记同一套 Markdown。阅读模式和实时预览都会渲染，点铅笔或双击节点就能就地编辑，改动直接写回代码块。
 
+代码块名也可以写成 `gogoga-mindmap`，效果一样。如果同时装了 Markmind（它也认 `mindmap` 代码块），可以在设置里关掉「渲染 ```mindmap 代码块」，把 `mindmap` 交给 Markmind，自己的图改用 `gogoga-mindmap`。
+
 ````markdown
 ```mindmap
 # 本周计划

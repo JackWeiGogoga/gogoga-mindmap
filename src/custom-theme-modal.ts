@@ -31,7 +31,7 @@ export function themeFromBase(base: ThemeName, name: string, id: string): Custom
   const body = document.body;
   const wasDark = body.classList.contains("theme-dark");
   if (wasDark) body.classList.replace("theme-dark", "theme-light");
-  const root = createDiv({ cls: "mm-root" });
+  const root = createDiv({ cls: "gg-mm-root" });
   root.dataset.theme = base;
   root.dataset.branchColors = th.branchColors ? "true" : "false";
   root.setCssStyles({ position: "absolute", left: "-10000px", top: "0", visibility: "hidden" });
@@ -41,7 +41,7 @@ export function themeFromBase(base: ThemeName, name: string, id: string): Custom
   body.append(root);
   try {
     for (let depth = 0; depth < 4; depth++) {
-      const node = root.createDiv({ cls: "mm-node" });
+      const node = root.createDiv({ cls: "gg-mm-node" });
       node.dataset.depth = String(depth);
       const underline = depth > 0 && isUnderlineAt(th, depth);
       if (underline) node.addClass("is-underline");

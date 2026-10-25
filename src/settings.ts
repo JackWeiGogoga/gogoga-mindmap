@@ -22,6 +22,8 @@ export interface MindMapSettings {
   indent: "tab" | "2" | "4";
   /** 代码块嵌入的最大高度 */
   codeBlockMaxHeight: number;
+  /** 是否接管 ```mindmap 代码块；关掉就只认 ```gogoga-mindmap，把 mindmap 让给 Markmind 等同名插件 */
+  claimMindmapBlock: boolean;
   /** 脑图视图是否显示大纲面板 */
   outlineOpen: boolean;
   /**
@@ -55,6 +57,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   maxHeadingLevel: 3,
   indent: "tab",
   codeBlockMaxHeight: 600,
+  claimMindmapBlock: true,
   outlineOpen: false,
   toolbarPosition: "bottom",
   wheelAction: "pan",
@@ -253,6 +256,16 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.codeBlockMaxHeight = n;
             await this.plugin.saveSettings();
           }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.claimBlock.name"))
+      .setDesc(t("settings.claimBlock.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.claimMindmapBlock).onChange(async (v) => {
+          this.plugin.settings.claimMindmapBlock = v;
+          await this.plugin.saveSettings();
         }),
       );
 

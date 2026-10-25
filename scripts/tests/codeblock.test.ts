@@ -53,3 +53,12 @@ test("替换块内容，围栏和其余文本原样保留", () => {
   const emptied = replaceBlock(host, { lineStart: 11, lineEnd: 13 }, "");
   assert.ok(emptied.includes("~~~mindmap\n~~~"), emptied);
 });
+
+test("```gogoga-mindmap 也算脑图代码块，能定位和写回", () => {
+  const text = "前文\n\n```gogoga-mindmap\n# 根\n- A\n```\n\n```mindmap-other\n# 不算\n```\n";
+  const blocks = findMindmapBlocks(text);
+  assert.deepEqual(blocks.map((b) => [b.lineStart, b.lineEnd, b.inner]), [[2, 5, "# 根\n- A"]]);
+  const range = locateBlock(text, null, "# 根\n- A");
+  assert.ok(range);
+  assert.equal(replaceBlock(text, range, "# 根\n- B"), "前文\n\n```gogoga-mindmap\n# 根\n- B\n```\n\n```mindmap-other\n# 不算\n```\n");
+});
