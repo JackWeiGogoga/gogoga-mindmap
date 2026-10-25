@@ -16,6 +16,7 @@ import {
   GroupKind,
   groupLimits,
   groupRange,
+  insertParents,
   setGroupRange,
   NODE_MAX_WIDTH,
   NODE_MIN_WIDTH,
@@ -177,6 +178,7 @@ export type NodeCommand =
   | "add-child"
   | "add-sibling"
   | "insert-before"
+  | "insert-parent"
   | "edit"
   | "delete"
   | "delete-only"
@@ -3577,6 +3579,18 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 视图把 ⌘↵ 交到这里：备注框里是关掉备注，搜索框里不管，其他时候插入父节点 */
+  handleModEnter(ev: KeyboardEvent): void {
+    const target = ev.target as HTMLElement;
+    if (target.closest?.(".gg-mm-search")) return;
+    if (target.tagName === "TEXTAREA") {
+      this.closePopover();
+      this.el.focus({ preventScroll: true });
+      return;
+    }
+    this.runNodeCommand("insert-parent");
+  }
+
   /** 命令入口：和画布里的按键做同一件事；正在编辑的文字先提交 */
   runNodeCommand(cmd: NodeCommand): void {
     const sel = this.primary;
@@ -3595,6 +3609,8 @@ export class MindMapCanvas {
         return this.addSiblingToSelected(false);
       case "insert-before":
         return this.addSiblingToSelected(true);
+      case "insert-parent":
+        return this.insertParentForSelected();
       case "edit":
         return this.startEdit(sel);
       case "delete":
@@ -3615,6 +3631,24 @@ export class MindMapCanvas {
         break;
     }
     this.ensureVisible(this.primary);
+  }
+
+  /**
+   * 插入父节点（XMind 的 ⌘↵）：选中的兄弟收进一个新节点，不是兄弟的各自一个；建好就进入编辑。
+   * 不当「新节点」编辑：Esc 或留空也不会删掉它（删它会连带收进去的节点），要撤销按 ⌘Z
+   */
+  private insertParentForSelected(): void {
+    if (!this.doc || !this.opts.editable) return;
+    if (this.editing) this.commitEdit();
+    const made = insertParents([...this.selected], this.doc.style);
+    if (!made.length) return;
+    this.select(made[0]);
+    for (const n of made.slice(1)) this.select(n, "add");
+    this.setPrimary(made[0]);
+    this.render();
+    this.notify();
+    this.ensureVisible(made[0]);
+    if (made.length === 1) this.startEdit(made[0]);
   }
 
   /** 只删选中的节点本身，它的子节点按原顺序接到父节点下、它原来的位置 */
@@ -4313,6 +4347,7 @@ export class MindMapCanvas {
         { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
         { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent, run: () => this.addSiblingToSelected(false) },
         { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", disabled: !node.parent, run: () => this.addSiblingToSelected(true) },
+        { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent, run: () => this.insertParentForSelected() },
         sep,
       );
     }

@@ -36,6 +36,15 @@ export class MindMapView extends TextFileView {
       void this.canvas?.linkSelectedToNote();
       return false;
     });
+    // ⌘↵ 插入父节点（XMind 的习惯）。全局的 ⌘↵ 是「在新标签页打开链接」，按键根本到不了画布，
+    // 只能在视图的 Scope 里截；用户自己把 ⌘↵ 绑给了本插件别的命令就执行那个
+    this.scope.register(["Mod"], "Enter", (ev) => {
+      const own = this.plugin.ownHotkeyCommand(ev);
+      const commands = (this.app as unknown as { commands?: { executeCommandById?: (id: string) => boolean } }).commands;
+      if (own && own !== `${this.plugin.manifest.id}:insert-parent` && commands?.executeCommandById) commands.executeCommandById(own);
+      else this.canvas?.handleModEnter(ev);
+      return false;
+    });
   }
 
   linkSelectedToNote(): Promise<void> {

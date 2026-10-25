@@ -191,6 +191,57 @@ export function setGroupRange(start: MindNode, kind: GroupKind, from: number, to
   return next;
 }
 
+/**
+ * 插入父节点（XMind 的 ⌘↵）：选中的节点按父节点分组，同一组放进一个新建的空节点里，
+ * 新节点占组里第一个节点的位置；不是兄弟的各自一组。中心主题跳过。
+ * 这一层的外框 / 概要按「被收进去的节点换成新节点」重算范围。返回新建的父节点
+ */
+export function insertParents(nodes: MindNode[], style: DocStyle): MindNode[] {
+  const groups = new Map<MindNode, MindNode[]>();
+  for (const n of nodes) {
+    if (!n.parent) continue;
+    const arr = groups.get(n.parent) ?? [];
+    if (!arr.includes(n)) arr.push(n);
+    groups.set(n.parent, arr);
+  }
+  const created: MindNode[] = [];
+  for (const [parent, members] of groups) {
+    const sibs = parent.children;
+    members.sort((a, b) => sibs.indexOf(a) - sibs.indexOf(b));
+    // 先摘下这一层的外框 / 概要，记住各自罩着哪些节点，挪完再按新位置放回去
+    const saved: { kind: GroupKind; start: MindNode; covered: MindNode[] }[] = [];
+    sibs.forEach((s, i) => {
+      for (const kind of ["box", "summary"] as const) {
+        const g = s[kind];
+        if (g) saved.push({ kind, start: s, covered: sibs.slice(i, i + Math.max(1, g.span)) });
+      }
+    });
+    const data = new Map(saved.map((g) => [g, g.start[g.kind]!]));
+    for (const g of saved) g.start[g.kind] = undefined;
+    const first = members[0];
+    const wrap = createNode({ parent, text: "", kind: first.kind, level: first.level, bullet: first.bullet });
+    wrap.depth = parent.depth + 1;
+    if (first.side) wrap.side = first.side;
+    sibs.splice(sibs.indexOf(first), 0, wrap);
+    members.forEach((m, i) => moveNode(m, wrap, i, style));
+    for (const m of members) m.side = undefined;
+    const inside = new Set(members);
+    for (const g of saved) {
+      const idx = g.covered.map((n) => sibs.indexOf(inside.has(n) ? wrap : n)).filter((i) => i >= 0);
+      if (!idx.length) continue;
+      const lo = Math.min(...idx);
+      const hi = Math.max(...idx);
+      const start = sibs[lo];
+      const prev = start[g.kind];
+      const span = Math.max(hi - lo + 1, prev?.span ?? 0);
+      if (g.kind === "box") start.box = { ...(data.get(g) as Boundary), ...(prev as Boundary | undefined), span };
+      else start.summary = { ...(data.get(g) as Summary), ...(prev as Summary | undefined), span };
+    }
+    created.push(wrap);
+  }
+  return created;
+}
+
 /** 同 boxGroups，换成概要：节点 id → 所属概要的起始节点 */
 export function summaryGroups(siblings: MindNode[]): Map<string, MindNode> {
   const out = new Map<string, MindNode>();

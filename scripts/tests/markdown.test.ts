@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseMarkdown, serializeMarkdown, splitMarker } from "../../src/markdown";
-import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange } from "../../src/model";
+import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents } from "../../src/model";
 
 const canonical = `---
 mindmap: true
@@ -574,4 +574,39 @@ test("调整概要 / 外框范围：两头都能伸缩，标记挪到新起点�
     serializeMarkdown(doc),
     `# 根\n- A %%box=6%%\n- B\n- C\n- D %%summary "小结" sw=120%%\n- E %%summary%%\n- F\n`,
   );
+});
+
+test("插入父节点：同一父节点下的选中节点收进一个新节点，放在第一个的位置；不是兄弟的各自一个", () => {
+  const doc = parseMarkdown(`# 根\n- A\n- B\n\t- B1\n- C\n- D\n`);
+  const [a, b, c, d] = doc.root.children;
+  const b1 = b.children[0];
+  const made = insertParents([c, a, b1], doc.style);
+  assert.equal(made.length, 2);
+  assert.deepEqual(doc.root.children.map((n) => n.text), ["", "B", "D"]);
+  assert.deepEqual(made[0].children.map((n) => n.text), ["A", "C"]);
+  assert.equal(made[0].depth, 1);
+  assert.equal(a.depth, 2);
+  assert.deepEqual(b.children.map((n) => n.text), [""]);
+  assert.equal(b.children[0].children[0], b1);
+  assert.equal(b1.depth, 3);
+  made[0].text = "新";
+  b.children[0].text = "包";
+  assert.equal(serializeMarkdown(doc), `# 根\n- 新\n\t- A\n\t- C\n- B\n\t- 包\n\t\t- B1\n- D\n`);
+  void d;
+});
+
+test("插入父节点：标题跟着降级；这一层的外框 / 概要把收进去的节点换成新节点重算范围", () => {
+  const doc = parseMarkdown(`# 根\n\n## A %%box=3 "框"%%\n\n## B\n\n## C\n\n## D %%summary "结"%%\n`);
+  const [a, b] = doc.root.children;
+  const [wrap] = insertParents([a, b], doc.style);
+  wrap.text = "新";
+  assert.equal(
+    serializeMarkdown(doc),
+    `# 根\n\n## 新 %%box=2 "框"%%\n\n### A\n\n### B\n\n## C\n\n## D %%summary "结"%%\n`,
+  );
+});
+
+test("插入父节点：中心主题跳过", () => {
+  const doc = parseMarkdown(`# 根\n- A\n`);
+  assert.deepEqual(insertParents([doc.root], doc.style), []);
 });

@@ -407,6 +407,7 @@ export default class MindMapPlugin extends Plugin {
       ["add-child", "add-child", "command.addChild"],
       ["add-sibling", "add-sibling", "command.addSibling"],
       ["insert-before", "insert-before", "command.insertBefore"],
+      ["insert-parent", "insert-parent", "command.insertParent"],
       ["edit-node", "edit", "command.editNode"],
       ["delete-node", "delete", "command.deleteNode"],
       ["delete-node-only", "delete-only", "command.deleteNodeOnly"],
@@ -640,21 +641,27 @@ export default class MindMapPlugin extends Plugin {
    * 读不到就当没有，画布按原来的方式处理
    */
   isOwnHotkey(ev: KeyboardEvent): boolean {
+    return this.ownHotkeyCommand(ev) !== null;
+  }
+
+  /** 按键命中的本插件命令 id（用户在快捷键设置里绑的），没有返回 null */
+  ownHotkeyCommand(ev: KeyboardEvent): string | null {
     const hm = (this.app as unknown as { hotkeyManager?: { bakedIds?: string[]; bakedHotkeys?: { modifiers: string; key: string }[] } }).hotkeyManager;
     const ids = hm?.bakedIds;
     const keys = hm?.bakedHotkeys;
-    if (!ids || !keys) return false;
+    if (!ids || !keys) return null;
     const mods = [ev.altKey && "Alt", ev.ctrlKey && "Ctrl", ev.metaKey && "Meta", ev.shiftKey && "Shift"].filter(Boolean).join(",");
     const key = ev.key.toLowerCase();
     // Alt 组合在 macOS 上 ev.key 是变形字符，再按物理键比一次
     const code = ev.code.replace(/^(Key|Digit)/, "").toLowerCase();
     const prefix = `${this.manifest.id}:`;
-    return ids.some((id, i) => {
+    const i = ids.findIndex((id, i) => {
       const hk = keys[i];
       if (!id.startsWith(prefix) || !hk || hk.modifiers !== mods) return false;
       const k = hk.key.toLowerCase();
       return k === key || k === code;
     });
+    return i < 0 ? null : ids[i];
   }
 
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
