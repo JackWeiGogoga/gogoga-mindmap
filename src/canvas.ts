@@ -2955,8 +2955,12 @@ export class MindMapCanvas {
         const scale = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
         const rect = el.getBoundingClientRect();
         if (ev.ctrlKey || ev.metaKey) {
-          // 触控板捏合也走这里（浏览器会带上 ctrlKey）
-          this.zoomBy(Math.exp(-ev.deltaY * scale * 0.01), ev.clientX - rect.left, ev.clientY - rect.top);
+          // 触控板捏合也走这里（浏览器会带上 ctrlKey），每次的量很小，按原样连续缩放；
+          // 鼠标滚轮一格的量约 100，原样算一格就是 2.7 倍，和直接缩放一样限幅成每格约 1.2 倍
+          const raw = ev.deltaY * scale;
+          const notch = ev.deltaMode !== 0 || Math.abs(raw) >= 50;
+          const d = notch ? Math.max(-100, Math.min(100, Math.sign(raw) * Math.max(Math.abs(raw), 100))) * 0.18 : raw;
+          this.zoomBy(Math.exp(-d * 0.01), ev.clientX - rect.left, ev.clientY - rect.top);
         } else if (!ev.shiftKey && this.opts.wheelZoom?.()) {
           // 鼠标一格 deltaY 约 100，限幅后每格约 1.2 倍，和工具栏 +/- 一致
           const d = Math.max(-100, Math.min(100, ev.deltaY * scale));
