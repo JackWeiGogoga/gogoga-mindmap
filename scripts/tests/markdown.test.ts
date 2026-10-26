@@ -656,3 +656,15 @@ test("自由主题：给它插入父节点，新节点接替它当自由主题�
   assert.equal(f.float, undefined);
   assert.equal(f.parent, wrap);
 });
+
+test("菜单平铺：二级菜单展开在原位置，前后加分隔线，不出现连续或首尾多余的分隔线；禁用的组整组跳过", async () => {
+  const { flattenMenu } = await import("../../src/canvas");
+  const out = flattenMenu([
+    { title: "A" },
+    { title: "组", submenu: [{ title: "x" }, { separator: true }, { title: "y" }] },
+    { separator: true },
+    { title: "禁用组", disabled: true, submenu: [{ title: "z" }] },
+    { title: "B" },
+  ]);
+  assert.deepEqual(out.map((e) => (e.separator ? "-" : e.title)), ["A", "-", "x", "-", "y", "-", "B"]);
+});

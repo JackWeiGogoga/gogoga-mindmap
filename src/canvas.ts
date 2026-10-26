@@ -120,6 +120,24 @@ export interface MenuEntry {
   checked?: boolean;
   run?: () => void;
   separator?: boolean;
+  /** 二级菜单；host 拿不到二级菜单时平铺在这一项的位置 */
+  submenu?: MenuEntry[];
+}
+
+/** 把二级菜单平铺开（不支持二级菜单的地方用），子项前后加分隔线 */
+export function flattenMenu(entries: MenuEntry[]): MenuEntry[] {
+  const out: MenuEntry[] = [];
+  for (const e of entries) {
+    if (!e.submenu) {
+      out.push(e);
+      continue;
+    }
+    if (e.disabled) continue;
+    if (out.length && !out[out.length - 1].separator) out.push({ separator: true });
+    out.push(...flattenMenu(e.submenu).filter((x, i, arr) => !(x.separator && (i === 0 || i === arr.length - 1))));
+    out.push({ separator: true });
+  }
+  return out.filter((x, i, arr) => !(x.separator && arr[i - 1]?.separator));
 }
 
 export interface DroppedFile {
@@ -4655,7 +4673,7 @@ export class MindMapCanvas {
       this.opts.host.showMenu(entries, ev, onClose);
       return;
     }
-    const items = entries.filter((e) => !e.separator && e.title && !e.disabled).map((e) => ({ label: e.title!, active: e.checked, run: () => e.run?.() }));
+    const items = flattenMenu(entries).filter((e) => !e.separator && e.title && !e.disabled).map((e) => ({ label: e.title!, active: e.checked, run: () => e.run?.() }));
     const host = this.el.getBoundingClientRect();
     this.contextMenu?.remove();
     this.contextMenu = this.buildMenu(items, null, () => {
@@ -4677,6 +4695,10 @@ export class MindMapCanvas {
     this.showContextMenu(this.backgroundMenuEntries(this.toWorld(ev.clientX, ev.clientY)), ev);
   }
 
+  /**
+   * 节点右键菜单。常用的留在第一层，成组的（插入、折叠展开、外框、概要）和低频的（更多）收进二级菜单，
+   * 第一层固定二十项左右，矮窗口也放得下。Obsidian 拿不到二级菜单时由 host 平铺开
+   */
   private nodeMenuEntries(node: MindNode): MenuEntry[] {
     const editable = this.opts.editable;
     const link = wikilinkOf(node.text);
@@ -4684,29 +4706,40 @@ export class MindMapCanvas {
     const entries: MenuEntry[] = [];
     if (editable) {
       entries.push(
-        { title: t("menu.edit"), icon: "pencil", run: () => this.startEdit(node) },
+        { title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
         { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
         { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent, run: () => this.addSiblingToSelected(false) },
-        { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", disabled: !node.parent, run: () => this.addSiblingToSelected(true) },
-        { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent, run: () => this.insertParentForSelected() },
+        {
+          title: t("menu.insertGroup"),
+          icon: "between-horizontal-start",
+          disabled: !node.parent,
+          submenu: [
+            { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", run: () => this.addSiblingToSelected(true) },
+            { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", run: () => this.insertParentForSelected() },
+          ],
+        },
         sep,
       );
+    }
+    if (node.children.length) {
+      entries.push({
+        title: t("menu.foldGroup"),
+        icon: node.folded ? "chevron-down" : "chevron-right",
+        submenu: [
+          { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) },
+          // 和数字键一样从这个节点往下算：0 = 全部展开，1 = 只露出下一级
+          { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
+          { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", run: () => this.setFoldLevel(1, node) },
+        ],
+      });
     }
     entries.push(
       this.focusRoot === node
         ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
         : { title: t("menu.focusBranch"), icon: "focus", disabled: !node.children.length, run: () => this.focusOn(node) },
+      { title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) },
+      sep,
     );
-    if (node.children.length) {
-      entries.push(
-        { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) },
-        // 和数字键一样从这个节点往下算：0 = 全部展开，1 = 只露出下一级
-        { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
-        { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", run: () => this.setFoldLevel(1, node) },
-      );
-    }
-    entries.push({ title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) });
-    entries.push(sep);
     if (editable) {
       if (link) {
         entries.push(
@@ -4714,7 +4747,7 @@ export class MindMapCanvas {
           { title: t("menu.unlink"), icon: "unlink", run: () => this.unlinkNote(node) },
         );
       } else if (this.opts.host?.pickNote) {
-        entries.push({ title: t("menu.linkNote"), icon: "link", run: () => void this.linkSelectedToNote() });
+        entries.push({ title: `${t("menu.linkNote")}  ${sc("Mod")}K`, icon: "link", run: () => void this.linkSelectedToNote() });
       }
       entries.push(
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
@@ -4722,29 +4755,39 @@ export class MindMapCanvas {
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
       if (node.width) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidth(node) });
-      if (this.isFloating(node)) entries.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
-      else if (node.parent && this.canFloat()) entries.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
+      // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
-      if (box) entries.push(...this.boxMenuEntries(box));
-      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent, run: () => this.addBoxToSelected() });
+      if (box) entries.push({ title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
+      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent || this.isFloating(node), run: () => this.addBoxToSelected() });
       const summary = this.summaryOf(node);
-      if (summary) entries.push(...this.summaryMenuEntries(summary));
-      else entries.push({ title: t("menu.addSummary"), icon: "brackets", disabled: !node.parent, run: () => this.addSummaryToSelected() });
+      if (summary) entries.push({ title: t("menu.summaryGroup"), icon: "brackets", submenu: this.summaryMenuEntries(summary) });
+      else entries.push({ title: t("menu.addSummary"), icon: "brackets", disabled: !node.parent || this.isFloating(node), run: () => this.addSummaryToSelected() });
       entries.push(sep);
-      const parent = node.parent;
-      const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
+    }
+    entries.push({ title: t("menu.copy"), icon: "copy", run: () => this.copySelection() });
+    if (editable) {
       entries.push(
-        { title: t("menu.toHeading"), icon: "heading", disabled: !parent || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
-        { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list", run: () => this.convertLevel(node, "list") },
-        sep,
+        { title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() },
+        { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() },
       );
     }
-    entries.push(
-      { title: t("menu.copy"), icon: "copy", run: () => this.copySelection() },
-      ...(editable ? [{ title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() } as MenuEntry, { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() } as MenuEntry] : []),
-      { title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) },
-      ...(this.opts.onRevealInMarkdown ? [{ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() } as MenuEntry] : []),
-    );
+    entries.push(sep);
+    // 更多：低频的转换、链接、跳转
+    const more: MenuEntry[] = [];
+    if (editable) {
+      const parent = node.parent;
+      const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
+      more.push(
+        { title: t("menu.toHeading"), icon: "heading", disabled: !parent || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
+        { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list", run: () => this.convertLevel(node, "list") },
+      );
+      if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
+      else if (node.parent && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
+      more.push(sep);
+    }
+    more.push({ title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
+    if (this.opts.onRevealInMarkdown) more.push({ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() });
+    entries.push({ title: t("menu.more"), icon: "more-horizontal", submenu: more });
     if (editable && node.parent) {
       entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
       if (node.children.length) entries.push({ title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });

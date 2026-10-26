@@ -33,7 +33,7 @@ import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, MindMapCanvas, NodeCommand } from "./canvas";
+import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand } from "./canvas";
 import { frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -784,19 +784,34 @@ export default class MindMapPlugin extends Plugin {
       showMenu: (entries, ev, onClose) => {
         const menu = new Menu();
         if (onClose) menu.onHide(onClose);
-        for (const e of entries) {
-          if (e.separator) {
-            menu.addSeparator();
-            continue;
+        // 二级菜单用的是 Obsidian 自己也在用的 MenuItem.setSubmenu()（不在公开 API 里）；
+        // 没有这个方法时把子项平铺开，功能一样
+        let canSub = false;
+        // 用一个不显示的菜单探一下 MenuItem 有没有 setSubmenu
+        new Menu().addItem((item) => {
+          canSub = typeof (item as unknown as { setSubmenu?: unknown }).setSubmenu === "function";
+        });
+        const fill = (m: Menu, list: MenuEntry[]) => {
+          for (const e of list) {
+            if (e.separator) {
+              m.addSeparator();
+              continue;
+            }
+            m.addItem((item) => {
+              item.setTitle(e.title ?? "");
+              if (e.icon) item.setIcon(e.icon);
+              if (e.checked) item.setChecked(true);
+              item.setDisabled(!!e.disabled);
+              if (e.submenu) {
+                const sub = (item as unknown as { setSubmenu: () => Menu }).setSubmenu();
+                fill(sub, e.submenu);
+              } else {
+                item.onClick(() => e.run?.());
+              }
+            });
           }
-          menu.addItem((item) => {
-            item.setTitle(e.title ?? "");
-            if (e.icon) item.setIcon(e.icon);
-            if (e.checked) item.setChecked(true);
-            item.setDisabled(!!e.disabled);
-            item.onClick(() => e.run?.());
-          });
-        }
+        };
+        fill(menu, canSub ? entries : flattenMenu(entries));
         menu.showAtMouseEvent(ev);
       },
       openTag: (tag) => {
