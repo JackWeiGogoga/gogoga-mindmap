@@ -632,6 +632,23 @@
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
   filter: brightness(0.96);
 }
+/* 多个节点一起拖时，幽灵节点右上角的数量角标 */
+.mm-ghost-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--mm-selection);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
 .mm-ghost {
   position: absolute;
   z-index: 5;

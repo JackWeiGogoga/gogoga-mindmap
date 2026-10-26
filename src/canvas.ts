@@ -443,7 +443,8 @@ export class MindMapCanvas {
     handle: HTMLElement;
   } | null = null;
   private clipboardText = "";
-  private drag: { node: MindNode; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
+  /** movers：一起拖的节点（多选时是选区里最外层的那些，按文档顺序），node 是按住的那个 */
+  private drag: { node: MindNode; movers: MindNode[]; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode>; moved?: boolean } | null = null;
   private popover: HTMLElement | null = null;
   private popoverSave: (() => void) | null = null;
@@ -2698,6 +2699,15 @@ export class MindMapCanvas {
     });
 
     this.on(el, "paste", (ev) => {
+      // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
+      if (this.opts.editable && this.editing && (ev.target as HTMLElement).closest?.(".mm-label")) {
+        const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!imgs.length) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        void this.addImagesToNote(this.editing, imgs);
+        return;
+      }
       if (!this.opts.editable || this.editing) return;
       const t = ev.target as HTMLElement;
       if (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable) return;
@@ -2972,10 +2982,7 @@ export class MindMapCanvas {
     if (ev.altKey && this.opts.editable && ev.key.startsWith("Arrow")) {
       // Alt+↑↓ 在兄弟间排序，Alt+←→ 升降级
       ev.preventDefault();
-      if (ev.key === "ArrowUp") this.moveSibling(sel, -1);
-      else if (ev.key === "ArrowDown") this.moveSibling(sel, 1);
-      else if (ev.key === "ArrowLeft") this.outdentNode(sel);
-      else this.indentNode(sel);
+      this.moveSelection(ev.key === "ArrowUp" ? "up" : ev.key === "ArrowDown" ? "down" : ev.key === "ArrowLeft" ? "outdent" : "indent");
       this.ensureVisible(this.primary);
       return;
     }
@@ -3248,19 +3255,23 @@ export class MindMapCanvas {
   private startDrag(node: MindNode, ev: PointerEvent): void {
     const el = this.els.get(node.id);
     if (!el || !this.doc) return;
+    // 按住的是多选里的一个：整组一起拖（父子都选中时只拖外层的，子节点跟着走）
+    const movers = this.selected.has(node) && this.selected.size > 1 ? this.topLevelSelection() : [node];
+    if (!movers.includes(node)) movers.splice(0, movers.length, node);
     const subtree = new Set<MindNode>();
-    walk(node, (n) => subtree.add(n));
+    for (const m of movers) walk(m, (n) => subtree.add(n));
     const ghost = el.cloneNode(true) as HTMLElement;
     ghost.classList.add("mm-ghost");
     ghost.classList.remove("is-selected");
     ghost.querySelector(".mm-toggle")?.remove();
     ghost.style.transform = `scale(${this.k})`;
+    if (movers.length > 1) ghost.createSpan({ cls: "mm-ghost-count", text: String(movers.length) });
     this.el.append(ghost);
     const indicator = createDiv();
     indicator.className = "mm-drop-indicator";
     this.overlay.append(indicator);
     for (const n of subtree) this.els.get(n.id)?.classList.add("is-dragging");
-    this.drag = { node, ghost, subtree, target: null, indicator };
+    this.drag = { node, movers, ghost, subtree, target: null, indicator };
     this.el.classList.add("is-dragging-node");
     this.positionNodebar();
     this.updateDrag(ev);
@@ -3447,12 +3458,17 @@ export class MindMapCanvas {
   private endDrag(commit: boolean): void {
     this.stopAutoScroll();
     if (!this.drag) return;
-    const { node, ghost, indicator, target } = this.drag;
+    const { node, movers, ghost, indicator, target } = this.drag;
     ghost.remove();
     indicator.remove();
     for (const el of this.els.values()) el.classList.remove("is-dragging", "is-drop-target");
     this.el.classList.remove("is-dragging-node");
     this.drag = null;
+    if (movers.length > 1) {
+      if (commit && target && this.doc) this.dropMany(movers, node, target);
+      else this.positionNodebar();
+      return;
+    }
     if (commit && target && this.doc && !isAncestor(node, target.parent) && target.parent !== node) {
       const parent = target.parent;
       const sideChange = !!target.side && node.parent === parent && this.layout?.placed.get(node.id)?.side !== target.side;
@@ -3484,6 +3500,108 @@ export class MindMapCanvas {
       }
     }
     this.positionNodebar();
+  }
+
+  /**
+   * 多个节点一起落到 target：按文档顺序排在一起，插在落点那个兄弟之前（或末尾）。
+   * 落点在某个被拖节点的子树里时不动（findDropTarget 已经排除了，这里再兜一次）
+   */
+  private dropMany(movers: MindNode[], primary: MindNode, target: DropTarget): void {
+    if (!this.doc) return;
+    const parent = target.parent;
+    if (movers.some((m) => m === parent || isAncestor(m, parent))) {
+      this.positionNodebar();
+      return;
+    }
+    // 记下落点后面第一个不被拖走的兄弟，挨个插到它前面；没有就追加到末尾
+    const anchor = parent.children.slice(target.index).find((c) => !movers.includes(c)) ?? null;
+    if (target.side) {
+      for (const c of parent.children) {
+        const s = this.layout?.placed.get(c.id)?.side;
+        if (!c.side && (s === "left" || s === "right")) c.side = s;
+      }
+    }
+    if (parent.folded) parent.folded = false;
+    for (const m of movers) {
+      const at = anchor ? parent.children.indexOf(anchor) : parent.children.length;
+      if (!moveNode(m, parent, at, this.doc.style)) continue;
+      if (target.side) m.side = target.side;
+      else if (parent !== (this.focusRoot ?? this.doc.root)) m.side = undefined;
+    }
+    this.select(null);
+    for (const m of movers) this.select(m, "add");
+    this.setPrimary(primary);
+    this.render();
+    this.notify();
+  }
+
+  /**
+   * Alt+方向键对整组生效（单选时还是原来的 moveSibling / indentNode / outdentNode）。
+   * 同一父节点下的选中节点一起动：上下移各挪一格，挪不动的（到顶 / 到底）连同挤着它的一起不动；
+   * 降级挂到组里第一个前面那个没被选中的兄弟下；升级放到父节点之后
+   */
+  private moveSelection(op: "up" | "down" | "indent" | "outdent"): void {
+    const movers = this.topLevelSelection();
+    const primary = this.primary;
+    if (movers.length <= 1 || !this.doc) {
+      const n = primary;
+      if (!n) return;
+      if (op === "up") this.moveSibling(n, -1);
+      else if (op === "down") this.moveSibling(n, 1);
+      else if (op === "outdent") this.outdentNode(n);
+      else this.indentNode(n);
+      return;
+    }
+    const style = this.doc.style;
+    const groups = new Map<MindNode, MindNode[]>();
+    for (const m of movers) groups.set(m.parent!, [...(groups.get(m.parent!) ?? []), m]);
+    let changed = false;
+    for (const [parent, group] of groups) {
+      const kids = parent.children;
+      group.sort((a, b) => kids.indexOf(a) - kids.indexOf(b));
+      if (op === "up" || op === "down") {
+        const dir = op === "up" ? -1 : 1;
+        const order = op === "up" ? group : [...group].reverse();
+        const stuck = new Set<MindNode>();
+        for (const m of order) {
+          const i = kids.indexOf(m);
+          const j = i + dir;
+          const other = kids[j];
+          if (j < 0 || j >= kids.length || (stuck.has(other) && group.includes(other))) {
+            stuck.add(m);
+            continue;
+          }
+          if (group.includes(other)) {
+            stuck.add(m);
+            continue;
+          }
+          moveNode(m, parent, dir < 0 ? j : j + 1, style);
+          changed = true;
+        }
+      } else if (op === "indent") {
+        const first = kids.indexOf(group[0]);
+        const prev = kids.slice(0, first).reverse().find((c) => !group.includes(c));
+        if (!prev) continue;
+        if (prev.folded) prev.folded = false;
+        for (const m of group) moveNode(m, prev, prev.children.length, style);
+        changed = true;
+      } else {
+        const grand = parent.parent;
+        if (!grand) continue;
+        let at = grand.children.indexOf(parent) + 1;
+        for (const m of group) {
+          moveNode(m, grand, at, style);
+          at = grand.children.indexOf(m) + 1;
+        }
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    this.select(null);
+    for (const m of movers) this.select(m, "add");
+    if (primary) this.setPrimary(primary);
+    this.render();
+    this.notify();
   }
 
   // ---------- 编辑 ----------
@@ -3666,16 +3784,16 @@ export class MindMapCanvas {
       case "delete-only":
         return this.deleteOnlySelected();
       case "move-up":
-        this.moveSibling(sel, -1);
+        this.moveSelection("up");
         break;
       case "move-down":
-        this.moveSibling(sel, 1);
+        this.moveSelection("down");
         break;
       case "outdent":
-        this.outdentNode(sel);
+        this.moveSelection("outdent");
         break;
       case "indent":
-        this.indentNode(sel);
+        this.moveSelection("indent");
         break;
     }
     this.ensureVisible(this.primary);
@@ -3762,7 +3880,8 @@ export class MindMapCanvas {
     const label = this.els.get(node.id)?.querySelector<HTMLElement>(".mm-label");
     const raw = fromEditableText(label?.textContent ?? "");
     const text = cancel ? node.text : raw;
-    if (text === "" && isNew) {
+    // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
+    if (text === "" && isNew && !node.note) {
       const parent = node.parent;
       removeNode(node);
       this.select(parent);
@@ -4674,6 +4793,20 @@ export class MindMapCanvas {
       this.opts.host?.notice?.(t("notice.saveImageFailed", { error: (e as Error).message }));
       return null;
     }
+  }
+
+  /** 图片存成附件，追加到节点备注的末尾；正在编辑这个节点的文字时不打断，提交时备注图标一起出来 */
+  private async addImagesToNote(node: MindNode, files: File[]): Promise<void> {
+    const links: string[] = [];
+    for (const f of files) {
+      const link = await this.saveImageFile(f);
+      if (link) links.push(`![[${link}]]`);
+    }
+    if (!links.length) return;
+    node.note = normalizeNote([unescapeNote(node.note), ...links].filter(Boolean).join("\n"));
+    this.opts.host?.notice?.(t("notice.imageAddedToNote"));
+    if (this.editing !== node) this.render();
+    this.notify();
   }
 
   /** 把图片文件存成附件并作为子节点插入 */
