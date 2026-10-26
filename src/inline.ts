@@ -34,7 +34,36 @@ export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive
   { get name() { return t("marker.flags"); }, emojis: ["🚩", "🟧", "🟨", "🟩", "🟦", "🟪"], exclusive: false },
   { get name() { return t("marker.symbols"); }, emojis: ["⭐", "❗", "❓", "💡", "⚠️", "🔥", "❤️", "📌"], exclusive: false },
 ];
-const ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+const BUILTIN_GROUPS = MARKER_GROUPS.length;
+let ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+
+/**
+ * 设置里填的自定义标记：一个字形一个标记，只认 emoji 和非 ASCII 的符号。
+ * 字母、数字、ASCII 符号不行：它们出现在节点开头再正常不过（「A 方案」「# 标题」），会被误当成标记
+ */
+export function parseCustomMarkers(input: string): string[] {
+  // Intl.Segmenter 不在这里的 TS lib 里，Electron 有；万一没有就按空白切
+  type Seg = { segment(s: string): Iterable<{ segment: string }> };
+  const Segmenter = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => Seg }).Segmenter;
+  const parts = Segmenter ? [...new Segmenter(undefined, { granularity: "grapheme" }).segment(input)].map((x) => x.segment) : input.split(/\s+/);
+  const out: string[] = [];
+  for (const segment of parts) {
+    if (/^[\s,，、]+$/.test(segment)) continue;
+    const emoji = /\p{Extended_Pictographic}|\u20e3/u.test(segment);
+    const symbol = /^[\p{S}\p{P}]+$/u.test(segment) && ![...segment].some((ch) => ch.charCodeAt(0) < 0x80);
+    if ((emoji || symbol) && !out.includes(segment)) out.push(segment);
+  }
+  return out;
+}
+
+/** 换掉自定义那一组（和内置重复的跳过）；空列表就是没有自定义组 */
+export function setCustomMarkers(emojis: string[], exclusive: boolean): void {
+  MARKER_GROUPS.splice(BUILTIN_GROUPS);
+  const builtin = new Set(MARKER_GROUPS.flatMap((g) => g.emojis));
+  const list = emojis.filter((e) => !builtin.has(e));
+  if (list.length) MARKER_GROUPS.push({ get name() { return t("marker.custom"); }, emojis: list, exclusive });
+  ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+}
 
 /** 标签开头连续的标记 emoji 与其余文字 */
 export function splitMarkers(text: string): { markers: string[]; rest: string } {

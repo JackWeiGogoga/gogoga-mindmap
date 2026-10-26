@@ -6,7 +6,7 @@ import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
-import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
+import { frontmatterValue, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue } from "./markdown";
 import type { MindDoc } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -98,6 +98,26 @@ export class MindMapView extends TextFileView {
     if (n?.children.length) this.canvas?.toggleFold(n);
   }
 
+  private following = false;
+
+  /** 分屏联动：Markdown 光标在第 line 行，选中对应节点（只在看不见时挪画面） */
+  followLine(text: string, line: number): void {
+    if (!this.canvas) return;
+    const path = pathAtLine(text, line);
+    if (path === null || path === this.canvas.getSelectedPath()) return;
+    this.following = true;
+    try {
+      this.canvas.followPath(path);
+    } finally {
+      this.following = false;
+    }
+  }
+
+  /** 标记的定义变了：节点开头哪些算标记要重新认，不能复用旧的节点 DOM */
+  redrawAll(): void {
+    this.canvas?.redrawAll();
+  }
+
   toggleCallouts(): void {
     this.canvas?.toggleCallouts();
   }
@@ -172,7 +192,10 @@ export class MindMapView extends TextFileView {
       onSelectionChange: (primary) => {
         this.outline?.syncSelection(primary);
         this.rememberViewportSoon();
+        // 跟着 Markdown 光标选中的，不再推回去
+        if (!this.following) this.plugin.syncMarkdownToMap(this);
       },
+      initialView: () => this.plugin.settings.openView,
       onViewChange: () => this.rememberViewportSoon(),
       onRevealInMarkdown: () => {
         if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);

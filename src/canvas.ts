@@ -182,6 +182,8 @@ export interface CanvasOptions {
   caretAtEnd?: () => boolean;
   /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
   dragToFloat?: () => boolean;
+  /** 首次显示（没有恢复视口时）：fit 适应画布（默认），center 中心主题 100% */
+  initialView?: () => "fit" | "center";
   /** 打开时标注是否隐藏（按文件记住）；不给就默认显示 */
   calloutsHidden?: () => boolean;
   /** 用户切换了标注的显示 / 隐藏 */
@@ -434,6 +436,8 @@ export class MindMapCanvas {
   private ty = 0;
   private k = 1;
   private hasView = false;
+  /** 聚焦 / 退出聚焦后重新适应画布，不走「打开脑图时」的设置 */
+  private refitOnly = false;
   private needsRender = false;
 
   private selected = new Set<MindNode>();
@@ -563,7 +567,7 @@ export class MindMapCanvas {
           this.render();
           return;
         }
-        if (!this.hasView && this.fit()) this.hasView = true;
+        if (!this.hasView && this.initialFit()) this.hasView = true;
         this.updateBottomInset();
         this.positionNodebar();
       });
@@ -746,6 +750,24 @@ export class MindMapCanvas {
   }
   private pendingReveal: string | null = null;
 
+  /** 跟随 Markdown 光标：选中节点（折叠着就选最近的可见祖先），看不见时才挪画面 */
+  followPath(path: string): void {
+    if (!this.doc || this.editing || this.editingCallout) return;
+    let node = findByPath(this.doc.root, path);
+    if (!node) return;
+    for (let a = node.parent; a; a = a.parent) if (a.folded) node = a;
+    if (!this.layout?.placed.get(node.id)) return;
+    this.select(node);
+    this.ensureVisible(node);
+  }
+
+  /** 节点 DOM 全部重建（内容签名没变也重建），用在标记定义这类影响渲染、但不在签名里的设置变了之后 */
+  redrawAll(): void {
+    this.elSigs = new WeakMap();
+    this.elContent = new WeakMap();
+    this.render();
+  }
+
   getViewState(): ViewState {
     return { tx: this.tx, ty: this.ty, k: this.k };
   }
@@ -855,6 +877,18 @@ export class MindMapCanvas {
   }
 
   /** 返回是否真的适应了：容器还没量出尺寸时会失败，调用方得再试一次 */
+  /** 第一次显示时的视口：按设置适应画布或回到中心；容器还没尺寸时返回 false，等下次再来 */
+  private initialFit(): boolean {
+    if (this.refitOnly || this.opts.initialView?.() !== "center") {
+      const ok = this.fit();
+      if (ok) this.refitOnly = false;
+      return ok;
+    }
+    if (!this.el.clientWidth || !this.el.clientHeight) return false;
+    this.center();
+    return true;
+  }
+
   fit(): boolean {
     if (!this.layout) return false;
     return this.fitBounds(this.layout.bounds);
@@ -916,7 +950,7 @@ export class MindMapCanvas {
     this.reflow();
     // 代码块嵌入首次渲染时容器高度还是 0（真正的高度要等 onLayout 下一帧才写上去），
     // 这时 fit 量不出东西。失败就别置 hasView，等 ResizeObserver 拿到高度再适应一次。
-    if (!this.hasView && this.fit()) this.hasView = true;
+    if (!this.hasView && this.initialFit()) this.hasView = true;
     if (this.pendingSelectPath !== null) {
       const path = this.pendingSelectPath;
       this.pendingSelectPath = null;
@@ -5237,6 +5271,7 @@ export class MindMapCanvas {
     if (this.editing) this.commitEdit();
     this.focusRoot = node;
     this.hasView = false; // 重新适应画布
+    this.refitOnly = true;
     this.select(node);
     this.render();
   }
@@ -5245,6 +5280,7 @@ export class MindMapCanvas {
     if (!this.focusRoot) return;
     this.focusRoot = null;
     this.hasView = false;
+    this.refitOnly = true;
     if (rerender) this.render();
   }
 

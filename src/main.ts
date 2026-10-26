@@ -39,6 +39,7 @@ import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, Sav
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
+import { parseCustomMarkers, setCustomMarkers } from "./inline";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 
@@ -64,6 +65,7 @@ export default class MindMapPlugin extends Plugin {
     registerMindMapIcon();
     await this.loadSettings();
     this.applyCustomThemes();
+    this.applyCustomMarkers(false);
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
     this.register(() => {
       for (const m of [...this.openThemeEditors]) m.close();
@@ -102,6 +104,7 @@ export default class MindMapPlugin extends Plugin {
     const refreshProps = () => this.propertyIcons?.schedule();
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEditorSync();
+    this.registerSplitSync();
     const syncButtons = () => this.syncMapButtons();
     this.registerEvent(this.app.workspace.on("layout-change", syncButtons));
     this.registerEvent(this.app.workspace.on("file-open", syncButtons));
@@ -225,6 +228,15 @@ export default class MindMapPlugin extends Plugin {
     this.refreshCustomCss();
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       if (leaf.view instanceof MindMapView) leaf.view.refreshTheme();
+    }
+  }
+
+  /** 设置里的自定义标记 → 标记面板；redraw 时让已打开的脑图按新的标记重新识别、重画 */
+  applyCustomMarkers(redraw = true): void {
+    setCustomMarkers(parseCustomMarkers(this.settings.customMarkers), this.settings.customMarkersExclusive);
+    if (!redraw) return;
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      if (leaf.view instanceof MindMapView) leaf.view.redrawAll();
     }
   }
 
@@ -373,6 +385,65 @@ export default class MindMapPlugin extends Plugin {
       if (live.has(view)) continue;
       el.remove();
       this.mapButtons.delete(view);
+    }
+  }
+
+  /**
+   * 分屏联动（设置里打开）：同一文件的脑图和 Markdown 同时显示时，Markdown 里的光标换了行，
+   * 脑图选中对应节点。光标移动没有公开事件，用 document 的 selectionchange（CodeMirror 会同步 DOM 选区），
+   * 只认有焦点的编辑器 —— 脑图那边带过来的光标不会再弹回去
+   */
+  private registerSplitSync(): void {
+    let timer: number | null = null;
+    let last = "";
+    this.registerDomEvent(document, "selectionchange", () => {
+      if (!this.settings.syncSplit) return;
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const file = view?.file;
+      if (!view || !file || !view.editor.hasFocus()) return;
+      const maps = this.visibleMapsOf(file.path);
+      if (!maps.length) return;
+      if (timer !== null) window.clearTimeout(timer);
+      // 比 editor-change 的 150ms 晚一点：打字换行时等脑图先跟上新内容
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (!view.editor.hasFocus()) return;
+        const line = view.editor.getCursor().line;
+        const key = `${file.path}\u0001${line}`;
+        if (key === last) return;
+        last = key;
+        const text = view.editor.getValue();
+        for (const m of this.visibleMapsOf(file.path)) m.followLine(text, line);
+      }, 200);
+    });
+    this.register(() => {
+      if (timer !== null) window.clearTimeout(timer);
+    });
+  }
+
+  /** 正在显示（不是藏在别的标签页后面）的同一文件的脑图 */
+  private visibleMapsOf(path: string): MindMapView[] {
+    return this.app.workspace
+      .getLeavesOfType(VIEW_TYPE_MINDMAP)
+      .map((l) => l.view)
+      .filter((v): v is MindMapView => v instanceof MindMapView && v.file?.path === path && v.containerEl.isShown());
+  }
+
+  /** 分屏联动的另一半：脑图里选中了节点，旁边显示着的同一文件的 Markdown 滚到那一行，不抢焦点 */
+  syncMarkdownToMap(from: MindMapView): void {
+    if (!this.settings.syncSplit || !from.file) return;
+    const path = from.getSelectedPath();
+    if (path === null) return;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || view.file?.path !== from.file.path || !view.containerEl.isShown()) continue;
+      // 用户正在那边打字：光标是他的，不去动
+      if (view.editor.hasFocus()) continue;
+      const editor = view.editor;
+      const line = lineOfPath(editor.getValue(), path);
+      if (line === null) continue;
+      editor.setCursor({ line, ch: editor.getLine(line).length });
+      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
     }
   }
 

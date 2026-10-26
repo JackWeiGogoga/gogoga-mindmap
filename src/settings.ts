@@ -50,6 +50,13 @@ export interface MindMapSettings {
   editCaret: "select" | "end";
   /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
   dragToFloat: boolean;
+  /** 没有记住的视口时打开脑图：fit 适应画布，center 中心主题 100% */
+  openView: "fit" | "center";
+  /** 同一文件的脑图和 Markdown 同时显示时，选中和光标互相跟随（默认关） */
+  syncSplit: boolean;
+  /** 自定义标记（设置里原样存用户填的文字，用时再解析） */
+  customMarkers: string;
+  customMarkersExclusive: boolean;
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
 }
@@ -86,6 +93,10 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   leftDrag: "pan",
   editCaret: "select",
   dragToFloat: false,
+  openView: "fit",
+  syncSplit: false,
+  customMarkers: "",
+  customMarkersExclusive: false,
   rememberView: true,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
@@ -314,6 +325,55 @@ export class MindMapSettingTab extends PluginSettingTab {
           this.plugin.settings.rememberViewport = v;
           if (!v) delete this.plugin.settings.viewports;
           await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.openView.name"))
+      .setDesc(t("settings.openView.desc"))
+      .addDropdown((d) =>
+        d
+          .addOption("fit", t("settings.openView.fit"))
+          .addOption("center", t("settings.openView.center"))
+          .setValue(this.plugin.settings.openView)
+          .onChange(async (v) => {
+            this.plugin.settings.openView = v === "center" ? "center" : "fit";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.syncSplit.name"))
+      .setDesc(t("settings.syncSplit.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.syncSplit).onChange(async (v) => {
+          this.plugin.settings.syncSplit = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.customMarkers.name"))
+      .setDesc(t("settings.customMarkers.desc"))
+      .addText((text) =>
+        text
+          .setPlaceholder("🎯 📎 ★ ◆")
+          .setValue(this.plugin.settings.customMarkers)
+          .onChange(async (v) => {
+            this.plugin.settings.customMarkers = v;
+            await this.plugin.saveSettings();
+            this.plugin.applyCustomMarkers();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.customMarkersExclusive.name"))
+      .setDesc(t("settings.customMarkersExclusive.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.customMarkersExclusive).onChange(async (v) => {
+          this.plugin.settings.customMarkersExclusive = v;
+          await this.plugin.saveSettings();
+          this.plugin.applyCustomMarkers();
         }),
       );
 

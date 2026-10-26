@@ -184,3 +184,22 @@ test("选择题选项：[x] 正确、[ ] 错误，前面可以有标记 emoji，
   assert.equal(taskState("[x]没有空格"), null);
   assert.equal(taskState("[[链接]]"), null);
 });
+
+test("自定义标记：只认 emoji 和非 ASCII 符号，和内置重复的跳过；加进来后能识别、切换，同组互斥可选", async () => {
+  const { parseCustomMarkers, setCustomMarkers, splitMarkers, toggleMarker, MARKER_GROUPS } = await import("../../src/inline");
+  assert.deepEqual(parseCustomMarkers("🎯 📎, ★◆ A 1 # - 中 👨‍👩‍👧 ⭐ 🎯"), ["🎯", "📎", "★", "◆", "👨‍👩‍👧", "⭐"]);
+  const before = MARKER_GROUPS.length;
+  setCustomMarkers(["🎯", "📎", "⭐"], false);
+  assert.equal(MARKER_GROUPS.length, before + 1);
+  assert.deepEqual(MARKER_GROUPS[before].emojis, ["🎯", "📎"], "和内置的 ⭐ 重复，不进自定义组");
+  assert.deepEqual(splitMarkers("🎯 📎 方案").markers, ["🎯", "📎"]);
+  // 排序：内置在前，自定义在后
+  assert.equal(toggleMarker("🎯 方案", "⭐"), "⭐ 🎯 方案");
+  assert.equal(toggleMarker("🎯 方案", "📎"), "🎯 📎 方案");
+  setCustomMarkers(["🎯", "📎"], true);
+  assert.equal(toggleMarker("🎯 方案", "📎"), "📎 方案", "同组互斥时替换");
+  // 清空：自定义组去掉，原来的 emoji 回到普通文字
+  setCustomMarkers([], false);
+  assert.equal(MARKER_GROUPS.length, before);
+  assert.deepEqual(splitMarkers("🎯 方案"), { markers: [], rest: "🎯 方案" });
+});
