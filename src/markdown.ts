@@ -53,10 +53,11 @@ interface Marker {
   width?: number;
   side?: "left" | "right";
   float?: FloatPos;
+  callout?: string;
 }
 
-/** 标记里的一项：box、box=3、summary=2 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
-const MARKER_TOKEN_RE = /(box|summary)(?:=(\d+))?(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|\S+/g;
+/** 标记里的一项：box、box=3、summary=2、callout 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
+const MARKER_TOKEN_RE = /(box|summary|callout)(?:=(\d+))?(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|\S+/g;
 
 /** 写进标记的文字：去掉会截断标记的 " 和 %%（单个 % 留着） */
 export function markerText(s: string): string {
@@ -64,6 +65,29 @@ export function markerText(s: string): string {
 }
 
 /** 从标签末尾摘出我们认识的 %% 标记；不认识的注释原样留在文本里 */
+/**
+ * 标注文字 → 标记里的样子：换行写成 <br>；英文双引号会截断标记，换成中文引号（左右交替），%% 换成 %
+ */
+export function calloutToMarker(s: string): string {
+  let open = false;
+  return s
+    .replace(/"/g, () => {
+      open = !open;
+      return open ? "\u201c" : "\u201d";
+    })
+    .replace(/%{2,}/g, "%")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .join("<br>")
+    .replace(/^(<br>)+|(<br>)+$/g, "")
+    .trim();
+}
+
+/** 标记里的标注文字 → 内存里的（<br> 还原成换行） */
+export function calloutFromMarker(s: string): string {
+  return s.replace(/<br\s*\/?>/gi, "\n").trim();
+}
+
 export function splitMarker(text: string): { text: string; marker: Marker } {
   const m = MARKER_RE.exec(text);
   const marker: Marker = { folded: false };
@@ -81,6 +105,11 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       marker.box = { span: Math.max(1, Number(tok[2] ?? 1)), title: tok[3]?.trim() ?? "" };
     } else if (tok[1] === "summary") {
       marker.summary = { span: Math.max(1, Number(tok[2] ?? 1)), text: tok[3]?.trim() ?? "" };
+    } else if (tok[1] === "callout") {
+      // 带数字的 callout=2 不是我们写的，整段当普通文字
+      if (tok[2] !== undefined) return { text: text.trimEnd(), marker: { folded: false } };
+      const c = calloutFromMarker(tok[3] ?? "");
+      if (c) marker.callout = c;
     } else if (/^sw=\d{1,6}$/.test(lower)) {
       sw = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(3))));
     } else if (/^w=\d{1,6}$/.test(lower)) {
@@ -105,7 +134,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
@@ -121,6 +150,8 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
     if (node.summary.width) parts.push(`sw=${Math.round(node.summary.width)}`);
   }
   if (node.float) parts.push(`float x=${Math.round(node.float.x)} y=${Math.round(node.float.y)}`);
+  const callout = node.callout ? calloutToMarker(node.callout) : "";
+  if (callout) parts.push(`callout "${callout}"`);
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
 
@@ -337,6 +368,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.width = marker.width;
         // 中心主题上的 float 没有意义，但原样保留，写回不改用户的文本
         root.float = marker.float;
+        root.callout = marker.callout;
         root.level = 1;
         root.kind = "heading";
         opts.lines?.set(root, lineNo);
@@ -348,7 +380,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -368,7 +400,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       opts.lines?.set(node, lineNo);

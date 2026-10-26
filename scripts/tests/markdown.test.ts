@@ -668,3 +668,41 @@ test("菜单平铺：二级菜单展开在原位置，前后加分隔线，不�
   ]);
   assert.deepEqual(out.map((e) => (e.separator ? "-" : e.title)), ["A", "-", "x", "-", "y", "-", "B"]);
 });
+
+test("标注标记：callout \"文字\" 读成多行文字，和其他标记共存，往返不变；引号、%% 写回时被换掉", async () => {
+  const { calloutToMarker, formatMarker } = await import("../../src/markdown");
+  const md = `# R %%callout "中心"%%
+
+## A %%red fold box "框" callout "第一行<br>第二行"%%
+
+- a1 %%callout "带 [[链接]] 和 **加粗**，50%"%%
+- a2
+
+## B %%float x=10 y=-20 callout "自由主题的"%%
+`;
+  const doc = parseMarkdown(md, { fallbackTitle: "R" });
+  const [a, b] = doc.root.children;
+  assert.equal(doc.root.callout, "中心");
+  assert.equal(a.callout, "第一行\n第二行");
+  assert.equal(a.color, "red");
+  assert.equal(a.folded, true);
+  assert.deepEqual(a.box, { span: 1, title: "框" });
+  assert.equal(a.text, "A");
+  assert.equal(a.children[0].callout, "带 [[链接]] 和 **加粗**，50%");
+  assert.equal(a.children[1].callout, undefined);
+  assert.deepEqual(b.float, { x: 10, y: -20 });
+  assert.equal(b.callout, "自由主题的");
+  assert.equal(serializeMarkdown(doc), md);
+  // 写回：英文引号换成中文引号，%% 换成 %，首尾空行去掉
+  assert.equal(calloutToMarker('他说"好"，100%%\n\n第二段\n'), "他说“好”，100%<br><br>第二段");
+  const fm = formatMarker({ folded: false, callout: 'a"b%%c' });
+  assert.equal(fm, ' %%callout "a“b%c"%%');
+  const back = splitMarker(`x${fm}`);
+  assert.equal(back.text, "x");
+  assert.equal(back.marker.callout, "a“b%c");
+  // 空标注不写；带数字的 callout=2、没引号的 callout 不认
+  assert.equal(formatMarker({ folded: false, callout: " \n " }), "");
+  assert.equal(splitMarker("x %%callout=2 \"y\"%%").text, 'x %%callout=2 "y"%%');
+  assert.equal(splitMarker("x %%callout%%").marker.callout, undefined);
+  assert.equal(splitMarker("x %%calloutx%%").text, "x %%calloutx%%");
+});

@@ -98,6 +98,10 @@ export class MindMapView extends TextFileView {
     if (n?.children.length) this.canvas?.toggleFold(n);
   }
 
+  toggleCallouts(): void {
+    this.canvas?.toggleCallouts();
+  }
+
   toggleRecite(): void {
     this.canvas?.setRecite(!this.canvas.isRecite());
   }
@@ -179,6 +183,10 @@ export class MindMapView extends TextFileView {
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
       dragToFloat: () => this.plugin.settings.dragToFloat,
+      calloutsHidden: () => this.plugin.isCalloutsHidden(this.file?.path ?? ""),
+      onCalloutsHiddenChange: (hidden) => {
+        if (this.file) this.plugin.setCalloutsHidden(this.file.path, hidden);
+      },
       notePopoverSize: this.plugin.notePopoverSize,
       ownsHotkey: (ev) => this.plugin.isOwnHotkey(ev),
       onToolbarPositionChange: (pos) => {
@@ -319,6 +327,7 @@ export class MindMapView extends TextFileView {
     this.applyFrontmatterOptions(this.doc);
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
+    if (clear && this.file) this.canvas?.setCalloutsHidden(this.plugin.isCalloutsHidden(this.file.path));
     if (saved && this.canvas) {
       this.restoringViewport = true;
       this.canvas.setViewState(saved);

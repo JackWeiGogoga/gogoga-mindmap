@@ -19,6 +19,8 @@ export interface XmindTopic {
   summary?: { span: number; text: string };
   /** 自由主题（XMind 的 detached，只认中心主题下的）：相对中心主题的位置 */
   float?: { x: number; y: number };
+  /** 标注（XMind 的 callout 主题）；一个主题有好几条时按行合并 */
+  callout?: string;
   children: XmindTopic[];
 }
 
@@ -120,7 +122,7 @@ interface JsonTopic {
   summaries?: { range?: string; topicId?: string }[];
   comments?: unknown[];
   notes?: { plain?: { content?: string } };
-  children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[] };
+  children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[]; callout?: JsonTopic[] };
   position?: { x?: number; y?: number };
   branch?: string;
   style?: { properties?: Record<string, string> };
@@ -135,6 +137,15 @@ interface JsonSheet {
 
 function cleanTitle(s: string | undefined): string {
   return (s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim();
+}
+
+/** 标注文字保留换行（标题里的换行在别处会被压成空格） */
+function calloutText(titles: (string | undefined)[]): string | undefined {
+  const text = titles
+    .map((s) => (s ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).join("\n"))
+    .filter(Boolean)
+    .join("\n");
+  return text || undefined;
 }
 
 /** 自由主题的位置；文件里没写就在中心主题右下方依次往下排 */
@@ -159,6 +170,7 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false)
     note: notes.length ? notes.join("\n\n") : undefined,
     color,
     folded: t.branch === "folded" || undefined,
+    callout: calloutText((t.children?.callout ?? []).map((c) => c.title)),
     children: [
       ...(t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
       ...(isRoot ? detached.map((d, i) => ({ ...fromJsonTopic(d, lost), float: floatPos(d.position?.x, d.position?.y, i) })) : []),
@@ -277,8 +289,13 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): Xmin
   const plain = notesEl ? childrenByName(notesEl, "plain")[0]?.text.trim() : undefined;
   const children: XmindTopic[] = [];
   const floats: XmindTopic[] = [];
+  const callouts: string[] = [];
   for (const ch of childrenByName(el, "children")) {
     for (const topics of childrenByName(ch, "topics")) {
+      if (topics.attrs["type"] === "callout") {
+        for (const t of childrenByName(topics, "topic")) callouts.push(childrenByName(t, "title")[0]?.text ?? "");
+        continue;
+      }
       if (topics.attrs["type"] === "detached") {
         if (!isRoot) {
           lost.detached += childrenByName(topics, "topic").length;
@@ -296,7 +313,14 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): Xmin
   }
   // 自由主题排在普通子主题之后，外框 / 概要按下标换算时不受影响
   children.push(...floats);
-  const topic: XmindTopic = { id: el.attrs["id"], title, note: plain || undefined, folded: el.attrs["branch"] === "folded" || undefined, children };
+  const topic: XmindTopic = {
+    id: el.attrs["id"],
+    title,
+    note: plain || undefined,
+    folded: el.attrs["branch"] === "folded" || undefined,
+    callout: calloutText(callouts),
+    children,
+  };
   for (const bs of childrenByName(el, "boundaries")) {
     for (const b of childrenByName(bs, "boundary")) applyBoundary(topic, b.attrs["range"], childrenByName(b, "title")[0]?.text ?? "");
   }
@@ -373,6 +397,7 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       box: t.box && { ...t.box },
       summary: t.summary && { ...t.summary },
       float: parent && !parent.parent && t.float ? { ...t.float } : undefined,
+      callout: t.callout,
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });

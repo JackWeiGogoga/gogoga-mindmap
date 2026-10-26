@@ -141,10 +141,12 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
       return `<rect x="${a("x")}" y="${a("y")}" width="${a("width")}" height="${a("height")}" rx="${a("rx")}" fill="${cs.fill}" fill-opacity="${cs.fillOpacity}" stroke="${cs.stroke}" stroke-opacity="${cs.strokeOpacity}" stroke-width="${cs.strokeWidth}" stroke-dasharray="${cs.strokeDasharray}"/>`;
     });
   // 连线和概要的括号；用不上的 path 只是藏起来（display: none）留着复用，不能导出去
-  const paths = [...edges.querySelectorAll<SVGPathElement>("path")].filter((p) => p.style.display !== "none").map((p) => {
+  const paths = [...edges.querySelectorAll<SVGPathElement>("path")].filter((p) => p.style.display !== "none" && !p.classList.contains("is-peek")).map((p) => {
     const cs = getComputedStyle(p);
     const d = p.getAttribute("d") ?? "";
     const dash = cs.strokeDasharray && cs.strokeDasharray !== "none" ? ` stroke-dasharray="${cs.strokeDasharray}"` : "";
+    // 标注的尖角是填色的三角形，其余都是线
+    if (p.classList.contains("mm-callout-tail")) return `<path d="${d}" fill="${cs.fill}" stroke="none"/>`;
     return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}" stroke-linejoin="${cs.strokeLinejoin}"${dash}/>`;
   });
 
@@ -176,7 +178,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const zoom = (canvas as unknown as { k: number }).k || 1;
     if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "nowrap" });
   });
-  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle").forEach((t) => t.remove());
+  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
     (n as HTMLElement).setCssStyles({ boxShadow: "none" });
   });

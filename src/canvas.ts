@@ -31,6 +31,7 @@ import {
 import {
   BOX_PAD,
   Bounds,
+  CALLOUT_GAP,
   DEFAULT_LAYOUT,
   edgeGeometry,
   edgePath,
@@ -38,6 +39,7 @@ import {
   LayoutOptions,
   LayoutResult,
   Placed,
+  PlacedCallout,
   PlacedSummary,
   Size,
   Structure,
@@ -66,7 +68,7 @@ import {
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
-import { COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
+import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
@@ -180,6 +182,10 @@ export interface CanvasOptions {
   caretAtEnd?: () => boolean;
   /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
   dragToFloat?: () => boolean;
+  /** 打开时标注是否隐藏（按文件记住）；不给就默认显示 */
+  calloutsHidden?: () => boolean;
+  /** 用户切换了标注的显示 / 隐藏 */
+  onCalloutsHiddenChange?: (hidden: boolean) => void;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
@@ -217,7 +223,8 @@ export type NodeCommand =
   | "move-down"
   | "outdent"
   | "indent"
-  | "expand-branch";
+  | "expand-branch"
+  | "callout";
 
 /** label 用 getter：模块加载时界面语言还没定，用到时再查字典 */
 const TOOLBAR_POSITION_LABELS: { id: ToolbarPosition; readonly label: string }[] = [
@@ -274,6 +281,7 @@ const ICONS: Record<string, string> = {
   trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>',
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
   edge: '<svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c6 0 4-12 10-12" stroke-dasharray="0"/></svg>',
+  callout: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>',
   box: '<svg viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg>',
 };
 
@@ -411,6 +419,16 @@ export class MindMapCanvas {
   private summaryLabels = new Map<string, HTMLElement>();
   private summaryStart = new WeakMap<HTMLElement, MindNode>();
   private editingSummary: MindNode | null = null;
+  /** 标注：气泡是 nodes 层里的 HTML（按节点 id 复用），尖角画在 svg 里 */
+  private calloutLayer!: SVGGElement;
+  private calloutTails: SVGPathElement[] = [];
+  private calloutEls = new Map<string, HTMLElement>();
+  private calloutNode = new WeakMap<HTMLElement, MindNode>();
+  private editingCallout: MindNode | null = null;
+  /** 整体隐藏标注时排版当它们不存在；点节点上的小图标临时浮出一条看（不重新排版） */
+  private calloutsHidden = false;
+  private peekCallout: MindNode | null = null;
+  private calloutButton: HTMLElement | null = null;
 
   private tx = 0;
   private ty = 0;
@@ -515,6 +533,10 @@ export class MindMapCanvas {
     this.summaryLayer = createSvg("g");
     this.summaryLayer.setAttribute("class", "mm-summaries");
     this.svg.append(this.summaryLayer);
+    this.calloutLayer = createSvg("g");
+    this.calloutLayer.setAttribute("class", "mm-callout-tails");
+    this.svg.append(this.calloutLayer);
+    this.calloutsHidden = opts.calloutsHidden?.() ?? false;
     this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
     this.overlay = createDiv();
@@ -523,6 +545,17 @@ export class MindMapCanvas {
     this.el.append(this.viewport);
     this.buildToolbar();
     this.bindEvents();
+    // 临时浮出的标注：点到别处就收起（捕获阶段，别的处理拦下事件也照样收）
+    this.el.addEventListener(
+      "pointerdown",
+      (ev) => {
+        if (!this.peekCallout || this.editingCallout) return;
+        if ((ev.target as HTMLElement).closest?.(".mm-callout, .mm-callout-icon")) return;
+        this.peekCallout = null;
+        if (this.doc && this.els.size) this.reflow();
+      },
+      true,
+    );
 
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => {
@@ -877,6 +910,7 @@ export class MindMapCanvas {
     this.closePopover();
     this.editing = null;
     this.rebuild();
+    this.updateCalloutButton();
     // 背诵模式的「多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
@@ -926,7 +960,7 @@ export class MindMapCanvas {
       const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
       // 内容签名管子节点，整体签名再叠上纯表现的部分（选中、配色、层级）；
       // 只有前者变了才重建 DOM，选一下节点不该把里面的 iframe 打回重载
-      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, this.opts.theme].join("\u0001");
+      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : ""].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
@@ -1049,6 +1083,20 @@ export class MindMapCanvas {
         el.append(n);
       }
 
+      // 标注隐藏时节点上留个小图标，点一下临时看这一条
+      if (!keepChildren && node.callout && this.calloutsHidden) {
+        const c = icon("callout");
+        c.classList.add("mm-callout-icon");
+        this.tip(c, t("canvas.viewCallout"));
+        c.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+        c.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.peekCallout = this.peekCallout === node ? null : node;
+          this.reflow();
+        });
+        el.append(c);
+      }
+
       if (!keepChildren && node.children.length) {
         const toggle = createEl("button");
         toggle.className = "mm-toggle" + (node.folded ? " is-folded" : "");
@@ -1153,10 +1201,21 @@ export class MindMapCanvas {
     this.alignWidths(base);
     const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
     this.syncSummaryLabels(base);
-    this.layout = layoutMap(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts, (start) => {
-      const el = this.summaryLabels.get(start.id);
-      return el ? { w: el.offsetWidth, h: el.offsetHeight } : { w: 0, h: 0 };
-    });
+    this.syncCallouts(base);
+    this.layout = layoutMap(
+      base,
+      (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 },
+      layoutOpts,
+      (start) => {
+        const el = this.summaryLabels.get(start.id);
+        return el ? { w: el.offsetWidth, h: el.offsetHeight } : { w: 0, h: 0 };
+      },
+      (n) => {
+        if (this.calloutsHidden) return null;
+        const el = this.calloutEls.get(n.id);
+        return el ? { w: el.offsetWidth, h: el.offsetHeight } : null;
+      },
+    );
 
     for (const p of this.layout.placed.values()) {
       const el = this.els.get(p.node.id);
@@ -1214,6 +1273,7 @@ export class MindMapCanvas {
     }
     this.drawBoxes();
     this.drawSummaries();
+    this.drawCallouts();
     this.drawRangeHandles();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
@@ -1713,6 +1773,242 @@ export class MindMapCanvas {
     return el;
   }
 
+  // ---------- 标注 ----------
+
+  /** 布局前把要显示的标注气泡建好（布局要量它的尺寸）；隐藏时只建临时浮出的那一条 */
+  private syncCallouts(base: MindNode): void {
+    const need = new Set<string>();
+    const show = (n: MindNode) => n.callout !== undefined && (!this.calloutsHidden || this.peekCallout === n || this.editingCallout === n);
+    const visit = (n: MindNode) => {
+      if (show(n)) {
+        need.add(n.id);
+        let el = this.calloutEls.get(n.id);
+        if (!el) {
+          el = this.createCallout();
+          this.calloutEls.set(n.id, el);
+        }
+        this.calloutNode.set(el, n);
+        if (this.editingCallout !== n) this.renderCalloutText(el, n.callout ?? "");
+        el.classList.toggle("is-peek", this.calloutsHidden);
+      }
+      for (const c of visibleChildren(n)) visit(c);
+    };
+    visit(base);
+    for (const [id, el] of this.calloutEls) {
+      if (need.has(id)) continue;
+      el.remove();
+      this.calloutEls.delete(id);
+    }
+  }
+
+  /** 一行一个块，每行按行内 Markdown 渲染（链接、加粗、公式、标签） */
+  private renderCalloutText(el: HTMLElement, text: string): void {
+    if (el.dataset.raw === text) return;
+    el.dataset.raw = text;
+    const box = el.querySelector<HTMLElement>(".mm-callout-text")!;
+    box.empty();
+    for (const line of text.split("\n")) renderInline(box.createDiv({ cls: "mm-callout-line" }), line || "\u200b", this.summaryInlineOptions());
+  }
+
+  private createCallout(): HTMLElement {
+    const el = createDiv();
+    el.className = "mm-callout";
+    el.createDiv({ cls: "mm-callout-text" });
+    // 和概要文字一样不参与画布拖拽；单击选中它所在的节点，双击编辑
+    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const n = this.calloutNode.get(el);
+      if (!n || this.editingCallout === n) return;
+      this.select(n);
+      this.positionNodebar();
+    });
+    el.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const n = this.calloutNode.get(el);
+      if (n && this.opts.editable) this.editCallout(n);
+    });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const n = this.calloutNode.get(el);
+      if (!n || this.editingCallout === n || !this.opts.editable) return;
+      this.showContextMenu(
+        [
+          { title: t("menu.editCallout"), icon: "pencil", run: () => this.editCallout(n) },
+          { title: t("menu.removeCallout"), icon: "x", run: () => this.removeCallout(n) },
+        ],
+        ev,
+      );
+    });
+    this.nodesEl.append(el);
+    return el;
+  }
+
+  /** 尖角：气泡边上一段短底边收到节点边上的一个点，填分支色 */
+  private static calloutTail(c: { x: number; y: number; w: number; h: number; dir: PlacedCallout["dir"] }, p: Placed): string {
+    const r = (v: number) => round2(v);
+    if (c.dir === "right") {
+      const y = c.y + Math.min(c.h, p.h) / 2;
+      const bx = c.x + 1;
+      return `M${r(bx)},${r(y - 5)} L${r(bx)},${r(y + 5)} L${r(p.x + p.w + 2)},${r(y)} Z`;
+    }
+    const lo = Math.max(c.x, p.x);
+    const hi = Math.min(c.x + c.w, p.x + p.w);
+    const x = hi > lo ? (lo + hi) / 2 : p.x + p.w / 2;
+    const by = c.y + c.h - 1;
+    // 离得远（气泡放到了整个分支上方）时底边收窄，像一根细线指回节点，不然是一根粗黑的刺
+    const half = p.y - by > 30 ? 2 : 5;
+    return `M${r(x - half)},${r(by)} L${r(x + half)},${r(by)} L${r(x)},${r(p.y - 2)} Z`;
+  }
+
+  private drawCallouts(): void {
+    const layout = this.layout!;
+    const list: { node: MindNode; x: number; y: number; w: number; h: number; dir: PlacedCallout["dir"] }[] = [...layout.callouts];
+    // 隐藏时临时浮出的一条：不占位置，直接浮在节点上方
+    const peek = this.calloutsHidden ? (this.editingCallout ?? this.peekCallout) : null;
+    if (peek) {
+      const p = layout.placed.get(peek.id);
+      const el = this.calloutEls.get(peek.id);
+      if (p && el) list.push({ node: peek, x: p.x, y: p.y - CALLOUT_GAP - el.offsetHeight, w: el.offsetWidth, h: el.offsetHeight, dir: "up" });
+    }
+    let i = 0;
+    for (const c of list) {
+      const el = this.calloutEls.get(c.node.id);
+      const p = layout.placed.get(c.node.id);
+      if (!el || !p) continue;
+      const branch = this.els.get(c.node.id)?.dataset.branch;
+      const color = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      if (el.style.getPropertyValue("--mm-callout-color") !== color) el.style.setProperty("--mm-callout-color", color);
+      el.setCssStyles({ left: `${round2(c.x)}px`, top: `${round2(c.y)}px` });
+      let tail = this.calloutTails[i];
+      if (!tail) {
+        tail = createSvg("path");
+        tail.setAttribute("class", "mm-callout-tail");
+        this.calloutLayer.append(tail);
+        this.calloutTails.push(tail);
+      }
+      i++;
+      const d = MindMapCanvas.calloutTail(c, p);
+      if (tail.getAttribute("d") !== d) tail.setAttribute("d", d);
+      if (tail.style.getPropertyValue("--mm-callout-color") !== color) tail.style.setProperty("--mm-callout-color", color);
+      tail.classList.toggle("is-peek", c.node === peek);
+      if (tail.style.display) tail.setCssStyles({ display: "" });
+    }
+    for (let j = i; j < this.calloutTails.length; j++) {
+      if (!this.calloutTails[j].style.display) this.calloutTails[j].setCssStyles({ display: "none" });
+    }
+  }
+
+  isCalloutsHidden(): boolean {
+    return this.calloutsHidden;
+  }
+
+  /** 打开别的文件时由宿主按记住的状态设置；不回调、不重画（随后的 setDoc 会画） */
+  setCalloutsHidden(hidden: boolean): void {
+    this.calloutsHidden = hidden;
+    this.peekCallout = null;
+  }
+
+  toggleCallouts(): void {
+    if (this.editingCallout) return;
+    this.calloutsHidden = !this.calloutsHidden;
+    this.peekCallout = null;
+    this.opts.onCalloutsHiddenChange?.(this.calloutsHidden);
+    this.render();
+  }
+
+  private updateCalloutButton(): void {
+    const b = this.calloutButton;
+    if (!b || !this.doc) return;
+    let any = false;
+    walk(this.doc.root, (n) => {
+      if (n.callout) any = true;
+    });
+    b.classList.toggle("is-hidden", !any);
+    b.classList.toggle("is-active", any && !this.calloutsHidden);
+    this.tip(b, this.calloutsHidden ? t("canvas.showCallouts") : t("canvas.hideCallouts"), "toolbar");
+  }
+
+  removeCallout(node: MindNode): void {
+    if (!this.opts.editable || node.callout === undefined) return;
+    node.callout = undefined;
+    if (this.peekCallout === node) this.peekCallout = null;
+    this.render();
+    this.notify();
+  }
+
+  /** 原地编辑标注（没有就新加一条）：Enter 提交，Shift+Enter 换行，Esc 取消；清空提交等于删除 */
+  editCallout(node: MindNode): void {
+    if (!this.opts.editable || !this.doc) return;
+    if (this.editing) this.commitEdit();
+    const isNew = node.callout === undefined;
+    const before = node.callout ?? "";
+    if (isNew) node.callout = "";
+    this.editingCallout = node;
+    this.select(node);
+    this.render();
+    const box = this.calloutEls.get(node.id);
+    const el = box?.querySelector<HTMLElement>(".mm-callout-text");
+    if (!box || !el) {
+      this.editingCallout = null;
+      if (isNew) node.callout = undefined;
+      return;
+    }
+    this.ensureVisible(node);
+    delete box.dataset.raw;
+    box.classList.add("is-editing");
+    el.textContent = before;
+    el.dataset.placeholder = t("canvas.calloutPlaceholder");
+    el.setAttribute("contenteditable", "plaintext-only");
+    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    // 改已有的：光标放末尾，接着写
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+
+    let done = false;
+    const finish = (commit: boolean) => {
+      if (done) return;
+      done = true;
+      // 先读文字再撤编辑样式：撤掉 pre-wrap 后 innerText 会把换行压成空格。
+      // 写回文件时引号、%% 会被换掉，这里先换好，画布上看到的和文件里一致
+      const text = commit ? calloutFromMarker(calloutToMarker(el.innerText ?? "")) : before;
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("blur", onBlur);
+      el.removeEventListener("input", onInput);
+      el.removeAttribute("contenteditable");
+      box.classList.remove("is-editing");
+      this.editingCallout = null;
+      node.callout = text || undefined;
+      // 隐藏标注时编辑完留着浮出的那条，方便看结果；点别处再收起
+      if (this.calloutsHidden && node.callout) this.peekCallout = node;
+      this.render();
+      if ((node.callout ?? "") !== before || (isNew && node.callout)) this.notify();
+      this.el.focus({ preventScroll: true });
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish(false);
+      }
+    };
+    // 文字变了气泡尺寸跟着变，周围的节点要重新让位
+    const onInput = () => this.reflow();
+    const onBlur = () => finish(true);
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("blur", onBlur);
+    el.addEventListener("input", onInput);
+  }
+
   /** 大括号：right / tree 尖朝右，left 尖朝左，down 横着、尖朝下 */
   private static bracePath(s: PlacedSummary): string {
     const { x, y, w, h } = s.brace;
@@ -2166,6 +2462,8 @@ export class MindMapCanvas {
       bar.append(sep3);
     }
     btn("search", t("canvas.search", { key: sc("Mod", "F") }), () => this.openSearch());
+    // 只在图里有标注时出现
+    this.calloutButton = btn("callout", t("canvas.toggleCallouts"), () => this.toggleCallouts());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
@@ -2409,7 +2707,15 @@ export class MindMapCanvas {
     const bw = this.nodebar.offsetWidth;
     const bh = this.nodebar.offsetHeight;
     const left = Math.max(4, Math.min(r.x + r.width / 2 - bw / 2, this.el.clientWidth - bw - 4));
-    let top = r.y - bh - 10;
+    // 节点上方有标注气泡时放到气泡上面，不然盖住气泡没法双击编辑
+    let above = r.y;
+    const bubble = this.calloutEls.get(this.primary!.id);
+    if (bubble && bubble.isConnected) {
+      const b = bubble.getBoundingClientRect();
+      const host = this.el.getBoundingClientRect();
+      if (b.bottom - host.top <= r.y + 1) above = Math.min(above, b.top - host.top);
+    }
+    let top = above - bh - 10;
     if (top < 4) top = r.y + r.height + 10;
     this.nodebar.style.left = `${left}px`;
     this.nodebar.style.top = `${top}px`;
@@ -3969,6 +4275,8 @@ export class MindMapCanvas {
         return this.insertParentForSelected();
       case "edit":
         return this.startEdit(sel);
+      case "callout":
+        return this.editCallout(sel);
       case "delete":
         return this.deleteSelected();
       case "delete-only":
@@ -4444,7 +4752,7 @@ export class MindMapCanvas {
     const list: MindNode[] = [];
     if (q) {
       walk(this.doc.root, (n) => {
-        if (plainText(n.text).toLowerCase().includes(q) || unescapeNote(n.note).toLowerCase().includes(q)) list.push(n);
+        if (plainText(n.text).toLowerCase().includes(q) || unescapeNote(n.note).toLowerCase().includes(q) || (n.callout ?? "").toLowerCase().includes(q)) list.push(n);
       });
     }
     s.list = list;
@@ -4751,6 +5059,7 @@ export class MindMapCanvas {
       }
       entries.push(
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
+        { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );

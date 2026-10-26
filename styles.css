@@ -1662,3 +1662,44 @@
 /* 白板卡片里的嵌入脑图：铺满卡片 */
 .mm-file-embed.mm-in-canvas { height: 100%; }
 .mm-file-embed.mm-in-canvas > .mm-codeblock { height: 100% !important; }
+
+/* 标注：节点旁的圆角气泡，尖角（svg 里的三角形）指向节点；边框和尖角用分支色 */
+.mm-callout {
+  position: absolute;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  padding: 5px 10px;
+  border: 1.5px solid var(--mm-callout-color, var(--mm-line));
+  border-radius: 10px;
+  background: var(--mm-bg, var(--background-primary));
+  font-family: var(--mm-font);
+  font-size: 13px;
+  line-height: 18px;
+  color: inherit;
+  cursor: default;
+  user-select: none;
+  overflow-wrap: anywhere;
+}
+.mm-callout .mm-link { color: var(--link-color, var(--mm-selection)); }
+.mm-callout.is-editing { cursor: text; user-select: text; min-width: 60px; }
+.mm-callout.is-editing .mm-callout-text { white-space: pre-wrap; outline: none; }
+.mm-callout.is-editing .mm-callout-text:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.45;
+}
+/* 隐藏标注时临时浮出的一条：盖在节点上面，带阴影区分 */
+.mm-callout.is-peek {
+  z-index: 5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.mm-callout-tail {
+  fill: var(--mm-callout-color, var(--mm-line));
+  stroke: none;
+}
+.mm-callout-icon {
+  font-size: 0.95em;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.mm-callout-icon:hover { opacity: 1; }

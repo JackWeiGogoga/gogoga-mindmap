@@ -113,9 +113,15 @@ export default class MindMapPlugin extends Plugin {
     });
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
-    // 记住的视口跟着文件改名 / 删除走
+    // 记住的视口、标注的隐藏状态跟着文件改名 / 删除走
     this.registerEvent(
       this.app.vault.on("rename", (f, oldPath) => {
+        const hidden = this.settings.hiddenCallouts;
+        const hi = hidden?.indexOf(oldPath) ?? -1;
+        if (hidden && hi >= 0) {
+          hidden[hi] = f.path;
+          this.saveSettingsSoon();
+        }
         const vp = this.settings.viewports?.[oldPath];
         if (!vp || !this.settings.viewports) return;
         delete this.settings.viewports[oldPath];
@@ -125,6 +131,7 @@ export default class MindMapPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (f) => {
+        if (this.settings.hiddenCallouts?.includes(f.path)) this.setCalloutsHidden(f.path, false);
         if (!this.settings.viewports?.[f.path]) return;
         delete this.settings.viewports[f.path];
         this.saveSettingsSoon();
@@ -170,6 +177,21 @@ export default class MindMapPlugin extends Plugin {
       this.saveTimer = null;
       void this.saveSettings();
     }, 1500);
+  }
+
+  // ---------- 标注的显示 / 隐藏（按文件记） ----------
+
+  isCalloutsHidden(path: string): boolean {
+    return !!path && !!this.settings.hiddenCallouts?.includes(path);
+  }
+
+  setCalloutsHidden(path: string, hidden: boolean): void {
+    if (!path) return;
+    const list = this.settings.hiddenCallouts ?? [];
+    const next = hidden ? [...new Set([...list, path])] : list.filter((p) => p !== path);
+    if (next.length) this.settings.hiddenCallouts = next;
+    else delete this.settings.hiddenCallouts;
+    this.saveSettingsSoon();
   }
 
   // ---------- 记住视口 ----------
@@ -479,6 +501,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
+    exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
     exportCommand("reveal-in-markdown", t("command.revealInMarkdown"), async (v) => {
       if (v.file) await this.openAsMarkdown(v.file, v.leaf);
     });
@@ -489,6 +512,7 @@ export default class MindMapPlugin extends Plugin {
       ["insert-before", "insert-before", "command.insertBefore"],
       ["insert-parent", "insert-parent", "command.insertParent"],
       ["edit-node", "edit", "command.editNode"],
+      ["edit-callout", "callout", "command.editCallout"],
       ["delete-node", "delete", "command.deleteNode"],
       ["delete-node-only", "delete-only", "command.deleteNodeOnly"],
       ["move-up", "move-up", "command.moveUp"],

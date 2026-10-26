@@ -198,3 +198,51 @@ mindmap: true
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮 %%float x=-240 y=90%%/);
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个" summary=2 "概括"%%/);
 });
+
+test("标注：content.json 的 children.callout、content.xml 的 topics type=callout 导入成 %%callout%%，多条按行合并", async () => {
+  const json = JSON.stringify([
+    {
+      title: "S",
+      rootTopic: {
+        title: "根",
+        children: {
+          callout: [{ title: "根的标注" }],
+          attached: [
+            { title: "A", children: { callout: [{ title: "第一条\n换行" }, { title: "第二条" }], attached: [{ title: "A1" }] } },
+            { title: "B" },
+          ],
+        },
+      },
+    },
+  ]);
+  const [s1] = await parseXmind(makeZip({ "content.json": json }));
+  assert.equal(
+    xmindSheetToMarkdown(s1, { maxHeadingLevel: 2, indent: "\t" }),
+    `---
+mindmap: true
+---
+
+# 根 %%callout "根的标注"%%
+
+## A %%callout "第一条<br>换行<br>第二条"%%
+- A1
+
+## B
+`,
+  );
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" version="2.0">
+  <sheet id="s1"><title>表一</title>
+    <topic id="t1"><title>根</title>
+      <children>
+        <topics type="attached"><topic id="t2"><title>甲</title>
+          <children><topics type="callout"><topic id="c1"><title>甲的标注</title></topic></topics></children>
+        </topic></topics>
+      </children>
+    </topic>
+  </sheet>
+</xmap-content>`;
+  const [s2] = await parseXmind(makeZip({ "content.xml": xml }));
+  assert.match(xmindSheetToMarkdown(s2, { maxHeadingLevel: 3 }), /## 甲 %%callout "甲的标注"%%/);
+  assert.equal(s2.root.children.length, 1, "标注不会变成子主题");
+});

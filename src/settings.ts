@@ -28,6 +28,8 @@ export interface MindMapSettings {
   rememberViewport: boolean;
   /** 按文件路径记的视口，只留最近 50 个 */
   viewports?: Record<string, SavedViewport>;
+  /** 隐藏了标注的脑图文件路径 */
+  hiddenCallouts?: string[];
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */

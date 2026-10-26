@@ -325,3 +325,110 @@ test("自由主题：外框不会跨过它；聚焦分支时不参与", async ()
   const rf = layoutMap(focus, measure, { ...DEFAULT_LAYOUT, structure: "logic-right" });
   assert.ok(!rf.floating?.size);
 });
+
+test("标注：气泡不压任何节点和别的气泡，连线和尖角不穿过气泡，外框、概要、边界都包含它，各结构都成立", async () => {
+  const { layoutMap, CALLOUT_GAP } = await import("../../src/layout");
+  const md = `# Root %%callout "中心的标注"%%
+
+## A %%callout "短"%%
+- a1 %%callout "这是一段很长很长很长的标注文字，比节点宽很多"%%
+	- a1x
+	- a1y
+- a2 %%box callout "框里的"%%
+- a3
+
+## B %%callout "第一行<br>第二行<br>第三行"%%
+- b1
+- b2 %%summary "小结" callout "被括住的"%%
+
+## C
+- c1
+
+## D %%callout "D 的标注也挺长的一段文字"%%
+
+## 浮 %%float x=500 y=-300 callout "自由主题的"%%
+- f1 %%callout "f1 的"%%
+`;
+  const measureCo = (n: { callout?: string }) => {
+    const lines = (n.callout ?? "").split("\n");
+    return { w: Math.min(240, 16 + Math.max(...lines.map((l) => l.length)) * 12), h: 8 + 20 * lines.length };
+  };
+  type R = { x: number; y: number; w: number; h: number };
+  const hit = (a: R, b: R) => a.x < b.x + b.w - 0.01 && b.x < a.x + a.w - 0.01 && a.y < b.y + b.h - 0.01 && b.y < a.y + a.h - 0.01;
+  /** 轴对齐线段 → 细矩形 */
+  const seg = (x1: number, y1: number, x2: number, y2: number): R => ({ x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1) || 0.02, h: Math.abs(y2 - y1) || 0.02 });
+  for (const structure of ["logic-right", "mindmap", "org-down", "tree-right"] as const) {
+    const doc = parseMarkdown(md);
+    const res = layoutMap(doc.root, measure, { ...DEFAULT_LAYOUT, structure }, () => ({ w: 40, h: 20 }), measureCo);
+    const nodes = [...res.placed.values()];
+    const cos = res.callouts;
+    const withCallout: string[] = [];
+    walk(doc.root, (n) => {
+      if (n.callout) withCallout.push(n.text);
+    });
+    assert.equal(cos.length, withCallout.length, `${structure} 每个标注都排上了`);
+    // 气泡之间、气泡和节点之间不重叠
+    for (const c of cos) {
+      for (const p of nodes) assert.ok(!hit(c, p), `${structure} 「${c.node.text}」的标注压到了节点 ${p.node.text}`);
+      for (const d of cos) if (d !== c) assert.ok(!hit(c, d), `${structure} 「${c.node.text}」和「${d.node.text}」的标注重叠`);
+    }
+    // 气泡在自己节点的上方（尖角能竖直落到节点顶边）或右边
+    for (const c of cos) {
+      const p = res.placed.get(c.node.id)!;
+      if (c.dir === "up") {
+        assert.ok(c.y + c.h <= p.y - CALLOUT_GAP + 0.01, `${structure} ${c.node.text} 的标注在节点上方`);
+        assert.ok(Math.min(c.x + c.w, p.x + p.w) - Math.max(c.x, p.x) > 4, `${structure} ${c.node.text} 的标注和节点横向有交叠`);
+        const tx = (Math.max(c.x, p.x) + Math.min(c.x + c.w, p.x + p.w)) / 2;
+        const tail = seg(tx, c.y + c.h, tx, p.y);
+        for (const q of nodes) if (q !== p) assert.ok(!hit(tail, q), `${structure} ${c.node.text} 的尖角穿过节点 ${q.node.text}`);
+        for (const d of cos) if (d !== c) assert.ok(!hit(tail, d), `${structure} ${c.node.text} 的尖角穿过 ${d.node.text} 的标注`);
+      } else {
+        assert.ok(c.x >= p.x + p.w + CALLOUT_GAP - 0.01, `${structure} ${c.node.text} 的标注在节点右边`);
+      }
+    }
+    // 折线连线不从气泡里穿过
+    const { edgeGeometry } = await import("../../src/layout");
+    for (const child of nodes) {
+      const parentNode = child.node.parent;
+      if (!parentNode || res.floating?.has(child.node)) continue;
+      const parent = res.placed.get(parentNode.id)!;
+      const e = edgeGeometry(parent, child);
+      const segs: R[] =
+        child.side === "tree"
+          ? [seg(e.x1, e.y1, e.x1, e.y2), seg(e.x1, e.y2, e.x2, e.y2)]
+          : child.side === "down"
+            ? [seg(e.x1, e.y1, e.x1, (e.y1 + e.y2) / 2), seg(e.x1, (e.y1 + e.y2) / 2, e.x2, (e.y1 + e.y2) / 2), seg(e.x2, (e.y1 + e.y2) / 2, e.x2, e.y2)]
+            : [seg(e.x1, e.y1, (e.x1 + e.x2) / 2, e.y1), seg((e.x1 + e.x2) / 2, e.y1, (e.x1 + e.x2) / 2, e.y2), seg((e.x1 + e.x2) / 2, e.y2, e.x2, e.y2)];
+      for (const c of cos) for (const sg of segs) assert.ok(!hit(sg, c), `${structure} ${parentNode.text}→${child.node.text} 的连线穿过 ${c.node.text} 的标注`);
+    }
+    // 外框包住成员的标注；整体边界包含所有标注
+    for (const b of res.boxes)
+      for (const m of b.members) {
+        const c = cos.find((x) => x.node === m);
+        if (c) assert.ok(c.x >= b.x && c.y >= b.y && c.x + c.w <= b.x + b.w && c.y + c.h <= b.y + b.h, `${structure} 外框包住 ${m.text} 的标注`);
+      }
+    for (const s of res.summaries)
+      for (const m of s.members) {
+        const c = cos.find((x) => x.node === m);
+        if (c && s.side !== "down") assert.ok(c.y >= s.brace.y - 0.01 && c.y + c.h <= s.brace.y + s.brace.h + 0.01, `${structure} 概要括住 ${m.text} 的标注`);
+      }
+    const b = res.bounds;
+    for (const c of cos) assert.ok(c.x >= b.x - 0.01 && c.y >= b.y - 0.01 && c.x + c.w <= b.x + b.w + 0.01 && c.y + c.h <= b.y + b.h + 0.01, `${structure} 边界包含 ${c.node.text} 的标注`);
+  }
+});
+
+test("标注：隐藏时（尺寸函数返回 null）排布和没有标注一模一样", async () => {
+  const { layoutMap } = await import("../../src/layout");
+  const a = parseMarkdown(`# R %%callout "x"%%\n\n## A %%callout "y"%%\n- a1 %%callout "z"%%\n\n## B\n`);
+  const b = parseMarkdown(`# R\n\n## A\n- a1\n\n## B\n`);
+  for (const structure of ["logic-right", "mindmap", "org-down", "tree-right"] as const) {
+    const ra = layoutMap(a.root, measure, { ...DEFAULT_LAYOUT, structure }, undefined, () => null);
+    const rb = layoutMap(b.root, measure, { ...DEFAULT_LAYOUT, structure });
+    assert.equal(ra.callouts.length, 0);
+    for (const path of ["", "0", "0/0", "1"]) {
+      const pa = ra.placed.get(findByPath(a.root, path)!.id)!;
+      const pb = rb.placed.get(findByPath(b.root, path)!.id)!;
+      assert.deepEqual([pa.x, pa.y], [pb.x, pb.y], `${structure} ${path}`);
+    }
+  }
+});
