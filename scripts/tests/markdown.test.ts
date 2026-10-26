@@ -628,3 +628,31 @@ test("节点 ⇄ 行号：标题、列表项、备注行都能对上，frontmatt
   assert.equal(lineOfPath(noH1, ""), 3);
   assert.equal(lineOfPath(noH1, "0/0"), 4);
 });
+
+test("自由主题标记：float x= y= 往返不变，和其他标记共存；单独的 x=/y= 不当标记；挪到非中心节点下就不再是自由主题", () => {
+  const src = `# 根\n\n## A\n- a1\n\n## 浮 %%blue float x=320 y=-80%%\n- 子\n\n## 浮二 %%float x=-200 y=150 box "框"%%\n`;
+  const doc = parseMarkdown(src);
+  const [a, f1, f2] = doc.root.children;
+  assert.equal(a.float, undefined);
+  assert.deepEqual(f1.float, { x: 320, y: -80 });
+  assert.equal(f1.color, "blue");
+  assert.deepEqual(f2.float, { x: -200, y: 150 });
+  assert.equal(f2.box?.title, "框");
+  assert.equal(serializeMarkdown(doc), `# 根\n\n## A\n- a1\n\n## 浮 %%blue float x=320 y=-80%%\n- 子\n\n## 浮二 %%box "框" float x=-200 y=150%%\n`);
+  const odd = parseMarkdown(`# 根\n- 不是 %%x=3%%\n`);
+  assert.equal(odd.root.children[0].text, "不是 %%x=3%%");
+  moveNode(f1, a, 0, doc.style);
+  assert.equal(f1.float, undefined);
+});
+
+test("自由主题：给它插入父节点，新节点接替它当自由主题；外框 / 概要范围伸不过自由主题", async () => {
+  const { insertParents: ip, groupLimits: gl } = await import("../../src/model");
+  const doc = parseMarkdown(`# 根\n\n## A %%box%%\n\n## B\n\n## 浮 %%float x=300 y=0%%\n\n## C\n`);
+  const [a, , f] = doc.root.children;
+  assert.deepEqual(gl(a, "box"), { lo: 0, hi: 1 });
+  assert.deepEqual(gl(f, "box"), { lo: 2, hi: 2 });
+  const [wrap] = ip([f], doc.style);
+  assert.deepEqual(wrap.float, { x: 300, y: 0 });
+  assert.equal(f.float, undefined);
+  assert.equal(f.parent, wrap);
+});

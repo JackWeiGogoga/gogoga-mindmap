@@ -17,6 +17,8 @@ export interface XmindTopic {
   box?: { span: number; title: string };
   /** 概要：同外框，按子主题下标括一段，文字取自 XMind 的概要主题 */
   summary?: { span: number; text: string };
+  /** 自由主题（XMind 的 detached，只认中心主题下的）：相对中心主题的位置 */
+  float?: { x: number; y: number };
   children: XmindTopic[];
 }
 
@@ -119,6 +121,7 @@ interface JsonTopic {
   comments?: unknown[];
   notes?: { plain?: { content?: string } };
   children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[] };
+  position?: { x?: number; y?: number };
   branch?: string;
   style?: { properties?: Record<string, string> };
   labels?: string[];
@@ -134,14 +137,21 @@ function cleanTitle(s: string | undefined): string {
   return (s ?? "").replace(/\s*[\r\n]+\s*/g, " ").trim();
 }
 
-function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss()): XmindTopic {
+/** 自由主题的位置；文件里没写就在中心主题右下方依次往下排 */
+function floatPos(x: number | undefined, y: number | undefined, i: number): { x: number; y: number } {
+  return Number.isFinite(x) && Number.isFinite(y) ? { x: Math.round(x!), y: Math.round(y!) } : { x: 360, y: 160 + i * 80 };
+}
+
+function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false): XmindTopic {
   const fill = t.style?.properties?.["fill"];
   const color = fill && /^#[0-9a-f]{6}/i.test(fill) ? fill.slice(0, 7).toLowerCase() : undefined;
   const notes: string[] = [];
   const plain = t.notes?.plain?.content?.trim();
   if (plain) notes.push(plain);
   if (t.labels?.length) notes.push(t.labels.map((l) => `#${l.replace(/\s+/g, "-")}`).join(" "));
-  lost.detached += t.children?.detached?.length ?? 0;
+  // 中心主题下的自由主题转成带位置的自由主题；别处的（很少见）还显示不了，算丢掉
+  const detached = t.children?.detached ?? [];
+  if (!isRoot) lost.detached += detached.length;
   lost.comments += t.comments?.length ?? 0;
   const topic: XmindTopic = {
     id: t.id,
@@ -149,7 +159,10 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss()): XmindTopic {
     note: notes.length ? notes.join("\n\n") : undefined,
     color,
     folded: t.branch === "folded" || undefined,
-    children: (t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
+    children: [
+      ...(t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
+      ...(isRoot ? detached.map((d, i) => ({ ...fromJsonTopic(d, lost), float: floatPos(d.position?.x, d.position?.y, i) })) : []),
+    ],
   };
   for (const b of t.boundaries ?? []) applyBoundary(topic, b.range, b.title ?? "");
   for (const s of t.summaries ?? []) {
@@ -167,7 +180,7 @@ function parseContentJson(text: string): XmindSheet[] {
     .map((s, i) => {
       const lost = noLoss();
       lost.relationships = s.relationships?.length ?? 0;
-      return { title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!, lost), lost };
+      return { title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!, lost, true), lost };
     });
 }
 
@@ -258,18 +271,31 @@ function childrenByName(el: XEl, name: string): XEl[] {
   return el.children.filter((c) => c.name === name);
 }
 
-function fromXmlTopic(el: XEl, lost: XmindLost = noLoss()): XmindTopic {
+function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): XmindTopic {
   const title = cleanTitle(childrenByName(el, "title")[0]?.text ?? "");
   const notesEl = childrenByName(el, "notes")[0];
   const plain = notesEl ? childrenByName(notesEl, "plain")[0]?.text.trim() : undefined;
   const children: XmindTopic[] = [];
+  const floats: XmindTopic[] = [];
   for (const ch of childrenByName(el, "children")) {
     for (const topics of childrenByName(ch, "topics")) {
-      if (topics.attrs["type"] === "detached") lost.detached += childrenByName(topics, "topic").length;
+      if (topics.attrs["type"] === "detached") {
+        if (!isRoot) {
+          lost.detached += childrenByName(topics, "topic").length;
+          continue;
+        }
+        for (const t of childrenByName(topics, "topic")) {
+          const pos = childrenByName(t, "position")[0];
+          floats.push({ ...fromXmlTopic(t, lost), float: floatPos(Number(pos?.attrs["svg:x"]), Number(pos?.attrs["svg:y"]), floats.length) });
+        }
+        continue;
+      }
       if (topics.attrs["type"] !== "attached") continue;
       for (const t of childrenByName(topics, "topic")) children.push(fromXmlTopic(t, lost));
     }
   }
+  // 自由主题排在普通子主题之后，外框 / 概要按下标换算时不受影响
+  children.push(...floats);
   const topic: XmindTopic = { id: el.attrs["id"], title, note: plain || undefined, folded: el.attrs["branch"] === "folded" || undefined, children };
   for (const bs of childrenByName(el, "boundaries")) {
     for (const b of childrenByName(bs, "boundary")) applyBoundary(topic, b.attrs["range"], childrenByName(b, "title")[0]?.text ?? "");
@@ -298,7 +324,7 @@ function parseContentXml(text: string): XmindSheet[] {
       if (!topic) return null;
       const lost = noLoss();
       for (const r of childrenByName(s, "relationships")) lost.relationships += childrenByName(r, "relationship").length;
-      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic, lost), lost };
+      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic, lost, true), lost };
     })
     .filter((s): s is XmindSheet => !!s);
 }
@@ -346,6 +372,7 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       folded: !!t.folded,
       box: t.box && { ...t.box },
       summary: t.summary && { ...t.summary },
+      float: parent && !parent.parent && t.float ? { ...t.float } : undefined,
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });

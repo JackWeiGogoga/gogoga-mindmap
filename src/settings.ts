@@ -46,6 +46,8 @@ export interface MindMapSettings {
   leftDrag: "pan" | "select";
   /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
   editCaret: "select" | "end";
+  /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
+  dragToFloat: boolean;
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
 }
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
+  dragToFloat: false,
   rememberView: true,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
@@ -259,6 +262,16 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.editCaret = v as MindMapSettings["editCaret"];
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.dragToFloat.name"))
+      .setDesc(t("settings.dragToFloat.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.dragToFloat).onChange(async (v) => {
+          this.plugin.settings.dragToFloat = v;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)

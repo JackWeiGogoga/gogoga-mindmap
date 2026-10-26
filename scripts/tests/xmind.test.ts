@@ -148,7 +148,7 @@ test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数
         ],
         children: {
           attached: [{ id: "a", title: "A", boundaries: [{ range: "master" }] }, { id: "b", title: "B" }, { id: "c", title: "C" }],
-          detached: [{ id: "f", title: "自由" }],
+          detached: [{ id: "f", title: "自由", position: { x: 320.4, y: -150 } }],
           summary: [
             { id: "s1", title: "前两个" },
             // 概要主题下面还挂着子主题：子主题显示不了，算丢掉一项
@@ -159,7 +159,8 @@ test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数
     },
   ]);
   const [sheet] = await parseXmind(makeZip({ "content.json": json }));
-  assert.deepEqual(sheet.lost, { detached: 1, relationships: 2, summaries: 1, comments: 0 });
+  // 中心主题下的自由主题能转过来，不再算丢失
+  assert.deepEqual(sheet.lost, { detached: 0, relationships: 2, summaries: 1, comments: 0 });
   assert.equal(
     xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
     `---
@@ -173,6 +174,8 @@ mindmap: true
 ## B %%box=2 "后两个"%%
 
 ## C %%summary "最后"%%
+
+## 自由 %%float x=320 y=-150%%
 `,
   );
   assert.ok(describeLost(sheet.lost).length > 0);
@@ -181,7 +184,7 @@ mindmap: true
   const xml = `<xmap-content><sheet id="s"><title>X</title>
     <topic id="t1"><title>根</title>
       <children><topics type="attached"><topic id="t2"><title>甲</title></topic><topic id="t3"><title>乙</title></topic></topics>
-      <topics type="detached"><topic id="t9"><title>浮</title></topic></topics>
+      <topics type="detached"><topic id="t9"><title>浮</title><position svg:x="-240" svg:y="90"/><children><topics type="detached"><topic id="t10"><title>深层自由</title></topic></topics></children></topic></topics>
       <topics type="summary"><topic id="sm"><title>概括</title></topic></topics></children>
       <boundaries><boundary range="(0,1)"><title>两个</title></boundary></boundaries>
       <summaries><summary range="(0,1)" topic-ref="sm"/></summaries>
@@ -190,6 +193,8 @@ mindmap: true
   </sheet></xmap-content>`;
   const comments = `<comments><comment object-id="t2" author="a"><content>hi</content></comment><comment object-id="zz"/></comments>`;
   const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
+  // 中心主题下的自由主题转过来；挂在别的主题下的自由主题还不支持，仍算丢掉
   assert.deepEqual(x.lost, { detached: 1, relationships: 1, summaries: 0, comments: 1 });
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮 %%float x=-240 y=90%%/);
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个" summary=2 "概括"%%/);
 });

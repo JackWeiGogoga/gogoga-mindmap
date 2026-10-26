@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseMarkdown } from "../../src/markdown";
-import { DEFAULT_LAYOUT, layoutTree, Structure } from "../../src/layout";
+import { DEFAULT_LAYOUT, layoutMap, layoutTree, Structure } from "../../src/layout";
 import { pathOf } from "../../src/model";
 
 /**
@@ -28,12 +28,12 @@ const fixtures: Record<string, string> = {
 const structures: Structure[] = ["logic-right", "mindmap", "org-down", "tree-right"];
 const r = (v: number) => Math.round(v * 100) / 100;
 
-function snapshot(): Record<string, unknown> {
+function snapshot(layout: typeof layoutTree = layoutTree): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [name, src] of Object.entries(fixtures)) {
     for (const structure of structures) {
       const doc = parseMarkdown(src);
-      const res = layoutTree(doc.root, measure, { ...DEFAULT_LAYOUT, structure }, measureSummary);
+      const res = layout(doc.root, measure, { ...DEFAULT_LAYOUT, structure }, measureSummary);
       out[`${name}/${structure}`] = {
         placed: [...res.placed.values()].map((p) => [pathOf(p.node), r(p.x), r(p.y), r(p.w), r(p.h), p.side]).sort(),
         boxes: res.boxes.map((b) => [pathOf(b.start), r(b.x), r(b.y), r(b.w), r(b.h), b.side]),
@@ -51,6 +51,13 @@ test("布局快照：没有新标记的笔记，四种结构下坐标和以前�
     writeFileSync(GOLDEN, JSON.stringify(now, null, 1) + "\n");
     return;
   }
+  const golden = JSON.parse(readFileSync(GOLDEN, "utf8")) as Record<string, unknown>;
+  for (const key of Object.keys(golden)) assert.deepEqual(now[key], golden[key], key);
+});
+
+test("布局快照：画布实际用的 layoutMap 在没有自由主题时和快照完全一致", () => {
+  if (!existsSync(GOLDEN)) return;
+  const now = snapshot(layoutMap);
   const golden = JSON.parse(readFileSync(GOLDEN, "utf8")) as Record<string, unknown>;
   for (const key of Object.keys(golden)) assert.deepEqual(now[key], golden[key], key);
 });

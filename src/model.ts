@@ -26,6 +26,11 @@ export interface MindNode {
   width?: number;
   /** 思维导图结构里主主题固定在哪一边；%%left%% / %%right%%，没有就按数量自动分 */
   side?: "left" | "right";
+  /**
+   * 自由主题：中心主题的直接子节点才有效，不和中心主题连线，摆在相对中心主题中心 (x, y) 的位置
+   * （自由主题根节点的中心点）。%%float x=320 y=-80%%
+   */
+  float?: FloatPos;
   kind: NodeKind;
   /** 标题节点的级别 1..6；合成根节点为最小标题级别 - 1 */
   level: number;
@@ -40,6 +45,11 @@ export interface MindNode {
 
 export const NODE_MIN_WIDTH = 60;
 export const NODE_MAX_WIDTH = 1200;
+
+export interface FloatPos {
+  x: number;
+  y: number;
+}
 
 export interface Boundary {
   /** 框住的兄弟数，含本节点，至少 1 */
@@ -97,6 +107,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     summary: init.summary,
     width: init.width,
     side: init.side,
+    float: init.float,
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
@@ -142,6 +153,18 @@ export function boxGroups(siblings: MindNode[]): Map<string, MindNode> {
 
 export type GroupKind = "box" | "summary";
 
+/** 节点要离开这一排兄弟（比如变成自由主题）之前：前面兄弟上罩着它的外框 / 概要少括一个，免得范围顺延到别人身上 */
+export function shrinkGroupsAround(node: MindNode): void {
+  const sibs = node.parent?.children;
+  if (!sibs) return;
+  const idx = sibs.indexOf(node);
+  sibs.forEach((s, i) => {
+    if (i >= idx) return;
+    if (s.box && i + s.box.span > idx) s.box.span = Math.max(1, s.box.span - 1);
+    if (s.summary && i + s.summary.span > idx) s.summary.span = Math.max(1, s.summary.span - 1);
+  });
+}
+
 /** 外框 / 概要从起始节点算起括住的兄弟下标 [from, to]（含两端） */
 export function groupRange(start: MindNode, kind: GroupKind): [number, number] {
   const sibs = start.parent?.children ?? [start];
@@ -156,7 +179,15 @@ export function groupLimits(start: MindNode, kind: GroupKind): { lo: number; hi:
   const me = sibs.indexOf(start);
   let lo = 0;
   let hi = sibs.length - 1;
+  // 中心主题下的自由主题不在主树里：范围伸不过去，自由主题自己也伸不出去
+  const floatAt = (i: number) => !start.parent?.parent && !!sibs[i]?.float;
+  if (floatAt(me)) return { lo: me, hi: me };
   for (let i = 0; i < sibs.length; i++) {
+    if (i !== me && floatAt(i)) {
+      if (i < me) lo = Math.max(lo, i + 1);
+      else hi = Math.min(hi, i - 1);
+      continue;
+    }
     const g = sibs[i][kind];
     if (!g || i === me) continue;
     const end = i + Math.max(1, g.span) - 1;
@@ -222,6 +253,8 @@ export function insertParents(nodes: MindNode[], style: DocStyle): MindNode[] {
     const wrap = createNode({ parent, text: "", kind: first.kind, level: first.level, bullet: first.bullet });
     wrap.depth = parent.depth + 1;
     if (first.side) wrap.side = first.side;
+    // 给自由主题加父节点：新节点接替它当自由主题，留在原来的位置
+    if (first.float && !parent.parent) wrap.float = { ...first.float };
     sibs.splice(sibs.indexOf(first), 0, wrap);
     members.forEach((m, i) => moveNode(m, wrap, i, style));
     for (const m of members) m.side = undefined;
@@ -375,6 +408,8 @@ export function moveNode(node: MindNode, newParent: MindNode, index: number, sty
   const at = Math.max(0, Math.min(index, newParent.children.length));
   newParent.children.splice(at, 0, node);
   node.parent = newParent;
+  // 自由主题只能挂在中心主题下；挪到别处就是普通节点了
+  if (newParent.parent) node.float = undefined;
   const { kind, level } = kindForNewChild(newParent, style);
   // 换了父节点后，写回方式跟随新位置的兄弟；子树里的标题级别在序列化时统一重算
   const ref = newParent.children.find((c) => c !== node);
@@ -396,6 +431,8 @@ function kindBelow(parent: MindNode, style: DocStyle): { kind: NodeKind; level: 
 export function attachSubtree(node: MindNode, parent: MindNode, style: DocStyle, index?: number): void {
   const top = kindForNewChild(parent, style);
   node.parent = parent;
+  // 粘贴进来的子树不带自由主题的位置（挂在中心主题下也会和原来的叠在一起）
+  node.float = undefined;
   const at = index === undefined ? parent.children.length : Math.max(0, Math.min(index, parent.children.length));
   parent.children.splice(at, 0, node);
   node.kind = top.kind;
@@ -427,6 +464,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     summary: node.summary && { ...node.summary },
     width: node.width,
     side: node.side,
+    float: node.float && { ...node.float },
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,

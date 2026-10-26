@@ -280,3 +280,48 @@ test("概要：括号在被括分支外侧，不压节点、不挪节点，整�
     else for (const p of members) assert.ok(ab.brace.x >= p.x + p.w, `${structure}: 括号应在右侧`);
   }
 });
+
+test("自由主题：不进主树、按位置单独排；主树坐标和去掉它时一样；左右分布时左边的向左展开；边界包含它", async () => {
+  const { layoutMap } = await import("../../src/layout");
+  const withFloat = `# Root\n\n## A\n- a1\n\n## B\n\n## 浮 %%float x=400 y=-200%%\n- f1\n- f2\n\n## 左浮 %%float x=-500 y=100%%\n- g1\n`;
+  const without = `# Root\n\n## A\n- a1\n\n## B\n`;
+  for (const structure of ["logic-right", "mindmap", "org-down", "tree-right"] as const) {
+    const d1 = parseMarkdown(withFloat);
+    const d2 = parseMarkdown(without);
+    const r1 = layoutMap(d1.root, measure, { ...DEFAULT_LAYOUT, structure });
+    const r2 = layoutMap(d2.root, measure, { ...DEFAULT_LAYOUT, structure });
+    // 主树（中心主题、A、a1、B）位置不受自由主题影响
+    for (const path of ["", "0", "0/0", "1"]) {
+      const p1 = r1.placed.get(findByPath(d1.root, path)!.id)!;
+      const p2 = r2.placed.get(findByPath(d2.root, path)!.id)!;
+      assert.deepEqual([p1.x, p1.y, p1.w, p1.h], [p2.x, p2.y, p2.w, p2.h], `${structure} ${path}`);
+    }
+    const f = findByPath(d1.root, "2")!;
+    const pf = r1.placed.get(f.id)!;
+    assert.ok(r1.floating?.has(f), "标成自由主题");
+    assert.ok(Math.abs(pf.x + pf.w / 2 - 400) < 0.01 && Math.abs(pf.y + pf.h / 2 + 200) < 0.01, `${structure} 自由主题中心在 (400,-200)`);
+    const kid = r1.placed.get(f.children[0].id)!;
+    if (structure === "org-down") assert.ok(kid.y > pf.y + pf.h, "组织结构图向下展开");
+    else assert.ok(kid.x > pf.x, `${structure} 向右展开`);
+    const g = findByPath(d1.root, "3")!;
+    const pg = r1.placed.get(g.id)!;
+    const gk = r1.placed.get(g.children[0].id)!;
+    if (structure === "mindmap") assert.ok(gk.x + gk.w <= pg.x && gk.side === "left", "左右分布时左边的自由主题向左展开");
+    const b = r1.bounds;
+    for (const p of r1.placed.values()) assert.ok(p.x >= b.x - 0.01 && p.y >= b.y - 0.01 && p.x + p.w <= b.x + b.w + 0.01 && p.y + p.h <= b.y + b.h + 0.01, `${structure} 边界包含 ${p.node.text}`);
+  }
+});
+
+test("自由主题：外框不会跨过它；聚焦分支时不参与", async () => {
+  const { layoutMap } = await import("../../src/layout");
+  const doc = parseMarkdown(`# Root\n\n## A %%box=3%%\n\n## 浮 %%float x=600 y=0%%\n\n## B\n`);
+  const r = layoutMap(doc.root, measure, { ...DEFAULT_LAYOUT, structure: "logic-right" });
+  assert.equal(r.boxes.length, 1);
+  const box = r.boxes[0];
+  assert.deepEqual(box.members.map((m) => m.text), ["A", "B"]);
+  const pf = r.placed.get(findByPath(doc.root, "1")!.id)!;
+  assert.ok(pf.x > box.x + box.w, "外框没有把自由主题框进去");
+  const focus = findByPath(doc.root, "0")!;
+  const rf = layoutMap(focus, measure, { ...DEFAULT_LAYOUT, structure: "logic-right" });
+  assert.ok(!rf.floating?.size);
+});

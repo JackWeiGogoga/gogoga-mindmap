@@ -18,6 +18,7 @@ import {
   groupRange,
   insertParents,
   setGroupRange,
+  shrinkGroupsAround,
   NODE_MAX_WIDTH,
   NODE_MIN_WIDTH,
   pathOf,
@@ -33,7 +34,7 @@ import {
   DEFAULT_LAYOUT,
   edgeGeometry,
   edgePath,
-  layoutTree,
+  layoutMap,
   LayoutOptions,
   LayoutResult,
   Placed,
@@ -159,6 +160,8 @@ export interface CanvasOptions {
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
   caretAtEnd?: () => boolean;
+  /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
+  dragToFloat?: () => boolean;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
@@ -444,7 +447,18 @@ export class MindMapCanvas {
   } | null = null;
   private clipboardText = "";
   /** movers：一起拖的节点（多选时是选区里最外层的那些，按文档顺序），node 是按住的那个 */
-  private drag: { node: MindNode; movers: MindNode[]; ghost: HTMLElement; subtree: Set<MindNode>; target: DropTarget | null; indicator: HTMLElement } | null = null;
+  private drag: {
+    node: MindNode;
+    movers: MindNode[];
+    ghost: HTMLElement;
+    subtree: Set<MindNode>;
+    target: DropTarget | null;
+    indicator: HTMLElement;
+    /** 按下点相对按住节点中心的偏移（世界坐标），放到空白处时用来算自由主题的位置 */
+    grab: { x: number; y: number };
+    /** 最后一次指针位置（世界坐标） */
+    last: { x: number; y: number } | null;
+  } | null = null;
   private marquee: { x: number; y: number; el: HTMLElement; base: Set<MindNode>; moved?: boolean } | null = null;
   private popover: HTMLElement | null = null;
   private popoverSave: (() => void) | null = null;
@@ -1121,7 +1135,7 @@ export class MindMapCanvas {
     this.alignWidths(base);
     const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
     this.syncSummaryLabels(base);
-    this.layout = layoutTree(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts, (start) => {
+    this.layout = layoutMap(base, (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 }, layoutOpts, (start) => {
       const el = this.summaryLabels.get(start.id);
       return el ? { w: el.offsetWidth, h: el.offsetHeight } : { w: 0, h: 0 };
     });
@@ -1144,6 +1158,8 @@ export class MindMapCanvas {
     for (const child of this.layout.placed.values()) {
       const parentNode = child.node.parent;
       if (!parentNode) continue;
+      // 自由主题不和中心主题连线
+      if (this.layout.floating?.has(child.node)) continue;
       const parent = this.layout.placed.get(parentNode.id);
       if (!parent) continue;
       const g = edgeGeometry(parent, child);
@@ -1270,8 +1286,14 @@ export class MindMapCanvas {
 
   /** node 所在外框的起始节点 */
   private boxOf(node: MindNode): MindNode | null {
-    if (!node.parent) return null;
-    return boxGroups(node.parent.children).get(node.id) ?? null;
+    if (!node.parent || this.isFloating(node)) return null;
+    return boxGroups(this.groupSiblings(node.parent)).get(node.id) ?? null;
+  }
+
+  /** 算外框 / 概要分组用的兄弟列表：和布局一致，中心主题下的自由主题不算在内 */
+  private groupSiblings(parent: MindNode): MindNode[] {
+    const floating = this.layout?.floating;
+    return floating?.size && !parent.parent ? parent.children.filter((c) => !floating.has(c)) : parent.children;
   }
 
   private boxMembers(start: MindNode): MindNode[] {
@@ -1517,7 +1539,7 @@ export class MindMapCanvas {
     if (!this.opts.editable) return;
     const byParent = new Map<MindNode, number[]>();
     for (const n of this.selected) {
-      if (!n.parent || this.boxOf(n)) continue;
+      if (!n.parent || this.boxOf(n) || this.isFloating(n)) continue;
       const arr = byParent.get(n.parent) ?? [];
       arr.push(n.parent.children.indexOf(n));
       byParent.set(n.parent, arr);
@@ -1718,8 +1740,8 @@ export class MindMapCanvas {
 
   /** node 所在概要的起始节点 */
   private summaryOf(node: MindNode): MindNode | null {
-    if (!node.parent) return null;
-    return summaryGroups(node.parent.children).get(node.id) ?? null;
+    if (!node.parent || this.isFloating(node)) return null;
+    return summaryGroups(this.groupSiblings(node.parent)).get(node.id) ?? null;
   }
 
   private summaryMenuEntries(start: MindNode): MenuEntry[] {
@@ -1735,7 +1757,7 @@ export class MindMapCanvas {
     if (!this.opts.editable) return;
     const byParent = new Map<MindNode, number[]>();
     for (const n of this.selected) {
-      if (!n.parent || this.summaryOf(n)) continue;
+      if (!n.parent || this.summaryOf(n) || this.isFloating(n)) continue;
       const arr = byParent.get(n.parent) ?? [];
       arr.push(n.parent.children.indexOf(n));
       byParent.set(n.parent, arr);
@@ -2613,6 +2635,13 @@ export class MindMapCanvas {
         if (box) {
           ev.preventDefault();
           this.editBoxTitle(box);
+          return;
+        }
+        // 双击空白处：在这里新建一个自由主题（和 XMind 一样）
+        const blank = !(ev.target as HTMLElement).closest(".mm-toolbar, .mm-nodebar, .mm-popover, .mm-menu, .mm-box-title, .mm-summary, .mm-range-handle, .mm-crumbs, .gg-mm-search, .mm-outline");
+        if (blank && this.canFloat()) {
+          ev.preventDefault();
+          this.createFloatAt(this.toWorld(ev.clientX, ev.clientY));
         }
         return;
       }
@@ -3104,7 +3133,7 @@ export class MindMapCanvas {
         return;
       }
       if (key === "ArrowUp") {
-        if (node.parent) this.select(node.parent);
+        if (node.parent && !this.isFloating(node)) this.select(node.parent);
         return;
       }
       this.selectNearest(p, key === "ArrowLeft" ? "left" : "right");
@@ -3117,7 +3146,7 @@ export class MindMapCanvas {
         return;
       }
       if (key === "ArrowLeft") {
-        if (node.parent) this.select(node.parent);
+        if (node.parent && !this.isFloating(node)) this.select(node.parent);
         return;
       }
       this.selectNearest(p, key === "ArrowUp" ? "up" : "down");
@@ -3126,14 +3155,15 @@ export class MindMapCanvas {
     const towardChildren = (key === "ArrowRight" && p.side === "right") || (key === "ArrowLeft" && p.side === "left");
     if (key === "ArrowLeft" || key === "ArrowRight") {
       if (node.depth === 0) {
-        const kids = visibleChildren(node).filter((c) => this.layout!.placed.get(c.id)?.side === (key === "ArrowRight" ? "right" : "left"));
+        const kids = visibleChildren(node).filter((c) => !this.isFloating(c) && this.layout!.placed.get(c.id)?.side === (key === "ArrowRight" ? "right" : "left"));
         if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
         return;
       }
       if (towardChildren) {
         const kids = visibleChildren(node);
         if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
-      } else if (node.parent) {
+      } else if (node.parent && !this.isFloating(node)) {
+        // 自由主题没有连到中心主题，往回走不到中心主题
         this.select(node.parent);
       }
       return;
@@ -3146,12 +3176,17 @@ export class MindMapCanvas {
    * 同一层、最近的节点。对齐按节点贴着父节点的那条边算，不用中心点 —— 兄弟左对齐，
    * 文字长短不一时中心点会偏得很远，以前就因此从 2-2 跳去了别的分支。
    */
+  /** 按自由主题排着的节点（中心主题下带 float 的子节点，聚焦分支时没有） */
+  private isFloating(node: MindNode): boolean {
+    return !!this.layout?.floating?.has(node);
+  }
+
   private selectVertical(node: MindNode, p: Placed, dir: -1 | 1): void {
     if (!this.layout || !node.parent) return;
     const placed = this.layout.placed;
     const sibs = visibleChildren(node.parent)
       .map((c) => placed.get(c.id))
-      .filter((q): q is Placed => !!q && q.side === p.side)
+      .filter((q): q is Placed => !!q && q.side === p.side && this.isFloating(q.node) === this.isFloating(node))
       .sort((a, b) => a.y - b.y);
     const next = sibs[sibs.indexOf(p) + dir];
     if (next) {
@@ -3271,7 +3306,10 @@ export class MindMapCanvas {
     indicator.className = "mm-drop-indicator";
     this.overlay.append(indicator);
     for (const n of subtree) this.els.get(n.id)?.classList.add("is-dragging");
-    this.drag = { node, movers, ghost, subtree, target: null, indicator };
+    const w0 = this.toWorld(ev.clientX, ev.clientY);
+    const p0 = this.layout?.placed.get(node.id);
+    const grab = p0 ? { x: w0.x - (p0.x + p0.w / 2), y: w0.y - (p0.y + p0.h / 2) } : { x: 0, y: 0 };
+    this.drag = { node, movers, ghost, subtree, target: null, indicator, grab, last: null };
     this.el.classList.add("is-dragging-node");
     this.positionNodebar();
     this.updateDrag(ev);
@@ -3283,6 +3321,7 @@ export class MindMapCanvas {
     this.drag.ghost.style.left = `${ev.clientX - host.left + 12}px`;
     this.drag.ghost.style.top = `${ev.clientY - host.top + 12}px`;
     const w = this.toWorld(ev.clientX, ev.clientY);
+    this.drag.last = w;
     const target = this.findDropTarget(w.x, w.y, this.drag.subtree);
     this.drag.target = target;
     for (const el of this.els.values()) el.classList.remove("is-drop-target");
@@ -3458,15 +3497,45 @@ export class MindMapCanvas {
   private endDrag(commit: boolean): void {
     this.stopAutoScroll();
     if (!this.drag) return;
-    const { node, movers, ghost, indicator, target } = this.drag;
+    const { node, movers, ghost, indicator, target, grab, last } = this.drag;
     ghost.remove();
     indicator.remove();
     for (const el of this.els.values()) el.classList.remove("is-dragging", "is-drop-target");
     this.el.classList.remove("is-dragging-node");
     this.drag = null;
+    // 放到空白处的落点（按住的节点中心）
+    const dropCenter = last && { x: last.x - grab.x, y: last.y - grab.y };
     if (movers.length > 1) {
       if (commit && target && this.doc) this.dropMany(movers, node, target);
+      else if (commit && !target && dropCenter && this.canFloat() && this.opts.dragToFloat?.()) this.floatMany(movers, node, dropCenter);
       else this.positionNodebar();
+      return;
+    }
+    // 自由主题：落在节点 / 空隙上就挂回去，落在空白处就挪到那里
+    if (commit && this.doc && this.isFloating(node)) {
+      if (!target) {
+        if (dropCenter) {
+          node.float = this.floatPos(dropCenter);
+          this.select(node);
+          this.render();
+          this.notify();
+        }
+        return;
+      }
+      if (target.parent !== node && !isAncestor(node, target.parent)) {
+        node.float = undefined;
+        if (target.side) node.side = target.side;
+        if (target.parent.folded) target.parent.folded = false;
+        moveNode(node, target.parent, target.index, this.doc.style);
+        this.select(node);
+        this.render();
+        this.notify();
+        return;
+      }
+    }
+    // 设置里打开了「拖到空白处变成自由主题」
+    if (commit && !target && dropCenter && this.doc && node.parent && this.canFloat() && this.opts.dragToFloat?.()) {
+      this.floatMany([node], node, dropCenter);
       return;
     }
     if (commit && target && this.doc && !isAncestor(node, target.parent) && target.parent !== node) {
@@ -3524,6 +3593,8 @@ export class MindMapCanvas {
     if (parent.folded) parent.folded = false;
     for (const m of movers) {
       const at = anchor ? parent.children.indexOf(anchor) : parent.children.length;
+      // 自由主题被拖进树里就挂上了
+      m.float = undefined;
       if (!moveNode(m, parent, at, this.doc.style)) continue;
       if (target.side) m.side = target.side;
       else if (parent !== (this.focusRoot ?? this.doc.root)) m.side = undefined;
@@ -3531,6 +3602,103 @@ export class MindMapCanvas {
     this.select(null);
     for (const m of movers) this.select(m, "add");
     this.setPrimary(primary);
+    this.render();
+    this.notify();
+  }
+
+  // ---------- 自由主题 ----------
+
+  /** 只有显示整张图（不在聚焦某个分支）时才能放自由主题 */
+  private canFloat(): boolean {
+    return !!this.doc && this.opts.editable && !this.focusRoot;
+  }
+
+  /** 世界坐标（画布里的点）→ 自由主题的位置：相对中心主题中心 */
+  private floatPos(center: { x: number; y: number }): { x: number; y: number } {
+    const rp = this.doc && this.layout?.placed.get(this.doc.root.id);
+    const cx = rp ? rp.x + rp.w / 2 : 0;
+    const cy = rp ? rp.y + rp.h / 2 : 0;
+    return { x: Math.round(center.x - cx), y: Math.round(center.y - cy) };
+  }
+
+  /** 节点所在位置的中心（世界坐标） */
+  private centerOf(node: MindNode): { x: number; y: number } | null {
+    const p = this.layout?.placed.get(node.id);
+    return p ? { x: p.x + p.w / 2, y: p.y + p.h / 2 } : null;
+  }
+
+  /** 在画布某处新建一个自由主题并进入编辑；没写字就按 Esc / 回车，等于没加 */
+  createFloatAt(center: { x: number; y: number }): void {
+    if (!this.canFloat() || !this.doc) return;
+    if (this.editing) this.commitEdit();
+    const node = addChild(this.doc.root, this.doc.style, "");
+    node.float = this.floatPos(center);
+    this.select(node);
+    this.render();
+    this.startEdit(node, true);
+  }
+
+  /** 在一个自由主题整棵树的下方（dir = -1 时上方）再放一个自由主题 */
+  private addFloatNear(f: MindNode, dir: 1 | -1): void {
+    if (!this.canFloat() || !this.doc || !this.layout) return;
+    const pf = this.layout.placed.get(f.id);
+    if (!pf) return;
+    let top = pf.y;
+    let bottom = pf.y + pf.h;
+    walk(f, (n) => {
+      const p = this.layout!.placed.get(n.id);
+      if (!p) return;
+      top = Math.min(top, p.y);
+      bottom = Math.max(bottom, p.y + p.h);
+    });
+    const gap = 40;
+    const y = dir > 0 ? bottom + gap + pf.h / 2 : top - gap - pf.h / 2;
+    this.createFloatAt({ x: pf.x + pf.w / 2, y });
+  }
+
+  /**
+   * 把节点（连同子树）变成自由主题：挪到中心主题下最后，放在 center（多个时保持彼此的相对位置）。
+   * 原来罩着它的外框 / 概要少括一个，免得范围顺延到别的兄弟上
+   */
+  private floatMany(nodes: MindNode[], primary: MindNode, center: { x: number; y: number }): void {
+    if (!this.doc) return;
+    const root = this.doc.root;
+    const c0 = this.centerOf(primary) ?? center;
+    const offsets = new Map(nodes.map((n) => {
+      const c = this.centerOf(n) ?? c0;
+      return [n, { x: c.x - c0.x, y: c.y - c0.y }] as const;
+    }));
+    for (const n of nodes) {
+      if (!n.parent || n === root) continue;
+      shrinkGroupsAround(n);
+      moveNode(n, root, root.children.length, this.doc.style);
+      n.side = undefined;
+      if (n.box) n.box.span = 1;
+      if (n.summary) n.summary.span = 1;
+      const o = offsets.get(n)!;
+      n.float = this.floatPos({ x: center.x + o.x, y: center.y + o.y });
+    }
+    this.select(null);
+    for (const n of nodes) this.select(n, "add");
+    this.setPrimary(primary);
+    this.render();
+    this.notify();
+  }
+
+  /** 节点原地变成自由主题（右键「转为自由主题」） */
+  convertToFloat(node: MindNode): void {
+    if (!this.canFloat() || !node.parent || this.isFloating(node)) return;
+    const c = this.centerOf(node);
+    if (c) this.floatMany([node], node, c);
+  }
+
+  /** 自由主题挂回中心主题，排在主主题最后 */
+  attachFloat(node: MindNode): void {
+    if (!this.doc || !this.opts.editable || !node.float) return;
+    node.float = undefined;
+    const root = this.doc.root;
+    moveNode(node, root, root.children.length, this.doc.style);
+    this.select(node);
     this.render();
     this.notify();
   }
@@ -3723,6 +3891,10 @@ export class MindMapCanvas {
   private addSiblingToSelected(before: boolean): void {
     const sel = this.primary;
     if (!sel || !this.doc) return;
+    if (this.isFloating(sel)) {
+      this.addFloatNear(sel, before ? -1 : 1);
+      return;
+    }
     const node = addSibling(sel, "", !before);
     if (!node) return;
     if (sel.side) node.side = sel.side;
@@ -4502,7 +4674,7 @@ export class MindMapCanvas {
       this.showContextMenu(this.boxMenuEntries(box), ev);
       return;
     }
-    this.showContextMenu(this.backgroundMenuEntries(), ev);
+    this.showContextMenu(this.backgroundMenuEntries(this.toWorld(ev.clientX, ev.clientY)), ev);
   }
 
   private nodeMenuEntries(node: MindNode): MenuEntry[] {
@@ -4550,6 +4722,8 @@ export class MindMapCanvas {
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
       if (node.width) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidth(node) });
+      if (this.isFloating(node)) entries.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
+      else if (node.parent && this.canFloat()) entries.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       const box = this.boxOf(node);
       if (box) entries.push(...this.boxMenuEntries(box));
       else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent, run: () => this.addBoxToSelected() });
@@ -4578,9 +4752,12 @@ export class MindMapCanvas {
     return entries;
   }
 
-  private backgroundMenuEntries(): MenuEntry[] {
+  private backgroundMenuEntries(at?: { x: number; y: number }): MenuEntry[] {
     const entries: MenuEntry[] = [];
-    if (this.opts.editable) entries.push({ title: t("menu.paste"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() }, { separator: true });
+    if (this.opts.editable) {
+      if (at && this.canFloat()) entries.push({ title: t("menu.newFloat"), icon: "square-plus", run: () => this.createFloatAt(at) });
+      entries.push({ title: t("menu.paste"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() }, { separator: true });
+    }
     entries.push(
       { title: t("canvas.expandAll"), icon: "chevrons-down-up", run: () => this.setFoldLevel(null) },
       { title: t("canvas.mainTopicsOnly"), icon: "chevrons-up-down", run: () => this.setFoldLevel(1) },

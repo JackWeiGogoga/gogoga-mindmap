@@ -615,6 +615,7 @@ export default class MindMapPlugin extends Plugin {
         wheelZoom: () => this.settings.wheelAction === "zoom",
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
+        dragToFloat: () => this.settings.dragToFloat,
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),
