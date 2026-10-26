@@ -4765,6 +4765,9 @@ export class MindMapCanvas {
       entries.push(sep);
     }
     entries.push({ title: t("menu.copy"), icon: "copy", run: () => this.copySelection() });
+    // 节点里有图片时可以把图片本身复制出去（⌘C 复制的是 Markdown 文字）
+    const img = this.els.get(node.id)?.querySelector<HTMLImageElement>(".mm-label img.mm-img");
+    if (img) entries.push({ title: t("menu.copyImage"), icon: "image", run: () => void this.copyImage(img) });
     if (editable) {
       entries.push(
         { title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() },
@@ -5076,6 +5079,29 @@ export class MindMapCanvas {
     try {
       await navigator.clipboard.writeText(link);
       this.opts.host?.notice?.(t("notice.copied", { link }));
+    } catch {
+      this.opts.host?.notice?.(t("notice.copyFailed"));
+    }
+  }
+
+  /** 把节点里的图片以 PNG 放进剪贴板：剪贴板只认 PNG，其他格式先画到 canvas 上转一下 */
+  private async copyImage(img: HTMLImageElement): Promise<void> {
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        const src = new Image();
+        src.crossOrigin = "anonymous";
+        src.onload = () => {
+          const c = createEl("canvas");
+          c.width = src.naturalWidth;
+          c.height = src.naturalHeight;
+          c.getContext("2d")?.drawImage(src, 0, 0);
+          c.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob"))), "image/png");
+        };
+        src.onerror = () => reject(new Error("load"));
+        src.src = img.currentSrc || img.src;
+      });
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      this.opts.host?.notice?.(t("notice.imageCopied"));
     } catch {
       this.opts.host?.notice?.(t("notice.copyFailed"));
     }

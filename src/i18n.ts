@@ -293,6 +293,7 @@ const en = {
   "menu.toHeading": "Convert level to headings",
   "menu.toList": "Convert level to lists",
   "menu.copy": "Copy",
+  "menu.copyImage": "Copy image",
   "menu.cut": "Cut",
   "menu.pasteChild": "Paste as child node",
   "menu.copyNodeLink": "Copy node link",
@@ -311,6 +312,7 @@ const en = {
   "notice.noBlockId": "This node has no block ID yet; one can only be generated while editing",
   "notice.copied": "Copied {link}",
   "notice.copyFailed": "Copy failed",
+  "notice.imageCopied": "Image copied",
 
   // outline.ts
   "outline.title": "Outline",
@@ -665,6 +667,7 @@ const zh: Record<Key, string> = {
   "menu.toHeading": "本级转为标题",
   "menu.toList": "本级转为列表",
   "menu.copy": "复制",
+  "menu.copyImage": "复制图片",
   "menu.cut": "剪切",
   "menu.pasteChild": "粘贴为子节点",
   "menu.copyNodeLink": "复制节点链接",
@@ -682,6 +685,7 @@ const zh: Record<Key, string> = {
   "notice.noBlockId": "这个节点还没有块 id，需要在可编辑状态下生成",
   "notice.copied": "已复制 {link}",
   "notice.copyFailed": "复制失败",
+  "notice.imageCopied": "已复制图片",
 
   "outline.title": "大纲",
   "outline.close": "关闭大纲面板",
