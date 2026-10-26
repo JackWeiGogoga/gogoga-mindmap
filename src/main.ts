@@ -34,8 +34,8 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, MindMapCanvas, NodeCommand } from "./canvas";
-import { frontmatterValue, parseMarkdown, serializeMarkdown, setFrontmatterValue } from "./markdown";
-import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab } from "./settings";
+import { frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue } from "./markdown";
+import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
@@ -113,6 +113,29 @@ export default class MindMapPlugin extends Plugin {
     });
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
+    // 记住的视口跟着文件改名 / 删除走
+    this.registerEvent(
+      this.app.vault.on("rename", (f, oldPath) => {
+        const vp = this.settings.viewports?.[oldPath];
+        if (!vp || !this.settings.viewports) return;
+        delete this.settings.viewports[oldPath];
+        this.settings.viewports[f.path] = vp;
+        this.saveSettingsSoon();
+      }),
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (f) => {
+        if (!this.settings.viewports?.[f.path]) return;
+        delete this.settings.viewports[f.path];
+        this.saveSettingsSoon();
+      }),
+    );
+    this.register(() => {
+      if (this.saveTimer === null) return;
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+      void this.saveSettings();
+    });
     this.registerEvent(this.app.metadataCache.on("changed", refreshProps));
     this.register(() => {
       this.propertyIcons?.destroy();
@@ -137,6 +160,35 @@ export default class MindMapPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private saveTimer: number | null = null;
+  /** 平移、缩放会频繁改视口，攒一下再写 data.json */
+  saveSettingsSoon(): void {
+    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
+      this.saveTimer = null;
+      void this.saveSettings();
+    }, 1500);
+  }
+
+  // ---------- 记住视口 ----------
+
+  getViewport(path: string): SavedViewport | undefined {
+    return this.settings.rememberViewport ? this.settings.viewports?.[path] : undefined;
+  }
+
+  rememberViewport(path: string, vp: Omit<SavedViewport, "at">): void {
+    // 文件刚被删掉时视图随后关闭还会再记一次，跳过已经不存在的文件
+    if (!this.settings.rememberViewport || !path || !this.app.vault.getAbstractFileByPath(path)) return;
+    const all = (this.settings.viewports ??= {});
+    all[path] = { ...vp, at: Date.now() };
+    const keys = Object.keys(all);
+    if (keys.length > 50) {
+      keys.sort((a, b) => all[a].at - all[b].at);
+      for (const k of keys.slice(0, keys.length - 50)) delete all[k];
+    }
+    this.saveSettingsSoon();
   }
 
   // ---------- 自定义主题 ----------
@@ -252,13 +304,30 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
+  /** 从脑图切到 Markdown：选中了节点就跳到它那一行（先落盘，行号按文件里的实际文本算） */
   async openAsMarkdown(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
+    const from = leaf.view;
+    let path: string | null = null;
+    if (from instanceof MindMapView && from.file === file) {
+      path = from.getSelectedPath();
+      from.rememberViewportNow();
+      await from.save();
+    }
     this.markdownOverride.add(file.path);
     try {
       await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" }, active: true });
     } finally {
       this.markdownOverride.delete(file.path);
     }
+    if (path === null) return;
+    const view = leaf.view;
+    if (!(view instanceof MarkdownView) || view.file !== file) return;
+    const line = lineOfPath(view.editor.getValue(), path);
+    if (line === null) return;
+    const editor = view.editor;
+    editor.setCursor({ line, ch: editor.getLine(line).length });
+    editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+    editor.focus();
   }
 
   /**
@@ -331,7 +400,15 @@ export default class MindMapPlugin extends Plugin {
         if (needsIcon) fm[ICON_KEY] = icon;
       });
     }
+    // 从 Markdown 切过来：选中光标所在的那个节点（中心主题那行不算，回到上次的位置更有用）
+    const from = leaf.view;
+    let path: string | null = null;
+    if (from instanceof MarkdownView && from.file === file) {
+      path = pathAtLine(from.editor.getValue(), from.editor.getCursor().line);
+      if (path === "") path = null;
+    }
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
+    if (path !== null && leaf.view instanceof MindMapView) leaf.view.revealPath(path);
   }
 
   // ---------- 命令 ----------
@@ -402,6 +479,9 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
+    exportCommand("reveal-in-markdown", t("command.revealInMarkdown"), async (v) => {
+      if (v.file) await this.openAsMarkdown(v.file, v.leaf);
+    });
     // 画布里的基础按键（Tab、Enter、Delete…）也注册成命令，用户可以绑成 XMind 的习惯；原来的按键照常可用
     const nodeCommands: [string, NodeCommand, Key][] = [
       ["add-child", "add-child", "command.addChild"],

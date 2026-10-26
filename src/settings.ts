@@ -24,6 +24,10 @@ export interface MindMapSettings {
   codeBlockMaxHeight: number;
   /** 是否接管 ```mindmap 代码块；关掉就只认 ```gogoga-mindmap，把 mindmap 让给 Markmind 等同名插件 */
   claimMindmapBlock: boolean;
+  /** 重新打开 / 切回脑图时恢复上次的视口和选中 */
+  rememberViewport: boolean;
+  /** 按文件路径记的视口，只留最近 50 个 */
+  viewports?: Record<string, SavedViewport>;
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
@@ -45,6 +49,15 @@ export interface MindMapSettings {
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
+export interface SavedViewport {
+  tx: number;
+  ty: number;
+  k: number;
+  /** 选中节点的路径 */
+  sel: string | null;
+  /** 最后一次记录的时间，超出 50 个时淘汰最旧的 */
+  at: number;
+}
 /** label 用 getter：设置页打开时才查字典，跟随界面语言 */
 export const TOOLBAR_POSITIONS: { id: ToolbarPosition; readonly label: string }[] = [
   { id: "bottom", get label() { return t("toolbarPos.bottom"); } },
@@ -60,6 +73,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   indent: "tab",
   codeBlockMaxHeight: 600,
   claimMindmapBlock: true,
+  rememberViewport: true,
   outlineOpen: false,
   toolbarPosition: "bottom",
   wheelAction: "pan",
@@ -258,6 +272,17 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.codeBlockMaxHeight = n;
             await this.plugin.saveSettings();
           }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.rememberViewport.name"))
+      .setDesc(t("settings.rememberViewport.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.rememberViewport).onChange(async (v) => {
+          this.plugin.settings.rememberViewport = v;
+          if (!v) delete this.plugin.settings.viewports;
+          await this.plugin.saveSettings();
         }),
       );
 

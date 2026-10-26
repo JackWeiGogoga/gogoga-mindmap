@@ -161,6 +161,8 @@ export interface CanvasOptions {
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
   notePopoverSize?: { get: () => PopoverSize | undefined; set: (size: PopoverSize) => void };
+  /** 提供则节点右键菜单有「在 Markdown 中定位」：切到 Markdown 并跳到选中节点那一行 */
+  onRevealInMarkdown?: () => void;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
@@ -652,6 +654,30 @@ export class MindMapCanvas {
     else this.pendingSelectPath = path;
   }
 
+  /**
+   * 选中路径对应的节点并移到画布中间（从 Markdown 切回来时用）。节点藏在折叠里就退到
+   * 最近的可见祖先，不去改折叠状态（那会改文件）。还没渲染就等首次渲染再做
+   */
+  revealPath(path: string): void {
+    if (!this.doc) {
+      this.pendingReveal = path;
+      return;
+    }
+    let node = findByPath(this.doc.root, path);
+    if (!node) return;
+    for (let a = node.parent; a; a = a.parent) if (a.folded) node = a;
+    if (!this.layout?.placed.get(node.id)) {
+      this.pendingReveal = path;
+      return;
+    }
+    this.select(node);
+    // 适应画布后整张大图可能缩得很小，跳过来的节点要看得清
+    if (this.k < 0.8) this.k = 1;
+    this.centerOn(node);
+    this.hasView = true;
+  }
+  private pendingReveal: string | null = null;
+
   getViewState(): ViewState {
     return { tx: this.tx, ty: this.ty, k: this.k };
   }
@@ -826,6 +852,11 @@ export class MindMapCanvas {
       const path = this.pendingSelectPath;
       this.pendingSelectPath = null;
       this.selectPath(path);
+    }
+    if (this.pendingReveal !== null && this.layout) {
+      const path = this.pendingReveal;
+      this.pendingReveal = null;
+      this.revealPath(path);
     }
     this.updateBottomInset();
     this.positionNodebar();
@@ -3709,8 +3740,10 @@ export class MindMapCanvas {
     if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
     label.focus({ preventScroll: true });
+    // 光标放在末尾接着写（多数脑图软件的习惯）；要整段替换按 ⌘A
     const range = document.createRange();
     range.selectNodeContents(label);
+    range.collapse(false);
     const sel = window.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
@@ -4415,6 +4448,7 @@ export class MindMapCanvas {
       { title: t("menu.copy"), icon: "copy", run: () => this.copySelection() },
       ...(editable ? [{ title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() } as MenuEntry, { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() } as MenuEntry] : []),
       { title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) },
+      ...(this.opts.onRevealInMarkdown ? [{ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() } as MenuEntry] : []),
     );
     if (editable && node.parent) {
       entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
@@ -4622,21 +4656,36 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 图片文件存成附件，返回嵌入用的链接文本；失败给提示、返回 null */
+  private async saveImageFile(f: File): Promise<string | null> {
+    const save = this.opts.host?.saveBinary;
+    if (!save) {
+      this.opts.host?.notice?.(t("notice.saveImageUnsupported"));
+      return null;
+    }
+    try {
+      const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const name = f.name && f.name !== "image.png" ? f.name : `Pasted image ${stamp}.${ext}`;
+      return await save(name, await f.arrayBuffer());
+    } catch (e) {
+      this.opts.host?.notice?.(t("notice.saveImageFailed", { error: (e as Error).message }));
+      return null;
+    }
+  }
+
   /** 把图片文件存成附件并作为子节点插入 */
   private async insertImageFiles(files: File[], target: MindNode | null): Promise<void> {
     if (!this.doc || !target) return;
-    const save = this.opts.host?.saveBinary;
-    if (!save) {
+    if (!this.opts.host?.saveBinary) {
       this.opts.host?.notice?.(t("notice.saveImageUnsupported"));
       return;
     }
     const created: MindNode[] = [];
     for (const f of files) {
       try {
-        const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
-        const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-        const name = f.name && f.name !== "image.png" ? f.name : `Pasted image ${stamp}.${ext}`;
-        const link = await save(name, await f.arrayBuffer());
+        const link = await this.saveImageFile(f);
+        if (!link) continue;
         created.push(addChild(target, this.doc.style, `![[${link}]]`));
       } catch (e) {
         this.opts.host?.notice?.(t("notice.saveImageFailed", { error: (e as Error).message }));
@@ -4926,6 +4975,57 @@ export class MindMapCanvas {
       });
       ta.addEventListener("blur", () => {
         if (this.popover === pop) this.closePopover();
+      });
+      // 编辑备注时粘贴 / 拖入图片：存成附件，在光标处插入 ![[图片]]，和在 Markdown 里粘贴一样
+      const insertText = (text: string) => {
+        if (!text) return;
+        if (ta.isConnected) {
+          ta.focus();
+          ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, "end");
+          ta.dispatchEvent(new Event("input"));
+          return;
+        }
+        // 存附件期间弹窗已经关了：直接接到备注末尾
+        node.note = normalizeNote([unescapeNote(node.note), text].filter(Boolean).join("\n"));
+        this.render();
+        this.notify();
+      };
+      const insertImages = async (files: File[]) => {
+        const links: string[] = [];
+        for (const f of files) {
+          const link = await this.saveImageFile(f);
+          if (link) links.push(`![[${link}]]`);
+        }
+        insertText(links.join("\n"));
+      };
+      ta.addEventListener("paste", (ev) => {
+        const files = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!files.length) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        void insertImages(files);
+      });
+      // 拖到备注框上的东西归备注框，不能冒到画布上变成新节点
+      ta.addEventListener("dragover", (ev) => {
+        ev.stopPropagation();
+        // 文件（系统里的图片、库里拖来的笔记）默认不能落在 textarea 上，要先声明接收
+        if (ev.dataTransfer?.types.includes("Files") || this.opts.host?.getDraggedFiles?.()?.length) {
+          ev.preventDefault();
+          ev.dataTransfer!.dropEffect = "copy";
+        }
+      });
+      ta.addEventListener("drop", (ev) => {
+        ev.stopPropagation();
+        const vaultFiles = this.opts.host?.getDraggedFiles?.() ?? null;
+        if (vaultFiles?.length) {
+          ev.preventDefault();
+          insertText(vaultFiles.map((f) => (f.isImage ? `![[${f.linktext}]]` : `[[${f.linktext}]]`)).join("\n"));
+          return;
+        }
+        const files = [...(ev.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!files.length) return;
+        ev.preventDefault();
+        void insertImages(files);
       });
       this.popoverSave = save;
       this.popoverApply = apply;

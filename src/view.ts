@@ -165,7 +165,14 @@ export class MindMapView extends TextFileView {
       onThemeChange: (t) => this.persistTheme(t),
       onEdgeChange: (e) => this.persistEdge(e),
       onRender: () => this.outline?.refresh(),
-      onSelectionChange: (primary) => this.outline?.syncSelection(primary),
+      onSelectionChange: (primary) => {
+        this.outline?.syncSelection(primary);
+        this.rememberViewportSoon();
+      },
+      onViewChange: () => this.rememberViewportSoon(),
+      onRevealInMarkdown: () => {
+        if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
+      },
       onToggleOutline: () => void this.toggleOutline(),
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
@@ -181,8 +188,34 @@ export class MindMapView extends TextFileView {
     if (this.plugin.settings.outlineOpen) this.openOutline();
   }
 
+  getSelectedPath(): string | null {
+    return this.canvas?.getSelectedPath() ?? null;
+  }
+
+  /** 选中路径对应的节点并移到中间（从 Markdown 切回来时） */
+  revealPath(path: string): void {
+    this.canvas?.revealPath(path);
+  }
+
+  private viewportTimer: number | null = null;
+  /** 平移、缩放、选中变了就记下来（攒 300ms），下次打开这个文件时恢复 */
+  private rememberViewportSoon(): void {
+    if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = window.setTimeout(() => this.rememberViewportNow(), 300);
+  }
+
+  rememberViewportNow(): void {
+    if (this.viewportTimer !== null) window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    // 还没渲染出来（刚打开、文件为空）时的视口没有意义，别把记住的覆盖掉
+    if (!this.canvas || !this.file || !this.doc || this.restoringViewport) return;
+    this.plugin.rememberViewport(this.file.path, { ...this.canvas.getViewState(), sel: this.canvas.getSelectedPath() });
+  }
+  private restoringViewport = false;
+
   /** 卸载前把正在输入的内容提交，Obsidian 随后会 save(true) 写盘 */
   async onUnloadFile(file: TFile): Promise<void> {
+    this.rememberViewportNow();
     this.canvas?.flush();
     return super.onUnloadFile(file);
   }
@@ -282,7 +315,15 @@ export class MindMapView extends TextFileView {
       style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
     });
     this.applyFrontmatterOptions(this.doc);
+    // 打开文件（不是文件内容变了）时恢复上次的视口和选中
+    const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
+    if (saved && this.canvas) {
+      this.restoringViewport = true;
+      this.canvas.setViewState(saved);
+      this.restoringViewport = false;
+    }
     this.canvas?.setDoc(this.doc);
+    if (saved?.sel != null) this.canvas?.selectPath(saved.sel);
   }
 
   /**

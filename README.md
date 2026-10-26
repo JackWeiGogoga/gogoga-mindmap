@@ -17,7 +17,7 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 > [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (code block example) is an ordinary note with `mindmap` blocks embedded in it. The folder also has a typical mind map, a meeting note with an embedded map, and an `.xmind` file to try the import.
 
 1. Command palette → **New mind map**, or add `mindmap: true` to the frontmatter of any note.
-2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **Toggle between mind map and Markdown**, or the file context menu.
+2. Notes with this key open as a mind map by default. Switch back and forth with the button in the top-right corner of the view, the command **Toggle between mind map and Markdown**, or the file context menu. Switching keeps your place: with a node selected, Markdown opens at its line; with the cursor on a node in Markdown, the map selects it and centers it. Right-click a node → **Show in Markdown** (also a command you can bind) jumps straight there. Reopening a map restores its last position, zoom and selection (turn off "Remember where you left off" in settings).
    Switching a regular note to a mind map adds `mindmap: true` so it keeps opening that way; turn off **Remember the mind map view** in settings to switch only the current tab and leave the file alone.
    To write and watch side by side, use **Preview as mind map in a split** (command palette or file context menu): the map opens on the right, follows your typing as you go, and the file isn't changed.
 3. In a regular note, write a ```` ```mindmap ```` code block containing the same kind of Markdown, and it renders as a small mind map in both Reading view and Live Preview.
@@ -82,7 +82,7 @@ To show a mind map you already have, embed the file like any other note: `![[Pro
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color and delete apply to the whole group.
   Coming from XMind? Set Settings → Left-drag on empty space to "Select": a plain left-drag draws the selection box, right- or middle-drag pans, and a right-click on empty space still opens the menu.
-- Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back. Drag the bottom-right corner of the note popover to resize it (the size is remembered), and click an image in a note to view it full-screen (Esc or click anywhere to close).
+- Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back. While editing a note you can paste or drop images: they are saved as attachments and inserted at the cursor. Drag the bottom-right corner of the note popover to resize it (the size is remembered), and click an image in a note to view it full-screen (Esc or click anywhere to close).
 - ⌘F searches nodes: matches are highlighted, Enter / Shift+Enter jump between results and center them, and collapsed ancestors expand automatically.
 - ⌘C / ⌘X / ⌘V copy, cut, and paste subtrees. The clipboard holds Markdown as an indented list, so you can paste it anywhere.
   The other way round, paste a list, headings, or plain text lines, and they become children of the current node, following their structure.
@@ -151,7 +151,7 @@ A paragraph here becomes the central topic's note.
 |---|---|
 | Tab | Add child node |
 | Enter | Add sibling node (adds a child on the root node); Shift+Enter inserts before |
-| Double-click / Space / F2 | Edit; Enter to commit, Esc to cancel |
+| Double-click / Space / F2 | Edit with the cursor at the end of the text (⌘A selects all); Enter to commit, Esc to cancel |
 | Delete / Backspace | Delete the selected nodes and their subtrees |
 | ⌘⌫ | Delete only the selected node; its children move up into its place |
 | ⌘↵ | Insert a parent node: selected siblings go into one new node, non-siblings each get their own (in the mind map view; use the context menu in code-block maps) |

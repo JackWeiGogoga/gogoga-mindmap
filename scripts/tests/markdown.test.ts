@@ -610,3 +610,21 @@ test("插入父节点：中心主题跳过", () => {
   const doc = parseMarkdown(`# 根\n- A\n`);
   assert.deepEqual(insertParents([doc.root], doc.style), []);
 });
+
+test("节点 ⇄ 行号：标题、列表项、备注行都能对上，frontmatter 里返回 null；没有一级标题的根落在正文第一行", async () => {
+  const { lineOfPath, pathAtLine } = await import("../../src/markdown");
+  const src = `---\nmindmap: true\n---\n\n# 根\n\n根的备注\n\n## A\n- A1\n\t- A11\n\n  A11 的备注\n- A2\n\n## B\n正文段落\n`;
+  assert.equal(lineOfPath(src, ""), 4);
+  assert.equal(lineOfPath(src, "0"), 8);
+  assert.equal(lineOfPath(src, "0/0/0"), 10);
+  assert.equal(lineOfPath(src, "0/1"), 13);
+  assert.equal(lineOfPath(src, "1"), 15);
+  assert.equal(lineOfPath(src, "9"), null);
+  assert.equal(pathAtLine(src, 1), null);
+  assert.equal(pathAtLine(src, 6), "");
+  assert.equal(pathAtLine(src, 12), "0/0/0");
+  assert.equal(pathAtLine(src, 16), "1");
+  const noH1 = `---\na: 1\n---\n## A\n- B\n`;
+  assert.equal(lineOfPath(noH1, ""), 3);
+  assert.equal(lineOfPath(noH1, "0/0"), 4);
+});

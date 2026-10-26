@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { Boundary, createNode, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { Boundary, createNode, findByPath, pathOf, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -260,6 +260,8 @@ export interface ParseOptions {
   /** 没有一级标题时用作根节点标签（通常是文件名） */
   fallbackTitle?: string;
   style?: Partial<DocStyle>;
+  /** 传进来就记下每个节点在源文本里的行号（0 起，含 frontmatter） */
+  lines?: Map<MindNode, number>;
 }
 
 export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
@@ -306,7 +308,10 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   let prevTokenWasHeading = false;
   let blankSinceHeading = false;
 
-  for (const tok of tokens) {
+  for (let ti = 0; ti < tokens.length; ti++) {
+    const tok = tokens[ti];
+    // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
+    const lineNo = start + ti;
     if (tok.t === "heading") {
       const { text, marker } = splitMarker(tok.text);
       if (!seenRoot && rootFromHeading) {
@@ -319,6 +324,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.width = marker.width;
         root.level = 1;
         root.kind = "heading";
+        opts.lines?.set(root, lineNo);
         // 根之前的文本是 preamble
         const pre = noteBuf.get(root) ?? [];
         preamble.push(...pre);
@@ -330,6 +336,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side });
         parent.children.push(node);
         headingStack.push(node);
+        opts.lines?.set(node, lineNo);
         target = { node, buf: noteBuf };
       }
       listStack = [];
@@ -349,6 +356,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
+      opts.lines?.set(node, lineNo);
       target = { node, buf: noteBuf };
       lastListItem = node;
       if (tok.ws) indents.push(tok.ws);
@@ -554,4 +562,34 @@ export function setFrontmatterValue(frontmatter: string, key: string, value: str
   if (value !== null) body.push(`${key}: ${value}`);
   if (body.length === 0) return "";
   return ["---", ...body, "---"].join("\n");
+}
+
+// ---------- 节点 ⇄ 行号 ----------
+// 脑图和 Markdown 之间来回跳：节点用路径（pathOf）标识，按同一份文本重新解析一遍就能对上行号
+
+/** 路径对应的节点在文本里的行号（0 起）；没有一级标题时根节点没有自己的行，给正文第一行 */
+export function lineOfPath(src: string, path: string): number | null {
+  const lines = new Map<MindNode, number>();
+  const doc = parseMarkdown(src, { lines });
+  const node = findByPath(doc.root, path);
+  if (!node) return null;
+  const line = lines.get(node);
+  if (line !== undefined) return line;
+  if (node === doc.root) return doc.frontmatter ? doc.frontmatter.split("\n").length : 0;
+  return null;
+}
+
+/** 某一行属于哪个节点（节点行，或它下面的备注 / 段落）；在 frontmatter 或第一个节点之前返回 null */
+export function pathAtLine(src: string, line: number): string | null {
+  const lines = new Map<MindNode, number>();
+  parseMarkdown(src, { lines });
+  let best: MindNode | null = null;
+  let bestLine = -1;
+  for (const [node, l] of lines) {
+    if (l <= line && l > bestLine) {
+      best = node;
+      bestLine = l;
+    }
+  }
+  return best ? pathOf(best) : null;
 }
