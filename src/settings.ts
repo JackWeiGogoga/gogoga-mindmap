@@ -44,6 +44,8 @@ export interface MindMapSettings {
   wheelAction: "pan" | "zoom";
   /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
   leftDrag: "pan" | "select";
+  /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
+  editCaret: "select" | "end";
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
 }
@@ -78,6 +80,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   toolbarPosition: "bottom",
   wheelAction: "pan",
   leftDrag: "pan",
+  editCaret: "select",
   rememberView: true,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
@@ -241,6 +244,19 @@ export class MindMapSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.wheelAction)
           .onChange(async (v) => {
             this.plugin.settings.wheelAction = v as MindMapSettings["wheelAction"];
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.editCaret.name"))
+      .setDesc(t("settings.editCaret.desc"))
+      .addDropdown((d) =>
+        d
+          .addOptions({ select: t("settings.editCaret.select"), end: t("settings.editCaret.end") })
+          .setValue(this.plugin.settings.editCaret)
+          .onChange(async (v) => {
+            this.plugin.settings.editCaret = v as MindMapSettings["editCaret"];
             await this.plugin.saveSettings();
           }),
       );

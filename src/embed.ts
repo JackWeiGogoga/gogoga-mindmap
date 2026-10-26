@@ -115,6 +115,7 @@ class MindMapEmbed extends Component {
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
         marqueeDrag: () => settings.leftDrag === "select",
+        caretAtEnd: () => settings.editCaret === "end",
         notePopoverSize: this.plugin.notePopoverSize,
         host: this.plugin.canvasHost(() => this.ctx.sourcePath, this),
         onOpenFile: () => void this.plugin.app.workspace.openLinkText(this.file.path, this.ctx.sourcePath),

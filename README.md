@@ -151,7 +151,7 @@ A paragraph here becomes the central topic's note.
 |---|---|
 | Tab | Add child node |
 | Enter | Add sibling node (adds a child on the root node); Shift+Enter inserts before |
-| Double-click / Space / F2 | Edit with the cursor at the end of the text (⌘A selects all); Enter to commit, Esc to cancel |
+| Double-click / Space / F2 | Edit; the text is selected so typing replaces it (set "When editing a node" in settings to put the cursor at the end instead); Enter to commit, Esc to cancel |
 | Delete / Backspace | Delete the selected nodes and their subtrees |
 | ⌘⌫ | Delete only the selected node; its children move up into its place |
 | ⌘↵ | Insert a parent node: selected siblings go into one new node, non-siblings each get their own (in the mind map view; use the context menu in code-block maps) |

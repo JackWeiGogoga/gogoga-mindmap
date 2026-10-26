@@ -614,6 +614,7 @@ export default class MindMapPlugin extends Plugin {
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
         marqueeDrag: () => this.settings.leftDrag === "select",
+        caretAtEnd: () => this.settings.editCaret === "end",
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(serializeMarkdown(d)),

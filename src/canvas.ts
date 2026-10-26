@@ -157,6 +157,8 @@ export interface CanvasOptions {
   wheelZoom?: () => boolean;
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
   marqueeDrag?: () => boolean;
+  /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
+  caretAtEnd?: () => boolean;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
@@ -3740,10 +3742,10 @@ export class MindMapCanvas {
     if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
     label.focus({ preventScroll: true });
-    // 光标放在末尾接着写（多数脑图软件的习惯）；要整段替换按 ⌘A
+    // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
     const range = document.createRange();
     range.selectNodeContents(label);
-    range.collapse(false);
+    if (this.opts.caretAtEnd?.()) range.collapse(false);
     const sel = window.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
