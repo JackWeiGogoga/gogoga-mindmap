@@ -27,7 +27,7 @@ import {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
 import { Key, setLocale, t } from "./i18n";
-import { MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
+import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
@@ -626,7 +626,7 @@ export default class MindMapPlugin extends Plugin {
     menu.addItem((item) =>
       item
         .setTitle(isMap ? t("menu.openAsMarkdown") : t("menu.openAsMindMap"))
-        .setIcon(isMap ? "file-text" : MINDMAP_ICON)
+        .setIcon(isMap ? MARKDOWN_ICON : MINDMAP_ICON)
         .onClick(() => {
           const target = shown ?? this.app.workspace.getLeaf(false);
           void (isMap ? this.openAsMarkdown(file, target) : this.openAsMindMap(file, target));

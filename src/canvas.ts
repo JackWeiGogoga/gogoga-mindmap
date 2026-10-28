@@ -4936,6 +4936,12 @@ export class MindMapCanvas {
 
   async pasteFromClipboard(): Promise<void> {
     if (!this.opts.editable || !this.doc) return;
+    // 右键菜单、工具栏的「粘贴」不经过 paste 事件，得自己读剪贴板：有图片按图片插入，和 ⌘V 一样
+    const images = await this.clipboardImages();
+    if (images.length) {
+      await this.insertImageFiles(images, this.primary ?? this.doc.root);
+      return;
+    }
     let text = "";
     try {
       text = await navigator.clipboard.readText();
@@ -4944,6 +4950,22 @@ export class MindMapCanvas {
     }
     if (!text.trim()) text = this.clipboardText;
     this.pasteText(text);
+  }
+
+  /** 剪贴板里的图片（截图、网页上复制的图片）；读不了（没权限、旧系统）就当没有 */
+  private async clipboardImages(): Promise<File[]> {
+    const files: File[] = [];
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        files.push(new File([blob], "image.png", { type }));
+      }
+    } catch {
+      // ignore
+    }
+    return files;
   }
 
   /** 把文本解析成节点挂到当前节点下（无选中则挂到根） */
@@ -5437,6 +5459,10 @@ export class MindMapCanvas {
     created.forEach((n, i) => this.select(n, i === 0 ? "replace" : "add"));
     this.render();
     this.notify();
+    // 存附件要等一会儿，期间点过的按钮、菜单可能已经没了，焦点落到 body 上，⌘Z 就到不了画布。
+    // 焦点还在画布里或者已经丢了，就收回来；用户点去了别处则不抢
+    const active = this.el.ownerDocument.activeElement;
+    if (!active || active === this.el.ownerDocument.body || this.el.contains(active)) this.el.focus({ preventScroll: true });
   }
 
   // ---------- 复制节点链接 ----------

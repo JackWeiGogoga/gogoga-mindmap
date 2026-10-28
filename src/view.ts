@@ -1,7 +1,7 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { MindMapCanvas, NodeCommand } from "./canvas";
-import { MINDMAP_ICON } from "./icon";
+import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
@@ -172,7 +172,7 @@ export class MindMapView extends TextFileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass("mm-view-content");
-    this.addAction("file-text", t("menu.openAsMarkdown"), () => {
+    this.addAction(MARKDOWN_ICON, t("menu.openAsMarkdown"), () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
     });
     this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
@@ -269,7 +269,7 @@ export class MindMapView extends TextFileView {
     menu.addItem((item) =>
       item
         .setTitle(t("menu.openAsMarkdown"))
-        .setIcon("file-text")
+        .setIcon(MARKDOWN_ICON)
         .setSection("pane")
         .onClick(() => {
           if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);

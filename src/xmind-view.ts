@@ -1,6 +1,6 @@
 import { FileView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import { MindMapCanvas } from "./canvas";
-import { MINDMAP_ICON } from "./icon";
+import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { indentString } from "./settings";
 import { describeLost, parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
@@ -40,7 +40,7 @@ export class XmindView extends FileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass("mm-view-content");
-    this.addAction("file-text", t("xmind.convert"), () => void this.convert());
+    this.addAction(MARKDOWN_ICON, t("xmind.convert"), () => void this.convert());
     const host = this.contentEl.createDiv();
     this.canvas = new MindMapCanvas(host, {
       structure: this.plugin.settings.defaultStructure,
