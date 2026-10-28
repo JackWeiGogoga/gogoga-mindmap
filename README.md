@@ -224,6 +224,8 @@ Rendering reuses DOM elements by node ID and only rebuilds elements whose conten
 
 ## Release
 
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md) ([中文](CHANGELOG.zh-CN.md)). Before releasing, add the new version to both files: the release notes are taken from them, and the tests fail when the current version has no entry.
+
 Pushing a tag publishes a release: `git tag 0.3.1 && git push --tags` (the tag must match `version` in manifest.json exactly, without a `v`). GitHub Actions builds the plugin and attaches `main.js`, `manifest.json`, and `styles.css` to the release.
 BRAT users can install it by entering the repository URL. To install manually, put these three files in
 `<vault>/.obsidian/plugins/gogoga-mindmap/`. Node isn't needed at runtime.

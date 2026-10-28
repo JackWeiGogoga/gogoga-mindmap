@@ -232,6 +232,8 @@ pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 
 ## 发布
 
+每个版本的变化见 [更新日志](CHANGELOG.zh-CN.md)（[English](CHANGELOG.md)）。发版前先在两份更新日志里写好新版本：Release 说明从这里取，当前版本没写时测试不会通过。
+
 推 tag 即发布：`git tag 0.3.1 && git push --tags`（tag 必须与 manifest.json 的 version 完全一致，不带 v），GitHub Actions 会构建并把 `main.js`、`manifest.json`、`styles.css`
 挂到 Release。用 BRAT 的人填仓库地址就能装；手动安装把这三个文件放进
 `<vault>/.obsidian/plugins/gogoga-mindmap/`。运行时不需要 Node。

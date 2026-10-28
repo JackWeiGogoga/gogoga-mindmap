@@ -1,0 +1,376 @@
+# 更新日志
+
+gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。English: [CHANGELOG.md](CHANGELOG.md).
+
+## [0.23.0] - 2026-10-29
+
+### 新增
+- 设置「用文件名作中心主题」（默认关）：中心主题始终是文件名，笔记里唯一的一级标题作为第一级分支。只改变显示，不改文件。
+- 设置「嵌入的脑图隐藏工具栏」（默认关）：嵌入的脑图（代码块和 `![[笔记]]` 嵌入）在阅读模式下不显示工具栏，编辑模式下鼠标移上去或正在编辑时才显示。
+- 和 Markdown 分屏联动时，跳到的那一行或节点会短暂高亮。
+
+### 改进
+- 备注弹窗点「编辑」时，窗口位置和大小保持不变，编辑框铺满窗口，还能继续拖动调整。
+
+### 修复
+- 备注里的 `[[双链]]` 点击就能打开（⌘/Ctrl 点击在新标签页打开），悬停能预览。
+
+## [0.22.0] - 2026-10-28
+
+### 新增
+- 设置「新建思维导图的模板」：选一篇笔记作为新建脑图的初始内容，`{{title}}`、`{{date}}`、`{{time}}`（也可以写 `{{date:YYYY-MM-DD}}`）和核心插件「模板」一样替换，frontmatter 自动补上 `mindmap: true`。
+- 答案标记 🙈（标记面板新增「背诵」组）：背诵模式下答案节点连同子节点一起遮住，图片、备注、标注都看不到，点一下揭开。截图题也能用。
+
+### 修复
+- 在标记面板选完标记、在工具栏菜单里选完一项后，⌘Z 能正常撤销。
+
+## [0.21.1] - 2026-10-28
+
+### 新增
+- 节点右键菜单的「粘贴」和节点工具栏的粘贴按钮也能粘贴图片，不再只有 ⌘V。
+
+### 修复
+- 粘贴图片后 ⌘Z 能正常撤销。
+- 「以 Markdown 打开」按钮的图标改为插件自带，安卓上也能显示。
+
+## [0.21.0] - 2026-10-28
+
+### 新增
+- 标注颜色：右键标注气泡 →「标注颜色」，存成 `cc=red`（或十六进制颜色）。
+
+## [0.20.1] - 2026-10-27
+
+### 修复
+- Ctrl/⌘ + 滚轮缩放每格约 1.2 倍，不再一下跳到 2.7 倍；触控板捏合不变。
+
+## [0.20.0] - 2026-10-27
+
+### 新增
+- 设置「打开脑图时」：没有记住的位置时，显示整张图（默认）或中心主题 100% 大小。
+- 「自定义标记」：设置里填的 emoji 或符号在标记面板里组成「自定义」一组，也可以设成每个节点只能选一个。
+- 「和 Markdown 分屏联动」（默认关）：选中节点，Markdown 滚到那一行；在 Markdown 里移动光标，脑图选中对应节点。
+
+## [0.19.0] - 2026-10-26
+
+### 新增
+- 标注：挂在节点旁边的小气泡，存成 `%%callout "文字"%%`。排版会给它让出位置，不会压到节点和连线。可以按文件隐藏，能被搜索、导出，也能从 `.xmind` 导入。
+
+## [0.18.1] - 2026-10-26
+
+### 新增
+- 含图片的节点右键菜单里有「复制图片」。
+
+## [0.18.0] - 2026-10-26
+
+### 新增
+- 自由主题：双击或右键空白处新建，可以把主题转成自由主题或挂回去，拖动移动、拖到节点上挂过去。存成 `%%float x=… y=…%%`；没有自由主题的脑图排版完全不变。XMind 的自由主题也能导入。
+
+### 改进
+- 节点右键菜单第一层放常用操作，其余收进「插入」「折叠」「外框」「概要」「更多」二级菜单。
+
+## [0.17.1] - 2026-10-26
+
+### 新增
+- 多选一起移动：拖任意一个选中的节点就整组移动；Alt+方向键和移动、升降级命令对整组生效。
+- 编辑节点文字时粘贴图片，图片加到这个节点的备注里。
+
+## [0.17.0] - 2026-10-26
+
+### 新增
+- 编辑备注时可以粘贴或拖入图片。
+- 「在 Markdown 中定位」跳到节点所在行，切回脑图时选中光标所在的节点。
+- 每个文件记住上次的位置、缩放和选中（最近 50 个）。
+- 设置「进入编辑节点时」：全选文字（默认）或光标放在末尾。
+
+## [0.16.3] - 2026-10-25
+
+### 新增
+- 「插入父节点」（脑图视图里 ⌘↵、右键菜单、命令）：选中的兄弟节点收进一个新节点。
+
+### 改进
+- 备注弹窗默认更大，右下角可以拖动改大小并记住尺寸；备注里的图片点一下全屏查看。
+
+### 修复
+- 从备注弹窗里拖出东西，不会再掉进脑图里。
+
+## [0.16.2] - 2026-10-25
+
+### 新增
+- 代码块名也可以写成 `gogoga-mindmap`；设置里可以把 ```` ```mindmap ```` 代码块让给 Markmind 等插件。
+
+### 修复
+- 和 Markmind 同时安装时样式不再冲突。
+- 实时预览的代码块里不再多出一层边框；拖动范围的手柄不会出现在导出图片里。
+
+## [0.16.1] - 2026-10-25
+
+### 新增
+- 概要和外框可以调整范围：点一下选中，拖两端的手柄，或在它的菜单里扩大 / 缩小。
+
+## [0.16.0] - 2026-10-25
+
+### 新增
+- XMind 式编辑：只删除节点、保留子节点（⌘⌫）；设置左键拖动空白处为框选，右键或中键拖动平移；右键菜单新增在前面插入、展开所有子分支、展开下一级。
+- 节点操作都注册成命令，可以自定义快捷键。画布自带的按键保持不变，只有你把某个键绑到本插件的命令时才让出来。
+
+## [0.15.2] - 2026-10-24
+
+### 新增
+- 嵌入可以指向某个节点（`![[脑图#标题]]`、标题路径、`![[脑图#^块]]`），只显示那一支。
+- 白板卡片里的脑图铺满卡片，调整卡片大小后重新适应。
+
+## [0.15.1] - 2026-10-23
+
+### 新增
+- 概要文字支持行内 Markdown（带悬停预览的链接、加粗等），概要宽度可以拖动调整。
+
+### 修复
+- 概要文字里可以有单个 `%`，编码过的网址不再被截断。
+
+## [0.15.0] - 2026-10-22
+
+### 新增
+- 概要：在相邻的同级节点外侧画一个大括号，配一段短文字，存成 `%%summary=N "文字"%%`。所有结构都能用，可以就地编辑、导出，也能从 XMind 导入。
+
+### 改进
+- 外框标题比节点文字淡一档。
+
+## [0.14.1] - 2026-10-22
+
+### 改进
+- 数字键从选中节点开始折叠：只显示它下面 N 层，其他分支不动；选中中心主题时仍作用于整张图。
+
+## [0.14.0] - 2026-10-22
+
+### 新增
+- 背诵模式：`==高亮==` 遮成横线，点一下揭开；子节点写成 `[x]` / `[ ]` 的节点是选择题，点题目揭晓，多个正确选项标「多选」。只改显示，不写文件。
+
+## [0.13.3] - 2026-10-22
+
+### 改进
+- 外框更方便加标题：右键或双击外框里的空白处；对带外框的节点，工具栏的外框按钮会弹出标题 / 删除菜单。
+
+### 修复
+- 右键外框不再选中框里的节点。
+- 右键菜单开着时隐藏节点工具栏；点空白处关菜单时工具栏不再闪一下。
+
+## [0.13.2] - 2026-10-22
+
+### 修复
+- 鼠标滚轮在链接提示和画布菜单上是滚动列表，不再平移脑图。
+
+## [0.13.1] - 2026-10-22
+
+### 改进
+- 链接提示：完全同名的排第一，其次是前缀和包含匹配，按名字排序（中文按拼音），最多列出 50 个、可以滚动。
+
+## [0.13.0] - 2026-10-22
+
+### 新增
+- 用 `![[笔记]]` 或 `![[文件.xmind]]` 嵌入已有脑图：只读预览，跟随文件更新；点打开按钮或双击节点打开文件。
+
+## [0.12.2] - 2026-10-21
+
+### 改进
+- 按 Obsidian 插件审核要求整理代码，使用上没有变化。
+
+## [0.12.1] - 2026-10-21
+
+### 修复
+- 节点文字里的 Markdown 反斜杠转义正确显示（`\<td\>` 显示为 `<td>`）。
+
+## [0.12.0] - 2026-10-21
+
+### 改进
+- 自定义主题的固定宽度改为最大宽度（短文字保持自身宽度），另有可选的同级宽度对齐；旧的固定宽度自动迁移。
+
+### 修复
+- 双击图片能正常打开大图。
+- 在代码块里编辑节点时，点击文字能重新定位光标。
+
+## [0.11.1] - 2026-10-21
+
+### 修复
+- 嵌入的脑图写回后不再丢失键盘焦点。
+
+## [0.11.0] - 2026-10-21
+
+### 新增
+- 自定义主题：从内置主题出发，分四个层级设置文字、填充或下划线、边框、宽度、连入的线条，以及整体线条和间距；实时预览，深色自动推算。
+
+## [0.10.6] - 2026-10-21
+
+### 修复
+- 移动端：底部工具栏避开 Obsidian 的悬浮导航栏，放不下时可以滚动，节点工具栏分成两行。
+
+## [0.10.5] - 2026-10-21
+
+### 新增
+- 双击图片查看大图；双击其他地方仍是编辑。
+
+## [0.10.4] - 2026-10-21
+
+### 修复
+- 用输入法打 【【 转成 [[ 时不再多出一个【；选中文字后输入括号会把它包起来。
+
+## [0.10.3] - 2026-10-21
+
+### 修复
+- 大脑图里拖放节点落点更准确。
+- 用键盘移动或新建节点时，选中的节点保持在可视范围内。
+
+## [0.10.2] - 2026-10-21
+
+### 新增
+- 拖到节点后面就成为它的子节点；拖动时靠近边缘画布自动滚动。
+
+### 改进
+- 上下方向键优先在兄弟节点之间移动。
+
+## [0.10.1] - 2026-10-20
+
+### 新增
+- 直角连线可以选圆角或尖角（`mindmap-edge-corner`）。
+
+## [0.10.0] - 2026-10-20
+
+### 新增
+- 线条样式菜单：跟随主题、曲线、直角、直线，以及虚线；按笔记存在 frontmatter 里。
+- 编辑节点时输入 `[[`（或 `【【`）弹出库里的文件。
+- 示例文件夹：使用指南脑图、嵌入示例、示例脑图和一个 `.xmind` 文件。
+
+## [0.9.1] - 2026-10-19
+
+### 修复
+- 节点里的 `$$…$$` 按展示样式渲染公式，两边不再多出 `$`。
+
+## [0.9.0] - 2026-10-19
+
+### 新增
+- 数字键把脑图折叠到第 N 层；缩放到选中的分支（⌘⇧0）。
+- 思维导图结构里可以把主分支固定在左边或右边。
+- 折叠、显示到第几层、缩放到分支、外框都有命令，可以绑快捷键。
+
+## [0.8.1] - 2026-10-18
+
+### 新增
+- 爱发电赞助链接。
+
+## [0.8.0] - 2026-10-18
+
+### 新增
+- 拖节点边缘设置宽度（`%%w=N%%`），双击边缘恢复。
+
+## [0.7.1] - 2026-10-18
+
+### 新增
+- 在 Markdown 里显示脑图笔记时，右上角有切回脑图的按钮；文件菜单跟随当前视图。
+
+## [0.7.0] - 2026-10-18
+
+### 新增
+- 跟随编辑器的分屏预览。
+- 设置：切换视图时可以不写入 `mindmap: true`。
+
+## [0.6.1] - 2026-10-16
+
+### 新增
+- 节点工具栏的外框按钮，⌘⇧B 切换外框。
+
+## [0.6.0] - 2026-10-16
+
+### 新增
+- 外框（`%%box%%`）：框住一个节点或相邻的几个兄弟。
+- XMind 导入保留外框，并提示哪些内容没能导入。
+
+## [0.5.0] - 2026-10-16
+
+### 新增
+- 设置：鼠标滚轮直接缩放（Shift + 滚轮平移）。
+
+## [0.4.1] - 2026-10-16
+
+### 修复
+- 脑图切回 Markdown 时打开编辑模式，保留阅读 / 编辑切换。
+
+## [0.4.0] - 2026-10-15
+
+### 新增
+- 界面支持英文和简体中文，跟随 Obsidian 的语言设置。
+
+## [0.3.2] - 2026-10-15
+
+### 改进
+- README 加演示 GIF 和截图。
+
+## [0.3.1] - 2026-10-14
+
+### 改进
+- 按 Obsidian 社区插件审核要求调整。
+
+## [0.3.0] - 2026-10-14
+
+首个公开版本。
+
+### 新增
+- Markdown 笔记的 XMind 风格脑图视图，标题 / 列表和脑图双向同步。
+- 逻辑图、思维导图、组织结构图、树形图四种结构；七个内置主题。
+- 普通笔记里的 ```` ```mindmap ```` 代码块可以就地编辑。
+- 搜索、子树复制粘贴、按层级折叠、多行文字、触屏操作。
+- 节点链接笔记（⌘K），悬停预览；裸网址自动成链。
+- 节点里的 LaTeX 公式和图片，图片可拖动改大小；`<iframe>` 嵌入（如视频）。
+- 和画布双向联动的大纲面板。
+- 右键菜单、聚焦分支、标记、任务复选框、标签、拖入和粘贴。
+- 导出 PNG / SVG，公式和图片一起嵌入。
+- 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
+
+[0.23.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.22.0...0.23.0
+[0.22.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.21.1...0.22.0
+[0.21.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.21.0...0.21.1
+[0.21.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.20.1...0.21.0
+[0.20.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.20.0...0.20.1
+[0.20.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.19.0...0.20.0
+[0.19.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.18.1...0.19.0
+[0.18.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.18.0...0.18.1
+[0.18.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.17.1...0.18.0
+[0.17.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.17.0...0.17.1
+[0.17.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.16.3...0.17.0
+[0.16.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.16.2...0.16.3
+[0.16.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.16.1...0.16.2
+[0.16.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.16.0...0.16.1
+[0.16.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.15.2...0.16.0
+[0.15.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.15.1...0.15.2
+[0.15.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.15.0...0.15.1
+[0.15.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.14.1...0.15.0
+[0.14.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.14.0...0.14.1
+[0.14.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.13.3...0.14.0
+[0.13.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.13.2...0.13.3
+[0.13.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.13.1...0.13.2
+[0.13.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.13.0...0.13.1
+[0.13.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.12.2...0.13.0
+[0.12.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.12.1...0.12.2
+[0.12.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.12.0...0.12.1
+[0.12.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.11.1...0.12.0
+[0.11.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.11.0...0.11.1
+[0.11.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.6...0.11.0
+[0.10.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.5...0.10.6
+[0.10.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.4...0.10.5
+[0.10.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.3...0.10.4
+[0.10.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.2...0.10.3
+[0.10.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.1...0.10.2
+[0.10.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.10.0...0.10.1
+[0.10.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.9.1...0.10.0
+[0.9.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.9.0...0.9.1
+[0.9.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.8.1...0.9.0
+[0.8.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.8.0...0.8.1
+[0.8.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.7.1...0.8.0
+[0.7.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.7.0...0.7.1
+[0.7.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.6.1...0.7.0
+[0.6.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.6.0...0.6.1
+[0.6.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.5.0...0.6.0
+[0.5.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.4.1...0.5.0
+[0.4.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.4.0...0.4.1
+[0.4.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.3.2...0.4.0
+[0.3.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.3.1...0.3.2
+[0.3.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.3.0...0.3.1
+[0.3.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/releases/tag/0.3.0

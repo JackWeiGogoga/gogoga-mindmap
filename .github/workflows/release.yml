@@ -28,4 +28,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
-          gh release create "$tag" --title "$tag" --generate-notes dist/main.js manifest.json styles.css
+          # 说明取自 CHANGELOG.zh-CN.md / CHANGELOG.md 里这个版本的条目；没写就失败（pnpm test 里也会先拦一次）
+          node scripts/release-notes.mjs "$tag" > release-notes.md
+          gh release create "$tag" --title "$tag" --notes-file release-notes.md dist/main.js manifest.json styles.css
