@@ -53,6 +53,8 @@ import {
   FRAME_MAX,
   FRAME_MIN,
   IMAGE_MIN_WIDTH,
+  ANSWER_MARKER,
+  isAnswer,
   MARKER_GROUPS,
   plainText,
   renderInline,
@@ -388,6 +390,8 @@ export class MindMapCanvas {
   private reciteButton: HTMLElement | null = null;
   /** 背诵模式下已揭晓答案的题目 */
   private revealedQuestions = new Set<string>();
+  /** 背诵模式下点开了的答案节点 */
+  private revealedAnswers = new Set<string>();
   private reciteDown: { x: number; y: number } | null = null;
   /** 撤掉同层对齐之前量到的宽高；对齐在它的基础上算 */
   private naturalSizes = new Map<string, Size>();
@@ -1958,6 +1962,7 @@ export class MindMapCanvas {
       if (tail.getAttribute("d") !== d) tail.setAttribute("d", d);
       if (tail.style.getPropertyValue("--mm-callout-color") !== color) tail.style.setProperty("--mm-callout-color", color);
       tail.classList.toggle("is-peek", c.node === peek);
+      tail.classList.toggle("is-answer-covered", el.classList.contains("is-answer-covered"));
       if (tail.style.display) tail.setCssStyles({ display: "" });
     }
     for (let j = i; j < this.calloutTails.length; j++) {
@@ -2542,7 +2547,8 @@ export class MindMapCanvas {
 
   /**
    * 背诵模式：只改显示，不写进文件。==高亮== 遮成横线，点一下揭开；子节点带 [x] / [ ] 的节点
-   * 是选择题，选项一律显示成没勾的样子，点题目揭晓（[x] 变绿、[ ] 变淡），两个以上正确选项标「多选」
+   * 是选择题，选项一律显示成没勾的样子，点题目揭晓（[x] 变绿、[ ] 变淡），两个以上正确选项标「多选」；
+   * 带答案标记的节点连同子树整个遮住，点一下揭开
    */
   isRecite(): boolean {
     return this.recite;
@@ -2552,6 +2558,7 @@ export class MindMapCanvas {
     if (this.recite === on) return;
     this.recite = on;
     this.revealedQuestions.clear();
+    this.revealedAnswers.clear();
     this.el.classList.toggle("is-recite", on);
     this.reciteButton?.classList.toggle("is-active", on);
     for (const m of this.el.querySelectorAll(".mm-label mark.is-revealed")) m.classList.remove("is-revealed");
@@ -2579,6 +2586,28 @@ export class MindMapCanvas {
         el.classList.toggle("is-option-shown", shown);
       }
     });
+    // 答案：没揭开的答案节点和它下面的节点都遮住，节点上的标注也一起藏
+    const cover = (n: MindNode, covered: boolean) => {
+      const answer = isAnswer(n.text);
+      const hide = covered || (answer && !this.revealedAnswers.has(n.id));
+      const el = this.els.get(n.id);
+      if (el) {
+        el.classList.toggle("is-answer", answer);
+        el.classList.toggle("is-answer-covered", hide);
+        if (answer && hide && !covered) el.dataset.answer = t("canvas.answerCovered");
+        else delete el.dataset.answer;
+      }
+      this.calloutEls.get(n.id)?.classList.toggle("is-answer-covered", hide);
+      for (const c of n.children) cover(c, hide);
+    };
+    cover(this.doc.root, false);
+  }
+
+  /** 遮住这个节点的那个答案：往上找最外层没揭开的答案；没被遮住返回 null */
+  private coveringAnswer(node: MindNode): MindNode | null {
+    let hit: MindNode | null = null;
+    for (let n: MindNode | null = node; n; n = n.parent) if (isAnswer(n.text) && !this.revealedAnswers.has(n.id)) hit = n;
+    return hit;
   }
 
   /** 背诵模式下的单击：点到遮住的高亮就揭开 / 盖回；点到题目就揭晓 / 收起答案 */
@@ -2591,6 +2620,24 @@ export class MindMapCanvas {
     if (mark) {
       mark.classList.toggle("is-revealed");
       return;
+    }
+    const answerEl = target.closest<HTMLElement>(".gg-mm-node.is-answer, .gg-mm-node.is-answer-covered");
+    const answer = answerEl ? this.nodeFromEl(answerEl) : null;
+    if (answer) {
+      const cover = this.coveringAnswer(answer);
+      if (cover) {
+        this.revealedAnswers.add(cover.id);
+        this.applyRecite();
+        if (this.layout) this.drawCallouts();
+        return;
+      }
+      // 揭开过的答案再点一下盖回去
+      if (isAnswer(answer.text)) {
+        this.revealedAnswers.delete(answer.id);
+        this.applyRecite();
+        if (this.layout) this.drawCallouts();
+        return;
+      }
     }
     const nodeEl = target.closest<HTMLElement>(".gg-mm-node.is-question");
     const q = nodeEl ? this.nodeFromEl(nodeEl) : null;
@@ -2634,8 +2681,11 @@ export class MindMapCanvas {
     menu.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     let cleanup = () => undefined as void;
     const closeAll = () => {
+      // 同上：菜单按钮带着焦点被删掉，焦点要收回画布
+      const refocus = menu.contains(this.el.ownerDocument.activeElement);
       cleanup();
       close();
+      if (refocus) this.el.focus({ preventScroll: true });
     };
     for (const it of items) {
       const b = createEl("button");
@@ -5277,6 +5327,7 @@ export class MindMapCanvas {
         b.className = "mm-marker-btn";
         b.dataset.emoji = emoji;
         b.textContent = emoji;
+        if (emoji === ANSWER_MARKER) this.tip(b, t("marker.answerTip"));
         b.addEventListener("click", (ev) => {
           ev.stopPropagation();
           for (const n of this.selected) n.text = toggleMarker(n.text, emoji);
@@ -5316,8 +5367,11 @@ export class MindMapCanvas {
   private closeMarkerPicker(): void {
     this.markerPickerCleanup?.();
     this.markerPickerCleanup = null;
+    // 焦点在面板的按钮上，面板一删就落到 body，⌘Z 到不了画布；收回来
+    const refocus = !!this.markerPicker?.contains(this.el.ownerDocument.activeElement);
     this.markerPicker?.remove();
     this.markerPicker = null;
+    if (refocus) this.el.focus({ preventScroll: true });
   }
 
   // ---------- 聚焦分支 ----------

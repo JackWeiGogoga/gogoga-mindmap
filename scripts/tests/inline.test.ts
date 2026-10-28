@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { noAutoplay, setFrameSize, taskState, TOKEN_RE } from "../../src/inline";
+import { ANSWER_MARKER, isAnswer, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -202,4 +202,15 @@ test("自定义标记：只认 emoji 和非 ASCII 符号，和内置重复的跳
   setCustomMarkers([], false);
   assert.equal(MARKER_GROUPS.length, before);
   assert.deepEqual(splitMarkers("🎯 方案"), { markers: [], rest: "🎯 方案" });
+});
+
+test("答案标记：和其他标记一起排在开头，可切换", () => {
+  assert.equal(isAnswer(`${ANSWER_MARKER} ![[题1答案.png]]`), true);
+  assert.equal(isAnswer(`⭐ ${ANSWER_MARKER} 解法`), true);
+  assert.equal(isAnswer(`解法 ${ANSWER_MARKER}`), false);
+  // 符号组排在背诵组前面
+  assert.equal(toggleMarker("⭐ 解法", ANSWER_MARKER), `⭐ ${ANSWER_MARKER} 解法`);
+  assert.equal(toggleMarker(`${ANSWER_MARKER} 解法`, ANSWER_MARKER), "解法");
+  // 选择题选项照样认得出来
+  assert.equal(taskState(`${ANSWER_MARKER} [x] 选项`), "done");
 });

@@ -45,6 +45,7 @@ const en = {
   "notice.createNoteFailed": "Failed to create note: {error}",
   "newFile.baseName": "Untitled mind map",
   "newFile.topic": "Topic {n}",
+  "notice.templateMissing": "Template note not found: {path}. Used the default content instead.",
 
   // view.ts
   "view.displayText": "Mind map",
@@ -115,6 +116,8 @@ const en = {
   "marker.flags": "Flags",
   "marker.symbols": "Symbols",
   "marker.custom": "Custom",
+  "marker.recite": "Recite",
+  "marker.answerTip": "Answer: covered in recite mode (with its children), click to reveal",
 
   // inline.ts
   "inline.toggleTask": "Click to toggle",
@@ -133,6 +136,7 @@ const en = {
   "canvas.viewCallout": "View callout",
   "canvas.calloutPlaceholder": "Callout",
   "canvas.multiChoice": "Multiple",
+  "canvas.answerCovered": "Answer · click to reveal",
   "canvas.toolbarContextTip": "Right-click to change the toolbar position",
   "canvas.outline": "Outline panel · tree list, rename and change levels",
   "canvas.zoomOut": "Zoom out {key}",
@@ -353,6 +357,9 @@ const en = {
   "settings.headingLevel.desc":
     "When adding nodes, levels deeper than this are written back as list items instead of headings. Existing content keeps its format.",
   "settings.headingLevel.h2": "H2 (main topics)",
+  "settings.template.name": "Template for new mind maps",
+  "settings.template.desc": "Pick a note whose content becomes the starting content of every new mind map. Supports {{title}}, {{date}} and {{time}} (also {{date:YYYY-MM-DD}} with a format), like the core Templates plugin. Leave empty to start with Topic 1/2/3.",
+  "settings.template.placeholder": "Path of the template note",
   "settings.indent.name": "List indentation for new files",
   "settings.indent.desc": "Existing files keep the indentation detected in the file.",
   "settings.indent.tab": "Tab",
@@ -450,6 +457,7 @@ const zh: Record<Key, string> = {
   "notice.createNoteFailed": "新建笔记失败：{error}",
   "newFile.baseName": "未命名思维导图",
   "newFile.topic": "主题 {n}",
+  "notice.templateMissing": "找不到模板笔记：{path}，已用默认内容新建。",
 
   "view.displayText": "思维导图",
   "error.noOpenFile": "没有打开的文件",
@@ -516,6 +524,8 @@ const zh: Record<Key, string> = {
   "marker.flags": "旗帜",
   "marker.symbols": "符号",
   "marker.custom": "自定义",
+  "marker.recite": "背诵",
+  "marker.answerTip": "答案：背诵模式下连同子节点一起遮住，点一下揭开",
 
   "inline.toggleTask": "点击切换",
   "inline.activate": "激活",
@@ -532,6 +542,7 @@ const zh: Record<Key, string> = {
   "canvas.viewCallout": "查看标注",
   "canvas.calloutPlaceholder": "标注",
   "canvas.multiChoice": "多选",
+  "canvas.answerCovered": "答案 · 点一下揭开",
   "canvas.toolbarContextTip": "右键可切换工具栏位置",
   "canvas.outline": "大纲面板 · 树形列表，可改名和调层级",
   "canvas.zoomOut": "缩小 {key}",
@@ -743,6 +754,9 @@ const zh: Record<Key, string> = {
   "settings.headingLevel.name": "标题的最深级别",
   "settings.headingLevel.desc": "新建节点时，比这更深的层级用列表而不是标题写回。已有内容的写法不受影响。",
   "settings.headingLevel.h2": "H2（主主题）",
+  "settings.template.name": "新建思维导图的模板",
+  "settings.template.desc": "选一篇笔记，新建思维导图时用它的内容作为初始内容。支持 {{title}}、{{date}}、{{time}}，也可以写 {{date:YYYY-MM-DD}} 指定格式，和核心插件「模板」一样。留空就用默认的「主题 1/2/3」。",
+  "settings.template.placeholder": "模板笔记的路径",
   "settings.indent.name": "新文件的列表缩进",
   "settings.indent.desc": "已有文件会沿用文件里检测到的缩进。",
   "settings.indent.tab": "Tab",

@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { AbstractInputSuggest, App, PluginSettingTab, Setting, setIcon, TFile } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
 import { MINDMAP_LIST_ICON } from "./icon";
 import { IconPickerModal, storedValue } from "./icon-picker";
@@ -59,6 +59,8 @@ export interface MindMapSettings {
   customMarkersExclusive: boolean;
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
+  /** 新建脑图用的模板笔记路径；留空用内置的「主题 1/2/3」 */
+  newFileTemplate: string;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -98,6 +100,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   customMarkers: "",
   customMarkersExclusive: false,
   rememberView: true,
+  newFileTemplate: "",
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -176,6 +179,20 @@ export class MindMapSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+
+    new Setting(containerEl)
+      .setName(t("settings.template.name"))
+      .setDesc(t("settings.template.desc"))
+      .addText((text) => {
+        text
+          .setPlaceholder(t("settings.template.placeholder"))
+          .setValue(this.plugin.settings.newFileTemplate)
+          .onChange(async (v) => {
+            this.plugin.settings.newFileTemplate = v.trim();
+            await this.plugin.saveSettings();
+          });
+        new NoteSuggest(this.app, text.inputEl);
+      });
 
     const iconSetting = new Setting(containerEl)
       .setName(t("settings.listIcon.name"))
@@ -458,5 +475,31 @@ export class MindMapSettingTab extends PluginSettingTab {
             new CustomThemeModal(this.app, plugin, themeFromBase(base, name, newCustomThemeId()), (x) => void save(x)).open();
           }),
       );
+  }
+}
+
+/** 设置里选模板笔记：输入时列出名字或路径匹配的 Markdown 笔记 */
+class NoteSuggest extends AbstractInputSuggest<TFile> {
+  constructor(app: App, private input: HTMLInputElement) {
+    super(app, input);
+  }
+
+  getSuggestions(query: string): TFile[] {
+    const q = query.trim().toLowerCase();
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((f) => f.path.toLowerCase().includes(q))
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .slice(0, 50);
+  }
+
+  renderSuggestion(file: TFile, el: HTMLElement): void {
+    el.setText(file.path);
+  }
+
+  selectSuggestion(file: TFile): void {
+    this.setValue(file.path);
+    this.input.dispatchEvent(new Event("input"));
+    this.close();
   }
 }

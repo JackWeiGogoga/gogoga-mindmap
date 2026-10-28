@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMarkdown, serializeMarkdown, splitMarker } from "../../src/markdown";
+import { fillTemplate, parseMarkdown, serializeMarkdown, splitMarker, withFrontmatter } from "../../src/markdown";
 import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents, cloneTree } from "../../src/model";
 
 const canonical = `---
@@ -729,4 +729,19 @@ test("标注颜色：cc=颜色名或 hex 跟着 callout 读写，往返不变；
   assert.ok(serializeMarkdown(doc).includes("## A %%red%%\n"));
   // 不认识的 cc 值：整段当普通文字
   assert.equal(splitMarker('x %%callout "y" cc=nope%%').text, 'x %%callout "y" cc=nope%%');
+});
+
+test("新建模板：变量替换和 frontmatter 补键", () => {
+  const fmt = (p: string) => `<${p}>`;
+  assert.equal(fillTemplate("# {{title}}\n{{date}} {{time}} {{date:YYYY年M月}} {{ Title }} <% tp.date.now() %>", "周报", fmt),
+    "# 周报\n<YYYY-MM-DD> <HH:mm> <YYYY年M月> 周报 <% tp.date.now() %>");
+  // 没有 frontmatter：新建一个
+  assert.equal(withFrontmatter("# A\n\n## B\n", [["mindmap", "true"]]), "---\nmindmap: true\n---\n\n# A\n\n## B\n");
+  // 已有 frontmatter：保留原来的键，补上 mindmap；icon 已经写了就不覆盖
+  assert.equal(
+    withFrontmatter("---\ntags: [x]\nicon: 🧠\n---\n\n# A\n", [["mindmap", "true"], ["icon", "lucide:x"]], ["icon"]),
+    "---\ntags: [x]\nicon: 🧠\nmindmap: true\n---\n\n# A\n",
+  );
+  // mindmap: false 也改成 true，不然新建出来不会用脑图打开
+  assert.equal(withFrontmatter("---\nmindmap: false\n---\n# A", [["mindmap", "true"]]), "---\nmindmap: true\n---\n# A");
 });

@@ -619,6 +619,30 @@ export function setFrontmatterValue(frontmatter: string, key: string, value: str
   return ["---", ...body, "---"].join("\n");
 }
 
+/**
+ * 新建脑图的模板：替换 {{title}} {{date}} {{time}}，也认 {{date:YYYY-MM-DD}} 这种带格式的写法，
+ * 和核心插件「模板」一样；format 按 moment 的格式串出日期。其余文字原样保留（Templater 的 <% %> 交给它自己处理）
+ */
+export function fillTemplate(template: string, title: string, format: (pattern: string) => string): string {
+  return template.replace(/\{\{\s*(title|date|time)\s*(?::([^}]*))?\}\}/gi, (_, key: string, pattern?: string) => {
+    const k = key.toLowerCase();
+    if (k === "title") return title;
+    return format(pattern?.trim() || (k === "date" ? "YYYY-MM-DD" : "HH:mm"));
+  });
+}
+
+/** 往文本的 frontmatter 里补上几个键（没有 frontmatter 就新建一个）；keep 里的键已经有了就不动 */
+export function withFrontmatter(content: string, values: [key: string, value: string][], keep: string[] = []): string {
+  const m = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(content);
+  let fm = m ? m[0].replace(/\r?\n$/, "").replace(/\r\n/g, "\n") : "";
+  const rest = m ? content.slice(m[0].length) : content;
+  for (const [key, value] of values) {
+    if (keep.includes(key) && frontmatterValue(fm, key) !== null) continue;
+    fm = setFrontmatterValue(fm, key, value);
+  }
+  return `${fm}\n${m ? "" : "\n"}${rest}`;
+}
+
 // ---------- 节点 ⇄ 行号 ----------
 // 脑图和 Markdown 之间来回跳：节点用路径（pathOf）标识，按同一份文本重新解析一遍就能对上行号
 

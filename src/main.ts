@@ -13,6 +13,7 @@ import {
   MarkdownView,
   Menu,
   MenuItem,
+  moment,
   Notice,
   setTooltip,
   Plugin,
@@ -34,7 +35,7 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand } from "./canvas";
-import { frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue } from "./markdown";
+import { fillTemplate, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
@@ -650,14 +651,35 @@ export default class MindMapPlugin extends Plugin {
     let name = `${base}.md`;
     for (let i = 1; this.app.vault.getAbstractFileByPath(joinPath(folder.path, name)); i++) name = `${base} ${i}.md`;
     const title = name.replace(/\.md$/, "");
-    const iconLine = this.settings.listIcon ? `${ICON_KEY}: ${this.settings.listIcon}\n` : "";
-    // 新文件的起始内容跟随界面语言；只影响新建的文件
-    const topics = [1, 2, 3].map((n) => `## ${t("newFile.topic", { n })}\n`).join("\n");
-    const content = `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n${topics}`;
+    const content = (await this.templateContent(title)) ?? this.defaultContent(title);
     const file = await this.app.vault.create(joinPath(folder.path, name), content);
     const leaf = this.app.workspace.getLeaf(false);
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
     new Notice(t("notice.created", { path: file.path }));
+  }
+
+  /** 内置的起始内容：跟随界面语言；只影响新建的文件 */
+  private defaultContent(title: string): string {
+    const iconLine = this.settings.listIcon ? `${ICON_KEY}: ${this.settings.listIcon}\n` : "";
+    const topics = [1, 2, 3].map((n) => `## ${t("newFile.topic", { n })}\n`).join("\n");
+    return `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n${topics}`;
+  }
+
+  /** 设置里指定了模板笔记就用它；没设返回 null，设了但找不到也提示一下再用内置内容 */
+  private async templateContent(title: string): Promise<string | null> {
+    const path = this.settings.newFileTemplate.trim();
+    if (!path) return null;
+    const file = this.app.vault.getAbstractFileByPath(path) ?? this.app.metadataCache.getFirstLinkpathDest(path.replace(/\.md$/, ""), "");
+    if (!(file instanceof TFile)) {
+      new Notice(t("notice.templateMissing", { path }));
+      return null;
+    }
+    // obsidian 导出的 moment 在 esModuleInterop 下类型上不可调用，运行时就是 moment 函数本身
+    const text = fillTemplate(await this.app.vault.cachedRead(file), title, (p) => (moment as unknown as () => moment.Moment)().format(p));
+    // 模板里自己写了 icon 就听模板的；mindmap: true 一定要有，不然新建出来不会用脑图打开
+    const values: [string, string][] = [[FRONTMATTER_KEY, "true"]];
+    if (this.settings.listIcon) values.push([ICON_KEY, this.settings.listIcon]);
+    return withFrontmatter(text, values, [ICON_KEY]);
   }
 
   // ---------- 代码块 ----------

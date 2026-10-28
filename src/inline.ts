@@ -26,6 +26,8 @@ export interface InlineOptions {
   reuseFrame?: (src: string) => HTMLIFrameElement | null;
 }
 
+/** 答案标记：背诵模式下带它的节点连同子树整个遮住，点一下揭开；截图题、文字题都能用 */
+export const ANSWER_MARKER = "🙈";
 /** 可加在节点开头的标记（emoji，存在文字里，任何地方都能显示） */
 /** name 是界面上的分组名，用 getter 在用到时才查字典；emoji 本身是数据，不翻译 */
 export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive: boolean }[] = [
@@ -33,6 +35,7 @@ export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive
   { get name() { return t("marker.progress"); }, emojis: ["⏳", "✅", "❌"], exclusive: true },
   { get name() { return t("marker.flags"); }, emojis: ["🚩", "🟧", "🟨", "🟩", "🟦", "🟪"], exclusive: false },
   { get name() { return t("marker.symbols"); }, emojis: ["⭐", "❗", "❓", "💡", "⚠️", "🔥", "❤️", "📌"], exclusive: false },
+  { get name() { return t("marker.recite"); }, emojis: [ANSWER_MARKER], exclusive: false },
 ];
 const BUILTIN_GROUPS = MARKER_GROUPS.length;
 let ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
@@ -89,6 +92,11 @@ export function toggleMarker(text: string, emoji: string): string {
   // 组内顺序固定：优先级、进度、旗帜、符号
   next.sort((a, b) => ALL_MARKERS.indexOf(a) - ALL_MARKERS.indexOf(b));
   return [...next, rest].filter(Boolean).join(" ");
+}
+
+/** 节点开头有没有答案标记 */
+export function isAnswer(text: string): boolean {
+  return splitMarkers(text).markers.includes(ANSWER_MARKER);
 }
 
 const TASK_RE = /^\[( |x|X)\]\s+/;
