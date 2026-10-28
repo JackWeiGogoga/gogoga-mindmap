@@ -2,6 +2,7 @@
  * 从 CHANGELOG.zh-CN.md 和 CHANGELOG.md 里取出某个版本的条目，拼成 GitHub Release 的说明（中文在前、英文在后）。
  * 用法：node scripts/release-notes.mjs 0.23.0 > notes.md；更新日志里没有这个版本就报错退出，发版前必须先写。
  */
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 /** 取「## [版本]」到下一个「## 」或链接定义之间的内容，不含标题行 */
@@ -14,13 +15,25 @@ export function sectionOf(changelog, version) {
   return lines.slice(start + 1, end).join("\n").trim();
 }
 
-export function releaseNotes(version, zh, en, repo = "JackWeiGogoga/gogoga-mindmap") {
+/** owner/repo：CI 里读 GITHUB_REPOSITORY，本地从 origin 的地址推出来 */
+function currentRepo() {
+  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
+  try {
+    const url = execSync("git remote get-url origin", { encoding: "utf8" }).trim();
+    return /github\.com[:/](.+?)(?:\.git)?$/.exec(url)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function releaseNotes(version, zh, en, repo = currentRepo()) {
   const z = sectionOf(zh, version);
   const e = sectionOf(en, version);
   if (!z || !e) return null;
   // Release 页面里用三级标题太大，降一级
   const demote = (s) => s.replace(/^### /gm, "#### ");
-  return [`### 中文`, "", demote(z), "", `### English`, "", demote(e), "", `完整更新日志 / Full changelog: https://github.com/${repo}/blob/main/CHANGELOG.zh-CN.md`, ""].join("\n");
+  const tail = repo ? ["", `完整更新日志 / Full changelog: https://github.com/${repo}/blob/main/CHANGELOG.zh-CN.md`] : [];
+  return [`### 中文`, "", demote(z), "", `### English`, "", demote(e), ...tail, ""].join("\n");
 }
 
 // 只在直接运行这个脚本时执行；被测试打包进去时不跑
