@@ -1672,11 +1672,11 @@
   padding: 5px 10px;
   border: 1.5px solid var(--mm-callout-color, var(--mm-line));
   border-radius: 10px;
-  background: var(--mm-bg, var(--background-primary));
+  background: var(--mm-callout-bg, var(--mm-bg, var(--background-primary)));
   font-family: var(--mm-font);
   font-size: 13px;
   line-height: 18px;
-  color: inherit;
+  color: var(--mm-callout-fg, inherit);
   cursor: default;
   user-select: none;
   overflow-wrap: anywhere;

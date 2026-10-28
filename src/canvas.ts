@@ -1870,6 +1870,7 @@ export class MindMapCanvas {
       this.showContextMenu(
         [
           { title: t("menu.editCallout"), icon: "pencil", run: () => this.editCallout(n) },
+          { title: t("menu.calloutColor"), icon: "palette", submenu: this.calloutColorEntries(n) },
           { title: t("menu.removeCallout"), icon: "x", run: () => this.removeCallout(n) },
         ],
         ev,
@@ -1877,6 +1878,23 @@ export class MindMapCanvas {
     });
     this.nodesEl.append(el);
     return el;
+  }
+
+  private calloutColorEntries(node: MindNode): MenuEntry[] {
+    const entry = (color: string | null): MenuEntry => ({
+      title: color ? colorLabel(color) : t("canvas.clearColor"),
+      icon: color ? "circle" : "circle-off",
+      checked: (node.calloutColor ?? null) === color,
+      run: () => this.setCalloutColor(node, color),
+    });
+    return [entry(null), ...COLOR_NAMES.map(entry)];
+  }
+
+  setCalloutColor(node: MindNode, color: string | null): void {
+    if (!this.opts.editable || node.callout === undefined || (node.calloutColor ?? null) === color) return;
+    node.calloutColor = color ?? undefined;
+    this.render();
+    this.notify();
   }
 
   /** 尖角：气泡边上一段短底边收到节点边上的一个点，填分支色 */
@@ -1912,8 +1930,21 @@ export class MindMapCanvas {
       const p = layout.placed.get(c.node.id);
       if (!el || !p) continue;
       const branch = this.els.get(c.node.id)?.dataset.branch;
-      const color = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      // 设了填充色：边框、尖角都用这个颜色；没设还是分支色描边
+      const fill = c.node.calloutColor;
+      const fillVar = !fill ? "" : (COLOR_NAMES as readonly string[]).includes(fill) ? `var(--mm-c-${fill})` : fill;
+      const color = fillVar || (branch !== undefined ? `var(--mm-branch-${branch})` : "");
       if (el.style.getPropertyValue("--mm-callout-color") !== color) el.style.setProperty("--mm-callout-color", color);
+      if (el.style.getPropertyValue("--mm-callout-bg") !== fillVar) {
+        if (fillVar) el.style.setProperty("--mm-callout-bg", fillVar);
+        else el.style.removeProperty("--mm-callout-bg");
+      }
+      const fg = !fill ? "" : fill.startsWith("#") ? contrastText(fill) : "var(--mm-c-fg)";
+      if (el.style.getPropertyValue("--mm-callout-fg") !== fg) {
+        if (fg) el.style.setProperty("--mm-callout-fg", fg);
+        else el.style.removeProperty("--mm-callout-fg");
+      }
+      el.classList.toggle("has-color", !!fill);
       el.setCssStyles({ left: `${round2(c.x)}px`, top: `${round2(c.y)}px` });
       let tail = this.calloutTails[i];
       if (!tail) {
@@ -1967,6 +1998,7 @@ export class MindMapCanvas {
   removeCallout(node: MindNode): void {
     if (!this.opts.editable || node.callout === undefined) return;
     node.callout = undefined;
+    node.calloutColor = undefined;
     if (this.peekCallout === node) this.peekCallout = null;
     this.render();
     this.notify();
@@ -2019,6 +2051,7 @@ export class MindMapCanvas {
       box.classList.remove("is-editing");
       this.editingCallout = null;
       node.callout = text || undefined;
+      if (!node.callout) node.calloutColor = undefined;
       // 隐藏标注时编辑完留着浮出的那条，方便看结果；点别处再收起
       if (this.calloutsHidden && node.callout) this.peekCallout = node;
       this.render();

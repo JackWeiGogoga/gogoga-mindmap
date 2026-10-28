@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseMarkdown, serializeMarkdown, splitMarker } from "../../src/markdown";
-import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents } from "../../src/model";
+import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents, cloneTree } from "../../src/model";
 
 const canonical = `---
 mindmap: true
@@ -705,4 +705,28 @@ test("标注标记：callout \"文字\" 读成多行文字，和其他标记共�
   assert.equal(splitMarker("x %%callout=2 \"y\"%%").text, 'x %%callout=2 "y"%%');
   assert.equal(splitMarker("x %%callout%%").marker.callout, undefined);
   assert.equal(splitMarker("x %%calloutx%%").text, "x %%calloutx%%");
+});
+
+test("标注颜色：cc=颜色名或 hex 跟着 callout 读写，往返不变；没有标注时不写", () => {
+  const md = `# R
+
+## A %%red callout "要点" cc=yellow%%
+
+- a1 %%callout "十六进制" cc=ff8800%%
+- a2 %%callout "没颜色"%%
+`;
+  const doc = parseMarkdown(md, { fallbackTitle: "R" });
+  const a = doc.root.children[0];
+  assert.equal(a.color, "red");
+  assert.equal(a.callout, "要点");
+  assert.equal(a.calloutColor, "yellow");
+  assert.equal(a.children[0].calloutColor, "#ff8800");
+  assert.equal(a.children[1].calloutColor, undefined);
+  assert.equal(serializeMarkdown(doc), md);
+  assert.equal(cloneTree(a).calloutColor, "yellow");
+  // 删了标注，颜色一起不写
+  a.callout = undefined;
+  assert.ok(serializeMarkdown(doc).includes("## A %%red%%\n"));
+  // 不认识的 cc 值：整段当普通文字
+  assert.equal(splitMarker('x %%callout "y" cc=nope%%').text, 'x %%callout "y" cc=nope%%');
 });

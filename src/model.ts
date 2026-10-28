@@ -33,6 +33,8 @@ export interface MindNode {
   float?: FloatPos;
   /** 标注：挂在节点上方的一段短文字（可换行），%%callout "文字<br>第二行"%% */
   callout?: string;
+  /** 标注气泡的填充色：颜色名或 #hex，%%callout "文字" cc=red%% */
+  calloutColor?: string;
   kind: NodeKind;
   /** 标题节点的级别 1..6；合成根节点为最小标题级别 - 1 */
   level: number;
@@ -111,6 +113,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     side: init.side,
     float: init.float,
     callout: init.callout,
+    calloutColor: init.callout === undefined ? undefined : init.calloutColor,
     kind: init.kind ?? "list",
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
@@ -469,6 +472,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     side: node.side,
     float: node.float && { ...node.float },
     callout: node.callout,
+    calloutColor: node.calloutColor,
     kind: node.kind,
     level: node.level,
     bullet: node.bullet,

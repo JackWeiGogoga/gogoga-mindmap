@@ -54,6 +54,7 @@ interface Marker {
   side?: "left" | "right";
   float?: FloatPos;
   callout?: string;
+  calloutColor?: string;
 }
 
 /** 标记里的一项：box、box=3、summary=2、callout 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
@@ -110,6 +111,9 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       if (tok[2] !== undefined) return { text: text.trimEnd(), marker: { folded: false } };
       const c = calloutFromMarker(tok[3] ?? "");
       if (c) marker.callout = c;
+    } else if (/^cc=/.test(lower) && ((COLOR_NAMES as readonly string[]).includes(lower.slice(3)) || HEX_RE.test(lower.slice(3)))) {
+      const c = lower.slice(3);
+      marker.calloutColor = c.startsWith("#") || (COLOR_NAMES as readonly string[]).includes(c) ? c : `#${c}`;
     } else if (/^sw=\d{1,6}$/.test(lower)) {
       sw = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(3))));
     } else if (/^w=\d{1,6}$/.test(lower)) {
@@ -128,13 +132,15 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
     else return { text: text.trimEnd(), marker: { folded: false } };
   }
   if (sw && marker.summary) marker.summary.width = sw;
+  // cc= 只跟着 callout 出现才算数
+  if (!marker.callout) delete marker.calloutColor;
   // x= / y= 只跟着 float 出现；单独出现说明不是我们的标记，整段当普通文字
   if (!isFloat && (fx !== undefined || fy !== undefined)) return { text: text.trimEnd(), marker: { folded: false } };
   if (isFloat) marker.float = { x: fx ?? 0, y: fy ?? 0 };
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
@@ -152,6 +158,7 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
   if (node.float) parts.push(`float x=${Math.round(node.float.x)} y=${Math.round(node.float.y)}`);
   const callout = node.callout ? calloutToMarker(node.callout) : "";
   if (callout) parts.push(`callout "${callout}"`);
+  if (callout && node.calloutColor) parts.push(`cc=${node.calloutColor.startsWith("#") ? node.calloutColor.slice(1) : node.calloutColor}`);
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
 
@@ -369,6 +376,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         // 中心主题上的 float 没有意义，但原样保留，写回不改用户的文本
         root.float = marker.float;
         root.callout = marker.callout;
+        root.calloutColor = marker.calloutColor;
         root.level = 1;
         root.kind = "heading";
         opts.lines?.set(root, lineNo);
@@ -380,7 +388,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -400,7 +408,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, bullet: tok.bullet, blockId });
       parent.children.push(node);
       listStack.push({ indent, node });
       opts.lines?.set(node, lineNo);
