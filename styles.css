@@ -725,6 +725,18 @@
   font: 13px/1.55 var(--mm-font);
   resize: vertical;
 }
+/* 从查看切过来的编辑框：外框沿用查看窗口的大小，文字区铺满，还能继续拖右下角 */
+.mm-popover.is-sized {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 160px;
+  min-height: 48px;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  resize: both;
+}
+.mm-popover.is-sized .mm-note-editor { flex: 1; width: auto; max-width: none; min-height: 0; resize: none; }
 .mm-popover-edit {
   all: unset;
   display: block;
@@ -1680,6 +1692,11 @@
   box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25);
 }
 .gg-mm-root.is-recite :is(.mm-callout, .mm-callout-tail).is-answer-covered { visibility: hidden; }
+
+/* 设置「嵌入的脑图隐藏工具栏」：阅读模式不显示；编辑模式鼠标移上来或正在编辑时才显示。白板卡片里照常 */
+body.gg-mm-embed-toolbar-autohide .markdown-preview-view .gg-mm-root.is-embedded:not(.is-editable):not(.canvas-node *) .mm-toolbar { display: none; }
+body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded .mm-toolbar { transition: opacity 0.15s; }
+body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:not(.is-editable):not(:hover):not(:focus-within):not(.canvas-node *) .mm-toolbar { opacity: 0; pointer-events: none; }
 
 /* 白板卡片里的嵌入脑图：铺满卡片 */
 .mm-file-embed.mm-in-canvas { height: 100%; }

@@ -103,7 +103,7 @@ export class MindMapView extends TextFileView {
   /** 分屏联动：Markdown 光标在第 line 行，选中对应节点（只在看不见时挪画面） */
   followLine(text: string, line: number): void {
     if (!this.canvas) return;
-    const path = pathAtLine(text, line);
+    const path = pathAtLine(text, line, this.plugin.rootRule());
     if (path === null || path === this.canvas.getSelectedPath()) return;
     this.following = true;
     try {
@@ -345,6 +345,7 @@ export class MindMapView extends TextFileView {
     this.data = data;
     this.doc = parseMarkdown(data, {
       fallbackTitle: this.file?.basename ?? "",
+      ...this.plugin.rootRule(),
       style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
     });
     this.applyFrontmatterOptions(this.doc);
@@ -434,9 +435,15 @@ export class MindMapView extends TextFileView {
     this.requestSave();
   }
 
+  /** 影响解析结果的设置变了（比如中心主题规则）：按当前文本重新解析 */
+  reloadFromSettings(): void {
+    if (this.doc) this.reparse();
+  }
+
   private reparse(): void {
     this.doc = parseMarkdown(this.data, {
       fallbackTitle: this.file?.basename ?? "",
+      ...this.plugin.rootRule(),
       style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
     });
     this.applyFrontmatterOptions(this.doc);

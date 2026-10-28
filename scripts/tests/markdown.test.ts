@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fillTemplate, parseMarkdown, serializeMarkdown, splitMarker, withFrontmatter } from "../../src/markdown";
+import { fillTemplate, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, splitMarker, withFrontmatter } from "../../src/markdown";
 import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents, cloneTree } from "../../src/model";
 
 const canonical = `---
@@ -744,4 +744,19 @@ test("新建模板：变量替换和 frontmatter 补键", () => {
   );
   // mindmap: false 也改成 true，不然新建出来不会用脑图打开
   assert.equal(withFrontmatter("---\nmindmap: false\n---\n# A", [["mindmap", "true"]]), "---\nmindmap: true\n---\n# A");
+});
+
+test("用文件名作中心主题：唯一的 H1 降为第一级分支，写回不变", () => {
+  const src = "# Heading h1\n- Bullet Point 1\n\n## Heading h2\n- Bullet Point 2\n";
+  const doc = parseMarkdown(src, { fallbackTitle: "Example Note", rootFromH1: false });
+  assert.equal(doc.root.text, "Example Note");
+  assert.deepEqual(doc.root.children.map((n) => n.text), ["Heading h1"]);
+  assert.deepEqual(doc.root.children[0].children.map((n) => n.text), ["Bullet Point 1", "Heading h2"]);
+  assert.equal(serializeMarkdown(doc), src);
+  // 默认规则不变
+  assert.equal(parseMarkdown(src, { fallbackTitle: "Example Note" }).root.text, "Heading h1");
+  // 路径和行号互查用同一种规则
+  assert.equal(pathAtLine(src, 3, { rootFromH1: false }), "0/1");
+  assert.equal(lineOfPath(src, "0/1", { rootFromH1: false }), 3);
+  assert.equal(pathAtLine(src, 3), "1");
 });

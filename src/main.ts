@@ -35,7 +35,7 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand } from "./canvas";
-import { fillTemplate, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
+import { fillTemplate, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
@@ -67,7 +67,10 @@ export default class MindMapPlugin extends Plugin {
     await this.loadSettings();
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
+    this.applyEmbedToolbar();
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
+    this.registerEvent(this.app.workspace.on("window-open", (win) => this.applyEmbedToolbar(win.doc)));
+    this.register(() => this.applyEmbedToolbar(undefined, false));
     this.register(() => {
       for (const m of [...this.openThemeEditors]) m.close();
       for (const el of this.customCssEls) el.remove();
@@ -169,6 +172,20 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
+  /**
+   * 嵌入的脑图（代码块、![[笔记]]）自动隐藏工具栏：开关挂在 body 上，样式表按阅读 / 编辑模式分别处理。
+   * 新开的独立窗口也要挂；卸载插件时摘掉
+   */
+  applyEmbedToolbar(doc?: Document, on = this.settings.embedToolbarAutoHide): void {
+    const docs = doc ? [doc] : [...new Set([document, ...this.app.workspace.getLeavesOfType("markdown").map((l) => l.view.containerEl.ownerDocument)])];
+    for (const d of docs) d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on);
+  }
+
+  /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
+  rootRule(): RootRule {
+    return { rootFromH1: !this.settings.fileNameAsRoot };
+  }
+
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
   }
@@ -238,6 +255,13 @@ export default class MindMapPlugin extends Plugin {
     if (!redraw) return;
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       if (leaf.view instanceof MindMapView) leaf.view.redrawAll();
+    }
+  }
+
+  /** 中心主题规则这类影响解析的设置变了：已打开的脑图重新解析 */
+  reloadMaps(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      if (leaf.view instanceof MindMapView) leaf.view.reloadFromSettings();
     }
   }
 
@@ -357,7 +381,7 @@ export default class MindMapPlugin extends Plugin {
     if (path === null) return;
     const view = leaf.view;
     if (!(view instanceof MarkdownView) || view.file !== file) return;
-    const line = lineOfPath(view.editor.getValue(), path);
+    const line = lineOfPath(view.editor.getValue(), path, this.rootRule());
     if (line === null) return;
     const editor = view.editor;
     editor.setCursor({ line, ch: editor.getLine(line).length });
@@ -441,11 +465,32 @@ export default class MindMapPlugin extends Plugin {
       // 用户正在那边打字：光标是他的，不去动
       if (view.editor.hasFocus()) continue;
       const editor = view.editor;
-      const line = lineOfPath(editor.getValue(), path);
+      const line = lineOfPath(editor.getValue(), path, this.rootRule());
       if (line === null) continue;
       editor.setCursor({ line, ch: editor.getLine(line).length });
       editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+      this.flashLine(view, line);
     }
+  }
+
+  /**
+   * 联动跳到的那一行底色闪一下。直接对行元素放 Web Animation：不碰 CodeMirror 的装饰，
+   * 它重设 class 也不影响；滚动后那一行要等 CodeMirror 画出来，所以晚两帧再找
+   */
+  private flashLine(view: MarkdownView, line: number): void {
+    type CM = { state: { doc: { lines: number; line(n: number): { from: number } } }; domAtPos(pos: number): { node: Node } };
+    const cm = (view.editor as unknown as { cm?: CM }).cm;
+    if (!cm || line + 1 > cm.state.doc.lines) return;
+    const pos = cm.state.doc.line(line + 1).from;
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const node = cm.domAtPos(pos).node;
+        const el = (node.instanceOf(HTMLElement) ? node : node.parentElement)?.closest<HTMLElement>(".cm-line");
+        if (!el?.animate) return;
+        const color = getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
+        el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
+      }),
+    );
   }
 
   /** Markdown 编辑器打字时，同一文件的脑图视图随之更新（分屏预览靠它做到实时） */
@@ -498,7 +543,7 @@ export default class MindMapPlugin extends Plugin {
     const from = leaf.view;
     let path: string | null = null;
     if (from instanceof MarkdownView && from.file === file) {
-      path = pathAtLine(from.editor.getValue(), from.editor.getCursor().line);
+      path = pathAtLine(from.editor.getValue(), from.editor.getCursor().line, this.rootRule());
       if (path === "") path = null;
     }
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });

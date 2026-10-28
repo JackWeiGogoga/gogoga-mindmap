@@ -61,6 +61,10 @@ export interface MindMapSettings {
   rememberView: boolean;
   /** 新建脑图用的模板笔记路径；留空用内置的「主题 1/2/3」 */
   newFileTemplate: string;
+  /** 中心主题始终用文件名，唯一的一级标题也只当第一级分支（默认关：一级标题就是中心主题） */
+  fileNameAsRoot: boolean;
+  /** 嵌入的脑图隐藏工具栏：阅读模式一直不显示，编辑模式鼠标移上去才显示（默认关） */
+  embedToolbarAutoHide: boolean;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -101,6 +105,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   customMarkersExclusive: false,
   rememberView: true,
   newFileTemplate: "",
+  embedToolbarAutoHide: false,
+  fileNameAsRoot: false,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -152,6 +158,17 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.defaultTheme = v as ThemeId;
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.fileNameAsRoot.name"))
+      .setDesc(t("settings.fileNameAsRoot.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.fileNameAsRoot).onChange(async (v) => {
+          this.plugin.settings.fileNameAsRoot = v;
+          await this.plugin.saveSettings();
+          this.plugin.reloadMaps();
+        }),
       );
 
     new Setting(containerEl)
@@ -331,6 +348,17 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.codeBlockMaxHeight = n;
             await this.plugin.saveSettings();
           }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.embedToolbar.name"))
+      .setDesc(t("settings.embedToolbar.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.embedToolbarAutoHide).onChange(async (v) => {
+          this.plugin.settings.embedToolbarAutoHide = v;
+          await this.plugin.saveSettings();
+          this.plugin.applyEmbedToolbar();
         }),
       );
 

@@ -353,6 +353,8 @@ const en = {
   "settings.theme.name": "Default theme",
   "settings.theme.desc":
     "Theme for new files. The palette button in the toolbar switches the theme per file and writes the choice to mindmap-theme.",
+  "settings.fileNameAsRoot.name": "Use the file name as the central topic",
+  "settings.fileNameAsRoot.desc": "Off: a note's only level-1 heading becomes the central topic. On: the central topic is always the file name and the level-1 heading becomes a first-level branch. Only changes how notes are shown; the file stays the same.",
   "settings.headingLevel.name": "Deepest heading level",
   "settings.headingLevel.desc":
     "When adding nodes, levels deeper than this are written back as list items instead of headings. Existing content keeps its format.",
@@ -413,6 +415,8 @@ const en = {
   "settings.hover.desc":
     "Ctrl-hover (⌘-hover on macOS) over a node that links to a note to see a preview of the note, as elsewhere in Obsidian. " +
     "To show it without holding a key, find \"{source}\" in the settings of the Page preview core plugin.",
+  "settings.embedToolbar.name": "Hide the toolbar of embedded maps",
+  "settings.embedToolbar.desc": "For mind maps embedded in notes (mindmap code blocks and ![[note]] embeds): no toolbar in reading view, and in editing view it shows only while the mouse is over the map or while you edit it.",
   "settings.codeBlockHeight.name": "Maximum height of embedded code blocks",
   "settings.codeBlockHeight.desc": "Embedded mindmap code blocks fit their content, up to this height in pixels.",
 } as const;
@@ -751,6 +755,8 @@ const zh: Record<Key, string> = {
   "settings.structure.desc": "新文件的布局。单个文件可在 frontmatter 里用 mindmap-structure 覆盖。",
   "settings.theme.name": "默认主题",
   "settings.theme.desc": "新文件用的主题。工具栏的调色盘按钮可以按文件切换，切换结果会写进 mindmap-theme。",
+  "settings.fileNameAsRoot.name": "用文件名作中心主题",
+  "settings.fileNameAsRoot.desc": "关闭时，笔记里唯一的一级标题就是中心主题；打开后中心主题始终是文件名，一级标题作为第一级分支。只改变显示方式，不改文件内容。",
   "settings.headingLevel.name": "标题的最深级别",
   "settings.headingLevel.desc": "新建节点时，比这更深的层级用列表而不是标题写回。已有内容的写法不受影响。",
   "settings.headingLevel.h2": "H2（主主题）",
@@ -809,6 +815,8 @@ const zh: Record<Key, string> = {
   "settings.hover.desc":
     "按住 ⌘ / Ctrl 把鼠标停在链接到笔记的节点上，会弹出笔记预览，和 Obsidian 其他地方一致。" +
     "想不按键就显示，去核心插件「页面预览」的设置里找「{source}」那一项。",
+  "settings.embedToolbar.name": "嵌入的脑图隐藏工具栏",
+  "settings.embedToolbar.desc": "笔记里嵌入的脑图（```mindmap 代码块和 ![[笔记]] 嵌入）：阅读模式下不显示工具栏；编辑模式下鼠标移到脑图上、或者正在编辑它时才显示。",
   "settings.codeBlockHeight.name": "代码块嵌入的最大高度",
   "settings.codeBlockHeight.desc": "```mindmap 代码块按内容自适应高度，但不超过这个值（像素）。",
 };

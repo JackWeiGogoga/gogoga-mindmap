@@ -213,7 +213,7 @@ class MindMapEmbed extends Component {
         const sheet = (await parseXmind(await vault.readBinary(this.file)))[0];
         return sheet ? { doc: xmindSheetToDoc(sheet, style), lost: describeLost(sheet.lost) } : { doc: null, lost: "" };
       }
-      return { doc: parseMarkdown(await vault.cachedRead(this.file), { fallbackTitle: this.file.basename, style }), lost: "" };
+      return { doc: parseMarkdown(await vault.cachedRead(this.file), { fallbackTitle: this.file.basename, style, ...this.plugin.rootRule() }), lost: "" };
     } catch (e) {
       this.ctx.containerEl.setText(t("xmind.readFailed", { name: this.file.name, error: (e as Error).message }));
       return { doc: null, lost: "" };

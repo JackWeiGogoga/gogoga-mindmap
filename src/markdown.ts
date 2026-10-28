@@ -313,7 +313,12 @@ export interface ParseOptions {
   style?: Partial<DocStyle>;
   /** 传进来就记下每个节点在源文本里的行号（0 起，含 frontmatter） */
   lines?: Map<MindNode, number>;
+  /** 唯一的一级标题升格为中心主题（默认）；false 时中心主题始终是 fallbackTitle，一级标题作为它的子节点 */
+  rootFromH1?: boolean;
 }
+
+/** 节点路径和行号互查时要和视图用同一种根节点规则，否则路径对不上 */
+export type RootRule = Pick<ParseOptions, "rootFromH1">;
 
 export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const lines = src.replace(/\r\n?/g, "\n").split("\n");
@@ -335,7 +340,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const root = createNode({ parent: null, kind: "heading", level: 0, text: opts.fallbackTitle ?? "" });
   const h1Count = tokens.filter((t) => t.t === "heading" && t.level === 1).length;
   const firstHeading = tokens.find((t) => t.t === "heading");
-  const rootFromHeading = h1Count === 1 && firstHeading?.t === "heading" && firstHeading.level === 1;
+  const rootFromHeading = (opts.rootFromH1 ?? true) && h1Count === 1 && firstHeading?.t === "heading" && firstHeading.level === 1;
 
   const preamble: string[] = [];
   const headingStack: MindNode[] = [root];
@@ -647,9 +652,9 @@ export function withFrontmatter(content: string, values: [key: string, value: st
 // 脑图和 Markdown 之间来回跳：节点用路径（pathOf）标识，按同一份文本重新解析一遍就能对上行号
 
 /** 路径对应的节点在文本里的行号（0 起）；没有一级标题时根节点没有自己的行，给正文第一行 */
-export function lineOfPath(src: string, path: string): number | null {
+export function lineOfPath(src: string, path: string, rule: RootRule = {}): number | null {
   const lines = new Map<MindNode, number>();
-  const doc = parseMarkdown(src, { lines });
+  const doc = parseMarkdown(src, { lines, ...rule });
   const node = findByPath(doc.root, path);
   if (!node) return null;
   const line = lines.get(node);
@@ -659,9 +664,9 @@ export function lineOfPath(src: string, path: string): number | null {
 }
 
 /** 某一行属于哪个节点（节点行，或它下面的备注 / 段落）；在 frontmatter 或第一个节点之前返回 null */
-export function pathAtLine(src: string, line: number): string | null {
+export function pathAtLine(src: string, line: number, rule: RootRule = {}): string | null {
   const lines = new Map<MindNode, number>();
-  parseMarkdown(src, { lines });
+  parseMarkdown(src, { lines, ...rule });
   let best: MindNode | null = null;
   let bestLine = -1;
   for (const [node, l] of lines) {

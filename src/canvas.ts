@@ -763,6 +763,15 @@ export class MindMapCanvas {
     if (!this.layout?.placed.get(node.id)) return;
     this.select(node);
     this.ensureVisible(node);
+    this.flashNode(node);
+  }
+
+  /** 联动跳过来的节点外面闪一圈，看得出是哪个；只是动画，不改 class，重画节点也不留痕迹 */
+  private flashNode(node: MindNode): void {
+    const el = this.els.get(node.id);
+    if (!el?.animate) return;
+    const color = getComputedStyle(el).getPropertyValue("--mm-selection").trim() || "#155dff";
+    el.animate([{ boxShadow: `0 0 0 6px ${color}` }, { boxShadow: `0 0 0 2px ${color}`, offset: 0.6 }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1200, easing: "ease-out" });
   }
 
   /** 节点 DOM 全部重建（内容签名没变也重建），用在标记定义这类影响渲染、但不在签名里的设置变了之后 */
@@ -5777,6 +5786,9 @@ export class MindMapCanvas {
       this.closePopover();
       return;
     }
+    // 从查看切到编辑：沿用查看窗口的位置和大小，不突然变大或挪位置
+    const prev = sameNode && edit && this.popover?.classList.contains("is-view") ? this.popover : null;
+    const keep = prev ? { left: prev.style.left, top: prev.style.top, w: prev.offsetWidth, h: prev.offsetHeight } : null;
     this.closePopover();
     const nodeEl = this.els.get(node.id);
     if (!nodeEl) return;
@@ -5874,7 +5886,12 @@ export class MindMapCanvas {
       this.popoverApply = apply;
       pop.append(ta);
       this.el.append(pop);
-      this.placePopover(pop, nodeEl);
+      if (keep) {
+        pop.classList.add("is-sized");
+        pop.setCssStyles({ width: `${keep.w}px`, height: `${keep.h}px`, left: keep.left, top: keep.top });
+      } else {
+        this.placePopover(pop, nodeEl);
+      }
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     } else {
@@ -5883,11 +5900,25 @@ export class MindMapCanvas {
       body.className = "mm-popover-body";
       // 备注里的图片弹窗里太小，单击（或双击）就全屏看原图
       body.addEventListener("click", (ev) => {
+        // 备注里的双链：MarkdownRenderer 只画出链接，点击要自己接（⌘/Ctrl 点在新标签页打开）
+        const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+        if (link) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          this.opts.host?.openLink?.(link.dataset.href ?? link.getAttribute("href") ?? "", true, ev);
+          return;
+        }
         const img = (ev.target as HTMLElement).closest("img");
         if (!img) return;
         ev.preventDefault();
         ev.stopPropagation();
         this.openLightbox(img);
+      });
+      // 悬停双链出预览（按住 ⌘/Ctrl 或开了页面预览设置时，Obsidian 自己判断）
+      body.addEventListener("mouseover", (ev) => {
+        const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+        const href = link?.dataset.href ?? link?.getAttribute("href");
+        if (link && href) this.opts.host?.hoverLink?.(ev, href, link);
       });
       if (this.opts.host?.renderNote) {
         body.classList.add("markdown-rendered");
