@@ -5554,7 +5554,7 @@ export class MindMapCanvas {
       if (link) links.push(`![[${link}]]`);
     }
     if (!links.length) return;
-    node.note = normalizeNote([unescapeNote(node.note), ...links].filter(Boolean).join("\n"));
+    node.note = normalizeNote([unescapeNote(node.note), ...links].filter(Boolean).join("\n"), node.kind === "list");
     this.opts.host?.notice?.(t("notice.imageAddedToNote"));
     if (this.editing !== node) this.render();
     this.notify();
@@ -5870,7 +5870,7 @@ export class MindMapCanvas {
       ta.rows = Math.min(12, Math.max(3, plain.split("\n").length + 1));
       const initial = node.note;
       const apply = () => {
-        const next = normalizeNote(ta.value.replace(/\s+$/, ""));
+        const next = normalizeNote(ta.value.replace(/\s+$/, ""), node.kind === "list");
         if (next === node.note) return false;
         node.note = next;
         return true;
@@ -5902,7 +5902,7 @@ export class MindMapCanvas {
           return;
         }
         // 存附件期间弹窗已经关了：直接接到备注末尾
-        node.note = normalizeNote([unescapeNote(node.note), text].filter(Boolean).join("\n"));
+        node.note = normalizeNote([unescapeNote(node.note), text].filter(Boolean).join("\n"), node.kind === "list");
         this.render();
         this.notify();
       };

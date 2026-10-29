@@ -197,7 +197,7 @@ function joinNote(lines: string[]): string {
 
 type Token =
   | { t: "heading"; level: number; text: string }
-  | { t: "list"; ws: string; bullet: string; text: string }
+  | { t: "list"; ws: string; bullet: string; text: string; raw: string }
   | { t: "line"; raw: string };
 
 function tokenize(lines: string[]): Token[] {
@@ -222,7 +222,7 @@ function tokenize(lines: string[]): Token[] {
     }
     const l = LIST_RE.exec(raw);
     if (l) {
-      out.push({ t: "list", ws: l[1], bullet: l[2], text: l[3] });
+      out.push({ t: "list", ws: l[1], bullet: l[2], text: l[3], raw });
       continue;
     }
     out.push({ t: "line", raw });
@@ -238,10 +238,27 @@ function tokenize(lines: string[]): Token[] {
 
 const NOTE_CALLOUT = "> [!note]";
 
-/** 备注里是否有会被解析成节点的行（代码块内的不算） */
-export function noteNeedsEscape(note: string): boolean {
+/**
+ * 备注里是否有会被解析成节点的行（代码块内的不算）。
+ * inList：备注写在列表项下面（缩进）。不在列表里时，按 CommonMark 紧跟在文字后面的「2026. 年底」这类
+ * 不从 1 开始的有序项、空列表项只是续行，不会变成节点，不用包 —— 包了会渲染成引用块，显示就变了
+ */
+export function noteNeedsEscape(note: string, inList = true): boolean {
   if (!note) return false;
-  return tokenize(note.split("\n")).some((t) => t.t === "heading" || t.t === "list");
+  const tokens = tokenize(note.split("\n"));
+  return tokens.some((t, i) => {
+    if (t.t === "heading") return true;
+    if (t.t !== "list") return false;
+    if (inList || !cannotInterrupt(t, tokens[i - 1])) return true;
+    tokens[i] = { t: "line", raw: t.raw };
+    return false;
+  });
+}
+
+/** 不从 1 开始的有序项、空列表项，紧跟在一行文字（不是代码围栏）后面：不能新开列表，只是那段文字的续行 */
+function cannotInterrupt(tok: { bullet: string; text: string }, prev: Token | undefined): boolean {
+  const afterText = prev?.t === "line" && prev.raw.trim() !== "" && !FENCE_RE.test(prev.raw);
+  return afterText && ((/^\d/.test(tok.bullet) && parseInt(tok.bullet, 10) !== 1) || tok.text.trim() === "");
 }
 
 export function isEscapedNote(note: string): boolean {
@@ -264,8 +281,8 @@ export function unescapeNote(note: string): string {
 }
 
 /** 用户输入的原文 → 存储形式（只在必要时包装） */
-export function normalizeNote(plain: string): string {
-  return noteNeedsEscape(plain) ? escapeNote(plain) : plain;
+export function normalizeNote(plain: string, inList = true): string {
+  return noteNeedsEscape(plain, inList) ? escapeNote(plain) : plain;
 }
 
 // ---------- 剪贴板 ----------
@@ -305,6 +322,30 @@ export function parseClipboard(text: string): MindNode[] {
     nodes.push(c);
   }
   return nodes;
+}
+
+/** CommonMark 里能打断段落的 HTML 块（第 1–6 类）开头的标签名 */
+const BLOCK_TAGS =
+  "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+const INTERRUPT_RE = new RegExp(
+  [
+    `^ {0,3}<(?:script|pre|style|textarea)(?:\\s|>|$)`,
+    `^ {0,3}<(?:!--|\\?|![A-Za-z]|!\\[CDATA\\[)`,
+    `^ {0,3}</?(?:${BLOCK_TAGS})(?:\\s|/?>|$)`,
+    "^ {0,3}(?:```|~~~)",
+    "^ {0,3}>",
+    "^ {0,3}([-*_])(?:[ \\t]*\\1){2,}[ \\t]*$",
+  ].join("|"),
+  "i",
+);
+
+/**
+ * 这一行会不会另起一个块：HTML 块（如 <!-- 注释 -->）、代码围栏、引用、分隔线。
+ * 这些紧跟在列表项后面也不是它的懒续行，而是结束了列表、属于外面那一层 ——
+ * 归进列表项的话，写回时会被缩进进列表项里，渲染出来就变了（比如 Fav Sync 的 <!-- fav-sync:end --> 被挪进最后一项）
+ */
+export function interruptsParagraph(line: string): boolean {
+  return INTERRUPT_RE.test(line);
 }
 
 export interface ParseOptions {
@@ -366,7 +407,14 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   let blankSinceHeading = false;
 
   for (let ti = 0; ti < tokens.length; ti++) {
-    const tok = tokens[ti];
+    let tok = tokens[ti];
+    // CommonMark：不从 1 开始的有序列表、空的列表项不能打断段落，新开列表时紧跟在一行文字后面就只是那段文字的续行。
+    // 不照这条认，删掉「1.」之后剩下的「2. 3.」挨着上面的文字写回，渲染出来列表就没了，我们却以为还是列表。
+    // 已经在列表里（同一个列表的下一项、备注后面的下一项）不受这条限制
+    if (tok.t === "list" && !listStack.length && cannotInterrupt(tok, tokens[ti - 1])) {
+      // 改写回 tokens：下一行的「3.」看到的前一行就是文字，同样算续行
+      tok = tokens[ti] = { t: "line", raw: tok.raw };
+    }
     // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
     const lineNo = start + ti;
     if (tok.t === "heading") {
@@ -415,6 +463,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
       const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, bullet: tok.bullet, blockId });
+      if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);
       if (pending?.some((l) => l.trim() !== "")) {
@@ -445,8 +494,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     prevTokenWasHeading = false;
     if (listStack.length) {
       const indent = indentWidth(leadingWs(raw));
-      if (!prevWasBlank && lastListItem) {
-        // 紧跟在列表项后面的非空行：懒延续，归该项
+      if (!prevWasBlank && lastListItem && !interruptsParagraph(raw)) {
+        // 紧跟在列表项后面的非空行：懒延续，归该项（能打断段落的块不算，见 interruptsParagraph）
         push({ node: lastListItem, buf: noteBuf }, raw);
       } else {
         while (listStack.length && listStack[listStack.length - 1].indent >= indent) listStack.pop();
@@ -537,7 +586,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     out.push(`${"#".repeat(level)} ${node.text}${formatMarker(node)}`.trimEnd());
     if (node.note) {
       ensureBlank();
-      pushBlock(normalizeNote(node.note));
+      pushBlock(normalizeNote(node.note, false));
     }
     const kids = node.children;
     const headingKids = kids.filter((c) => c.kind === "heading" && level < 6);
@@ -549,7 +598,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     }
     if (node.tail) {
       ensureBlank();
-      pushBlock(normalizeNote(node.tail));
+      pushBlock(normalizeNote(node.tail, false));
     }
     for (const c of headingKids) emitHeading(c, level + 1);
   };
@@ -557,7 +606,7 @@ export function serializeMarkdown(doc: MindDoc): string {
   /** 一段属于某一层的文字（列表项里的要缩进到那一层），前后空一行，和列表分开 */
   const emitBlock = (text: string, depth: number) => {
     ensureBlank();
-    for (const l of normalizeNote(text).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth)}${l}`);
+    for (const l of normalizeNote(text, depth > 0).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth)}${l}`);
     ensureBlank();
   };
 
@@ -565,7 +614,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     if (node.lead) emitBlock(node.lead, depth);
     const bullet = node.bullet || style.bullet;
     const blockId = node.blockId ? ` ^${node.blockId}` : "";
-    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd());
+    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
     if (node.note) {
       for (const l of normalizeNote(node.note).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
     }
@@ -579,7 +628,7 @@ export function serializeMarkdown(doc: MindDoc): string {
   } else {
     if (root.note) {
       ensureBlank();
-      pushBlock(normalizeNote(root.note));
+      pushBlock(normalizeNote(root.note, false));
     }
     const level = Math.max(1, root.level + 1);
     const headingKids = root.children.filter((c) => c.kind === "heading");
@@ -590,7 +639,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     }
     if (root.tail) {
       ensureBlank();
-      pushBlock(normalizeNote(root.tail));
+      pushBlock(normalizeNote(root.tail, false));
     }
     for (const c of headingKids) emitHeading(c, Math.min(level, 6));
   }

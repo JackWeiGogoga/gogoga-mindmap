@@ -19,6 +19,8 @@ export interface MindNode {
    * 跟着位置走，不跟着节点走 —— 节点删掉或挪走时交给下一个兄弟，见 releaseLead
    */
   lead: string;
+  /** 列表项那一行末尾有两个以上空格（硬换行，下一行的续写要换行显示）；写回时补在行末 */
+  hardBreak?: boolean;
   /** 颜色名或 #hex，来自 %%red%% 这类标记 */
   color?: string;
   /** 折叠状态，用 %%fold%% 持久化 */
@@ -111,6 +113,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     note: init.note ?? "",
     tail: init.tail ?? "",
     lead: init.lead ?? "",
+    hardBreak: init.hardBreak,
     color: init.color,
     folded: init.folded ?? false,
     box: init.box,
@@ -488,6 +491,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     note: node.note,
     tail: node.tail,
     lead: node.lead,
+    hardBreak: node.hardBreak,
     color: node.color,
     folded: node.folded,
     box: node.box && { ...node.box },
