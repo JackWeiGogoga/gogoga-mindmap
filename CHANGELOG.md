@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- Text between two lists under the same heading (or between sub-lists of a list item) stays where it was. Before, editing such a note moved it after the last list and merged the lists, which changed what the text referred to. Deleting or moving a list item leaves that text in place.
+
 ## [0.25.0] - 2026-10-29
 
 ### Changed

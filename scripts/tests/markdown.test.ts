@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fillTemplate, lineOfPath, parseMarkdown, pathAtLine, serializeMarkdown, splitMarker, withFrontmatter } from "../../src/markdown";
-import { addChild, addSibling, moveNode, pathOf, findByPath, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents, cloneTree } from "../../src/model";
+import { addChild, addSibling, moveNode, pathOf, findByPath, removeNode, removeNodeKeepChildren, groupLimits, groupRange, setGroupRange, insertParents, cloneTree } from "../../src/model";
 
 const canonical = `---
 mindmap: true
@@ -759,4 +759,48 @@ test("用文件名作中心主题：唯一的 H1 降为第一级分支，写回�
   assert.equal(pathAtLine(src, 3, { rootFromH1: false }), "0/1");
   assert.equal(lineOfPath(src, "0/1", { rootFromH1: false }), 3);
   assert.equal(pathAtLine(src, 3), "1");
+});
+
+test("列表中间夹着的文字：解析、写回保持原来的顺序", () => {
+  const src = "# 性能\n\n如果主要用于：\n\n* GitHub\n* npm\n\n推荐升级为：\n\n* SOCKS5\n* Xray\n\n速度会明显更快。\n";
+  const doc = parseMarkdown(src, { fallbackTitle: "t" });
+  assert.deepEqual(doc.root.children.map((n) => n.text), ["GitHub", "npm", "SOCKS5", "Xray"]);
+  assert.equal(doc.root.children[2].lead, "推荐升级为：");
+  assert.equal(doc.root.tail, "速度会明显更快。");
+  assert.equal(serializeMarkdown(doc), src);
+  // 嵌套：子列表中间的说明、子列表后面的结尾
+  const nested = "# N\n\n- a\n\t- b\n\n\t说明\n\n\t- c\n\n\t结尾\n\n- d\n";
+  const d2 = parseMarkdown(nested, { fallbackTitle: "t" });
+  const a = d2.root.children[0];
+  assert.deepEqual(a.children.map((n) => n.text), ["b", "c"]);
+  assert.equal(a.children[1].lead, "说明");
+  assert.equal(a.tail, "结尾");
+  assert.equal(serializeMarkdown(d2), nested);
+});
+
+test("列表中间夹着的文字：节点删掉、挪走、只删本身、粘贴时文字留在原位", () => {
+  const src = "# 性能\n\n* GitHub\n* npm\n\n推荐升级为：\n\n* SOCKS5\n* Xray\n";
+  const body = (d: ReturnType<typeof parseMarkdown>) => serializeMarkdown(d).split("\n").filter((l) => l && !l.startsWith("#"));
+  // 删掉带前置段落的节点：文字交给接替位置的 Xray
+  let d = parseMarkdown(src, { fallbackTitle: "t" });
+  removeNode(d.root.children[2]);
+  assert.deepEqual(body(d), ["* GitHub", "* npm", "推荐升级为：", "* Xray"]);
+  // 删掉最后一个：文字并进标题的 tail，还在列表后面
+  d = parseMarkdown(src, { fallbackTitle: "t" });
+  removeNode(d.root.children[3]);
+  removeNode(d.root.children[2]);
+  assert.deepEqual(body(d), ["* GitHub", "* npm", "推荐升级为："]);
+  // 把 SOCKS5 挪到最前面：文字留在原处
+  d = parseMarkdown(src, { fallbackTitle: "t" });
+  moveNode(d.root.children[2], d.root, 0, d.style);
+  assert.deepEqual(body(d), ["* SOCKS5", "* GitHub", "* npm", "推荐升级为：", "* Xray"]);
+  // 只删 npm 本身（没有子节点）不影响后面的文字
+  d = parseMarkdown(src, { fallbackTitle: "t" });
+  removeNodeKeepChildren(d.root.children[1], d.style);
+  assert.deepEqual(body(d), ["* GitHub", "推荐升级为：", "* SOCKS5", "* Xray"]);
+  // 复制 SOCKS5 粘到别处：前置段落不跟着复制
+  d = parseMarkdown(src, { fallbackTitle: "t" });
+  const copy = cloneTree(d.root.children[2]);
+  attachSubtree(copy, d.root, d.style, 0);
+  assert.deepEqual(body(d), ["* SOCKS5", "* GitHub", "* npm", "推荐升级为：", "* SOCKS5", "* Xray"]);
 });

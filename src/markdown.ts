@@ -347,6 +347,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   let listStack: { indent: number; node: MindNode }[] = [];
   const noteBuf = new Map<MindNode, string[]>();
   const tailBuf = new Map<MindNode, string[]>();
+  const leadBuf = new Map<MindNode, string[]>();
   let target: { node: MindNode; buf: Map<MindNode, string[]> } = { node: root, buf: noteBuf };
   let seenRoot = false;
   let prevWasBlank = true;
@@ -414,6 +415,12 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
       const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, bullet: tok.bullet, blockId });
+      // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
+      const pending = tailBuf.get(parent);
+      if (pending?.some((l) => l.trim() !== "")) {
+        leadBuf.set(node, pending);
+        tailBuf.delete(parent);
+      }
       parent.children.push(node);
       listStack.push({ indent, node });
       opts.lines?.set(node, lineNo);
@@ -446,7 +453,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         if (listStack.length) {
           const item = listStack[listStack.length - 1].node;
           lastListItem = item;
-          target = { node: item, buf: noteBuf };
+          // 已经有子列表了：这段在子列表后面，不是备注（备注写在子列表前面，归过去顺序就反了）
+          target = { node: item, buf: item.children.length ? tailBuf : noteBuf };
           push(target, raw);
         } else {
           lastListItem = null;
@@ -464,8 +472,12 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const finalize = (node: MindNode) => {
     const n = noteBuf.get(node);
     if (n) node.note = joinNote(node.kind === "list" ? dedent(trimBlankLines(n)) : n);
+    // 列表项的 tail / lead 带着所在层的缩进，去掉；标题下的不缩进
+    const plain = (lines: string[], inList: boolean) => joinNote(inList ? dedent(trimBlankLines(lines)) : lines);
     const t = tailBuf.get(node);
-    if (t) node.tail = joinNote(t);
+    if (t) node.tail = plain(t, node.kind === "list");
+    const l = leadBuf.get(node);
+    if (l) node.lead = plain(l, node.parent?.kind === "list");
     for (const c of node.children) finalize(c);
   };
   finalize(root);
@@ -542,7 +554,15 @@ export function serializeMarkdown(doc: MindDoc): string {
     for (const c of headingKids) emitHeading(c, level + 1);
   };
 
+  /** 一段属于某一层的文字（列表项里的要缩进到那一层），前后空一行，和列表分开 */
+  const emitBlock = (text: string, depth: number) => {
+    ensureBlank();
+    for (const l of normalizeNote(text).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth)}${l}`);
+    ensureBlank();
+  };
+
   const emitList = (node: MindNode, depth: number) => {
+    if (node.lead) emitBlock(node.lead, depth);
     const bullet = node.bullet || style.bullet;
     const blockId = node.blockId ? ` ^${node.blockId}` : "";
     out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd());
@@ -550,6 +570,7 @@ export function serializeMarkdown(doc: MindDoc): string {
       for (const l of normalizeNote(node.note).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
     }
     for (const c of node.children) emitList(c, depth + 1);
+    if (node.tail) emitBlock(node.tail, depth + 1);
   };
 
   const root = doc.root;

@@ -12,8 +12,13 @@ export interface MindNode {
   text: string;
   /** 标签下面的备注（原始 Markdown，已去掉首尾空行），无则为空串 */
   note: string;
-  /** 仅标题节点：列表子节点之后、下一个标题之前的段落 */
+  /** 子节点之后的段落：标题是列表子节点之后、下一个标题之前；列表项是子列表之后、同样缩进的段落 */
   tail: string;
+  /**
+   * 写在本节点前面、属于父节点那一层的段落：两个列表项之间夹着的文字（「如果用于：」列表「推荐升级为：」列表）。
+   * 跟着位置走，不跟着节点走 —— 节点删掉或挪走时交给下一个兄弟，见 releaseLead
+   */
+  lead: string;
   /** 颜色名或 #hex，来自 %%red%% 这类标记 */
   color?: string;
   /** 折叠状态，用 %%fold%% 持久化 */
@@ -105,6 +110,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     text: init.text ?? "",
     note: init.note ?? "",
     tail: init.tail ?? "",
+    lead: init.lead ?? "",
     color: init.color,
     folded: init.folded ?? false,
     box: init.box,
@@ -374,11 +380,26 @@ export function addSibling(node: MindNode, text = "", after = true): MindNode | 
   return sibling;
 }
 
+/**
+ * 节点要离开原来的位置（删除、移走）：它前面那段属于父节点的文字留在原处，
+ * 交给接替这个位置的下一个列表兄弟；后面没有列表兄弟就并进父节点的 tail（写回时还在同一个地方）
+ */
+function releaseLead(node: MindNode): void {
+  const parent = node.parent;
+  if (!node.lead || !parent) return;
+  const next = parent.children[parent.children.indexOf(node) + 1];
+  const join = (a: string, b: string) => [a, b].filter(Boolean).join("\n\n");
+  if (next && next.kind === "list") next.lead = join(node.lead, next.lead);
+  else parent.tail = join(node.lead, parent.tail);
+  node.lead = "";
+}
+
 export function removeNode(node: MindNode): boolean {
   const parent = node.parent;
   if (!parent) return false;
   const idx = parent.children.indexOf(node);
   if (idx < 0) return false;
+  releaseLead(node);
   parent.children.splice(idx, 1);
   node.parent = null;
   return true;
@@ -408,6 +429,7 @@ export function removeNodeKeepChildren(node: MindNode, style: DocStyle): MindNod
 export function moveNode(node: MindNode, newParent: MindNode, index: number, style: DocStyle): boolean {
   if (node === newParent || isAncestor(node, newParent) || !node.parent) return false;
   const oldParent = node.parent;
+  releaseLead(node);
   const oldIdx = oldParent.children.indexOf(node);
   oldParent.children.splice(oldIdx, 1);
   if (oldParent === newParent && index > oldIdx) index -= 1;
@@ -437,8 +459,9 @@ function kindBelow(parent: MindNode, style: DocStyle): { kind: NodeKind; level: 
 export function attachSubtree(node: MindNode, parent: MindNode, style: DocStyle, index?: number): void {
   const top = kindForNewChild(parent, style);
   node.parent = parent;
-  // 粘贴进来的子树不带自由主题的位置（挂在中心主题下也会和原来的叠在一起）
+  // 粘贴进来的子树不带自由主题的位置（挂在中心主题下也会和原来的叠在一起），也不带原来位置上的前置段落
   node.float = undefined;
+  node.lead = "";
   const at = index === undefined ? parent.children.length : Math.max(0, Math.min(index, parent.children.length));
   parent.children.splice(at, 0, node);
   node.kind = top.kind;
@@ -464,6 +487,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     text: node.text,
     note: node.note,
     tail: node.tail,
+    lead: node.lead,
     color: node.color,
     folded: node.folded,
     box: node.box && { ...node.box },
