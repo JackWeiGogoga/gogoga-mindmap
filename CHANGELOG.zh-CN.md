@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-10-29
+
 ### 修复
 - 同一个标题下两个列表中间的文字（或列表项的子列表中间的文字）保持在原来的位置。以前编辑这样的笔记，这段文字会被挪到最后一个列表后面、两个列表合成一个，意思就变了。删掉或挪动列表项时，这段文字也留在原处。
 - 紧跟在列表项后面、另起一块的行（`<!-- fav-sync:end -->` 这类 HTML 注释、代码围栏、引用、分隔线），编辑那个列表项时不会再被挪进列表项里。
@@ -349,7 +351,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...HEAD
+[0.25.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...0.25.1
 [0.25.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.24.0...0.25.0
 [0.24.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.23.0...0.24.0
 [0.23.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.22.0...0.23.0
