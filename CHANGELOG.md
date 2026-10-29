@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-29
+
 ### Added
 - Expanded notes: the note button in the toolbar (and the command "Expand / collapse notes") shows notes in a box right under their nodes. The nodes around make room, so notes never cover nodes or lines, and long notes scroll inside the box. Double-click a box to edit it in place; click ≡ on the node or the collapse button on the box to hide just that one. Remembered per file, with the "Expand notes" setting (off by default) as the default and "Maximum height of expanded notes" at 240. Nothing is written to your notes, and PNG/SVG exports include the expanded notes.
 
@@ -362,7 +364,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...HEAD
+[0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0
 [0.25.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...0.25.1
 [0.25.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.24.0...0.25.0

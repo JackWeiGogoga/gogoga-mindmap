@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-29
+
 ### 新增
 - 备注展开显示：工具栏的备注按钮（和命令「展开 / 收起备注」）把备注直接显示在节点下方的框里，周围的节点自动让开，不压到节点和连线；内容超出最大高度时在框里滚动。双击框原位编辑，点节点上的 ≡ 或框上的收起按钮只收起这一条。每个文件各自记住，设置「备注展开显示」（默认关）是默认值，「展开备注的最大高度」默认 240。不往笔记里写任何东西，导出 PNG/SVG 时一起带上。
 
@@ -362,7 +364,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...HEAD
+[0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0
 [0.25.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...0.25.1
 [0.25.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.24.0...0.25.0
