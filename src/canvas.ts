@@ -1034,7 +1034,7 @@ export class MindMapCanvas {
     this.rebuild();
     this.updateCalloutButton();
     this.updateNotesButton();
-    // 背诵模式的「多选」标签会改变节点宽度，得在测量之前挂上
+    // 背诵模式的「单选 / 多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
     // 代码块嵌入首次渲染时容器高度还是 0（真正的高度要等 onLayout 下一帧才写上去），
@@ -2671,6 +2671,8 @@ export class MindMapCanvas {
     this.el.classList.toggle("is-recite", on);
     this.reciteButton?.classList.toggle("is-active", on);
     for (const m of this.el.querySelectorAll(".mm-label mark.is-revealed")) m.classList.remove("is-revealed");
+    // 节点 DOM 会复用，退出时把题目标签摘掉，免得撑宽节点
+    if (!on) for (const tag of this.el.querySelectorAll(".mm-quiz-tag")) tag.remove();
     this.render();
   }
 
@@ -2682,9 +2684,14 @@ export class MindMapCanvas {
       const options = q.children.map((c) => ({ c, state: taskState(c.text) })).filter((o) => o.state);
       if (qEl) {
         qEl.classList.toggle("is-question", options.length > 0);
-        const multi = options.filter((o) => o.state === "done").length > 1;
-        if (multi) qEl.dataset.multi = t("canvas.multiChoice");
-        else delete qEl.dataset.multi;
+        // 题目上挂「单选 / 多选」标签，揭晓答案只认点它，点节点别处就是普通的选中
+        let tag = qEl.querySelector<HTMLElement>(":scope > .mm-quiz-tag");
+        if (options.length) {
+          tag ??= qEl.createSpan({ cls: "mm-quiz-tag" });
+          const multi = options.filter((o) => o.state === "done").length > 1;
+          tag.textContent = t(multi ? "canvas.multiChoice" : "canvas.singleChoice");
+          tag.classList.toggle("is-shown", this.revealedQuestions.has(q.id));
+        } else tag?.remove();
       }
       const shown = this.revealedQuestions.has(q.id);
       for (const { c, state } of options) {
@@ -2696,8 +2703,10 @@ export class MindMapCanvas {
       }
     });
     // 答案：没揭开的答案节点和它下面的节点都遮住，节点上的标注也一起藏
+    // 选择题没揭晓时，选项下面的子节点（解题思路之类）也一起遮住
     const cover = (n: MindNode, covered: boolean) => {
       const answer = isAnswer(n.text);
+      const option = !!n.parent && !!taskState(n.text) && !this.revealedQuestions.has(n.parent.id);
       const hide = covered || (answer && !this.revealedAnswers.has(n.id));
       const el = this.els.get(n.id);
       if (el) {
@@ -2708,7 +2717,7 @@ export class MindMapCanvas {
       }
       this.calloutEls.get(n.id)?.classList.toggle("is-answer-covered", hide);
       this.noteEls.get(n.id)?.classList.toggle("is-answer-covered", hide);
-      for (const c of n.children) cover(c, hide);
+      for (const c of n.children) cover(c, hide || option);
     };
     cover(this.doc.root, false);
   }
@@ -2755,11 +2764,16 @@ export class MindMapCanvas {
         return;
       }
     }
-    const nodeEl = target.closest<HTMLElement>(".gg-mm-node.is-question");
+    const tagEl = target.closest<HTMLElement>(".mm-quiz-tag");
+    const nodeEl = tagEl?.closest<HTMLElement>(".gg-mm-node.is-question");
     const q = nodeEl ? this.nodeFromEl(nodeEl) : null;
     if (!q) return;
     if (!this.revealedQuestions.delete(q.id)) this.revealedQuestions.add(q.id);
     this.applyRecite();
+    if (this.layout) {
+      this.drawCallouts();
+      this.drawNotes();
+    }
   }
 
   private changeStructure(s: Structure): void {

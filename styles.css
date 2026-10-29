@@ -1658,15 +1658,16 @@
 .gg-mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
 .gg-mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
 /* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
-.gg-mm-root.is-recite .gg-mm-node.is-question { cursor: pointer; }
 .gg-mm-root.is-recite .mm-task { cursor: default; }
 .gg-mm-root.is-recite .gg-mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }
 .gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown.is-correct { box-shadow: 0 0 0 2px #2fb344; }
 .gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown.is-correct .mm-task { background: #2fb344; border-color: #2fb344; opacity: 1; }
 .gg-mm-root.is-recite .gg-mm-node.is-option.is-option-shown:not(.is-correct) { opacity: 0.4; }
-.gg-mm-root.is-recite .gg-mm-node.is-question[data-multi]::after {
-  content: attr(data-multi);
+/* 题目上的「单选 / 多选」标签：点它揭晓 / 收起答案 */
+.gg-mm-root:not(.is-recite) .mm-quiz-tag { display: none; }
+.gg-mm-root.is-recite .mm-quiz-tag {
   flex: none;
+  cursor: pointer;
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 4px;
@@ -1676,6 +1677,8 @@
   color: var(--mm-selection);
   background: color-mix(in srgb, var(--mm-selection) 14%, transparent);
 }
+.gg-mm-root.is-recite .mm-quiz-tag:hover { background: color-mix(in srgb, var(--mm-selection) 24%, transparent); }
+.gg-mm-root.is-recite .mm-quiz-tag.is-shown { color: #fff; background: var(--mm-selection); }
 
 /* 答案：节点连同子树盖上一层，答案节点上写提示，点一下揭开；折叠按钮照常能点 */
 .gg-mm-root.is-recite .gg-mm-node.is-answer { cursor: pointer; }
