@@ -212,6 +212,9 @@ export class MindMapView extends TextFileView {
         if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
       },
       onToggleOutline: () => void this.toggleOutline(),
+      onSideBySide: () => {
+        if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
+      },
       onLockChange: (locked) => {
         if (this.file) this.plugin.setLocked(this.file.path, locked);
       },

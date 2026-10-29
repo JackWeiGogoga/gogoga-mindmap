@@ -173,6 +173,8 @@ export interface CanvasOptions {
   onSelectionChange?: (primary: MindNode | null, all: MindNode[]) => void;
   /** 提供则工具栏出现「大纲」按钮 */
   onToggleOutline?: () => void;
+  /** 提供则空白处右键菜单里有「Markdown 和思维导图分屏对照」（只在脑图视图里，嵌入的没有） */
+  onSideBySide?: () => void;
   /** 提供则工具栏出现「锁定编辑」按钮：锁住后只能看（缩放、平移、折叠），参数是锁上之后的状态 */
   onLockChange?: (locked: boolean) => void;
   /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
@@ -5328,6 +5330,8 @@ export class MindMapCanvas {
       { title: t("menu.fit"), icon: "maximize", run: () => this.fit() },
     );
     if (this.focusRoot) entries.push({ separator: true }, { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() });
+    const side = this.opts.onSideBySide;
+    if (side) entries.push({ separator: true }, { title: t("command.openPreview"), icon: "columns-2", run: () => side() });
     return entries;
   }
 

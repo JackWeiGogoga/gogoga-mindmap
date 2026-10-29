@@ -5,7 +5,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Changed
-- The split preview is now **Markdown and mind map side by side** and is also available while a note shows as a mind map (command palette, file menu, ⋯ menu): the current tab switches to Markdown and the map opens on the right. Before, it only appeared for notes shown as Markdown.
+- The split preview is now **Markdown and mind map side by side** and is also available while a note shows as a mind map (command palette, file menu, ⋯ menu, and the right-click menu on empty canvas): the current tab switches to Markdown and the map opens on the right. Before, it only appeared for notes shown as Markdown.
 - Editing in the map only rewrites the lines that changed. The rest of the note stays byte for byte as it was (blank lines, indentation, list markers, trailing spaces, line endings), in mind map notes and `mindmap` code blocks alike. Previously every edit rewrote the whole note in the plugin's format.
 
 ### Fixed
