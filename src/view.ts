@@ -119,6 +119,10 @@ export class MindMapView extends TextFileView {
     this.canvas?.redrawAll();
   }
 
+  toggleNotes(): void {
+    this.canvas?.toggleNotes();
+  }
+
   toggleCallouts(): void {
     this.canvas?.toggleCallouts();
   }
@@ -226,6 +230,10 @@ export class MindMapView extends TextFileView {
       calloutsHidden: () => this.plugin.isCalloutsHidden(this.file?.path ?? ""),
       onCalloutsHiddenChange: (hidden) => {
         if (this.file) this.plugin.setCalloutsHidden(this.file.path, hidden);
+      },
+      notesExpanded: () => this.plugin.isNotesExpanded(this.file?.path ?? ""),
+      onNotesExpandedChange: (expanded) => {
+        if (this.file) this.plugin.setNotesExpanded(this.file.path, expanded);
       },
       notePopoverSize: this.plugin.notePopoverSize,
       ownsHotkey: (ev) => this.plugin.isOwnHotkey(ev),
@@ -365,6 +373,7 @@ export class MindMapView extends TextFileView {
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
     if (clear && this.file) this.canvas?.setCalloutsHidden(this.plugin.isCalloutsHidden(this.file.path));
+    if (clear && this.file) this.canvas?.setNotesExpanded(this.plugin.isNotesExpanded(this.file.path));
     if (clear && this.file) this.canvas?.setLocked(this.plugin.isLocked(this.file.path));
     if (saved && this.canvas) {
       this.restoringViewport = true;

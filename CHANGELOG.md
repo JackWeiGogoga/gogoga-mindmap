@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Expanded notes: the note button in the toolbar (and the command "Expand / collapse notes") shows notes in a box right under their nodes. The nodes around make room, so notes never cover nodes or lines, and long notes scroll inside the box. Double-click a box to edit it in place; click ≡ on the node or the collapse button on the box to hide just that one. Remembered per file, with the "Expand notes" setting (off by default) as the default and "Maximum height of expanded notes" at 240. Nothing is written to your notes, and PNG/SVG exports include the expanded notes.
+
+### Fixed
+- Locking editing while a node was selected left the node's floating toolbar on screen; it now goes away.
+
 ## [0.26.0] - 2026-10-29
 
 ### Fixed

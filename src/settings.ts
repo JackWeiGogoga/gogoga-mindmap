@@ -9,6 +9,7 @@ import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
+import { syncNotesExpandedAll } from "./canvas";
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
@@ -30,6 +31,12 @@ export interface MindMapSettings {
   viewports?: Record<string, SavedViewport>;
   /** 隐藏了标注的脑图文件路径 */
   hiddenCallouts?: string[];
+  /** 备注默认展开显示在节点下面（默认关：点图标弹窗看） */
+  notesExpanded: boolean;
+  /** 在工具栏上单独切换过备注展开的文件：路径 → 是否展开，优先于默认值 */
+  notesExpandedFiles?: Record<string, boolean>;
+  /** 展开备注的最大高度（像素，随节点字号缩放） */
+  noteMaxHeight: number;
   /** 锁定了编辑的脑图文件路径 */
   lockedFiles?: string[];
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
@@ -117,6 +124,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   followActiveNote: false,
   spacingScale: 100,
   fontScale: 100,
+  notesExpanded: false,
+  noteMaxHeight: 240,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -307,6 +316,39 @@ export class MindMapSettingTab extends PluginSettingTab {
     };
     scaleSetting(t("settings.spacing.name"), t("settings.spacing.desc"), "spacingScale", 50, 200);
     scaleSetting(t("settings.fontScale.name"), t("settings.fontScale.desc"), "fontScale", 70, 150);
+
+    new Setting(containerEl)
+      .setName(t("settings.notesExpanded.name"))
+      .setDesc(t("settings.notesExpanded.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.notesExpanded).onChange(async (v) => {
+          this.plugin.settings.notesExpanded = v;
+          await this.plugin.saveSettings();
+          syncNotesExpandedAll();
+        }),
+      );
+    let noteHeight: { setValue(v: number): unknown } | null = null;
+    new Setting(containerEl)
+      .setName(t("settings.noteMaxHeight.name"))
+      .setDesc(t("settings.noteMaxHeight.desc"))
+      .addSlider((s) => {
+        noteHeight = s;
+        s.setLimits(120, 800, 20)
+          .setValue(this.plugin.settings.noteMaxHeight)
+          .onChange(async (v) => {
+            this.plugin.settings.noteMaxHeight = v;
+            await this.plugin.saveSettings();
+            this.plugin.applyDisplayScale();
+          });
+      })
+      .addExtraButton((b) =>
+        b.setIcon("rotate-ccw").setTooltip(t("settings.resetNoteHeight")).onClick(async () => {
+          this.plugin.settings.noteMaxHeight = DEFAULT_SETTINGS.noteMaxHeight;
+          noteHeight?.setValue(DEFAULT_SETTINGS.noteMaxHeight);
+          await this.plugin.saveSettings();
+          this.plugin.applyDisplayScale();
+        }),
+      );
 
     new Setting(containerEl)
       .setName(t("settings.toolbar.name"))

@@ -75,7 +75,10 @@ export default class MindMapPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.setFontScale(win.doc)));
     this.register(() => {
       this.applyEmbedToolbar(undefined, false);
-      for (const d of this.allDocs()) d.body.style.removeProperty("--mm-font-scale");
+      for (const d of this.allDocs()) {
+        d.body.style.removeProperty("--mm-font-scale");
+        d.body.style.removeProperty("--mm-note-max-h");
+      }
     });
     this.register(() => {
       for (const m of [...this.openThemeEditors]) m.close();
@@ -136,6 +139,12 @@ export default class MindMapPlugin extends Plugin {
           list[hi] = f.path;
           this.saveSettingsSoon();
         }
+        const ne = this.settings.notesExpandedFiles;
+        if (ne && oldPath in ne) {
+          ne[f.path] = ne[oldPath];
+          delete ne[oldPath];
+          this.saveSettingsSoon();
+        }
         const vp = this.settings.viewports?.[oldPath];
         if (!vp || !this.settings.viewports) return;
         delete this.settings.viewports[oldPath];
@@ -147,6 +156,11 @@ export default class MindMapPlugin extends Plugin {
       this.app.vault.on("delete", (f) => {
         if (this.settings.hiddenCallouts?.includes(f.path)) this.setCalloutsHidden(f.path, false);
         if (this.settings.lockedFiles?.includes(f.path)) this.setLocked(f.path, false);
+        if (this.settings.notesExpandedFiles && f.path in this.settings.notesExpandedFiles) {
+          delete this.settings.notesExpandedFiles[f.path];
+          if (!Object.keys(this.settings.notesExpandedFiles).length) delete this.settings.notesExpandedFiles;
+          this.saveSettingsSoon();
+        }
         if (!this.settings.viewports?.[f.path]) return;
         delete this.settings.viewports[f.path];
         this.saveSettingsSoon();
@@ -209,6 +223,9 @@ export default class MindMapPlugin extends Plugin {
     const k = this.settings.fontScale / 100;
     if (k === 1) doc.body.style.removeProperty("--mm-font-scale");
     else doc.body.style.setProperty("--mm-font-scale", String(k));
+    const h = this.settings.noteMaxHeight;
+    if (h === DEFAULT_SETTINGS.noteMaxHeight) doc.body.style.removeProperty("--mm-note-max-h");
+    else doc.body.style.setProperty("--mm-note-max-h", `${h}px`);
   }
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
@@ -242,6 +259,18 @@ export default class MindMapPlugin extends Plugin {
     const next = hidden ? [...new Set([...list, path])] : list.filter((p) => p !== path);
     if (next.length) this.settings.hiddenCallouts = next;
     else delete this.settings.hiddenCallouts;
+    this.saveSettingsSoon();
+  }
+
+  // ---------- 备注展开（默认值在设置里，工具栏上切换过的按文件记） ----------
+
+  isNotesExpanded(path: string): boolean {
+    return (path ? this.settings.notesExpandedFiles?.[path] : undefined) ?? this.settings.notesExpanded;
+  }
+
+  setNotesExpanded(path: string, expanded: boolean): void {
+    if (!path) return;
+    this.settings.notesExpandedFiles = { ...this.settings.notesExpandedFiles, [path]: expanded };
     this.saveSettingsSoon();
   }
 
@@ -755,6 +784,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
+    exportCommand("toggle-notes", t("command.toggleNotes"), async (v) => v.toggleNotes());
     exportCommand("toggle-lock", t("command.toggleLock"), async (v) => v.toggleLock());
     exportCommand("reveal-in-markdown", t("command.revealInMarkdown"), async (v) => {
       if (v.file) await this.openAsMarkdown(v.file, v.leaf);
@@ -917,6 +947,7 @@ export default class MindMapPlugin extends Plugin {
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,
+        notesExpanded: () => this.settings.notesExpanded,
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => writeBack(keepFormat(serializeMarkdown(d))),

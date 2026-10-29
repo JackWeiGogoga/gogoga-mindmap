@@ -413,6 +413,7 @@
   cursor: pointer;
 }
 .mm-note-icon:hover { opacity: 1; }
+.mm-note-icon.is-expanded { opacity: 0.9; }
 
 /* 折叠按钮：挂在节点外侧，短线连到节点 */
 .mm-toggle {
@@ -579,25 +580,25 @@
   box-sizing: border-box;
   resize: both;
 }
-.gg-mm-root .mm-popover-body img { max-width: 100%; height: auto; cursor: zoom-in; -webkit-user-drag: none; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) img { max-width: 100%; height: auto; cursor: zoom-in; -webkit-user-drag: none; }
 .mm-popover-body.is-plain { white-space: pre-wrap; }
-.gg-mm-root .mm-popover-body { font-size: 13px; line-height: 1.55; }
-.gg-mm-root .mm-popover-body > :first-child { margin-top: 0; }
-.gg-mm-root .mm-popover-body > :last-child { margin-bottom: 0; }
-.gg-mm-root .mm-popover-body p { margin: 0 0 0.5em; }
-.gg-mm-root .mm-popover-body ul,
-.gg-mm-root .mm-popover-body ol { margin: 0.2em 0 0.5em; padding-left: 1.4em; }
-.gg-mm-root .mm-popover-body li { margin: 0.1em 0; }
-.gg-mm-root .mm-popover-body li > p { margin: 0; }
-.gg-mm-root .mm-popover-body h1,
-.gg-mm-root .mm-popover-body h2,
-.gg-mm-root .mm-popover-body h3,
-.gg-mm-root .mm-popover-body h4 { margin: 0.5em 0 0.25em; font-size: 1.05em; font-weight: 600; line-height: 1.4; }
-.gg-mm-root .mm-popover-body pre { margin: 0.4em 0; padding: 6px 8px; font-size: 12px; }
-.gg-mm-root .mm-popover-body blockquote { margin: 0.3em 0; padding: 0 0 0 0.8em; border-left: 2px solid var(--background-modifier-border, #ddd); }
-.gg-mm-root .mm-popover-body .callout { margin: 0.3em 0; }
-.gg-mm-root .mm-popover-body table { font-size: 12px; }
-.gg-mm-root .mm-popover-body img { max-width: 100%; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) { font-size: 13px; line-height: 1.55; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :first-child { margin-top: 0; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :last-child { margin-bottom: 0; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) p { margin: 0 0 0.5em; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) ul,
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) ol { margin: 0.2em 0 0.5em; padding-left: 1.4em; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) li { margin: 0.1em 0; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) li > p { margin: 0; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) h1,
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) h2,
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) h3,
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) h4 { margin: 0.5em 0 0.25em; font-size: 1.05em; font-weight: 600; line-height: 1.4; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) pre { margin: 0.4em 0; padding: 6px 8px; font-size: 12px; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) blockquote { margin: 0.3em 0; padding: 0 0 0 0.8em; border-left: 2px solid var(--background-modifier-border, #ddd); }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) .callout { margin: 0.3em 0; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) table { font-size: 12px; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) img { max-width: 100%; }
 
 /* ---------- 代码块嵌入 ---------- */
 
@@ -1691,7 +1692,7 @@
     var(--mm-bg, var(--background-primary));
   box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25);
 }
-.gg-mm-root.is-recite :is(.mm-callout, .mm-callout-tail).is-answer-covered { visibility: hidden; }
+.gg-mm-root.is-recite :is(.mm-callout, .mm-callout-tail, .mm-note-card, .mm-note-link).is-answer-covered { visibility: hidden; }
 
 /* 设置「嵌入的脑图隐藏工具栏」：阅读模式不显示；编辑模式鼠标移上来或正在编辑时才显示。白板卡片里照常 */
 body.gg-mm-embed-toolbar-autohide .markdown-preview-view .gg-mm-root.is-embedded:not(.is-editable):not(.canvas-node *) .mm-toolbar { display: none; }
@@ -1742,3 +1743,62 @@ body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:
   cursor: pointer;
 }
 .mm-callout-icon:hover { opacity: 1; }
+
+/* 展开的备注：挂在节点下方的框，边框和底色取分支色的淡色；内容超出最大高度时在框里滚动 */
+.mm-note-card {
+  position: absolute;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 80px;
+  max-width: calc(320px * var(--mm-font-scale, 1));
+  border: 1px solid color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 40%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 6%, var(--mm-bg, var(--background-primary, #fff)));
+  color: var(--text-normal, #1f1f1f);
+  font-family: var(--mm-font);
+  font-size: calc(12.5px * var(--mm-font-scale, 1));
+  line-height: 1.55;
+  cursor: default;
+}
+.mm-note-card-body {
+  box-sizing: border-box;
+  max-height: calc(var(--mm-note-max-h, 240px) * var(--mm-font-scale, 1));
+  overflow: auto;
+  padding: 6px 10px;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.gg-mm-root .mm-note-card-body { font-size: inherit; }
+.mm-note-card-body.is-plain { white-space: pre-wrap; }
+.mm-note-card.is-overflow .mm-note-card-body {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.mm-note-card-fold {
+  all: unset;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--mm-bg, var(--background-primary, #fff));
+  color: var(--text-muted, #777);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.mm-note-card-fold .mm-icon { font-size: 12px; }
+.mm-note-card:hover .mm-note-card-fold { opacity: 0.85; }
+.mm-note-card-fold:hover { opacity: 1; color: var(--mm-selection); }
+.mm-note-link {
+  fill: none;
+  stroke: var(--mm-note-color, var(--mm-line));
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}

@@ -11,6 +11,8 @@ const INLINE_PROPS = [
   "padding", "margin", "border", "border-radius", "border-bottom", "background-color", "color", "opacity",
   "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-align", "text-decoration",
   "white-space", "overflow-wrap", "word-break", "max-width", "vertical-align",
+  // 展开的备注：超出最大高度的部分照画面裁掉，底部渐隐
+  "overflow", "max-height", "mask-image", "-webkit-mask-image",
   "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
 ];
 
@@ -178,7 +180,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const zoom = (canvas as unknown as { k: number }).k || 1;
     if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "nowrap" });
   });
-  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek").forEach((t) => t.remove());
+  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
     (n as HTMLElement).setCssStyles({ boxShadow: "none" });
   });

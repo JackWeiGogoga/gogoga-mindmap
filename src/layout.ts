@@ -65,6 +65,9 @@ export const SUMMARY_LABEL_GAP = 6;
 /** 标注气泡和节点之间的距离（尖角画在这段空隙里） */
 export const CALLOUT_GAP = 12;
 
+/** 展开的备注和节点之间的距离 */
+export const NOTE_GAP = 6;
+
 export interface Placed {
   node: MindNode;
   x: number;
@@ -72,6 +75,11 @@ export interface Placed {
   w: number;
   h: number;
   side: Side;
+  /**
+   * 节点下方挂着展开的备注时，备注连同间距的高度。组织结构图和树形图的子节点连线从备注底下出来，
+   * 不从备注里穿过；其余结构连线从节点侧面出，用不上
+   */
+  stem?: number;
 }
 
 export interface Bounds {
@@ -110,10 +118,18 @@ export interface PlacedCallout extends Bounds {
   dir: "up" | "right";
 }
 
+/** 展开的备注：放在节点下方；far 表示离节点较远（放到了整个分支下面），要画一根引线指回节点 */
+export interface PlacedNote extends Bounds {
+  node: MindNode;
+  far: boolean;
+}
+
 export interface LayoutResult {
   placed: Map<string, Placed>;
   /** 显示中的标注；没传 measureCallout（或都没有标注）时为空 */
   callouts: PlacedCallout[];
+  /** 展开显示的备注；没传 measureNote 时为空 */
+  notes: PlacedNote[];
   /** 由内向外排列：先画外层再画内层时倒着遍历 */
   boxes: PlacedBox[];
   summaries: PlacedSummary[];
@@ -152,13 +168,15 @@ export function layoutTree(
   skip?: Set<MindNode>,
   /** 标注气泡的尺寸；返回 null（或不给）就当没有标注，排布和以前完全一样 */
   measureCallout?: (node: MindNode) => Size | null,
+  /** 展开的备注的尺寸；返回 null（或不给）就当不展开 */
+  measureNote?: (node: MindNode) => Size | null,
 ): LayoutResult {
   /** 根的子节点里去掉 skip 的；没有 skip 时原样返回，和以前完全一样 */
   const childrenOf = (p: MindNode): MindNode[] => (skip?.size && p === root ? p.children.filter((c) => !skip.has(c)) : p.children);
   const sizes = new Map<string, Size>();
   const extents = new Map<string, number>();
   /** 水平结构：节点中心往上 / 往下各占多少；组织结构图：往左 / 往右各占多少 */
-  const halfCache = new Map<string, { up: number; down: number; kids: number; wide: boolean }>();
+  const halfCache = new Map<string, { up: number; down: number; kids: number; wide: boolean; noteFar: boolean }>();
   const wHalfCache = new Map<string, { left: number; right: number }>();
   const placed = new Map<string, Placed>();
   /** 相对布局根的深度：聚焦某个分支时它就是根 */
@@ -180,6 +198,38 @@ export function layoutTree(
   const addCallout = (n: MindNode, b: Bounds, dir: PlacedCallout["dir"]) => {
     callouts.push({ node: n, dir, ...b });
     calloutRects.set(n.id, b);
+  };
+  const noteSizes = new Map<string, Size | null>();
+  const noteOf = (n: MindNode): Size | null => {
+    if (!n.note || !measureNote) return null;
+    let c = noteSizes.get(n.id);
+    if (c === undefined) {
+      c = measureNote(n);
+      noteSizes.set(n.id, c);
+    }
+    return c;
+  };
+  const notes: PlacedNote[] = [];
+  const noteRects = new Map<string, Bounds>();
+  const addNote = (n: MindNode, b: Bounds, far = false) => {
+    notes.push({ node: n, far, ...b });
+    noteRects.set(n.id, b);
+  };
+  /**
+   * 组织结构图里标注在节点右边、从节点顶边往下长：备注宽到伸进标注下面、标注又比节点高时，
+   * 备注要从标注底下开始，多让出的这一段
+   */
+  const noteLift = (n: MindNode): number => {
+    if (opts.structure !== "org-down") return 0;
+    const no = noteOf(n);
+    const co = calloutOf(n);
+    const s = sizeOf(n);
+    return no && co && no.w > s.w + 2 * CALLOUT_GAP && co.h > s.h ? co.h - s.h : 0;
+  };
+  /** 组织结构图、树形图：备注挂在节点下面，子节点那一排跟着往下让 */
+  const stemOf = (n: MindNode): number | undefined => {
+    const no = noteOf(n);
+    return no ? noteLift(n) + NOTE_GAP + no.h : undefined;
   };
 
   const sizeOf = (n: MindNode): Size => {
@@ -259,7 +309,8 @@ export function layoutTree(
   }
 
   const rs = sizeOf(root);
-  placed.set(root.id, { node: root, x: -rs.w / 2, y: -rs.h / 2, w: rs.w, h: rs.h, side: "right" });
+  const vertical = opts.structure === "org-down" || opts.structure === "tree-right";
+  placed.set(root.id, { node: root, x: -rs.w / 2, y: -rs.h / 2, w: rs.w, h: rs.h, side: "right", stem: vertical ? stemOf(root) : undefined });
   const kids = root.folded ? [] : childrenOf(root);
 
   if (opts.structure === "org-down") {
@@ -291,7 +342,7 @@ export function layoutTree(
    * 有标注时上半截加高放气泡。气泡比节点宽、而子节点又排到了气泡底边以上时，
    * 贴着节点放会压到连向子节点的线，就放到整个分支的上方（wide），尖角拉长指回节点
    */
-  function halves(n: MindNode): { up: number; down: number; kids: number; wide: boolean } {
+  function halves(n: MindNode): { up: number; down: number; kids: number; wide: boolean; noteFar: boolean } {
     const cached = halfCache.get(n.id);
     if (cached) return cached;
     const s = sizeOf(n);
@@ -305,7 +356,15 @@ export function layoutTree(
       wide = co.w > s.w && kids > s.h / 2 + CALLOUT_GAP;
       up = wide ? half + CALLOUT_GAP + co.h : Math.max(half, s.h / 2 + CALLOUT_GAP + co.h);
     }
-    const v = { up, down: half, kids, wide };
+    // 备注放在节点下面，同样的道理：比节点宽、子节点又排到了备注顶边以下时，放到整个分支的下面
+    let down = half;
+    let noteFar = false;
+    const no = noteOf(n);
+    if (no) {
+      noteFar = no.w > s.w && kids > s.h / 2 + NOTE_GAP;
+      down = noteFar ? half + NOTE_GAP + no.h : Math.max(half, s.h / 2 + NOTE_GAP + no.h);
+    }
+    const v = { up, down, kids, wide, noteFar };
     halfCache.set(n.id, v);
     return v;
   }
@@ -332,6 +391,12 @@ export function layoutTree(
         const top = v.wide ? ccy - Math.max(s.h / 2, v.kids) : ccy - s.h / 2;
         addCallout(c, { x: cx, y: top - CALLOUT_GAP - co.h, w: co.w, h: co.h }, "up");
       }
+      const no = noteOf(c);
+      if (no) {
+        const nx = side === "left" ? x + s.w - no.w : x;
+        const bottom = v.noteFar ? ccy + Math.max(s.h / 2, v.kids) : ccy + s.h / 2;
+        addNote(c, { x: nx, y: bottom + NOTE_GAP, w: no.w, h: no.h }, v.noteFar);
+      }
       placeColumn(c, visibleChildren(c), side, ccy);
       y += e + after[i] + gapV;
     });
@@ -353,7 +418,9 @@ export function layoutTree(
     const k = visibleChildren(n);
     const half = k.length ? Math.max(s.w / 2, (k.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? hGapFor(n) : 0), 0) + sidePads(k)) / 2) : s.w / 2;
     const co = calloutOf(n);
-    const v = { left: half, right: co ? Math.max(half, s.w / 2 + CALLOUT_GAP + co.w) : half };
+    // 备注在节点正下方居中，比节点宽时两边都要让
+    const nh = (noteOf(n)?.w ?? 0) / 2;
+    const v = { left: Math.max(half, nh), right: Math.max(co ? Math.max(half, s.w / 2 + CALLOUT_GAP + co.w) : half, nh) };
     wHalfCache.set(n.id, v);
     return v;
   }
@@ -363,8 +430,9 @@ export function layoutTree(
    */
   function rowDrop(p: Placed, gapV: number): number {
     const co = calloutOf(p.node);
-    const base = p.h + gapV;
-    return co ? Math.max(base, 2 * (co.h + 4) - p.h) : base;
+    const stem = p.stem ?? 0;
+    const base = p.h + stem + gapV;
+    return co ? Math.max(base, 2 * (co.h + 4) - p.h - stem) : base;
   }
   function layoutDown(parent: MindNode, list: MindNode[]): void {
     if (!list.length) return;
@@ -383,9 +451,11 @@ export function layoutTree(
       const v = wHalves(c);
       const e = v.left + v.right;
       const ccx = x + v.left;
-      placed.set(c.id, { node: c, x: ccx - s.w / 2, y, w: s.w, h: s.h, side: "down" });
+      placed.set(c.id, { node: c, x: ccx - s.w / 2, y, w: s.w, h: s.h, side: "down", stem: stemOf(c) });
       const co = calloutOf(c);
       if (co) addCallout(c, { x: ccx + s.w / 2 + CALLOUT_GAP, y, w: co.w, h: co.h }, "right");
+      const no = noteOf(c);
+      if (no) addNote(c, { x: ccx - no.w / 2, y: y + s.h + noteLift(c) + NOTE_GAP, w: no.w, h: no.h });
       layoutDown(c, visibleChildren(c));
       x += e + gapX + (gs[i] && gs[i] !== gs[i + 1] ? BOX_PAD : 0);
     });
@@ -397,14 +467,14 @@ export function layoutTree(
     if (cached !== undefined) return cached;
     const k = visibleChildren(n);
     const co = calloutOf(n);
-    const e = (co ? co.h + CALLOUT_GAP : 0) + sizeOf(n).h + k.reduce((sum, c) => sum + opts.gapSibling + treeExtent(c), 0) + padTotal(k);
+    const e = (co ? co.h + CALLOUT_GAP : 0) + sizeOf(n).h + (stemOf(n) ?? 0) + k.reduce((sum, c) => sum + opts.gapSibling + treeExtent(c), 0) + padTotal(k);
     extents.set(n.id, e);
     return e;
   }
   function layoutTreeRight(parent: MindNode, list: MindNode[]): void {
     if (!list.length) return;
     const p = placed.get(parent.id)!;
-    let y = p.y + p.h + opts.gapSibling;
+    let y = p.y + p.h + (p.stem ?? 0) + opts.gapSibling;
     const x = p.x + TREE_INDENT;
     const { before, after } = boxPads(list);
     recordRuns(parent, list, "tree");
@@ -415,7 +485,9 @@ export function layoutTree(
       const co = calloutOf(c);
       const top = co ? y + co.h + CALLOUT_GAP : y;
       if (co) addCallout(c, { x, y, w: co.w, h: co.h }, "up");
-      placed.set(c.id, { node: c, x, y: top, w: s.w, h: s.h, side: "tree" });
+      placed.set(c.id, { node: c, x, y: top, w: s.w, h: s.h, side: "tree", stem: stemOf(c) });
+      const no = noteOf(c);
+      if (no) addNote(c, { x, y: top + s.h + NOTE_GAP, w: no.w, h: no.h });
       layoutTreeRight(c, visibleChildren(c));
       y += treeExtent(c) + after[i] + opts.gapSibling;
     });
@@ -434,7 +506,7 @@ export function layoutTree(
   function boundsOf(n: MindNode): Bounds | null {
     const p = placed.get(n.id);
     if (!p) return null;
-    let b: Bounds | null = union({ x: p.x, y: p.y, w: p.w, h: p.h }, calloutRects.get(n.id) ?? null);
+    let b: Bounds | null = union(union({ x: p.x, y: p.y, w: p.w, h: p.h }, calloutRects.get(n.id) ?? null), noteRects.get(n.id) ?? null);
     for (const c of visibleChildren(n)) {
       const cb = boundsOf(c);
       subtree.set(c.id, cb);
@@ -503,6 +575,12 @@ export function layoutTree(
       addCallout(root, { x: -rs.w / 2, y: -rs.h / 2 - CALLOUT_GAP - rootCo.h, w: rootCo.w, h: rootCo.h }, "up");
     }
   }
+  // 根节点的备注：组织结构图居中、树形图左对齐，直接挂在下面（子节点已经让开了）
+  const rootNo = noteOf(root);
+  if (rootNo && vertical) {
+    const nx = opts.structure === "org-down" ? -rootNo.w / 2 : -rs.w / 2;
+    addNote(root, { x: nx, y: rs.h / 2 + noteLift(root) + NOTE_GAP, w: rootNo.w, h: rootNo.h });
+  }
   let all = boundsOf(root) ?? { x: 0, y: 0, w: 0, h: 0 };
   if (rootCo && opts.structure !== "org-down" && opts.structure !== "tree-right") {
     const wide = rootCo.w > rs.w && all.y < -rs.h / 2 - CALLOUT_GAP;
@@ -511,7 +589,16 @@ export function layoutTree(
     addCallout(root, rect, "up");
     all = union(all, rect)!;
   }
-  return { placed, boxes, summaries, callouts, bounds: all };
+  // 水平结构：思维导图居中、逻辑图左对齐（子节点都在右边）；太宽会伸到下面的分支那里时放到整张图的最下面
+  if (rootNo && !vertical) {
+    const nx = opts.structure === "mindmap" ? -rootNo.w / 2 : -rs.w / 2;
+    const far = rootNo.w > rs.w && all.y + all.h > rs.h / 2 + NOTE_GAP;
+    const top = (far ? all.y + all.h : rs.h / 2) + NOTE_GAP;
+    const rect = { x: nx, y: top, w: rootNo.w, h: rootNo.h };
+    addNote(root, rect, far);
+    all = union(all, rect)!;
+  }
+  return { placed, boxes, summaries, callouts, notes, bounds: all };
 }
 
 /**
@@ -524,17 +611,18 @@ export function layoutMap(
   opts: LayoutOptions,
   measureSummary?: (start: MindNode) => Size,
   measureCallout?: (node: MindNode) => Size | null,
+  measureNote?: (node: MindNode) => Size | null,
 ): LayoutResult {
   // 只有真正的中心主题下才有自由主题（聚焦某个分支时不算）
   const floats = root.parent ? [] : visibleChildren(root).filter((c) => c.float);
-  if (!floats.length) return layoutTree(root, measure, opts, measureSummary, undefined, measureCallout);
-  const main = layoutTree(root, measure, opts, measureSummary, new Set(floats), measureCallout);
+  if (!floats.length) return layoutTree(root, measure, opts, measureSummary, undefined, measureCallout, measureNote);
+  const main = layoutTree(root, measure, opts, measureSummary, new Set(floats), measureCallout, measureNote);
   const floating = new Set<MindNode>(floats);
   const structure: Structure = opts.structure === "org-down" || opts.structure === "tree-right" ? opts.structure : "logic-right";
   let bounds = main.bounds;
   for (const f of floats) {
     // 自由主题是主主题那一层：它和子节点之间按普通层级的间距，不用中心主题那么宽
-    const sub = layoutTree(f, measure, { ...opts, structure, gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout);
+    const sub = layoutTree(f, measure, { ...opts, structure, gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
     const mirror = opts.structure === "mindmap" && f.float!.x < 0;
     const dx = f.float!.x;
     const dy = f.float!.y;
@@ -543,6 +631,7 @@ export function layoutMap(
     for (const p of sub.placed.values()) main.placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side) });
     for (const b of sub.boxes) main.boxes.push({ ...b, x: mx(b.x, b.w), y: b.y + dy, side: flip(b.side) });
     for (const c of sub.callouts) main.callouts.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });
+    for (const c of sub.notes) main.notes.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });
     for (const s of sub.summaries) {
       main.summaries.push({
         ...s,
@@ -578,13 +667,13 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
     case "left":
       return { parent, child, x1: parent.x, y1: parent.y + parent.h / 2, x2: child.x + child.w, y2: child.y + child.h / 2 };
     case "down":
-      return { parent, child, x1: parent.x + parent.w / 2, y1: parent.y + parent.h, x2: child.x + child.w / 2, y2: child.y };
+      return { parent, child, x1: parent.x + parent.w / 2, y1: parent.y + parent.h + (parent.stem ?? 0), x2: child.x + child.w / 2, y2: child.y };
     case "tree":
       return {
         parent,
         child,
         x1: parent.x + Math.min(TREE_INDENT / 2, parent.w / 2),
-        y1: parent.y + parent.h,
+        y1: parent.y + parent.h + (parent.stem ?? 0),
         x2: child.x,
         y2: child.y + child.h / 2,
       };

@@ -194,6 +194,10 @@ export interface CanvasOptions {
   calloutsHidden?: () => boolean;
   /** 用户切换了标注的显示 / 隐藏 */
   onCalloutsHiddenChange?: (hidden: boolean) => void;
+  /** 打开时备注是否展开显示在节点下面（按文件记住）；不给就收起（点图标弹窗看） */
+  notesExpanded?: () => boolean;
+  /** 用户切换了备注的展开 / 收起 */
+  onNotesExpandedChange?: (expanded: boolean) => void;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
@@ -269,6 +273,11 @@ export function setSpacingScale(scale: number): void {
 /** 全局显示设置变了：所有打开着的画布重新量尺寸、重新排版 */
 export function redrawAllCanvases(): void {
   for (const c of liveCanvases) c.redrawAll();
+}
+
+/** 设置里改了「备注展开显示」的默认值 */
+export function syncNotesExpandedAll(): void {
+  for (const c of liveCanvases) c.syncNotesExpanded();
 }
 
 const ICONS: Record<string, string> = {
@@ -455,6 +464,17 @@ export class MindMapCanvas {
   private calloutsHidden = false;
   private peekCallout: MindNode | null = null;
   private calloutButton: HTMLElement | null = null;
+  /** 展开的备注：卡片是 nodes 层里的 HTML（按节点 id 复用），放到分支下面离得远时引线画在 svg 里 */
+  private noteLayer!: SVGGElement;
+  private noteLinks: SVGPathElement[] = [];
+  private noteEls = new Map<string, HTMLElement>();
+  private noteNode = new WeakMap<HTMLElement, MindNode>();
+  private notesExpanded = false;
+  /** 展开时单独收起的几条：只在这次打开有效，不记 */
+  private collapsedNotes = new Set<string>();
+  private notesButton: HTMLElement | null = null;
+  /** 备注里的图片、公式晚到会把卡片撑大，尺寸一变就重新排版 */
+  private noteRo: ResizeObserver | null = null;
 
   private tx = 0;
   private ty = 0;
@@ -566,6 +586,10 @@ export class MindMapCanvas {
     this.calloutLayer.setAttribute("class", "mm-callout-tails");
     this.svg.append(this.calloutLayer);
     this.calloutsHidden = opts.calloutsHidden?.() ?? false;
+    this.noteLayer = createSvg("g");
+    this.noteLayer.setAttribute("class", "mm-note-links");
+    this.svg.append(this.noteLayer);
+    this.notesExpanded = opts.notesExpanded?.() ?? false;
     this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
     this.overlay = createDiv();
@@ -597,6 +621,7 @@ export class MindMapCanvas {
         this.positionNodebar();
       });
       this.ro.observe(this.el);
+      this.noteRo = new ResizeObserver(() => this.scheduleReflow());
     }
   }
 
@@ -913,6 +938,7 @@ export class MindMapCanvas {
   destroy(): void {
     liveCanvases.delete(this);
     this.ro?.disconnect();
+    this.noteRo?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
     if (this.reflowTimer !== null) window.clearTimeout(this.reflowTimer);
@@ -1005,6 +1031,7 @@ export class MindMapCanvas {
     this.editing = null;
     this.rebuild();
     this.updateCalloutButton();
+    this.updateNotesButton();
     // 背诵模式的「多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
@@ -1172,7 +1199,9 @@ export class MindMapCanvas {
         n.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         n.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          this.toggleNotePopover(node);
+          // 展开备注时图标管这一条的收起 / 展开；收起时还是弹窗看
+          if (this.notesExpanded) this.toggleNoteCard(node);
+          else this.toggleNotePopover(node);
         });
         el.append(n);
       }
@@ -1298,6 +1327,7 @@ export class MindMapCanvas {
     const layoutOpts: LayoutOptions = { ...raw, gapRoot: sp(raw.gapRoot), gapLevel: sp(raw.gapLevel), gapSibling: sp(raw.gapSibling), gapMain: sp(raw.gapMain) };
     this.syncSummaryLabels(base);
     this.syncCallouts(base);
+    this.syncNotes(base);
     this.layout = layoutMap(
       base,
       (n) => this.sizes.get(n.id) ?? { w: 40, h: 24 },
@@ -1309,6 +1339,10 @@ export class MindMapCanvas {
       (n) => {
         if (this.calloutsHidden) return null;
         const el = this.calloutEls.get(n.id);
+        return el ? { w: el.offsetWidth, h: el.offsetHeight } : null;
+      },
+      (n) => {
+        const el = this.noteEls.get(n.id);
         return el ? { w: el.offsetWidth, h: el.offsetHeight } : null;
       },
     );
@@ -1370,6 +1404,7 @@ export class MindMapCanvas {
     this.drawBoxes();
     this.drawSummaries();
     this.drawCallouts();
+    this.drawNotes();
     this.drawRangeHandles();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
@@ -2604,6 +2639,8 @@ export class MindMapCanvas {
     btn("search", t("canvas.search", { key: sc("Mod", "F") }), () => this.openSearch());
     // 只在图里有标注时出现
     this.calloutButton = btn("callout", t("canvas.toggleCallouts"), () => this.toggleCallouts());
+    // 只在图里有备注时出现
+    this.notesButton = btn("note", t("canvas.toggleNotes"), () => this.toggleNotes());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
@@ -2666,6 +2703,7 @@ export class MindMapCanvas {
         else delete el.dataset.answer;
       }
       this.calloutEls.get(n.id)?.classList.toggle("is-answer-covered", hide);
+      this.noteEls.get(n.id)?.classList.toggle("is-answer-covered", hide);
       for (const c of n.children) cover(c, hide);
     };
     cover(this.doc.root, false);
@@ -2696,14 +2734,20 @@ export class MindMapCanvas {
       if (cover) {
         this.revealedAnswers.add(cover.id);
         this.applyRecite();
-        if (this.layout) this.drawCallouts();
+        if (this.layout) {
+          this.drawCallouts();
+          this.drawNotes();
+        }
         return;
       }
       // 揭开过的答案再点一下盖回去
       if (isAnswer(answer.text)) {
         this.revealedAnswers.delete(answer.id);
         this.applyRecite();
-        if (this.layout) this.drawCallouts();
+        if (this.layout) {
+          this.drawCallouts();
+          this.drawNotes();
+        }
         return;
       }
     }
@@ -2868,8 +2912,8 @@ export class MindMapCanvas {
 
   private positionNodebar(): void {
     this.updateImageHandle();
-    if (!this.opts.editable) return;
-    const show = this.primary && this.selected.size > 0 && !this.editing && !this.drag && !this.marquee && this.els.has(this.primary.id);
+    // 只读（包括选中节点后才锁定）时不显示，留着的要收掉
+    const show = this.opts.editable && this.primary && this.selected.size > 0 && !this.editing && !this.drag && !this.marquee && this.els.has(this.primary.id);
     if (!show) {
       this.nodebar?.remove();
       this.nodebar = null;
@@ -2901,7 +2945,17 @@ export class MindMapCanvas {
       if (b.bottom - host.top <= r.y + 1) above = Math.min(above, b.top - host.top);
     }
     let top = above - bh - 10;
-    if (top < 4) top = r.y + r.height + 10;
+    if (top < 4) {
+      // 上面放不下改放下面：节点下方挂着展开的备注时放到备注下面，同样不盖住它
+      let below = r.y + r.height;
+      const card = this.noteEls.get(this.primary!.id);
+      if (card && card.isConnected) {
+        const c = card.getBoundingClientRect();
+        const host = this.el.getBoundingClientRect();
+        if (c.top - host.top >= below - 1) below = Math.max(below, c.bottom - host.top);
+      }
+      top = below + 10;
+    }
     this.nodebar.style.left = `${left}px`;
     this.nodebar.style.top = `${top}px`;
     const hidden = r.y + r.height < 0 || r.y > this.el.clientHeight || r.x + r.width < 0 || r.x > this.el.clientWidth;
@@ -3098,6 +3152,12 @@ export class MindMapCanvas {
       (ev) => {
         // 备注弹窗、链接补全这类菜单自己能滚，滚轮留给它们，不拿去平移缩放画布
         if ((ev.target as HTMLElement).closest(".mm-popover, .mm-menu")) {
+          if (this.opts.embedded) ev.stopPropagation();
+          return;
+        }
+        // 展开的备注内容超出时，在卡片里滚动；滚到头了（或按着 ⌘/Ctrl 缩放）再交给画布
+        const noteBody = (ev.target as HTMLElement).closest<HTMLElement>(".mm-note-card-body");
+        if (noteBody && !ev.ctrlKey && !ev.metaKey && MindMapCanvas.canScroll(noteBody, ev)) {
           if (this.opts.embedded) ev.stopPropagation();
           return;
         }
@@ -5837,9 +5897,207 @@ export class MindMapCanvas {
     handle.style.top = `${top - 7}px`;
   }
 
+  // ---------- 展开的备注 ----------
+
+  /** 布局前把要展开的备注卡片建好（布局要量它的尺寸）；顺手更新节点上备注图标的状态 */
+  private syncNotes(base: MindNode): void {
+    const need = new Set<string>();
+    const visit = (n: MindNode) => {
+      if (n.note) {
+        const shown = this.notesExpanded && !this.collapsedNotes.has(n.id);
+        const icon = this.els.get(n.id)?.querySelector<HTMLElement>(".mm-note-icon");
+        const state = !this.notesExpanded ? "popover" : shown ? "open" : "closed";
+        if (icon && icon.dataset.state !== state) {
+          icon.dataset.state = state;
+          icon.classList.toggle("is-expanded", shown);
+          this.tip(icon, state === "popover" ? t("canvas.viewNote") : shown ? t("canvas.collapseNote") : t("canvas.expandNote"));
+        }
+        if (shown) {
+          need.add(n.id);
+          let el = this.noteEls.get(n.id);
+          if (!el) {
+            el = this.createNoteCard();
+            this.noteEls.set(n.id, el);
+          }
+          this.noteNode.set(el, n);
+          if (el.dataset.raw !== n.note) {
+            el.dataset.raw = n.note;
+            const body = el.querySelector<HTMLElement>(".mm-note-card-body")!;
+            body.empty();
+            body.scrollTop = 0;
+            this.fillNoteBody(body, n.note);
+          }
+        }
+      }
+      for (const c of visibleChildren(n)) visit(c);
+    };
+    visit(base);
+    for (const [id, el] of this.noteEls) {
+      if (need.has(id)) continue;
+      this.noteRo?.unobserve(el);
+      el.remove();
+      this.noteEls.delete(id);
+    }
+  }
+
+  private createNoteCard(): HTMLElement {
+    const el = createDiv();
+    el.className = "mm-note-card";
+    const body = el.createDiv({ cls: "mm-note-card-body" });
+    this.wireNoteBody(body);
+    body.addEventListener("scroll", () => this.updateNoteFade(el), { passive: true });
+    const fold = el.createEl("button", { cls: "mm-note-card-fold" });
+    fold.type = "button";
+    fold.append(icon("up"));
+    this.tip(fold, t("canvas.collapseNote"));
+    fold.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const n = this.noteNode.get(el);
+      if (n) this.toggleNoteCard(n);
+    });
+    // 和标注一样不参与画布拖拽（里面的文字可以选中复制）；单击选中它所在的节点，双击编辑
+    el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const n = this.noteNode.get(el);
+      if (!n) return;
+      this.select(n);
+      this.positionNodebar();
+    });
+    el.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const n = this.noteNode.get(el);
+      if (n && this.opts.editable && !this.recite) this.editNoteCard(n, el);
+    });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const n = this.noteNode.get(el);
+      if (!n) return;
+      const entries: MenuEntry[] = [];
+      if (this.opts.editable && !this.recite) entries.push({ title: t("menu.editNote"), icon: "pencil", run: () => this.editNoteCard(n, el) });
+      entries.push({ title: t("canvas.collapseNote"), icon: "chevron-up", run: () => this.toggleNoteCard(n) });
+      this.showContextMenu(entries, ev);
+    });
+    this.nodesEl.append(el);
+    this.noteRo?.observe(el);
+    return el;
+  }
+
+  /** 在卡片原位打开编辑框：和弹窗编辑是同一套（粘贴图片、拖入笔记都能用），起码留出能写字的大小 */
+  private editNoteCard(node: MindNode, card: HTMLElement): void {
+    const r = card.getBoundingClientRect();
+    const host = this.el.getBoundingClientRect();
+    const w = Math.min(Math.max(r.width, 260), Math.max(160, host.width - 16));
+    const h = Math.min(Math.max(r.height, 140), Math.max(80, host.height - 16));
+    const left = Math.max(8, Math.min(r.left - host.left, host.width - w - 8));
+    const top = Math.max(8, Math.min(r.top - host.top, host.height - h - 8));
+    this.toggleNotePopover(node, true, { left: `${left}px`, top: `${top}px`, w, h });
+  }
+
+  /** 内容超出卡片、还没滚到底时，底部渐隐提示下面还有 */
+  private updateNoteFade(el: HTMLElement): void {
+    const body = el.querySelector<HTMLElement>(".mm-note-card-body");
+    if (!body) return;
+    const more = body.scrollHeight > body.clientHeight + 1 && body.scrollTop + body.clientHeight < body.scrollHeight - 1;
+    if (el.classList.contains("is-overflow") !== more) el.classList.toggle("is-overflow", more);
+  }
+
+  /** 滚轮在这个元素里还能不能往这个方向滚 */
+  private static canScroll(el: HTMLElement, ev: WheelEvent): boolean {
+    if (Math.abs(ev.deltaY) >= Math.abs(ev.deltaX)) {
+      if (el.scrollHeight <= el.clientHeight + 1 || !ev.deltaY) return false;
+      return ev.deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    }
+    if (el.scrollWidth <= el.clientWidth + 1) return false;
+    return ev.deltaX < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+  }
+
+  private drawNotes(): void {
+    const layout = this.layout!;
+    let i = 0;
+    for (const c of layout.notes) {
+      const el = this.noteEls.get(c.node.id);
+      const p = layout.placed.get(c.node.id);
+      if (!el || !p) continue;
+      const branch = this.els.get(c.node.id)?.dataset.branch;
+      const color = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      if (el.style.getPropertyValue("--mm-note-color") !== color) {
+        if (color) el.style.setProperty("--mm-note-color", color);
+        else el.style.removeProperty("--mm-note-color");
+      }
+      el.setCssStyles({ left: `${round2(c.x)}px`, top: `${round2(c.y)}px` });
+      this.updateNoteFade(el);
+      if (!c.far) continue;
+      // 放到了整个分支下面：从节点底边竖一根细线下来，走节点靠里的一侧，不碰连向子节点的线
+      let link = this.noteLinks[i];
+      if (!link) {
+        link = createSvg("path");
+        link.setAttribute("class", "mm-note-link");
+        this.noteLayer.append(link);
+        this.noteLinks.push(link);
+      }
+      i++;
+      const k = Math.min(12, p.w / 2);
+      const centered = Math.abs(c.x + c.w / 2 - (p.x + p.w / 2)) < 1;
+      const x = centered ? p.x + p.w / 2 : p.side === "left" ? p.x + p.w - k : p.x + k;
+      const d = `M${round2(x)},${round2(p.y + p.h)} L${round2(x)},${round2(c.y)}`;
+      if (link.getAttribute("d") !== d) link.setAttribute("d", d);
+      if (link.style.getPropertyValue("--mm-note-color") !== color) link.style.setProperty("--mm-note-color", color);
+      link.classList.toggle("is-answer-covered", el.classList.contains("is-answer-covered"));
+      if (link.style.display) link.setCssStyles({ display: "" });
+    }
+    for (let j = i; j < this.noteLinks.length; j++) {
+      if (!this.noteLinks[j].style.display) this.noteLinks[j].setCssStyles({ display: "none" });
+    }
+  }
+
+  /** 展开时单独收起 / 重新展开某一条（只在这次打开有效） */
+  private toggleNoteCard(node: MindNode): void {
+    if (!this.collapsedNotes.delete(node.id)) this.collapsedNotes.add(node.id);
+    this.reflow();
+  }
+
+  isNotesExpanded(): boolean {
+    return this.notesExpanded;
+  }
+
+  /** 打开别的文件时由宿主按记住的状态设置；不回调、不重画（随后的 setDoc 会画） */
+  setNotesExpanded(expanded: boolean): void {
+    this.notesExpanded = expanded;
+    this.collapsedNotes.clear();
+  }
+
+  /** 设置里改了默认值：按宿主现在给的状态重画 */
+  syncNotesExpanded(): void {
+    const v = this.opts.notesExpanded?.() ?? false;
+    if (v === this.notesExpanded) return;
+    this.setNotesExpanded(v);
+    this.render();
+  }
+
+  toggleNotes(): void {
+    this.notesExpanded = !this.notesExpanded;
+    this.collapsedNotes.clear();
+    this.opts.onNotesExpandedChange?.(this.notesExpanded);
+    this.render();
+  }
+
+  private updateNotesButton(): void {
+    const b = this.notesButton;
+    if (!b || !this.doc) return;
+    let any = false;
+    walk(this.doc.root, (n) => {
+      if (n.note) any = true;
+    });
+    b.classList.toggle("is-hidden", !any);
+    b.classList.toggle("is-active", any && this.notesExpanded);
+    this.tip(b, this.notesExpanded ? t("canvas.collapseNotes") : t("canvas.expandNotes"), "toolbar");
+  }
+
   // ---------- 备注弹层 ----------
 
-  private toggleNotePopover(node: MindNode, edit = false): void {
+  private toggleNotePopover(node: MindNode, edit = false, at?: { left: string; top: string; w: number; h: number }): void {
     const sameNode = this.popover?.dataset.id === node.id;
     const alreadyEditing = !!this.popover?.querySelector("textarea");
     // 再点一次图标就收起；但「编辑」请求要把查看态切成编辑态，不能当成收起
@@ -5849,7 +6107,7 @@ export class MindMapCanvas {
     }
     // 从查看切到编辑：沿用查看窗口的位置和大小，不突然变大或挪位置
     const prev = sameNode && edit && this.popover?.classList.contains("is-view") ? this.popover : null;
-    const keep = prev ? { left: prev.style.left, top: prev.style.top, w: prev.offsetWidth, h: prev.offsetHeight } : null;
+    const keep = at ?? (prev ? { left: prev.style.left, top: prev.style.top, w: prev.offsetWidth, h: prev.offsetHeight } : null);
     this.closePopover();
     const nodeEl = this.els.get(node.id);
     if (!nodeEl) return;
@@ -5959,35 +6217,8 @@ export class MindMapCanvas {
       pop.classList.add("is-view");
       const body = createDiv();
       body.className = "mm-popover-body";
-      // 备注里的图片弹窗里太小，单击（或双击）就全屏看原图
-      body.addEventListener("click", (ev) => {
-        // 备注里的双链：MarkdownRenderer 只画出链接，点击要自己接（⌘/Ctrl 点在新标签页打开）
-        const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
-        if (link) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          this.opts.host?.openLink?.(link.dataset.href ?? link.getAttribute("href") ?? "", true, ev);
-          return;
-        }
-        const img = (ev.target as HTMLElement).closest("img");
-        if (!img) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        this.openLightbox(img);
-      });
-      // 悬停双链出预览（按住 ⌘/Ctrl 或开了页面预览设置时，Obsidian 自己判断）
-      body.addEventListener("mouseover", (ev) => {
-        const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
-        const href = link?.dataset.href ?? link?.getAttribute("href");
-        if (link && href) this.opts.host?.hoverLink?.(ev, href, link);
-      });
-      if (this.opts.host?.renderNote) {
-        body.classList.add("markdown-rendered");
-        this.opts.host.renderNote(body, unescapeNote(node.note));
-      } else {
-        body.classList.add("is-plain");
-        body.textContent = unescapeNote(node.note);
-      }
+      this.wireNoteBody(body);
+      this.fillNoteBody(body, node.note);
       pop.append(body);
       if (this.opts.editable) {
         const editBtn = createEl("button");
@@ -6004,6 +6235,42 @@ export class MindMapCanvas {
       body.addEventListener("load", () => this.placePopover(pop, nodeEl), true);
     }
     this.popover = pop;
+  }
+
+  /** 备注正文里的双链、图片：弹窗和展开的卡片共用 */
+  private wireNoteBody(body: HTMLElement): void {
+    // 备注里的图片太小，单击（或双击）就全屏看原图
+    body.addEventListener("click", (ev) => {
+      // 备注里的双链：MarkdownRenderer 只画出链接，点击要自己接（⌘/Ctrl 点在新标签页打开）
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+      if (link) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.opts.host?.openLink?.(link.dataset.href ?? link.getAttribute("href") ?? "", true, ev);
+        return;
+      }
+      const img = (ev.target as HTMLElement).closest("img");
+      if (!img) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.openLightbox(img);
+    });
+    // 悬停双链出预览（按住 ⌘/Ctrl 或开了页面预览设置时，Obsidian 自己判断）
+    body.addEventListener("mouseover", (ev) => {
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+      const href = link?.dataset.href ?? link?.getAttribute("href");
+      if (link && href) this.opts.host?.hoverLink?.(ev, href, link);
+    });
+  }
+
+  private fillNoteBody(body: HTMLElement, note: string): void {
+    if (this.opts.host?.renderNote) {
+      body.classList.add("markdown-rendered");
+      this.opts.host.renderNote(body, unescapeNote(note));
+    } else {
+      body.classList.add("is-plain");
+      body.textContent = unescapeNote(note);
+    }
   }
 
   /**
