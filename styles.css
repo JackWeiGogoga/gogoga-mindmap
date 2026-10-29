@@ -1053,6 +1053,11 @@
 .gg-mm-node.has-image { align-items: flex-start; max-width: none; }
 .gg-mm-node.has-image .mm-label { display: block; text-align: center; }
 .gg-mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
+/* PDF 截区（PDF++ 画的裁切图）：外面包着 MarkdownRenderer 的段落和嵌入容器，去掉它们的边距，
+   鼠标事件一律交给节点（和普通图片一样按坐标判断点没点在图上） */
+.mm-label .mm-pdf-crop { display: block; pointer-events: none; }
+.mm-label .mm-pdf-crop p { margin: 0; }
+.mm-label .mm-pdf-crop .internal-embed { display: block; margin: 0; }
 
 /* <iframe> 嵌入：视频这类东西自己要吃走鼠标事件，所以节点留一圈边距当把手，
    不然整个节点被 iframe 盖住，既选不中也拖不动 */

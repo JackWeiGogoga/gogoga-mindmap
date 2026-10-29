@@ -15,6 +15,11 @@ export interface InlineOptions {
   resolveImage?: (link: string) => string | null;
   /** 图片加载完成（尺寸变了，需要重新布局） */
   onImageLoad?: () => void;
+  /**
+   * PDF 截区 `![[文件.pdf#page=…&rect=…]]`：交给宿主渲染（PDF++ 画出裁切后的图），画好的图片交回 onImage。
+   * 宿主画不了（没装 PDF++）返回 false，退回成指向那一页的链接
+   */
+  renderPdfCrop?: (link: string, el: HTMLElement, onImage: (img: HTMLImageElement) => void) => boolean;
   /** 点了 #标签 */
   onTag?: (tag: string, ev: MouseEvent) => void;
   /** 点了任务复选框 */
@@ -278,8 +283,10 @@ export function setImageWidth(text: string, width: number | null): string {
   const md = IMG_MD_RE.exec(text);
   const first = wiki && md ? (wiki.index <= md.index ? "wiki" : "md") : wiki ? "wiki" : md ? "md" : null;
   if (first === "wiki" && wiki) {
-    const param = wiki[2];
-    const keep = param && !/^\d+$/.test(param.trim()) ? param : undefined; // 非数字参数（别名）保留
+    // 非数字参数（别名）保留；「别名|宽度」只换掉最后那段宽度，不然每拖一次就多接一段
+    const segs = (wiki[2] ?? "").split("|");
+    if (segs.length && /^\d+$/.test(segs[segs.length - 1].trim())) segs.pop();
+    const keep = segs.join("|") || undefined;
     const parts = [wiki[1], ...(keep ? [keep] : []), ...(w !== null ? [String(w)] : [])];
     return text.slice(0, wiki.index) + `![[${parts.join("|")}]]` + text.slice(wiki.index + wiki[0].length);
   }
@@ -384,6 +391,7 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
 
 /** 图片：`![[文件|宽度]]` 的参数若是数字就当宽度；解析不到就显示文字 */
 function image(link: string, param: string | undefined, alt: string, opts: InlineOptions): HTMLElement {
+  if (isPdfCrop(link)) return pdfCrop(link, param, opts);
   const src = opts.resolveImage ? opts.resolveImage(link) : /^https?:\/\//.test(link) ? link : null;
   if (!src) return wrap("span", alt || link);
   const img = createEl("img");
@@ -403,6 +411,38 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
     opts.onImageLoad?.();
   });
   return img;
+}
+
+/** PDF++ 的截区嵌入：链接指向 PDF 里的一块矩形（`#page=1&rect=x1,y1,x2,y2`） */
+export function isPdfCrop(link: string): boolean {
+  return /\.pdf#/i.test(link) && /[#&]rect=/i.test(link);
+}
+
+/**
+ * PDF 截区：参数里最后一段是数字就当宽度（和普通图片一样拖手柄改），其余是 PDF++ 写的显示文字。
+ * 宿主（PDF++）画出来的图片挂上 mm-img，看大图、复制图片、改宽度都和普通图片一样
+ */
+function pdfCrop(target: string, param: string | undefined, opts: InlineOptions): HTMLElement {
+  const parts = (param ?? "").split("|");
+  const last = parts[parts.length - 1].trim();
+  const width = /^\d+$/.test(last) ? Number(last) : null;
+  const label = parts.filter((p, i) => p.trim() && !(i === parts.length - 1 && width !== null)).join("|");
+  const box = createSpan();
+  box.className = "mm-pdf-crop";
+  const ok = opts.renderPdfCrop?.(target, box, (img) => {
+    img.classList.add("mm-img");
+    img.draggable = false;
+    if (width) {
+      img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, width))}px`;
+      img.classList.add("has-size");
+    }
+    opts.onImageLoad?.();
+  });
+  if (ok) return box;
+  // 画不了截区：显示成指向那一页的链接
+  const file = target.split("#")[0].split("/").pop() ?? target;
+  const page = /[#&]page=(\d+)/.exec(target)?.[1];
+  return link(label || (page ? `${file}, p.${page}` : file), target.replace(/&rect=[^&]*/i, ""), true, opts);
 }
 
 function tag(name: string, opts: InlineOptions): HTMLElement {

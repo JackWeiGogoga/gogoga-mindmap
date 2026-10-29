@@ -86,6 +86,8 @@ export interface CanvasHost {
   afterRender?: () => void;
   /** 把图片链接解析成 src */
   resolveImage?: (link: string) => string | null;
+  /** PDF 截区（PDF++ 的 #rect=）：画进 el，图片好了交回 onImage；画不了返回 false */
+  renderPdfCrop?: (link: string, el: HTMLElement, onImage: (img: HTMLImageElement) => void) => boolean;
   /** 原生右键菜单（Obsidian 的 Menu）；没有就用画布自带的 */
   /** onClose：菜单关掉时调用（画布借此在菜单开着时藏起节点浮动工具栏） */
   showMenu?: (entries: MenuEntry[], ev: MouseEvent, onClose?: () => void) => void;
@@ -1145,6 +1147,7 @@ export class MindMapCanvas {
           onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
           renderMath: this.opts.host?.renderMath,
           resolveImage: this.opts.host?.resolveImage,
+          renderPdfCrop: this.opts.host?.renderPdfCrop,
           onImageLoad: () => this.scheduleReflow(),
           onTag: (tag) => this.opts.host?.openTag?.(tag),
           onTaskToggle: () => {
@@ -1851,6 +1854,7 @@ export class MindMapCanvas {
       onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
       renderMath: this.opts.host?.renderMath,
       resolveImage: this.opts.host?.resolveImage,
+      renderPdfCrop: this.opts.host?.renderPdfCrop,
       onImageLoad: () => this.scheduleReflow(),
       onTag: (tag) => this.opts.host?.openTag?.(tag),
     };

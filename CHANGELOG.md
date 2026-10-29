@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- PDF crops: `![[book.pdf#page=3&rect=…]]` in a node (what PDF++ copies for a rectangle selection) shows the cropped image itself. Like other images in nodes, drag the handle to resize it and double-click to view it full-size. Needs PDF++; without it the crop shows as a link to that page.
+- Clicking a link to a PDF in a node or a note, while that PDF is already open in another tab, jumps there to the page and selection (the selection is highlighted) and keeps the mind map where it is, so reading a PDF on the right and taking notes on the left works smoothly.
+
+### Fixed
+- Pasting a block quote no longer turns every line into its own node (it used to leave a few nodes with nothing but `>`). A selection copied from PDF++ (`> [!PDF|] [[book.pdf#…|book, p.3]]` followed by the quoted text) pastes as one node: the quoted text, linked to that selection in the PDF. Other quotes become one node from the first line (or the callout title), with the rest as its note.
+- Resizing an image that has a caption, like `![[image|caption|width]]`, replaces only the width instead of adding another segment each time.
+
 ## [0.27.0] - 2026-10-29
 
 ### Added

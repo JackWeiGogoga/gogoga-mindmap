@@ -1088,6 +1088,39 @@ export default class MindMapPlugin extends Plugin {
     return i < 0 ? null : ids[i];
   }
 
+  /**
+   * 链接指向一个已经在别的标签页里打开的 PDF：在那个标签页里跳到对应位置（页码、选区高亮），
+   * 不把脑图所在的标签页换成 PDF。左脑图右 PDF 边读边记时，点节点就在右边定位
+   */
+  private revealInOpenPdf(href: string, sourcePath: string): boolean {
+    const hash = href.indexOf("#");
+    const path = hash < 0 ? href : href.slice(0, hash);
+    const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath);
+    if (!file || file.extension !== "pdf") return false;
+    let target: WorkspaceLeaf | null = null;
+    this.app.workspace.iterateAllLeaves((l) => {
+      if (!target && l.view.getViewType() === "pdf" && (l.view as unknown as { file?: TFile }).file?.path === file.path) target = l;
+    });
+    if (!target) return false;
+    const leaf: WorkspaceLeaf = target;
+    void leaf.openFile(file, { eState: { subpath: hash < 0 ? "" : href.slice(hash) } }).then(() => {
+      void this.app.workspace.revealLeaf(leaf);
+      // Obsidian 自己的 PDF 阅读器在文件已经打开时只滚动、不画选区高亮（高亮要等页面重新渲染）；
+      // 内部接口在就补画一次，没有就算了。PDF++ 自己会画
+      type Child = { subpathHighlight?: { type: string; page: number; range: unknown } | null; highlightText?: (page: number, range: unknown) => void };
+      const child = (leaf.view as unknown as { viewer?: { child?: Child } }).viewer?.child;
+      const h = child?.subpathHighlight;
+      if (h?.type === "text" && typeof child?.highlightText === "function") {
+        try {
+          child.highlightText(h.page, h.range);
+        } catch {
+          // 内部接口变了：只滚动到位置
+        }
+      }
+    });
+    return true;
+  }
+
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
       renderNote: (el, markdown) => {
@@ -1107,6 +1140,28 @@ export default class MindMapPlugin extends Plugin {
       },
       afterRender: () => {
         if (this.mathReady) void finishRenderMath();
+      },
+      renderPdfCrop: (link, el, onImage) => {
+        // 截区是 PDF++ 的写法，Obsidian 自己只会显示整页，没装就退回成链接
+        const plugins = (this.app as unknown as { plugins?: { enabledPlugins?: Set<string> } }).plugins;
+        if (!plugins?.enabledPlugins?.has("pdf-plus")) return false;
+        let done = false;
+        const settle = (img: HTMLImageElement) => {
+          if (done) return;
+          done = true;
+          observer.disconnect();
+          onImage(img);
+        };
+        // PDF++ 先放一个占位、渲染好了才换成 <img>（data URL），等图片真正加载完再交回去量尺寸
+        const observer = new MutationObserver(() => {
+          const img = el.querySelector("img");
+          if (!img) return;
+          if (img.complete && img.naturalWidth) settle(img);
+          else img.addEventListener("load", () => settle(img), { once: true });
+        });
+        observer.observe(el, { childList: true, subtree: true });
+        void MarkdownRenderer.render(this.app, `![[${link}]]`, el, sourcePath(), component);
+        return true;
       },
       resolveImage: (link) => {
         if (/^(https?:|data:|app:)/.test(link)) return link;
@@ -1176,7 +1231,9 @@ export default class MindMapPlugin extends Plugin {
       notice: (m) => new Notice(m),
       setTooltip: (el, text, placement) => setTooltip(el, text, { placement }),
       openLink: (href, internal, ev) => {
-        if (internal) void this.app.workspace.openLinkText(href, sourcePath(), ev.metaKey || ev.ctrlKey);
+        const newTab = ev.metaKey || ev.ctrlKey;
+        if (internal && !newTab && this.revealInOpenPdf(href, sourcePath())) return;
+        if (internal) void this.app.workspace.openLinkText(href, sourcePath(), newTab);
         else window.open(href, "_blank");
       },
       hoverLink: hoverParent

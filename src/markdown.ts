@@ -313,6 +313,8 @@ export function subtreeToList(node: MindNode, indent = "\t"): string {
 export function parseClipboard(text: string): MindNode[] {
   const trimmed = text.replace(/\r/g, "").trim();
   if (!trimmed) return [];
+  const quoted = parseQuoteBlocks(trimmed);
+  if (quoted) return quoted;
   const doc = parseMarkdown(trimmed, { fallbackTitle: "" });
   if (doc.rootFromHeading) {
     doc.root.parent = null;
@@ -330,6 +332,78 @@ export function parseClipboard(text: string): MindNode[] {
     nodes.push(c);
   }
   return nodes;
+}
+
+/** PDF 里的选区链接 [[文件.pdf#page=…&selection=…|显示文字]] */
+const PDF_SELECTION_RE = /\[\[([^\]|]+\.pdf#[^\]|]*selection=[^\]|]*)(?:\|([^\]]*))?\]\]/i;
+/** PDF++ 的截区嵌入 ![[文件.pdf#page=…&rect=…]] */
+const PDF_CROP_RE = /!\[\[[^\]|]+\.pdf#[^\]|]*rect=[^\]]*\]\]/i;
+
+/**
+ * 整段剪贴板都是引用块（`>` 开头，空行隔开的几块）时，每块合成一个节点，不再一行一个、
+ * 拆出一堆只有 `>` 的空节点。PDF++ 复制的选区就是这种：
+ *   > [!PDF|yellow] [[书.pdf#page=3&selection=…|书, p.3]]
+ *   > > 选中的原文
+ * 变成一个节点「原文」，整个链接到 PDF 里那段选区（点它跳回去高亮）。截区嵌入原样做节点（显示裁切的图）。
+ * 别的引用块：标注 [!type] 标题 取标题（没标题取类型）、普通引用取第一行做节点，其余做备注。
+ * 有一行不是引用就返回 null，按普通 Markdown 解析
+ */
+function parseQuoteBlocks(text: string): MindNode[] | null {
+  const lines = text.split("\n");
+  if (!lines.every((l) => !l.trim() || /^ {0,3}>/.test(l))) return null;
+  const blocks: string[][] = [];
+  let cur: string[] | null = null;
+  for (const l of lines) {
+    if (!l.trim()) {
+      cur = null;
+      continue;
+    }
+    if (!cur) blocks.push((cur = []));
+    cur.push(l.replace(/^ {0,3}> ?/, ""));
+  }
+  const nodes: MindNode[] = [];
+  for (const block of blocks) {
+    const body = block.join("\n");
+    const crop = PDF_CROP_RE.exec(body);
+    const sel = PDF_SELECTION_RE.exec(body);
+    if (crop && !sel) {
+      nodes.push(createNode({ parent: null, text: crop[0], kind: "list" }));
+      continue;
+    }
+    if (sel) {
+      // 链接以外的文字就是选中的原文：去掉标注头、内层引用符号、链接本身和链接外面留下的空括号
+      const rest = body
+        .replace(sel[0], "")
+        .replace(/\[![^\]]*\][+-]?/, "")
+        .split("\n")
+        .map((l) => l.replace(/^(?: {0,3}> ?)+/, "").trim())
+        .join(" ")
+        .replace(/\(\s*\)|\[\s*\]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      // 显示文字里不能有 ] 和 |，否则链接就断了
+      const label = (rest || sel[2] || sel[1]).replace(/\|/g, "/").replace(/\]/g, ")").replace(/\[/g, "(");
+      nodes.push(createNode({ parent: null, text: `[[${sel[1]}|${label}]]`, kind: "list" }));
+      continue;
+    }
+    const inner = block.map((l) => l.replace(/^(?: {0,3}> ?)+/, ""));
+    const head = /^\[!([^\]]*)\][+-]?\s*(.*)$/.exec(inner[0].trim());
+    let title: string;
+    let rest: string[];
+    if (head) {
+      title = head[2].trim() || head[1].split("|")[0].trim();
+      rest = inner.slice(1);
+    } else {
+      const first = inner.findIndex((l) => l.trim());
+      if (first < 0) continue;
+      title = inner[first].trim();
+      rest = inner.slice(first + 1);
+    }
+    const note = rest.join("\n").trim();
+    if (!title && !note) continue;
+    nodes.push(createNode({ parent: null, text: title || note.split("\n")[0], kind: "list", note: note && title ? normalizeNote(note) : "" }));
+  }
+  return nodes.length ? nodes : null;
 }
 
 /** CommonMark 里能打断段落的 HTML 块（第 1–6 类）开头的标签名 */
