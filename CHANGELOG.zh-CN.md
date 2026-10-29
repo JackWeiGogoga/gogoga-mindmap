@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-29
+
 ### 改进
 - 分屏预览改名为「Markdown 和思维导图分屏对照」，笔记正显示成脑图时也能用（命令面板、文件菜单、⋯ 菜单、脑图空白处右键菜单）：当前标签页切回 Markdown，右侧打开脑图。以前只有笔记显示为 Markdown 时才出现。
 - 在脑图里编辑时只改写改动的那几行，笔记其余部分逐字节保持原样（空行、缩进、列表符号、行尾空格、换行符），脑图笔记和 `mindmap` 代码块都是这样。以前每次编辑都会按插件的格式整篇重写。
@@ -340,7 +342,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.24.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...HEAD
+[0.25.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.24.0...0.25.0
 [0.24.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.23.0...0.24.0
 [0.23.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.21.1...0.22.0
