@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-10-30
+
+### 变更
+- 背诵模式：每道选择题都显示「单选」或「多选」标签，只有点标签才揭晓或收起答案；点题目别的地方就是普通选中，不会再误点翻出答案。
+- 背诵模式：选项下面的子节点（比如解题思路）在揭晓前也一起遮住，和 🙈 答案的遮法一样。
+
 ## [0.28.0] - 2026-10-29
 
 ### 新增
@@ -374,7 +380,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...HEAD
+[0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0

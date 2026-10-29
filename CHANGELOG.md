@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-10-30
+
+### Changed
+- Recite mode: every quiz question now shows a "Single" or "Multiple" tag, and only clicking the tag reveals or hides the answer. Clicking anywhere else on the question selects it like any other node, so answers no longer get revealed by accident.
+- Recite mode: children of the options (the reasoning behind an answer, for example) stay covered until the answer is revealed, the same way 🙈 answers are covered.
+
 ## [0.28.0] - 2026-10-29
 
 ### Added
@@ -374,7 +380,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...HEAD
+[0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0
