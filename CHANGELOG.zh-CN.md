@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-29
+
 ### 新增
 - PDF 截区：节点里的 `![[书.pdf#page=3&rect=…]]`（PDF++ 框选区域复制出来的）直接显示成裁切出来的图，和节点里的普通图片一样能拖手柄改大小、双击看大图。需要装 PDF++；没装时显示成指向那一页的链接。
 - 点节点或备注里指向 PDF 的链接时，如果这个 PDF 已经在别的标签页开着，就在那个标签页里跳到对应的页和选区（选区会高亮），脑图留在原地，左脑图右 PDF 边读边记更顺手。
@@ -372,7 +374,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...HEAD
+[0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0
 [0.25.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...0.25.1

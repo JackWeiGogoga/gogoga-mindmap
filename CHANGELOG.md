@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-29
+
 ### Added
 - PDF crops: `![[book.pdf#page=3&rect=…]]` in a node (what PDF++ copies for a rectangle selection) shows the cropped image itself. Like other images in nodes, drag the handle to resize it and double-click to view it full-size. Needs PDF++; without it the crop shows as a link to that page.
 - Clicking a link to a PDF in a node or a note, while that PDF is already open in another tab, jumps there to the page and selection (the selection is highlighted) and keeps the mind map where it is, so reading a PDF on the right and taking notes on the left works smoothly.
@@ -372,7 +374,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...HEAD
+[0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
 [0.26.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.1...0.26.0
 [0.25.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.25.0...0.25.1
