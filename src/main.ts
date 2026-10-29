@@ -592,6 +592,19 @@ export default class MindMapPlugin extends Plugin {
     this.register(() => timers.forEach((id) => window.clearTimeout(id)));
   }
 
+  /**
+   * 左右分屏对照：左边 Markdown，右边脑图，都不写 frontmatter。
+   * leaf 正显示着这篇的脑图（脑图笔记默认就是）：先把它换成 Markdown，再在右侧开脑图；
+   * 没给 leaf、或 leaf 显示的不是这篇：在当前标签页打开 Markdown
+   */
+  async openSideBySide(file: TFile, leaf?: WorkspaceLeaf): Promise<void> {
+    const target = leaf ?? this.app.workspace.getLeaf(false);
+    const view = target.view;
+    if (!(view instanceof MarkdownView && view.file === file)) await this.openAsMarkdown(file, target);
+    this.app.workspace.setActiveLeaf(target, { focus: true });
+    await this.openPreview(file);
+  }
+
   /** 在右侧分屏用脑图看当前笔记，不写 frontmatter；已经开着就直接显示那个 */
   async openPreview(file: TFile): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => (l.view as MindMapView).file?.path === file.path);
@@ -667,10 +680,11 @@ export default class MindMapPlugin extends Plugin {
       id: "open-preview",
       name: t("command.openPreview"),
       checkCallback: (checking) => {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        // Markdown 和脑图视图里都能用：当前显示哪一边，另一边就开到右侧
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView) ?? this.app.workspace.getActiveViewOfType(MindMapView);
         const file = view?.file;
-        if (!file || file.extension !== "md") return false;
-        if (!checking) void this.openPreview(file);
+        if (!view || !file || file.extension !== "md") return false;
+        if (!checking) void this.openSideBySide(file, view.leaf);
         return true;
       },
     });
@@ -755,14 +769,13 @@ export default class MindMapPlugin extends Plugin {
           void (isMap ? this.openAsMarkdown(file, target) : this.openAsMindMap(file, target));
         }),
     );
-    if (!isMap) {
-      menu.addItem((item) =>
-        item
-          .setTitle(t("command.openPreview"))
-          .setIcon("columns-2")
-          .onClick(() => void this.openPreview(file)),
-      );
-    }
+    // 脑图笔记也给：最想左右对照着看的往往就是它
+    menu.addItem((item) =>
+      item
+        .setTitle(t("command.openPreview"))
+        .setIcon("columns-2")
+        .onClick(() => void this.openSideBySide(file, shown ?? undefined)),
+    );
   }
 
   /** 不传文件夹就按 Obsidian 的新建笔记位置设置来 */
