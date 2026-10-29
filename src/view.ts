@@ -1,5 +1,6 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
+import { preserveFormat } from "./merge";
 import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
@@ -356,11 +357,7 @@ export class MindMapView extends TextFileView {
       }
     }
     this.data = data;
-    this.doc = parseMarkdown(data, {
-      fallbackTitle: this.file?.basename ?? "",
-      ...this.plugin.rootRule(),
-      style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
-    });
+    this.doc = this.parseText(data);
     this.applyFrontmatterOptions(this.doc);
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
@@ -401,7 +398,8 @@ export class MindMapView extends TextFileView {
   }
 
   private onDocChange(doc: MindDoc): void {
-    const next = serializeMarkdown(doc);
+    // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
+    const next = preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text)));
     if (next === this.data) return;
     this.history.push(this.data);
     this.data = next;
@@ -457,12 +455,17 @@ export class MindMapView extends TextFileView {
     if (this.doc) this.reparse();
   }
 
-  private reparse(): void {
-    this.doc = parseMarkdown(this.data, {
+  /** 按这个视图的规则解析一段文本（文件名作兜底标题、中心主题规则、新节点的写法） */
+  private parseText(text: string): MindDoc {
+    return parseMarkdown(text, {
       fallbackTitle: this.file?.basename ?? "",
       ...this.plugin.rootRule(),
       style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
     });
+  }
+
+  private reparse(): void {
+    this.doc = this.parseText(this.data);
     this.applyFrontmatterOptions(this.doc);
     this.canvas?.setDoc(this.doc);
   }

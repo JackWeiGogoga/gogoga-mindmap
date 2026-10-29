@@ -27,6 +27,7 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
+import { preserveFormat } from "./merge";
 import { Key, setLocale, t } from "./i18n";
 import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
@@ -825,6 +826,9 @@ export default class MindMapPlugin extends Plugin {
       let lastHeight = 0;
       let writing = Promise.resolve();
 
+      // 代码块里没被这次编辑碰到的行保持原样，和脑图笔记一样
+      const keepFormat = (next: string) =>
+        preserveFormat(current, next.replace(/\n$/, ""), (text) => serializeMarkdown(parseMarkdown(text, { fallbackTitle: "", style })).replace(/\n$/, ""));
       const writeBack = (next: string, pushHistory = true) => {
         next = next.replace(/\n$/, "");
         if (next === current) return;
@@ -856,7 +860,7 @@ export default class MindMapPlugin extends Plugin {
         dragToFloat: () => this.settings.dragToFloat,
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
-        onChange: (d) => writeBack(serializeMarkdown(d)),
+        onChange: (d) => writeBack(keepFormat(serializeMarkdown(d))),
         onUndo: () => {
           const prev = state.history.undo(current);
           if (prev !== null) writeBack(prev, false);
@@ -869,7 +873,7 @@ export default class MindMapPlugin extends Plugin {
           const d = canvas.getDoc();
           if (!d) return;
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-structure", s === this.settings.defaultStructure ? null : s);
-          writeBack(serializeMarkdown(d));
+          writeBack(keepFormat(serializeMarkdown(d)));
         },
         onEdgeChange: (e) => {
           const d = canvas.getDoc();
@@ -877,7 +881,7 @@ export default class MindMapPlugin extends Plugin {
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge", e.shape ?? null);
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed === undefined ? null : String(e.dashed));
           d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-corner", e.sharp === undefined ? null : e.sharp ? "sharp" : "round");
-          writeBack(serializeMarkdown(d));
+          writeBack(keepFormat(serializeMarkdown(d)));
         },
         onLayout: (bounds) => {
           const h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96)));

@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- Editing in the map only rewrites the lines that changed. The rest of the note stays byte for byte as it was (blank lines, indentation, list markers, trailing spaces, line endings), in mind map notes and `mindmap` code blocks alike. Previously every edit rewrote the whole note in the plugin's format.
+
+### Fixed
+- Editing an existing note no longer moves lines that follow a list item into that item, drops trailing double spaces (hard line breaks), or adds blank lines elsewhere in the file.
+
 ## [0.24.0] - 2026-10-29
 
 ### Added

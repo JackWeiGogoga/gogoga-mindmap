@@ -148,6 +148,7 @@ A paragraph here becomes the central topic's note.
 - Boundaries are stored in the same comment: `%%box%%` frames the node and its branch, `%%box=3%%` also takes in the next two siblings, and `%%box "Title"%%` adds a title. Summaries work the same way: `%%summary=2 "Text"%%`; callouts are `%%callout "Text"%%`, with `<br>` for line breaks and `cc=red` (or a hex color) for the fill color. A floating topic is a child of the central topic marked `%%float x=320 y=-80%%` (position relative to the central topic).
 - Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **Deepest heading level** setting.
 - Paragraphs and code blocks under a node are kept as-is as its note, and the node shows a ≡ icon you can click to view it.
+- Editing in the map only rewrites the lines you changed. Everything else in the file stays byte for byte as it was: blank lines, indentation, list markers, trailing spaces (hard line breaks) and line endings. This works for mind map notes and for `mindmap` code blocks. If a merge can't be made exact, the plugin falls back to writing the whole note in its own format, as earlier versions did.
 - Markdown exported from XMind uses this same heading hierarchy, so it opens directly; it also works the other way, imported into XMind.
 
 ### Keyboard shortcuts (when the canvas has focus)
