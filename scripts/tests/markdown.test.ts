@@ -11,12 +11,14 @@ mindmap: true
 
 计划说明作为根节点备注。
 
-## 装备清单 %%green%%
+## 装备清单
+%%green%%
 - 帐篷 2 顶
 	- 睡袋 4 个
 	- 防潮垫 4 张
 
-## 路线与行程 %%red%%
+## 路线与行程
+%%red%%
 
 ### 第一天 出发
 - 车程 3 小时
@@ -280,7 +282,8 @@ import { attachSubtree } from "../../src/model";
 test("复制子树 → 缩进列表 → 粘贴回来结构、标记、备注都在", () => {
   const doc = parseMarkdown(`# R
 
-## A %%green%%
+## A
+%%green%%
 
 段落备注
 
@@ -310,7 +313,7 @@ test("复制子树 → 缩进列表 → 粘贴回来结构、标记、备注都�
   const target = addChild(doc.root, doc.style, "B");
   attachSubtree(nodes[0], target, doc.style);
   const md = serializeMarkdown(doc);
-  assert.ok(md.includes("## B\n\n### A %%green%%\n\n段落备注\n\n- A1\n\t- x %%fold%%\n\t\t- x1\n"), md);
+  assert.ok(md.includes("## B\n\n### A\n%%green%%\n\n段落备注\n\n- A1\n\t- x %%fold%%\n\t\t- x1\n"), md);
 });
 
 test("粘贴纯文本：每行一个节点；带标题的文本按结构解析", () => {
@@ -384,12 +387,12 @@ test("整层兄弟在标题与列表之间转换", () => {
 
 test("色值不带 # 写回，避免被 Obsidian 当成标签；读时两种都认", () => {
   // 旧文件里的 %%#a3e5a2%% 仍能读，写回时归一成不带 #
-  const doc = parseMarkdown("# R\n\n## A %%#a3e5a2%%\n\n## B %%f9a3a3%%\n\n## C %%red%%\n");
+  const doc = parseMarkdown("# R\n\n## A\n%%#a3e5a2%%\n\n## B\n%%f9a3a3%%\n\n## C\n%%red%%\n");
   assert.equal(doc.root.children[0].color, "#a3e5a2");
   assert.equal(doc.root.children[1].color, "#f9a3a3");
   assert.equal(doc.root.children[2].color, "red");
   const md = serializeMarkdown(doc);
-  assert.equal(md, "# R\n\n## A %%a3e5a2%%\n\n## B %%f9a3a3%%\n\n## C %%red%%\n");
+  assert.equal(md, "# R\n\n## A\n%%a3e5a2%%\n\n## B\n%%f9a3a3%%\n\n## C\n%%red%%\n");
   assert.ok(!md.includes("%%#"), "写回的文件里不应再有 #，否则会进标签面板");
   // 归一之后往返稳定
   assert.equal(serializeMarkdown(parseMarkdown(md)), md);
@@ -400,13 +403,15 @@ test("色值不带 # 写回，避免被 Obsidian 当成标签；读时两种都�
 test("外框标记：box / box=N / 带标题，与颜色、折叠共存且往返不变", () => {
   const md = `# 根
 
-## A %%box "第一组"%%
+## A
+%%box "第一组"%%
 - a1 %%red box=2%%
 - a2
 - a3 %%fold box=3 "跨 度"%%
 	- a31
 
-## B %%box=2%%
+## B
+%%box=2%%
 
 ## C
 `;
@@ -428,9 +433,11 @@ test("外框标记：box / box=N / 带标题，与颜色、折叠共存且往返
 });
 
 test("节点宽度 %%w=N%%：与其他标记共存、往返不变、超范围收进区间", () => {
-  const md = `# 根 %%w=480%%
+  const md = `# 根
+%%w=480%%
 
-## A %%red w=200 box%%
+## A
+%%red w=200 box%%
 - a1 %%w=90000%%
 `;
   const doc = parseMarkdown(md);
@@ -448,9 +455,11 @@ test("节点宽度 %%w=N%%：与其他标记共存、往返不变、超范围收
 test("主主题左右标记 %%left%% / %%right%% 往返不变", () => {
   const md = `# 根
 
-## A %%red left%%
+## A
+%%red left%%
 
-## B %%w=200 right box%%
+## B
+%%w=200 right box%%
 `;
   const doc = parseMarkdown(md);
   assert.equal(findByPath(doc.root, "0")!.side, "left");
@@ -461,14 +470,16 @@ test("主主题左右标记 %%left%% / %%right%% 往返不变", () => {
 test("概要标记：summary / summary=N / 带文字，与外框、颜色共存且往返不变；跨度超出时收窄", () => {
   const md = `# R
 
-## A %%box summary=2 "核心卖点"%%
+## A
+%%box summary=2 "核心卖点"%%
 
 - a1 %%red summary%%
 - a2
 
 ## B
 
-## C %%summary=5 "超出"%%
+## C
+%%summary=5 "超出"%%
 `;
   const doc = parseMarkdown(md, { fallbackTitle: "R" });
   const [a, b, c] = doc.root.children;
@@ -489,7 +500,8 @@ test("概要文字可以是 Markdown（链接里的 %E4 编码不截断标记）
   const { markerText, formatMarker } = await import("../../src/markdown");
   const md = `# R
 
-## A %%summary=2 "看 [说明](https://a.cn/%E4%B8%AD) 和 **重点**" sw=240%%
+## A
+%%summary=2 "看 [说明](https://a.cn/%E4%B8%AD) 和 **重点**" sw=240%%
 
 ## B
 `;
@@ -499,7 +511,7 @@ test("概要文字可以是 Markdown（链接里的 %E4 编码不截断标记）
   assert.deepEqual(a.summary, { span: 2, text: "看 [说明](https://a.cn/%E4%B8%AD) 和 **重点**", width: 240 });
   assert.equal(serializeMarkdown(doc), md);
   // 正文里本来就有的百分号不受影响
-  const p = parseMarkdown("# R\n\n## 涨了 50% %%red%%\n", { fallbackTitle: "R" }).root.children[0];
+  const p = parseMarkdown("# R\n\n## 涨了 50%\n%%red%%\n", { fallbackTitle: "R" }).root.children[0];
   assert.equal(p.text, "涨了 50%");
   assert.equal(p.color, "red");
   assert.equal(markerText('a"b%%c%d'), "ab%c%d");
@@ -509,7 +521,8 @@ test("概要文字可以是 Markdown（链接里的 %E4 编码不截断标记）
 test("仅删除节点：子节点按顺序接到原位置，标题降成的列表跟随兄弟，外框跨度跟着变", () => {
   const src = `# 根
 
-## 甲 %%box=3%%
+## 甲
+%%box=3%%
 
 ## 乙
 - 乙一
@@ -530,7 +543,8 @@ test("仅删除节点：子节点按顺序接到原位置，标题降成的列�
     serializeMarkdown(doc),
     `# 根
 
-## 甲 %%box=4%%
+## 甲
+%%box=4%%
 
 ## 乙一
 - 乙一一
@@ -596,13 +610,13 @@ test("插入父节点：同一父节点下的选中节点收进一个新节点�
 });
 
 test("插入父节点：标题跟着降级；这一层的外框 / 概要把收进去的节点换成新节点重算范围", () => {
-  const doc = parseMarkdown(`# 根\n\n## A %%box=3 "框"%%\n\n## B\n\n## C\n\n## D %%summary "结"%%\n`);
+  const doc = parseMarkdown(`# 根\n\n## A\n%%box=3 "框"%%\n\n## B\n\n## C\n\n## D\n%%summary "结"%%\n`);
   const [a, b] = doc.root.children;
   const [wrap] = insertParents([a, b], doc.style);
   wrap.text = "新";
   assert.equal(
     serializeMarkdown(doc),
-    `# 根\n\n## 新 %%box=2 "框"%%\n\n### A\n\n### B\n\n## C\n\n## D %%summary "结"%%\n`,
+    `# 根\n\n## 新\n%%box=2 "框"%%\n\n### A\n\n### B\n\n## C\n\n## D\n%%summary "结"%%\n`,
   );
 });
 
@@ -630,7 +644,7 @@ test("节点 ⇄ 行号：标题、列表项、备注行都能对上，frontmatt
 });
 
 test("自由主题标记：float x= y= 往返不变，和其他标记共存；单独的 x=/y= 不当标记；挪到非中心节点下就不再是自由主题", () => {
-  const src = `# 根\n\n## A\n- a1\n\n## 浮 %%blue float x=320 y=-80%%\n- 子\n\n## 浮二 %%float x=-200 y=150 box "框"%%\n`;
+  const src = `# 根\n\n## A\n- a1\n\n## 浮\n%%blue float x=320 y=-80%%\n- 子\n\n## 浮二\n%%float x=-200 y=150 box "框"%%\n`;
   const doc = parseMarkdown(src);
   const [a, f1, f2] = doc.root.children;
   assert.equal(a.float, undefined);
@@ -638,7 +652,7 @@ test("自由主题标记：float x= y= 往返不变，和其他标记共存；�
   assert.equal(f1.color, "blue");
   assert.deepEqual(f2.float, { x: -200, y: 150 });
   assert.equal(f2.box?.title, "框");
-  assert.equal(serializeMarkdown(doc), `# 根\n\n## A\n- a1\n\n## 浮 %%blue float x=320 y=-80%%\n- 子\n\n## 浮二 %%box "框" float x=-200 y=150%%\n`);
+  assert.equal(serializeMarkdown(doc), `# 根\n\n## A\n- a1\n\n## 浮\n%%blue float x=320 y=-80%%\n- 子\n\n## 浮二\n%%box "框" float x=-200 y=150%%\n`);
   const odd = parseMarkdown(`# 根\n- 不是 %%x=3%%\n`);
   assert.equal(odd.root.children[0].text, "不是 %%x=3%%");
   moveNode(f1, a, 0, doc.style);
@@ -647,7 +661,7 @@ test("自由主题标记：float x= y= 往返不变，和其他标记共存；�
 
 test("自由主题：给它插入父节点，新节点接替它当自由主题；外框 / 概要范围伸不过自由主题", async () => {
   const { insertParents: ip, groupLimits: gl } = await import("../../src/model");
-  const doc = parseMarkdown(`# 根\n\n## A %%box%%\n\n## B\n\n## 浮 %%float x=300 y=0%%\n\n## C\n`);
+  const doc = parseMarkdown(`# 根\n\n## A\n%%box%%\n\n## B\n\n## 浮\n%%float x=300 y=0%%\n\n## C\n`);
   const [a, , f] = doc.root.children;
   assert.deepEqual(gl(a, "box"), { lo: 0, hi: 1 });
   assert.deepEqual(gl(f, "box"), { lo: 2, hi: 2 });
@@ -671,14 +685,17 @@ test("菜单平铺：二级菜单展开在原位置，前后加分隔线，不�
 
 test("标注标记：callout \"文字\" 读成多行文字，和其他标记共存，往返不变；引号、%% 写回时被换掉", async () => {
   const { calloutToMarker, formatMarker } = await import("../../src/markdown");
-  const md = `# R %%callout "中心"%%
+  const md = `# R
+%%callout "中心"%%
 
-## A %%red fold box "框" callout "第一行<br>第二行"%%
+## A
+%%red fold box "框" callout "第一行<br>第二行"%%
 
 - a1 %%callout "带 [[链接]] 和 **加粗**，50%"%%
 - a2
 
-## B %%float x=10 y=-20 callout "自由主题的"%%
+## B
+%%float x=10 y=-20 callout "自由主题的"%%
 `;
   const doc = parseMarkdown(md, { fallbackTitle: "R" });
   const [a, b] = doc.root.children;
@@ -710,7 +727,8 @@ test("标注标记：callout \"文字\" 读成多行文字，和其他标记共�
 test("标注颜色：cc=颜色名或 hex 跟着 callout 读写，往返不变；没有标注时不写", () => {
   const md = `# R
 
-## A %%red callout "要点" cc=yellow%%
+## A
+%%red callout "要点" cc=yellow%%
 
 - a1 %%callout "十六进制" cc=ff8800%%
 - a2 %%callout "没颜色"%%
@@ -726,7 +744,7 @@ test("标注颜色：cc=颜色名或 hex 跟着 callout 读写，往返不变；
   assert.equal(cloneTree(a).calloutColor, "yellow");
   // 删了标注，颜色一起不写
   a.callout = undefined;
-  assert.ok(serializeMarkdown(doc).includes("## A %%red%%\n"));
+  assert.ok(serializeMarkdown(doc).includes("## A\n%%red%%\n"));
   // 不认识的 cc 值：整段当普通文字
   assert.equal(splitMarker('x %%callout "y" cc=nope%%').text, 'x %%callout "y" cc=nope%%');
 });
@@ -803,4 +821,48 @@ test("列表中间夹着的文字：节点删掉、挪走、只删本身、粘�
   const copy = cloneTree(d.root.children[2]);
   attachSubtree(copy, d.root, d.style, 0);
   assert.deepEqual(body(d), ["* SOCKS5", "* GitHub", "* npm", "推荐升级为：", "* SOCKS5", "* Xray"]);
+});
+
+test("标题标记写在下一行：标题行保持干净；老写法照样认，编辑到时才换成新写法", async () => {
+  const { preserveFormat } = await import("../../src/merge");
+  const canon = (s: string) => serializeMarkdown(parseMarkdown(s, { fallbackTitle: "t" }));
+  const oldStyle = "# 根\n\n## 甲 %%red fold%%\n- a\n\n## 乙 %%box \"框\"%%\n- b\n";
+  const newStyle = "# 根\n\n## 甲\n%%red fold%%\n- a\n\n## 乙\n%%box \"框\"%%\n- b\n";
+  const shape = (s: string) => {
+    const d = parseMarkdown(s, { fallbackTitle: "t" });
+    return d.root.children.map((n) => [n.text, n.color ?? null, n.folded, n.box?.title ?? null]);
+  };
+  // 两种写法读出来一样，标题文字里没有标记
+  assert.deepEqual(shape(oldStyle), shape(newStyle));
+  assert.deepEqual(shape(newStyle).map((x) => x[0]), ["甲", "乙"]);
+  // 规范写法是新写法
+  assert.equal(canon(oldStyle), newStyle);
+  assert.equal(canon(newStyle), newStyle);
+  // 编辑别的节点：老写法的标题行原样不动
+  let doc = parseMarkdown(oldStyle, { fallbackTitle: "t" });
+  doc.root.children[1].children[0].text = "b2";
+  assert.equal(preserveFormat(oldStyle, serializeMarkdown(doc), canon), "# 根\n\n## 甲 %%red fold%%\n- a\n\n## 乙 %%box \"框\"%%\n- b2\n");
+  // 编辑这个标题的标记：换成新写法
+  doc = parseMarkdown(oldStyle, { fallbackTitle: "t" });
+  doc.root.children[0].folded = false;
+  assert.equal(preserveFormat(oldStyle, serializeMarkdown(doc), canon), "# 根\n\n## 甲\n%%red%%\n- a\n\n## 乙 %%box \"框\"%%\n- b\n");
+  // 两处都写了：下一行为准，折叠任一处有就算
+  const both = parseMarkdown("# 根\n\n## 甲 %%red%%\n%%blue fold%%\n", { fallbackTitle: "t" });
+  assert.equal(both.root.children[0].color, "blue");
+  assert.equal(both.root.children[0].folded, true);
+  // 标题下一行是用户自己的注释（认不出的标记）：留在备注里
+  const own = parseMarkdown("# 根\n\n## 甲\n%%以后再说%%\n- a\n", { fallbackTitle: "t" });
+  assert.equal(own.root.children[0].text, "甲");
+  assert.equal(own.root.children[0].note, "%%以后再说%%");
+  assert.equal(serializeMarkdown(own), "# 根\n\n## 甲\n\n%%以后再说%%\n\n- a\n");
+});
+
+test("标题迁到新写法时，找出要跟着改链接的旧标题", async () => {
+  const { strippedMarkerRenames, headingTexts } = await import("../../src/markdown");
+  const before = "---\nmindmap: true\n---\n# 根\n\n## 甲 %%red fold%%\n\n## 乙 %%box%%\n\n```\n## 代码里的 %%red%%\n```\n";
+  const after = "---\nmindmap: true\n---\n# 根\n\n## 甲\n%%red%%\n\n## 乙 %%box%%\n\n```\n## 代码里的 %%red%%\n```\n";
+  assert.deepEqual(headingTexts(before), ["根", "甲 %%red fold%%", "乙 %%box%%"]);
+  assert.deepEqual([...strippedMarkerRenames(before, after)], [["甲 %%red fold%%", "甲"]]);
+  // 标题真的改名（不只是去掉标记）不算
+  assert.deepEqual([...strippedMarkerRenames("# 甲 %%red%%\n", "# 丙\n%%red%%\n")], []);
 });

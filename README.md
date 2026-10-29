@@ -38,17 +38,20 @@ The block can also be named `gogoga-mindmap`; it works the same. If you also use
 ```mindmap
 # This week
 
-## Product %%blue%%
+## Product
+%%blue%%
 
 - 1️⃣ Requirements review
 - 2️⃣ Prototype walkthrough
 
-## Engineering %%green%%
+## Engineering
+%%green%%
 
 - ⏳ API integration
 - ✅ Analytics shipped
 
-## Risks %%red%%
+## Risks
+%%red%%
 
 - ❗ Design not final
 ```
@@ -136,7 +139,8 @@ mindmap-theme: rainbow       # optional: snow (default) | rainbow | business | w
 
 A paragraph here becomes the central topic's note.
 
-## Main topic %%green%%        ← %%color%% colors a node and is invisible in Reading view
+## Main topic
+%%green%%                      ← %%color%% colors a node and is invisible in Reading view
 ### Subtopic
 - Deeper levels use lists
 	- One level deeper
@@ -144,6 +148,7 @@ A paragraph here becomes the central topic's note.
 ```
 
 - Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
+- On a heading the marker goes on its own line right below it, so the heading text stays clean and `[[note#Heading]]` links keep working. The older style with the marker at the end of the heading line is still read; it is moved to the next line when you change that node in the map, and links elsewhere that included the marker (`[[note#Heading %%fold%%]]`) are updated. List items keep the marker at the end of the line.
 - In the mind map (left and right) structure, dragging a main topic to one side pins it there with `%%left%%` / `%%right%%`, so the other branches stay put.
 - Boundaries are stored in the same comment: `%%box%%` frames the node and its branch, `%%box=3%%` also takes in the next two siblings, and `%%box "Title"%%` adds a title. Summaries work the same way: `%%summary=2 "Text"%%`; callouts are `%%callout "Text"%%`, with `<br>` for line breaks and `cc=red` (or a hex color) for the fill color. A floating topic is a child of the central topic marked `%%float x=320 y=-80%%` (position relative to the central topic).
 - Headings go down to H6, after which lists are used automatically. New nodes use lists from level 4 by default; change this with the **Deepest heading level** setting.

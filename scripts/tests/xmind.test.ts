@@ -86,7 +86,8 @@ mindmap: true
 
 根备注
 
-## A %%f9a3a3%%
+## A
+%%f9a3a3%%
 - A1
 - A2 %%fold%%
 \t- A21
@@ -122,7 +123,8 @@ mindmap: true
 
 # 根
 
-## 甲 %%fold%%
+## 甲
+%%fold%%
 
 甲的备注
 
@@ -169,13 +171,17 @@ mindmap: true
 
 # 根
 
-## A %%box summary=2 "前两个"%%
+## A
+%%box summary=2 "前两个"%%
 
-## B %%box=2 "后两个"%%
+## B
+%%box=2 "后两个"%%
 
-## C %%summary "最后"%%
+## C
+%%summary "最后"%%
 
-## 自由 %%float x=320 y=-150%%
+## 自由
+%%float x=320 y=-150%%
 `,
   );
   assert.ok(describeLost(sheet.lost).length > 0);
@@ -195,8 +201,8 @@ mindmap: true
   const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
   // 中心主题下的自由主题转过来；挂在别的主题下的自由主题还不支持，仍算丢掉
   assert.deepEqual(x.lost, { detached: 1, relationships: 1, summaries: 0, comments: 1 });
-  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮 %%float x=-240 y=90%%/);
-  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲 %%box=2 "两个" summary=2 "概括"%%/);
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮\n%%float x=-240 y=90%%/);
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲\n%%box=2 "两个" summary=2 "概括"%%/);
 });
 
 test("标注：content.json 的 children.callout、content.xml 的 topics type=callout 导入成 %%callout%%，多条按行合并", async () => {
@@ -222,9 +228,11 @@ test("标注：content.json 的 children.callout、content.xml 的 topics type=c
 mindmap: true
 ---
 
-# 根 %%callout "根的标注"%%
+# 根
+%%callout "根的标注"%%
 
-## A %%callout "第一条<br>换行<br>第二条"%%
+## A
+%%callout "第一条<br>换行<br>第二条"%%
 - A1
 
 ## B
@@ -243,6 +251,6 @@ mindmap: true
   </sheet>
 </xmap-content>`;
   const [s2] = await parseXmind(makeZip({ "content.xml": xml }));
-  assert.match(xmindSheetToMarkdown(s2, { maxHeadingLevel: 3 }), /## 甲 %%callout "甲的标注"%%/);
+  assert.match(xmindSheetToMarkdown(s2, { maxHeadingLevel: 3 }), /## 甲\n%%callout "甲的标注"%%/);
   assert.equal(s2.root.children.length, 1, "标注不会变成子主题");
 });

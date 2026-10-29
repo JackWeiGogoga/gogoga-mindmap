@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- `[[note#Heading]]` links to a heading that was folded, colored or given another marker in the map now work. The marker used to sit at the end of the heading line, which made it part of the heading name in Obsidian; it is now written on its own line below the heading. Old notes are still read as before and move over only when you change that node; links elsewhere that included the marker are updated at the same time.
+
 ## [0.25.1] - 2026-10-29
 
 ### Fixed

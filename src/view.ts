@@ -7,7 +7,7 @@ import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
-import { frontmatterValue, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue } from "./markdown";
+import { frontmatterValue, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
 import type { MindDoc } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -403,6 +403,8 @@ export class MindMapView extends TextFileView {
   private onDocChange(doc: MindDoc): void {
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
     const next = preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text)));
+    // 标题的标记从行末挪到下一行后，标题文字变了：别的笔记里指向旧标题（带着 %%标记%%）的链接跟着改
+    if (this.file && next !== this.data) this.plugin.fixHeadingLinks(this.file, strippedMarkerRenames(this.data, next));
     if (next === this.data) return;
     this.history.push(this.data);
     this.data = next;

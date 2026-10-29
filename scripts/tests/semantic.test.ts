@@ -11,8 +11,8 @@ import { preserveFormat } from "../../src/merge";
 import { isAncestor, moveNode, removeNode, walk, type MindNode } from "../../src/model";
 
 const md = new MarkdownIt({ html: true });
-/** 只比结构和文字：标签前后的空白、宽松列表多出来的 <p> 不算 */
-const rendered = (s: string) => md.render(s).replace(/<\/?p>/g, "").replace(/\s+/g, " ").replace(/ ?(<[^>]+>) ?/g, "$1").trim();
+/** 只比结构和文字：标签前后的空白、宽松列表多出来的 <p> 不算；%%…%% 是 Obsidian 的注释，渲染前去掉 */
+const rendered = (s: string) => md.render(s.replace(/%%[\s\S]*?%%/g, "")).replace(/<\/?p>/g, "").replace(/\s+/g, " ").replace(/ ?(<[^>]+>) ?/g, "$1").trim();
 const canon = (s: string) => serializeMarkdown(parseMarkdown(s, { fallbackTitle: "t" }));
 
 const CASES: Record<string, string> = {

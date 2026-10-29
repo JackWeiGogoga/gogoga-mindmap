@@ -47,6 +47,7 @@ const en = {
   "newFile.baseName": "Untitled mind map",
   "newFile.topic": "Topic {n}",
   "notice.templateMissing": "Template note not found: {path}. Used the default content instead.",
+  "notice.headingLinksUpdated": "Updated {n} link(s) to this note's headings",
 
   // view.ts
   "view.displayText": "Mind map",
@@ -473,6 +474,7 @@ const zh: Record<Key, string> = {
   "newFile.baseName": "未命名思维导图",
   "newFile.topic": "主题 {n}",
   "notice.templateMissing": "找不到模板笔记：{path}，已用默认内容新建。",
+  "notice.headingLinksUpdated": "已更新 {n} 处指向这篇笔记标题的链接",
 
   "view.displayText": "思维导图",
   "error.noOpenFile": "没有打开的文件",

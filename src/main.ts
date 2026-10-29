@@ -308,6 +308,52 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
+  /**
+   * 标题改名后修别的笔记里的链接：[[笔记#旧标题]] / [[笔记#上级#旧标题]] / ![[笔记#旧标题]] 改成新标题。
+   * 只改链接目标确实是这篇笔记、而且那一段标题完全一致的；笔记自己里面的 [[#旧标题]] 不动（正在写这篇）
+   */
+  fixHeadingLinks(file: TFile, renames: Map<string, string>): void {
+    if (!renames.size) return;
+    const sources = Object.entries(this.app.metadataCache.resolvedLinks)
+      .filter(([src, targets]) => src !== file.path && targets[file.path])
+      .map(([src]) => src);
+    void (async () => {
+      let count = 0;
+      for (const src of sources) {
+        const srcFile = this.app.vault.getAbstractFileByPath(src);
+        const cache = srcFile instanceof TFile ? this.app.metadataCache.getFileCache(srcFile) : null;
+        if (!(srcFile instanceof TFile) || !cache) continue;
+        const swaps: [string, string][] = [];
+        for (const l of [...(cache.links ?? []), ...(cache.embeds ?? [])]) {
+          const hash = l.link.indexOf("#");
+          if (hash < 0) continue;
+          if (this.app.metadataCache.getFirstLinkpathDest(l.link.slice(0, hash), src) !== file) continue;
+          const parts = l.link.slice(hash + 1).split("#");
+          const last = parts[parts.length - 1];
+          const to = renames.get(last);
+          if (to === undefined) continue;
+          // 原文里的写法：wikilink 是原样，Markdown 链接可能是编码过的
+          for (const from of [`#${last}`, `#${encodeURI(last)}`, `#${last.replace(/ /g, "%20")}`]) {
+            if (!l.original.includes(from)) continue;
+            const enc = from === `#${last}` ? to : from === `#${encodeURI(last)}` ? encodeURI(to) : to.replace(/ /g, "%20");
+            swaps.push([l.original, l.original.replace(from, `#${enc}`)]);
+            break;
+          }
+        }
+        if (!swaps.length) continue;
+        await this.app.vault.process(srcFile, (text) => {
+          for (const [a, b] of swaps) {
+            if (!text.includes(a)) continue;
+            text = text.split(a).join(b);
+            count++;
+          }
+          return text;
+        });
+      }
+      if (count) new Notice(t("notice.headingLinksUpdated", { n: count }));
+    })();
+  }
+
   /** 中心主题规则这类影响解析的设置变了：已打开的脑图重新解析 */
   reloadMaps(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {

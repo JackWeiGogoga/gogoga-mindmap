@@ -140,6 +140,14 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   return { text: text.slice(0, m.index).trimEnd(), marker };
 }
 
+/** 两处标记合在一起：b 里写了的以 b 为准，折叠任一处有就算 */
+function mergeMarker(a: Marker, b: Marker): Marker {
+  const out: Marker = { ...a };
+  for (const [k, v] of Object.entries(b) as [keyof Marker, Marker[keyof Marker]][]) if (v !== undefined && k !== "folded") (out as unknown as Record<string, unknown>)[k] = v;
+  out.folded = a.folded || b.folded;
+  return out;
+}
+
 export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
@@ -348,6 +356,33 @@ export function interruptsParagraph(line: string): boolean {
   return INTERRUPT_RE.test(line);
 }
 
+/** 文本里的标题文字（Obsidian 链接 [[笔记#标题]] 用的那个），代码围栏里的不算 */
+export function headingTexts(src: string): string[] {
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  let start = 0;
+  if (lines[0] === "---") {
+    const end = lines.findIndex((l, i) => i > 0 && /^---[ \t]*$/.test(l));
+    if (end > 0) start = end + 1;
+  }
+  return tokenize(lines.slice(start)).flatMap((t) => (t.t === "heading" ? [t.text.replace(/[ \t]+#+[ \t]*$/, "").trim()] : []));
+}
+
+/**
+ * 写回前后标题文字的变化里，哪些只是去掉了行末的 %%标记%%（老写法迁到新写法）：旧标题 → 新标题。
+ * 别的笔记里 [[笔记#旧标题]] 的链接要跟着改，不然就断了
+ */
+export function strippedMarkerRenames(before: string, after: string): Map<string, string> {
+  const old = headingTexts(before);
+  const now = new Set(headingTexts(after));
+  const out = new Map<string, string>();
+  for (const h of old) {
+    if (!h.includes("%%") || now.has(h)) continue;
+    const clean = h.replace(/[ \t]*%%(?:[^%]|%(?!%))*?%%[ \t]*$/, "").trim();
+    if (clean && clean !== h && now.has(clean)) out.set(h, clean);
+  }
+  return out;
+}
+
 export interface ParseOptions {
   /** 没有一级标题时用作根节点标签（通常是文件名） */
   fallbackTitle?: string;
@@ -418,7 +453,19 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
     const lineNo = start + ti;
     if (tok.t === "heading") {
-      const { text, marker } = splitMarker(tok.text);
+      const split = splitMarker(tok.text);
+      const { text } = split;
+      let { marker } = split;
+      // 标题的标记写在下一行（只有 %%…%% 的一行）：标题行保持干净，[[笔记#标题]] 的链接才对得上。
+      // 老写法（标记在标题行末尾）照样认；两处都有时以下一行为准
+      const next = tokens[ti + 1];
+      if (next?.t === "line" && next.raw.trim() !== "") {
+        const own = splitMarker(next.raw.trim());
+        if (own.text === "") {
+          marker = mergeMarker(marker, own.marker);
+          ti++;
+        }
+      }
       if (!seenRoot && rootFromHeading) {
         seenRoot = true;
         root.text = text;
@@ -583,7 +630,10 @@ export function serializeMarkdown(doc: MindDoc): string {
 
   const emitHeading = (node: MindNode, level: number) => {
     ensureBlank();
-    out.push(`${"#".repeat(level)} ${node.text}${formatMarker(node)}`.trimEnd());
+    out.push(`${"#".repeat(level)} ${node.text}`.trimEnd());
+    // 标记单独一行写在标题下面，不进标题文字（见解析处的说明）
+    const marker = formatMarker(node).trim();
+    if (marker) out.push(marker);
     if (node.note) {
       ensureBlank();
       pushBlock(normalizeNote(node.note, false));
