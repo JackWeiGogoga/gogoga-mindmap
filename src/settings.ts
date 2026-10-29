@@ -30,6 +30,8 @@ export interface MindMapSettings {
   viewports?: Record<string, SavedViewport>;
   /** 隐藏了标注的脑图文件路径 */
   hiddenCallouts?: string[];
+  /** 锁定了编辑的脑图文件路径 */
+  lockedFiles?: string[];
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
@@ -61,6 +63,11 @@ export interface MindMapSettings {
   rememberView: boolean;
   /** 新建脑图用的模板笔记路径；留空用内置的「主题 1/2/3」 */
   newFileTemplate: string;
+  /** 编辑器里切换笔记时，旁边的脑图跟着显示那篇（默认关） */
+  followActiveNote: boolean;
+  /** 节点间距、节点字号的百分比，100 为主题原样 */
+  spacingScale: number;
+  fontScale: number;
   /** 中心主题始终用文件名，唯一的一级标题也只当第一级分支（默认关：一级标题就是中心主题） */
   fileNameAsRoot: boolean;
   /** 嵌入的脑图隐藏工具栏：阅读模式一直不显示，编辑模式鼠标移上去才显示（默认关） */
@@ -107,6 +114,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   newFileTemplate: "",
   embedToolbarAutoHide: false,
   fileNameAsRoot: false,
+  followActiveNote: false,
+  spacingScale: 100,
+  fontScale: 100,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -271,6 +281,33 @@ export class MindMapSettingTab extends PluginSettingTab {
           }),
       );
 
+    const scaleSetting = (name: string, desc: string, key: "spacingScale" | "fontScale", min: number, max: number) => {
+      let slider: { setValue(v: number): unknown } | null = null;
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addSlider((s) => {
+          slider = s;
+          s.setLimits(min, max, 5)
+            .setValue(this.plugin.settings[key])
+            .onChange(async (v) => {
+              this.plugin.settings[key] = v;
+              await this.plugin.saveSettings();
+              this.plugin.applyDisplayScale();
+            });
+        })
+        .addExtraButton((b) =>
+          b.setIcon("rotate-ccw").setTooltip(t("settings.reset")).onClick(async () => {
+            this.plugin.settings[key] = 100;
+            slider?.setValue(100);
+            await this.plugin.saveSettings();
+            this.plugin.applyDisplayScale();
+          }),
+        );
+    };
+    scaleSetting(t("settings.spacing.name"), t("settings.spacing.desc"), "spacingScale", 50, 200);
+    scaleSetting(t("settings.fontScale.name"), t("settings.fontScale.desc"), "fontScale", 70, 150);
+
     new Setting(containerEl)
       .setName(t("settings.toolbar.name"))
       .setDesc(t("settings.toolbar.desc"))
@@ -348,6 +385,16 @@ export class MindMapSettingTab extends PluginSettingTab {
             this.plugin.settings.codeBlockMaxHeight = n;
             await this.plugin.saveSettings();
           }
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.followActive.name"))
+      .setDesc(t("settings.followActive.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.followActiveNote).onChange(async (v) => {
+          this.plugin.settings.followActiveNote = v;
+          await this.plugin.saveSettings();
         }),
       );
 

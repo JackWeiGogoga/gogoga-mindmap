@@ -122,6 +122,16 @@ export class MindMapView extends TextFileView {
     this.canvas?.toggleCallouts();
   }
 
+  applyLock(locked: boolean): void {
+    this.canvas?.setLocked(locked);
+  }
+
+  toggleLock(): void {
+    if (!this.canvas || !this.file) return;
+    this.canvas.setLocked(!this.canvas.isLocked());
+    this.plugin.setLocked(this.file.path, this.canvas.isLocked());
+  }
+
   toggleRecite(): void {
     this.canvas?.setRecite(!this.canvas.isRecite());
   }
@@ -201,6 +211,9 @@ export class MindMapView extends TextFileView {
         if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
       },
       onToggleOutline: () => void this.toggleOutline(),
+      onLockChange: (locked) => {
+        if (this.file) this.plugin.setLocked(this.file.path, locked);
+      },
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
@@ -352,6 +365,7 @@ export class MindMapView extends TextFileView {
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
     if (clear && this.file) this.canvas?.setCalloutsHidden(this.plugin.isCalloutsHidden(this.file.path));
+    if (clear && this.file) this.canvas?.setLocked(this.plugin.isLocked(this.file.path));
     if (saved && this.canvas) {
       this.restoringViewport = true;
       this.canvas.setViewState(saved);
@@ -420,6 +434,8 @@ export class MindMapView extends TextFileView {
   }
 
   private undo(): void {
+    // 锁定编辑时撤销重做也不动文件
+    if (this.canvas?.isLocked()) return;
     const prev = this.history.undo(this.data);
     if (prev === null) return;
     this.data = prev;
@@ -428,6 +444,7 @@ export class MindMapView extends TextFileView {
   }
 
   private redo(): void {
+    if (this.canvas?.isLocked()) return;
     const next = this.history.redo(this.data);
     if (next === null) return;
     this.data = next;

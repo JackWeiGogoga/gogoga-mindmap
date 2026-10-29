@@ -162,7 +162,7 @@ function tierRules(sel: string, t: TierStyle, depth: number, theme: CustomTheme,
   if (!dark) {
     const border = t.borderStyle === "none" || t.underline ? "none" : `${t.borderWidth}px ${t.borderStyle} ${t.borderColor}`;
     out.push(
-      `${node} { font-size: ${t.fontSize}px; font-weight: ${t.bold ? 600 : 400}; font-style: ${t.italic ? "italic" : "normal"}; }`,
+      `${node} { font-size: calc(${t.fontSize}px * var(--mm-font-scale, 1)); font-weight: ${t.bold ? 600 : 400}; font-style: ${t.italic ? "italic" : "normal"}; }`,
       `${node}:not(.is-underline) { border-radius: ${t.radius}px; border: ${border}; }`,
     );
     if (t.maxWidth) out.push(`${node}:not(.has-width):not(.has-image) { max-width: ${t.maxWidth}px; }`);

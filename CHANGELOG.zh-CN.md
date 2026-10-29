@@ -2,6 +2,13 @@
 
 gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。English: [CHANGELOG.md](CHANGELOG.md).
 
+## [Unreleased]
+
+### 新增
+- 锁定编辑：工具栏的锁按钮（和命令「锁定 / 解锁编辑」）把脑图变成只能查看，缩放、平移、折叠、搜索照常。按文件记在插件设置里，不写进笔记。
+- 设置「节点间距」「节点字号」：按比例调整所有主题（包括自定义主题）的节点间距和文字大小。
+- 设置「跟随当前笔记」（默认关）：编辑器里切换笔记时，旁边的脑图跟着显示那篇；钉住的标签页不跟。
+
 ## [0.23.0] - 2026-10-29
 
 ### 新增
@@ -324,6 +331,7 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.23.0...HEAD
 [0.23.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.21.1...0.22.0
 [0.21.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.21.0...0.21.1

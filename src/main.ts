@@ -34,7 +34,7 @@ import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand } from "./canvas";
+import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
 import { fillTemplate, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -68,9 +68,14 @@ export default class MindMapPlugin extends Plugin {
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();
+    this.applyDisplayScale(false);
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.applyEmbedToolbar(win.doc)));
-    this.register(() => this.applyEmbedToolbar(undefined, false));
+    this.registerEvent(this.app.workspace.on("window-open", (win) => this.setFontScale(win.doc)));
+    this.register(() => {
+      this.applyEmbedToolbar(undefined, false);
+      for (const d of this.allDocs()) d.body.style.removeProperty("--mm-font-scale");
+    });
     this.register(() => {
       for (const m of [...this.openThemeEditors]) m.close();
       for (const el of this.customCssEls) el.remove();
@@ -109,6 +114,7 @@ export default class MindMapPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEditorSync();
     this.registerSplitSync();
+    this.registerFollowActive();
     const syncButtons = () => this.syncMapButtons();
     this.registerEvent(this.app.workspace.on("layout-change", syncButtons));
     this.registerEvent(this.app.workspace.on("file-open", syncButtons));
@@ -123,10 +129,10 @@ export default class MindMapPlugin extends Plugin {
     // 记住的视口、标注的隐藏状态跟着文件改名 / 删除走
     this.registerEvent(
       this.app.vault.on("rename", (f, oldPath) => {
-        const hidden = this.settings.hiddenCallouts;
-        const hi = hidden?.indexOf(oldPath) ?? -1;
-        if (hidden && hi >= 0) {
-          hidden[hi] = f.path;
+        for (const list of [this.settings.hiddenCallouts, this.settings.lockedFiles]) {
+          const hi = list?.indexOf(oldPath) ?? -1;
+          if (!list || hi < 0) continue;
+          list[hi] = f.path;
           this.saveSettingsSoon();
         }
         const vp = this.settings.viewports?.[oldPath];
@@ -139,6 +145,7 @@ export default class MindMapPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("delete", (f) => {
         if (this.settings.hiddenCallouts?.includes(f.path)) this.setCalloutsHidden(f.path, false);
+        if (this.settings.lockedFiles?.includes(f.path)) this.setLocked(f.path, false);
         if (!this.settings.viewports?.[f.path]) return;
         delete this.settings.viewports[f.path];
         this.saveSettingsSoon();
@@ -177,8 +184,30 @@ export default class MindMapPlugin extends Plugin {
    * 新开的独立窗口也要挂；卸载插件时摘掉
    */
   applyEmbedToolbar(doc?: Document, on = this.settings.embedToolbarAutoHide): void {
-    const docs = doc ? [doc] : [...new Set([document, ...this.app.workspace.getLeavesOfType("markdown").map((l) => l.view.containerEl.ownerDocument)])];
-    for (const d of docs) d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on);
+    for (const d of doc ? [doc] : this.allDocs()) d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on);
+  }
+
+  /** 主窗口和打开着的独立窗口 */
+  private allDocs(): Document[] {
+    const docs = new Set<Document>([document]);
+    this.app.workspace.iterateAllLeaves((l) => docs.add(l.view.containerEl.ownerDocument));
+    return [...docs];
+  }
+
+  /**
+   * 设置里的节点间距、节点字号：间距交给排版，字号写成 body 上的 --mm-font-scale（样式表和自定义主题都乘它）。
+   * 改了以后所有画布重新量、重新排
+   */
+  applyDisplayScale(redraw = true): void {
+    setSpacingScale(this.settings.spacingScale / 100);
+    for (const d of this.allDocs()) this.setFontScale(d);
+    if (redraw) redrawAllCanvases();
+  }
+
+  private setFontScale(doc: Document): void {
+    const k = this.settings.fontScale / 100;
+    if (k === 1) doc.body.style.removeProperty("--mm-font-scale");
+    else doc.body.style.setProperty("--mm-font-scale", String(k));
   }
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
@@ -213,6 +242,26 @@ export default class MindMapPlugin extends Plugin {
     if (next.length) this.settings.hiddenCallouts = next;
     else delete this.settings.hiddenCallouts;
     this.saveSettingsSoon();
+  }
+
+  // ---------- 锁定编辑（按文件记，不写进笔记） ----------
+
+  isLocked(path: string): boolean {
+    return !!path && !!this.settings.lockedFiles?.includes(path);
+  }
+
+  setLocked(path: string, locked: boolean): void {
+    if (!path) return;
+    const list = this.settings.lockedFiles ?? [];
+    const next = locked ? [...new Set([...list, path])] : list.filter((p) => p !== path);
+    if (next.length) this.settings.lockedFiles = next;
+    else delete this.settings.lockedFiles;
+    this.saveSettingsSoon();
+    // 同一个文件开在别的标签页里的脑图跟着锁上 / 解开
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      const v = leaf.view;
+      if (v instanceof MindMapView && v.file?.path === path) v.applyLock(locked);
+    }
   }
 
   // ---------- 记住视口 ----------
@@ -446,6 +495,32 @@ export default class MindMapPlugin extends Plugin {
     });
   }
 
+  /**
+   * 跟随当前笔记（设置里打开）：编辑器里换了一篇 Markdown 笔记，旁边正显示着的脑图也换成它。
+   * 只动一个脑图标签页（最近用过的那个），钉住的不动；那篇已经有脑图在显示就不用换
+   */
+  private registerFollowActive(): void {
+    const follow = () => {
+      if (!this.settings.followActiveNote) return;
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      const file = view?.file;
+      if (!view || !file || file.extension !== "md") return;
+      const maps = this.app.workspace
+        .getLeavesOfType(VIEW_TYPE_MINDMAP)
+        .filter((l) => l !== view.leaf && l.view instanceof MindMapView && l.view.containerEl.isShown());
+      if (!maps.length || maps.some((l) => (l.view as MindMapView).file?.path === file.path)) return;
+      const target = maps
+        .filter((l) => !(l as WorkspaceLeaf & { pinned?: boolean }).pinned)
+        .sort((a, b) => ((b as unknown as { activeTime?: number }).activeTime ?? 0) - ((a as unknown as { activeTime?: number }).activeTime ?? 0))[0];
+      if (!target) return;
+      const mapView = target.view as MindMapView;
+      mapView.rememberViewportNow();
+      void target.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+    };
+    this.registerEvent(this.app.workspace.on("file-open", follow));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", follow));
+  }
+
   /** 正在显示（不是藏在别的标签页后面）的同一文件的脑图 */
   private visibleMapsOf(path: string): MindMapView[] {
     return this.app.workspace
@@ -619,6 +694,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
+    exportCommand("toggle-lock", t("command.toggleLock"), async (v) => v.toggleLock());
     exportCommand("reveal-in-markdown", t("command.revealInMarkdown"), async (v) => {
       if (v.file) await this.openAsMarkdown(v.file, v.leaf);
     });

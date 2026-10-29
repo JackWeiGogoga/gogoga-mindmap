@@ -291,7 +291,7 @@
   border-radius: var(--mm-node-radius);
   background: var(--mm-node-bg);
   color: var(--mm-node-fg);
-  font-size: var(--mm-node-size);
+  font-size: calc(var(--mm-node-size) * var(--mm-font-scale, 1));
   font-weight: var(--mm-node-weight);
   line-height: 1.4;
   white-space: normal;
@@ -305,7 +305,7 @@
   color: var(--mm-main-fg);
   padding: var(--mm-main-pad);
   border-radius: var(--mm-main-radius);
-  font-size: var(--mm-main-size);
+  font-size: calc(var(--mm-main-size) * var(--mm-font-scale, 1));
   font-weight: var(--mm-main-weight);
 }
 
@@ -314,7 +314,7 @@
   color: var(--mm-root-fg);
   padding: var(--mm-root-pad);
   border-radius: var(--mm-root-radius);
-  font-size: var(--mm-root-size);
+  font-size: calc(var(--mm-root-size) * var(--mm-font-scale, 1));
   font-weight: var(--mm-root-weight);
   max-width: var(--mm-root-max-width);
   border: var(--mm-root-border);

@@ -173,6 +173,8 @@ export interface CanvasOptions {
   onSelectionChange?: (primary: MindNode | null, all: MindNode[]) => void;
   /** 提供则工具栏出现「大纲」按钮 */
   onToggleOutline?: () => void;
+  /** 提供则工具栏出现「锁定编辑」按钮：锁住后只能看（缩放、平移、折叠），参数是锁上之后的状态 */
+  onLockChange?: (locked: boolean) => void;
   /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
   toolbarPosition?: ToolbarPosition;
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
@@ -253,7 +255,23 @@ const MAX_ZOOM = 3;
 const FIT_PADDING = 48;
 const DRAG_THRESHOLD = 4;
 
+/** 设置里的「节点间距」：所有画布的间距按这个倍数放大缩小（1 = 主题原样） */
+let spacingScale = 1;
+/** 活着的画布，间距、字号这类全局设置变了时一起重画 */
+const liveCanvases = new Set<MindMapCanvas>();
+
+export function setSpacingScale(scale: number): void {
+  spacingScale = scale;
+}
+
+/** 全局显示设置变了：所有打开着的画布重新量尺寸、重新排版 */
+export function redrawAllCanvases(): void {
+  for (const c of liveCanvases) c.redrawAll();
+}
+
 const ICONS: Record<string, string> = {
+  lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  unlock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.3"/></svg>',
   minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   fit: '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
@@ -519,6 +537,7 @@ export class MindMapCanvas {
     this.opts = { ...opts };
     this.el = container;
     this.el.classList.add("gg-mm-root");
+    liveCanvases.add(this);
     this.el.tabIndex = 0;
     this.applyThemeAttrs();
     this.el.dataset.structure = opts.structure;
@@ -811,6 +830,31 @@ export class MindMapCanvas {
     return t("canvas.structureTip", { name: label });
   }
 
+  private locked = false;
+  private lockButton: HTMLElement | null = null;
+
+  isLocked(): boolean {
+    return this.locked;
+  }
+
+  /** 锁定编辑：只改能不能编辑，不改文件；锁着的时候折叠也只是看，不写回 */
+  setLocked(locked: boolean): void {
+    if (this.locked === locked) return;
+    this.locked = locked;
+    this.setEditable(!locked);
+    this.el.classList.toggle("is-locked", locked);
+    this.updateLockButton();
+  }
+
+  private updateLockButton(): void {
+    const b = this.lockButton;
+    if (!b) return;
+    b.dataset.tool = this.locked ? "lock" : "unlock";
+    b.replaceChildren(icon(this.locked ? "lock" : "unlock"));
+    b.classList.toggle("is-active", this.locked);
+    this.tip(b, this.locked ? t("canvas.unlockEditing") : t("canvas.lockEditing"), "toolbar");
+  }
+
   setEditable(editable: boolean): void {
     if (this.opts.editable === editable) return;
     if (!editable) this.flush();
@@ -865,6 +909,7 @@ export class MindMapCanvas {
   }
 
   destroy(): void {
+    liveCanvases.delete(this);
     this.ro?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
@@ -1246,7 +1291,9 @@ export class MindMapCanvas {
     }
     this.sizes = new Map(this.naturalSizes);
     this.alignWidths(base);
-    const layoutOpts: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
+    const raw: LayoutOptions = { ...DEFAULT_LAYOUT, ...theme.layout, structure: this.opts.structure };
+    const sp = (v: number) => Math.round(v * spacingScale);
+    const layoutOpts: LayoutOptions = { ...raw, gapRoot: sp(raw.gapRoot), gapLevel: sp(raw.gapLevel), gapSibling: sp(raw.gapSibling), gapMain: sp(raw.gapMain) };
     this.syncSummaryLabels(base);
     this.syncCallouts(base);
     this.layout = layoutMap(
@@ -2488,6 +2535,16 @@ export class MindMapCanvas {
     };
     if (this.opts.onToggleOutline) {
       btn("outline", t("canvas.outline"), () => this.opts.onToggleOutline?.());
+    }
+    if (this.opts.onLockChange) {
+      const onLock = this.opts.onLockChange;
+      this.lockButton = btn(this.locked ? "lock" : "unlock", "", () => {
+        this.setLocked(!this.locked);
+        onLock(this.locked);
+      });
+      this.updateLockButton();
+    }
+    if (this.opts.onToggleOutline || this.opts.onLockChange) {
       const sep0 = createSpan();
       sep0.className = "mm-tool-sep";
       bar.append(sep0);
