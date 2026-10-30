@@ -4,6 +4,15 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-31
+
+### 新增
+- 展开备注：新设置「展开备注的最大宽度」（默认 320，框越宽备注里的图片显示得越大）；拖备注框右下角可以单独调这一条的大小，双击右下角恢复默认。单独收起了哪几条、拖过的大小按文件记在 `state.json` 里，在脑图里改名、挪动节点时跟着走。
+- 大纲面板：标题里的公式照常渲染；新设置「大纲显示完整标题」（默认关）让长标题换行显示全文，不再省略。
+
+### 修复
+- 把标题挪到同级列表项前面时，不会再把它降成列表项。Markdown 里同一层的标题只能排在列表后面，所以改成把排在它后面的列表项升为同级标题（块 ID 和前面的段落都保留），并弹出提示，可以 ⌘Z 撤销。反过来把列表项挪到标题后面时它也变成标题，保存后顺序不再被打乱。把标题拖到别的节点上也保持标题。（[#10](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/10)）
+
 ## [0.29.0] - 2026-10-30
 
 ### 变更
@@ -393,7 +402,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...HEAD
+[0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1

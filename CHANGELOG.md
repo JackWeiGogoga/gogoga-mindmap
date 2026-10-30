@@ -4,6 +4,15 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-31
+
+### Added
+- Expanded notes: a "Maximum width of expanded notes" setting (320 by default; wider boxes show images in notes larger), and drag the bottom-right corner of a note box to give that note its own size (double-click the corner to reset). Notes you collapse one by one and the sizes you drag are remembered per file in `state.json`, and follow a node when you rename or move it in the map.
+- Outline panel: formulas in titles render as formulas, and the "Show full titles in the outline" setting (off by default) wraps long titles instead of cutting them off.
+
+### Fixed
+- Moving a heading before list items at the same level no longer turns it into a list item. Headings have to come after list items at the same level in Markdown, so the list items after it become headings of the same level instead (block IDs and paragraphs before them are kept), with a notice; press Mod+Z to undo. Moving a list item after a heading likewise makes it a heading, so saving no longer reorders them. Dragging a heading onto a node keeps it a heading. ([#10](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/10))
+
 ## [0.29.0] - 2026-10-30
 
 ### Changed
@@ -393,7 +402,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...HEAD
+[0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
