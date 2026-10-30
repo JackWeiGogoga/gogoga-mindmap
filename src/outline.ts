@@ -132,6 +132,11 @@ export class OutlinePanel {
 
   private onKeyDown(ev: KeyboardEvent): void {
     if (this.editing) {
+      // 输入法组字中的按键归输入法，不然回车会把拼音分隔符一起提交
+      if (ev.isComposing || ev.keyCode === 229) {
+        ev.stopPropagation();
+        return;
+      }
       if (ev.key === "Enter") {
         ev.preventDefault();
         this.commitRename();

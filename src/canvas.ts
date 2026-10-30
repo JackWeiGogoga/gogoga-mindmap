@@ -2162,7 +2162,8 @@ export class MindMapCanvas {
     };
     const onKey = (ev: KeyboardEvent) => {
       ev.stopPropagation();
-      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+      if (ev.isComposing || ev.keyCode === 229) return;
+      if (ev.key === "Enter" && !ev.shiftKey) {
         ev.preventDefault();
         finish(true);
       } else if (ev.key === "Escape") {
@@ -2329,7 +2330,8 @@ export class MindMapCanvas {
     };
     const onKey = (ev: KeyboardEvent) => {
       ev.stopPropagation();
-      if (ev.key === "Enter" && !ev.isComposing) {
+      if (ev.isComposing || ev.keyCode === 229) return;
+      if (ev.key === "Enter") {
         ev.preventDefault();
         finish(true);
       } else if (ev.key === "Escape") {
@@ -2414,7 +2416,8 @@ export class MindMapCanvas {
     };
     const onKey = (ev: KeyboardEvent) => {
       ev.stopPropagation();
-      if (ev.key === "Enter" && !ev.isComposing) {
+      if (ev.isComposing || ev.keyCode === 229) return;
+      if (ev.key === "Enter") {
         ev.preventDefault();
         finish(true);
       } else if (ev.key === "Escape") {
@@ -3463,6 +3466,9 @@ export class MindMapCanvas {
     const mod = ev.metaKey || ev.ctrlKey;
     const target = ev.target as HTMLElement;
     if (target.closest(".gg-mm-search")) return;
+    // 输入法组字中的回车、Esc、Tab 归输入法（回车上屏英文、Esc 取消组字）；
+    // 这时提交编辑会把拼音里的分隔符（自带输入法的空格、搜狗的 '）一起存进去
+    if (ev.isComposing || ev.keyCode === 229) return;
     // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
     if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {
@@ -4990,6 +4996,7 @@ export class MindMapCanvas {
     input.addEventListener("input", () => this.runSearch(input.value));
     input.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
+      if (ev.isComposing || ev.keyCode === 229) return;
       if (ev.key === "Enter" || ev.key === "ArrowDown") {
         ev.preventDefault();
         this.stepMatch(ev.shiftKey && ev.key === "Enter" ? -1 : 1);
