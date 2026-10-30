@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-30
+
+### Changed
+- Per-file view state no longer lives in `data.json` next to the plugin settings, so syncing several devices can't clobber your settings over a panned canvas. Where you left off in each map (position, zoom, selection) is kept on this device only and not synced; whether a file is locked, has notes expanded or callouts hidden goes to a separate `state.json` in the plugin folder, and changes made on another device are merged instead of overwritten. Existing state moves over automatically the first time the plugin loads. Colors, folds, boxes and other styling stay in your notes as before.
+
+### Fixed
+- Maps and notes in pop-out windows: with "Sync with Markdown side by side" on, moving the cursor in Markdown selects the matching node and selecting a node scrolls Markdown to its line and flashes it, whichever window each is in. Editing nodes and outline renames place the cursor correctly, and menus close when you click elsewhere in a pop-out window.
+
 ## [0.28.2] - 2026-10-30
 
 ### Fixed
@@ -385,7 +393,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...HEAD
+[0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0

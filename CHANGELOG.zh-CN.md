@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-30
+
+### 变更
+- 按文件记的视图状态不再和插件设置一起存在 `data.json` 里，多台设备同步时不会因为拖了一下画布就把设置冲掉。每张脑图上次的位置、缩放和选中只记在这台设备上，不跟着同步；锁定、备注展开、隐藏标注存到插件目录下单独的 `state.json`，别的设备改过时会合并而不是覆盖。升级后第一次加载时自动搬过去。颜色、折叠、外框这些样式照旧写在笔记里。
+
+### 修复
+- 独立窗口：打开「和 Markdown 分屏联动」后，不管脑图和 Markdown 各在哪个窗口，在 Markdown 里移动光标脑图都会选中对应节点，点节点 Markdown 也会跳到那一行并闪一下。独立窗口里编辑节点、大纲重命名时光标位置正确，点别处也能关掉菜单。
+
 ## [0.28.2] - 2026-10-30
 
 ### 修复
@@ -385,7 +393,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...HEAD
+[0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
