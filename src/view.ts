@@ -146,6 +146,11 @@ export class MindMapView extends TextFileView {
       c.setNotesExpanded(this.plugin.isNotesExpanded(path));
       redraw = true;
     }
+    const cards = this.plugin.getNoteCards(path);
+    if (JSON.stringify(cards ?? {}) !== JSON.stringify(c.getNoteCards())) {
+      c.setNoteCards(cards);
+      redraw = true;
+    }
     if (redraw) c.render();
   }
 
@@ -252,6 +257,9 @@ export class MindMapView extends TextFileView {
       notesExpanded: () => this.plugin.isNotesExpanded(this.file?.path ?? ""),
       onNotesExpandedChange: (expanded) => {
         if (this.file) this.plugin.setNotesExpanded(this.file.path, expanded);
+      },
+      onNoteCardsChange: (cards) => {
+        if (this.file) this.plugin.setNoteCards(this.file.path, cards);
       },
       notePopoverSize: this.plugin.notePopoverSize,
       ownsHotkey: (ev) => this.plugin.isOwnHotkey(ev),
@@ -392,6 +400,7 @@ export class MindMapView extends TextFileView {
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
     if (clear && this.file) this.canvas?.setCalloutsHidden(this.plugin.isCalloutsHidden(this.file.path));
     if (clear && this.file) this.canvas?.setNotesExpanded(this.plugin.isNotesExpanded(this.file.path));
+    if (clear && this.file) this.canvas?.setNoteCards(this.plugin.getNoteCards(this.file.path));
     if (clear && this.file) this.canvas?.setLocked(this.plugin.isLocked(this.file.path));
     if (saved && this.canvas) {
       this.restoringViewport = true;

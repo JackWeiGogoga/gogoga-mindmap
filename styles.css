@@ -1176,6 +1176,11 @@
 .mm-outline-dot[data-color="pink"] { background: var(--mm-c-pink, #f8b8da); }
 .mm-outline-dot[data-color="gray"] { background: var(--mm-c-gray, #dcdce2); }
 .mm-outline-text { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; outline: none; }
+/* 设置「大纲显示完整标题」：长标题换行，箭头和色点贴着第一行 */
+body.gg-mm-outline-wrap .mm-outline-row { white-space: normal; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; }
+body.gg-mm-outline-wrap .mm-outline-text { overflow: visible; overflow-wrap: anywhere; }
+body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0.3em; }
+.mm-outline-text .mm-math { font-size: 0.95em; }
 .mm-outline-row[style*="--depth: 0"] .mm-outline-text { font-weight: 600; }
 .mm-outline-row[style*="--depth: 1"] .mm-outline-text { font-weight: 500; }
 .mm-outline-row.is-editing .mm-outline-text { white-space: pre-wrap; user-select: text; -webkit-user-select: text; background: var(--background-primary, #fff); border-radius: 3px; padding: 0 3px; }
@@ -1758,7 +1763,7 @@ body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:
   box-sizing: border-box;
   width: max-content;
   min-width: 80px;
-  max-width: calc(320px * var(--mm-font-scale, 1));
+  max-width: calc(var(--mm-note-max-w, 320px) * var(--mm-font-scale, 1));
   border: 1px solid color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 40%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 6%, var(--mm-bg, var(--background-primary, #fff)));
@@ -1783,6 +1788,23 @@ body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
+/* 右下角的手柄：拖动单独调这一条的宽高，双击恢复默认 */
+.mm-note-card-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0;
+  border-bottom-right-radius: 8px;
+  background: linear-gradient(135deg, transparent 0 55%, color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 70%, transparent) 55% 62%, transparent 62% 72%, color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 70%, transparent) 72% 79%, transparent 79%);
+  transition: opacity 0.12s;
+  touch-action: none;
+}
+.mm-note-card:hover .mm-note-card-resize,
+.mm-note-card.is-resizing .mm-note-card-resize { opacity: 1; }
+.mm-note-card.is-resizing { user-select: none; -webkit-user-select: none; }
 .mm-note-card-fold {
   all: unset;
   position: absolute;

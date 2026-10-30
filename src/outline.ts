@@ -82,7 +82,8 @@ export class OutlinePanel {
 
       const text = createSpan();
       text.className = "mm-outline-text";
-      text.textContent = plainText(node.text) || (node.depth === 0 ? t("canvas.centralTopic") : "");
+      if (plainText(node.text)) this.canvas.renderOutlineText(text, node.text);
+      else text.textContent = node.depth === 0 ? t("canvas.centralTopic") : "";
       row.append(text);
 
       if (node.note) {

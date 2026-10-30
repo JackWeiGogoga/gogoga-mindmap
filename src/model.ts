@@ -428,8 +428,11 @@ export function removeNodeKeepChildren(node: MindNode, style: DocStyle): MindNod
   return kids;
 }
 
-/** 移动节点到新父节点的 index 位置；禁止移到自己的子树里 */
-export function moveNode(node: MindNode, newParent: MindNode, index: number, style: DocStyle): boolean {
+/**
+ * 移动节点到新父节点的 index 位置；禁止移到自己的子树里。
+ * 挪完之后排在它后面、只能升成标题才写得回去的列表兄弟会被升级，记进 promoted（给界面提示用）
+ */
+export function moveNode(node: MindNode, newParent: MindNode, index: number, style: DocStyle, promoted?: MindNode[]): boolean {
   if (node === newParent || isAncestor(node, newParent) || !node.parent) return false;
   const oldParent = node.parent;
   releaseLead(node);
@@ -441,13 +444,52 @@ export function moveNode(node: MindNode, newParent: MindNode, index: number, sty
   node.parent = newParent;
   // 自由主题只能挂在中心主题下；挪到别处就是普通节点了
   if (newParent.parent) node.float = undefined;
-  const { kind, level } = kindForNewChild(newParent, style);
-  // 换了父节点后，写回方式跟随新位置的兄弟；子树里的标题级别在序列化时统一重算
-  const ref = newParent.children.find((c) => c !== node);
-  node.kind = ref ? ref.kind : kind;
-  node.level = ref ? ref.level : level;
+  settleKind(node, style, promoted);
   refreshDepth(node);
   return true;
+}
+
+/**
+ * 同一层里标题只能排在列表后面：写回时列表先写、标题后写（标题会把后面的列表都收进自己名下），
+ * 顺序不对的话存一次就乱了。node 刚放到这里，按位置定它的写法：
+ * - 这一层能写标题，并且它本来就是标题、或者前面已经有标题兄弟：它保持 / 变成标题，
+ *   排在它后面的列表兄弟一起升成同级标题（不把标题降成列表，#10）
+ * - 否则跟着这一层写成列表
+ * 子树里的标题级别在序列化时统一重算
+ */
+function settleKind(node: MindNode, style: DocStyle, promoted?: MindNode[]): void {
+  const parent = node.parent!;
+  const sibs = parent.children;
+  const at = sibs.indexOf(node);
+  const otherHeading = sibs.find((c) => c !== node && c.kind === "heading");
+  const below = kindBelow(parent, style);
+  const headingLevel = otherHeading?.level ?? (below.kind === "heading" ? below.level : 0);
+  const headingBefore = sibs.slice(0, at).some((c) => c.kind === "heading");
+  if (headingLevel && (node.kind === "heading" || headingBefore)) {
+    toHeading(node, headingLevel);
+    for (const c of sibs.slice(at + 1)) {
+      if (c.kind === "heading") continue;
+      toHeading(c, headingLevel);
+      promoted?.push(c);
+    }
+    return;
+  }
+  node.kind = "list";
+  node.level = 0;
+}
+
+/** 列表项改写成标题：属于它的块 ID 并进文字（标题行不单独写 ^id），前置段落交给父节点 */
+function toHeading(node: MindNode, level: number): void {
+  if (node.kind === "list") {
+    if (node.blockId) {
+      node.text = `${node.text} ^${node.blockId}`.trim();
+      node.blockId = undefined;
+    }
+    releaseLead(node);
+    node.hardBreak = false;
+  }
+  node.kind = "heading";
+  node.level = level;
 }
 
 /** 父节点之下应当用什么写法：不看兄弟，只看父节点 */

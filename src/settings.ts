@@ -31,10 +31,14 @@ export interface MindMapSettings {
   notesExpanded: boolean;
   /** 展开备注的最大高度（像素，随节点字号缩放） */
   noteMaxHeight: number;
+  /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
+  noteMaxWidth: number;
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
   outlineOpen: boolean;
+  /** 大纲面板里的标题换行显示全文（默认一行，放不下就省略） */
+  outlineWrap: boolean;
   /**
    * 写进 frontmatter `icon` 属性的值，让文件列表显示图标。
    * Notebook Navigator、Iconize 等都读这个属性；留空则不写。
@@ -100,6 +104,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   claimMindmapBlock: true,
   rememberViewport: true,
   outlineOpen: false,
+  outlineWrap: false,
   toolbarPosition: "bottom",
   wheelAction: "pan",
   leftDrag: "pan",
@@ -118,6 +123,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   fontScale: 100,
   notesExpanded: false,
   noteMaxHeight: 240,
+  noteMaxWidth: 320,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -342,6 +348,29 @@ export class MindMapSettingTab extends PluginSettingTab {
         }),
       );
 
+    let noteWidth: { setValue(v: number): unknown } | null = null;
+    new Setting(containerEl)
+      .setName(t("settings.noteMaxWidth.name"))
+      .setDesc(t("settings.noteMaxWidth.desc"))
+      .addSlider((s) => {
+        noteWidth = s;
+        s.setLimits(160, 960, 20)
+          .setValue(this.plugin.settings.noteMaxWidth)
+          .onChange(async (v) => {
+            this.plugin.settings.noteMaxWidth = v;
+            await this.plugin.saveSettings();
+            this.plugin.applyDisplayScale();
+          });
+      })
+      .addExtraButton((b) =>
+        b.setIcon("rotate-ccw").setTooltip(t("settings.resetNoteWidth")).onClick(async () => {
+          this.plugin.settings.noteMaxWidth = DEFAULT_SETTINGS.noteMaxWidth;
+          noteWidth?.setValue(DEFAULT_SETTINGS.noteMaxWidth);
+          await this.plugin.saveSettings();
+          this.plugin.applyDisplayScale();
+        }),
+      );
+
     new Setting(containerEl)
       .setName(t("settings.toolbar.name"))
       .setDesc(t("settings.toolbar.desc"))
@@ -438,6 +467,17 @@ export class MindMapSettingTab extends PluginSettingTab {
       .addToggle((tg) =>
         tg.setValue(this.plugin.settings.embedToolbarAutoHide).onChange(async (v) => {
           this.plugin.settings.embedToolbarAutoHide = v;
+          await this.plugin.saveSettings();
+          this.plugin.applyEmbedToolbar();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.outlineWrap.name"))
+      .setDesc(t("settings.outlineWrap.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.outlineWrap).onChange(async (v) => {
+          this.plugin.settings.outlineWrap = v;
           await this.plugin.saveSettings();
           this.plugin.applyEmbedToolbar();
         }),

@@ -44,7 +44,7 @@ import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { parseCustomMarkers, setCustomMarkers } from "./inline";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
-import { FileStateStore, LEGACY_KEYS, LegacyFileState, ViewportStore } from "./state";
+import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
 
 const FRONTMATTER_KEY = "mindmap";
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
@@ -83,6 +83,7 @@ export default class MindMapPlugin extends Plugin {
       for (const d of this.allDocs()) {
         d.body.style.removeProperty("--mm-font-scale");
         d.body.style.removeProperty("--mm-note-max-h");
+        d.body.style.removeProperty("--mm-note-max-w");
       }
     });
     this.register(() => {
@@ -201,8 +202,12 @@ export default class MindMapPlugin extends Plugin {
    * 嵌入的脑图（代码块、![[笔记]]）自动隐藏工具栏：开关挂在 body 上，样式表按阅读 / 编辑模式分别处理。
    * 新开的独立窗口也要挂；卸载插件时摘掉
    */
-  applyEmbedToolbar(doc?: Document, on = this.settings.embedToolbarAutoHide): void {
-    for (const d of doc ? [doc] : this.allDocs()) d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on);
+  applyEmbedToolbar(doc?: Document, on = true): void {
+    for (const d of doc ? [doc] : this.allDocs()) {
+      d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on && this.settings.embedToolbarAutoHide);
+      // 大纲面板显示完整标题（换行），默认一行放不下就省略
+      d.body.classList.toggle("gg-mm-outline-wrap", on && this.settings.outlineWrap);
+    }
   }
 
   /** 主窗口和打开着的独立窗口 */
@@ -229,6 +234,9 @@ export default class MindMapPlugin extends Plugin {
     const h = this.settings.noteMaxHeight;
     if (h === DEFAULT_SETTINGS.noteMaxHeight) doc.body.style.removeProperty("--mm-note-max-h");
     else doc.body.style.setProperty("--mm-note-max-h", `${h}px`);
+    const w = this.settings.noteMaxWidth;
+    if (w === DEFAULT_SETTINGS.noteMaxWidth) doc.body.style.removeProperty("--mm-note-max-w");
+    else doc.body.style.setProperty("--mm-note-max-w", `${w}px`);
   }
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
@@ -275,6 +283,15 @@ export default class MindMapPlugin extends Plugin {
 
   setNotesExpanded(path: string, expanded: boolean): void {
     this.fileState.set("notesExpanded", path, expanded);
+  }
+
+  /** 每条展开备注单独的状态（单独收起、拖出来的大小） */
+  getNoteCards(path: string): NoteCards | undefined {
+    return path ? this.fileState.get("noteCards", path) : undefined;
+  }
+
+  setNoteCards(path: string, cards: NoteCards): void {
+    this.fileState.set("noteCards", path, Object.keys(cards).length ? cards : undefined);
   }
 
   // ---------- 锁定编辑（按文件记，不写进笔记） ----------

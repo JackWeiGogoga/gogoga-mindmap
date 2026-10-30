@@ -70,6 +70,7 @@ import {
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
+import type { NoteCards, NoteCardState } from "./state";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
@@ -200,6 +201,11 @@ export interface CanvasOptions {
   notesExpanded?: () => boolean;
   /** 用户切换了备注的展开 / 收起 */
   onNotesExpandedChange?: (expanded: boolean) => void;
+  /**
+   * 每条展开备注单独的状态（单独收起、拖出来的大小）变了，或者节点改名、挪动让文字路径变了：把整份交回去存。
+   * 打开文件时由宿主用 setNoteCards 交进来；不接就只在这次打开有效
+   */
+  onNoteCardsChange?: (cards: NoteCards) => void;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
   /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
@@ -278,6 +284,23 @@ export function redrawAllCanvases(): void {
 }
 
 /** 设置里改了「备注展开显示」的默认值 */
+/**
+ * 节点在树里的文字路径，用来记单条备注的状态：中心主题是空串，往下每层是节点文字，
+ * 同一层有同名兄弟时带上它是第几个。在 Markdown 里改了文字就对不上，退回默认显示（只是视图状态，不要紧）
+ */
+export function noteKey(node: MindNode): string {
+  const parts: string[] = [];
+  for (let n = node; n.parent; n = n.parent) {
+    const same = n.parent.children.filter((c) => c.text === n.text);
+    const i = same.indexOf(n);
+    parts.push(i > 0 ? `${n.text}\u0002${i}` : n.text);
+  }
+  return parts.reverse().join("\u0001");
+}
+
+/** 拖备注卡片时的最小尺寸（画布像素） */
+const NOTE_CARD_MIN = { w: 80, h: 40 };
+
 export function syncNotesExpandedAll(): void {
   for (const c of liveCanvases) c.syncNotesExpanded();
 }
@@ -472,8 +495,12 @@ export class MindMapCanvas {
   private noteEls = new Map<string, HTMLElement>();
   private noteNode = new WeakMap<HTMLElement, MindNode>();
   private notesExpanded = false;
-  /** 展开时单独收起的几条：只在这次打开有效，不记 */
-  private collapsedNotes = new Set<string>();
+  /** 每条展开备注单独的状态，按节点 id 记（改名、挪动时跟着节点走）；写出时换算成文字路径 */
+  private cardState = new Map<string, NoteCardState>();
+  /** 上次读到 / 交出去的文字路径版本：重新解析出新的树时，靠它把状态认回到节点上 */
+  private cardKeys: NoteCards = {};
+  /** 这次操作里因为挪动被升成标题的列表节点，notify 时提示一次 */
+  private promoted: MindNode[] = [];
   private notesButton: HTMLElement | null = null;
   /** 备注里的图片、公式晚到会把卡片撑大，尺寸一变就重新排版 */
   private noteRo: ResizeObserver | null = null;
@@ -635,6 +662,7 @@ export class MindMapCanvas {
     const primaryPath = this.primary ? pathOf(this.primary) : null;
     const focusPath = this.focusRoot ? pathOf(this.focusRoot) : null;
     this.doc = doc;
+    this.resolveNoteCards();
     this.focusRoot = focusPath !== null ? findByPath(doc.root, focusPath) : null;
     if (this.focusRoot === doc.root) this.focusRoot = null;
     this.editing = null;
@@ -4125,7 +4153,7 @@ export class MindMapCanvas {
         node.float = undefined;
         if (target.side) node.side = target.side;
         if (target.parent.folded) target.parent.folded = false;
-        moveNode(node, target.parent, target.index, this.doc.style);
+        moveNode(node, target.parent, target.index, this.doc.style, this.promoted);
         this.select(node);
         this.render();
         this.notify();
@@ -4159,7 +4187,7 @@ export class MindMapCanvas {
           return;
         }
         if (parent.folded) parent.folded = false;
-        if (moveNode(node, parent, target.index, this.doc.style)) {
+        if (moveNode(node, parent, target.index, this.doc.style, this.promoted)) {
           this.select(node);
           this.render();
           this.notify();
@@ -4194,7 +4222,7 @@ export class MindMapCanvas {
       const at = anchor ? parent.children.indexOf(anchor) : parent.children.length;
       // 自由主题被拖进树里就挂上了
       m.float = undefined;
-      if (!moveNode(m, parent, at, this.doc.style)) continue;
+      if (!moveNode(m, parent, at, this.doc.style, this.promoted)) continue;
       if (target.side) m.side = target.side;
       else if (parent !== (this.focusRoot ?? this.doc.root)) m.side = undefined;
     }
@@ -4270,7 +4298,7 @@ export class MindMapCanvas {
     for (const n of nodes) {
       if (!n.parent || n === root) continue;
       shrinkGroupsAround(n);
-      moveNode(n, root, root.children.length, this.doc.style);
+      moveNode(n, root, root.children.length, this.doc.style, this.promoted);
       n.side = undefined;
       if (n.box) n.box.span = 1;
       if (n.summary) n.summary.span = 1;
@@ -4296,7 +4324,7 @@ export class MindMapCanvas {
     if (!this.doc || !this.opts.editable || !node.float) return;
     node.float = undefined;
     const root = this.doc.root;
-    moveNode(node, root, root.children.length, this.doc.style);
+    moveNode(node, root, root.children.length, this.doc.style, this.promoted);
     this.select(node);
     this.render();
     this.notify();
@@ -4342,7 +4370,7 @@ export class MindMapCanvas {
             stuck.add(m);
             continue;
           }
-          moveNode(m, parent, dir < 0 ? j : j + 1, style);
+          moveNode(m, parent, dir < 0 ? j : j + 1, style, this.promoted);
           changed = true;
         }
       } else if (op === "indent") {
@@ -4350,14 +4378,14 @@ export class MindMapCanvas {
         const prev = kids.slice(0, first).reverse().find((c) => !group.includes(c));
         if (!prev) continue;
         if (prev.folded) prev.folded = false;
-        for (const m of group) moveNode(m, prev, prev.children.length, style);
+        for (const m of group) moveNode(m, prev, prev.children.length, style, this.promoted);
         changed = true;
       } else {
         const grand = parent.parent;
         if (!grand) continue;
         let at = grand.children.indexOf(parent) + 1;
         for (const m of group) {
-          moveNode(m, grand, at, style);
+          moveNode(m, grand, at, style, this.promoted);
           at = grand.children.indexOf(m) + 1;
         }
         changed = true;
@@ -4378,6 +4406,14 @@ export class MindMapCanvas {
       window.clearTimeout(this.notifyTimer);
       this.notifyTimer = null;
     }
+    if (this.promoted.length) {
+      // 标题挪到列表前面时，后面的列表兄弟升成了标题（不然存不回 Markdown）：说一声，⌘Z 能撤
+      const names = this.promoted.map((n) => `「${n.text.replace(/\s*\^[\w-]+$/, "")}」`).join("");
+      this.opts.host?.notice?.(t("notice.promotedToHeading", { names, count: this.promoted.length, key: sc("Mod", "Z") }));
+      this.promoted.length = 0;
+    }
+    // 改名、挪动会让节点的文字路径变掉，先把单条备注的状态按新路径交出去
+    this.emitNoteCards();
     if (this.doc) this.opts.onChange?.(this.doc);
   }
 
@@ -4432,7 +4468,7 @@ export class MindMapCanvas {
   moveNodeTo(node: MindNode, parent: MindNode, index: number): boolean {
     if (!this.opts.editable || !this.doc) return false;
     if (parent.folded) parent.folded = false;
-    if (!moveNode(node, parent, index, this.doc.style)) return false;
+    if (!moveNode(node, parent, index, this.doc.style, this.promoted)) return false;
     this.select(node);
     this.render();
     this.notify();
@@ -5931,7 +5967,8 @@ export class MindMapCanvas {
     const need = new Set<string>();
     const visit = (n: MindNode) => {
       if (n.note) {
-        const shown = this.notesExpanded && !this.collapsedNotes.has(n.id);
+        const card = this.cardState.get(n.id);
+        const shown = this.notesExpanded && !card?.collapsed;
         const icon = this.els.get(n.id)?.querySelector<HTMLElement>(".mm-note-icon");
         const state = !this.notesExpanded ? "popover" : shown ? "open" : "closed";
         if (icon && icon.dataset.state !== state) {
@@ -5954,6 +5991,7 @@ export class MindMapCanvas {
             body.scrollTop = 0;
             this.fillNoteBody(body, n.note);
           }
+          this.applyCardSize(el, card);
         }
       }
       for (const c of visibleChildren(n)) visit(c);
@@ -5977,6 +6015,7 @@ export class MindMapCanvas {
     fold.type = "button";
     fold.append(icon("up"));
     this.tip(fold, t("canvas.collapseNote"));
+    this.wireCardResize(el);
     fold.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const n = this.noteNode.get(el);
@@ -6009,6 +6048,56 @@ export class MindMapCanvas {
     this.nodesEl.append(el);
     this.noteRo?.observe(el);
     return el;
+  }
+
+  /**
+   * 右下角的手柄拖动改这条备注的宽高（图片跟着宽度放大），松手记住；双击手柄回到默认大小。
+   * 拖的是屏幕像素，按当前缩放换回画布里的尺寸
+   */
+  private wireCardResize(el: HTMLElement): void {
+    const grip = el.createDiv({ cls: "mm-note-card-resize" });
+    this.tip(grip, t("canvas.resizeNote"));
+    grip.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const node = this.noteNode.get(el);
+      const body = el.querySelector<HTMLElement>(".mm-note-card-body");
+      if (!node || !body) return;
+      const k = this.k;
+      const start = { x: ev.clientX, y: ev.clientY, w: el.offsetWidth, h: body.offsetHeight };
+      let size: { w: number; h: number } | null = null;
+      grip.setPointerCapture(ev.pointerId);
+      el.classList.add("is-resizing");
+      const move = (e: PointerEvent) => {
+        size = {
+          w: Math.round(Math.max(NOTE_CARD_MIN.w, start.w + (e.clientX - start.x) / k)),
+          h: Math.round(Math.max(NOTE_CARD_MIN.h, start.h + (e.clientY - start.y) / k)),
+        };
+        this.applyCardSize(el, size);
+        this.updateNoteFade(el);
+      };
+      const up = () => {
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", up);
+        grip.removeEventListener("pointercancel", up);
+        el.classList.remove("is-resizing");
+        if (size) this.updateCard(node, size);
+        this.reflow();
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up);
+      grip.addEventListener("pointercancel", up);
+    });
+    grip.addEventListener("click", (ev) => ev.stopPropagation());
+    grip.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const node = this.noteNode.get(el);
+      if (!node) return;
+      this.updateCard(node, { w: undefined, h: undefined });
+      this.applyCardSize(el, this.cardState.get(node.id));
+      this.reflow();
+    });
   }
 
   /** 在卡片原位打开编辑框：和弹窗编辑是同一套（粘贴图片、拖入笔记都能用），起码留出能写字的大小 */
@@ -6079,10 +6168,83 @@ export class MindMapCanvas {
     }
   }
 
-  /** 展开时单独收起 / 重新展开某一条（只在这次打开有效） */
+  /** 展开时单独收起 / 重新展开某一条（按文件记住） */
   private toggleNoteCard(node: MindNode): void {
-    if (!this.collapsedNotes.delete(node.id)) this.collapsedNotes.add(node.id);
+    const card = this.cardState.get(node.id);
+    this.updateCard(node, { collapsed: card?.collapsed ? undefined : true });
     this.reflow();
+  }
+
+  /** 改一条备注的单独状态；全部回到默认就删掉，然后交出去存 */
+  private updateCard(node: MindNode, patch: NoteCardState): void {
+    const next: NoteCardState = { ...this.cardState.get(node.id), ...patch };
+    for (const k of Object.keys(next) as (keyof NoteCardState)[]) if (next[k] === undefined) delete next[k];
+    if (Object.keys(next).length) this.cardState.set(node.id, next);
+    else this.cardState.delete(node.id);
+    this.emitNoteCards();
+  }
+
+  /** 拖出来的大小写到卡片上；没拖过就按内容和设置里的上限 */
+  private applyCardSize(el: HTMLElement, card: NoteCardState | undefined): void {
+    const body = el.querySelector<HTMLElement>(".mm-note-card-body");
+    const w = card?.w ? `${card.w}px` : "";
+    const h = card?.h ? `${card.h}px` : "";
+    if (el.style.width !== w) el.setCssStyles({ width: w, maxWidth: w ? "none" : "" });
+    if (body && body.style.height !== h) body.setCssStyles({ height: h, maxHeight: h ? "none" : "" });
+    el.classList.toggle("is-sized", !!(w || h));
+  }
+
+  /** 大纲面板里的标题：$公式$ 照节点里的样子渲染，其余按纯文本（图片、链接只留文字） */
+  renderOutlineText(el: HTMLElement, text: string): void {
+    el.empty();
+    const re = /\$\$?(?!\s)([^$\n]+?)(?<!\s)\$\$?(?!\d)/g;
+    let last = 0;
+    let math = false;
+    for (let m = re.exec(text); m; m = re.exec(text)) {
+      if (m.index > last) el.appendText(plainText(text.slice(last, m.index)));
+      const r = this.opts.host?.renderMath?.(m[1]);
+      if (r) {
+        r.classList.add("mm-math");
+        el.append(r);
+        math = true;
+      } else el.appendText(m[0]);
+      last = re.lastIndex;
+    }
+    if (last < text.length) el.appendText(plainText(text.slice(last)));
+    if (math) this.opts.host?.afterRender?.();
+  }
+
+  getNoteCards(): NoteCards {
+    return this.cardKeys;
+  }
+
+  /** 宿主换了文件：交来这个文件记下的单条备注状态（随后的 setDoc 按它认节点） */
+  setNoteCards(cards: NoteCards | undefined): void {
+    this.cardKeys = cards ?? {};
+    this.resolveNoteCards();
+  }
+
+  /** 按文字路径把记下的状态认回到当前树的节点上 */
+  private resolveNoteCards(): void {
+    this.cardState.clear();
+    if (!this.doc || !Object.keys(this.cardKeys).length) return;
+    walk(this.doc.root, (n) => {
+      const c = this.cardKeys[noteKey(n)];
+      if (c) this.cardState.set(n.id, { ...c });
+    });
+  }
+
+  /** 按当前的树重算文字路径，变了才交出去 */
+  private emitNoteCards(): void {
+    if (!this.doc) return;
+    const out: NoteCards = {};
+    walk(this.doc.root, (n) => {
+      const c = this.cardState.get(n.id);
+      if (c && n.note) out[noteKey(n)] = c;
+    });
+    if (JSON.stringify(out) === JSON.stringify(this.cardKeys)) return;
+    this.cardKeys = out;
+    this.opts.onNoteCardsChange?.(out);
   }
 
   isNotesExpanded(): boolean {
@@ -6092,7 +6254,6 @@ export class MindMapCanvas {
   /** 打开别的文件时由宿主按记住的状态设置；不回调、不重画（随后的 setDoc 会画） */
   setNotesExpanded(expanded: boolean): void {
     this.notesExpanded = expanded;
-    this.collapsedNotes.clear();
   }
 
   /** 设置里改了默认值：按宿主现在给的状态重画 */
@@ -6105,7 +6266,16 @@ export class MindMapCanvas {
 
   toggleNotes(): void {
     this.notesExpanded = !this.notesExpanded;
-    this.collapsedNotes.clear();
+    // 整体展开就是全部展开：单独收起过的也放出来（拖过的大小留着）
+    if (this.notesExpanded) {
+      for (const [id, c] of this.cardState) {
+        if (!c.collapsed) continue;
+        const { collapsed: _, ...rest } = c;
+        if (Object.keys(rest).length) this.cardState.set(id, rest);
+        else this.cardState.delete(id);
+      }
+    }
+    this.emitNoteCards();
     this.opts.onNotesExpandedChange?.(this.notesExpanded);
     this.render();
   }
