@@ -73,6 +73,8 @@ export interface MindMapSettings {
   fontScale: number;
   /** 中心主题始终用文件名，唯一的一级标题也只当第一级分支（默认关：一级标题就是中心主题） */
   fileNameAsRoot: boolean;
+  /** 笔记的脑图只把标题当节点，列表都算标题的备注（代码块里的脑图不受影响） */
+  headingsOnly: boolean;
   /** 嵌入的脑图隐藏工具栏：阅读模式一直不显示，编辑模式鼠标移上去才显示（默认关） */
   embedToolbarAutoHide: boolean;
 }
@@ -118,6 +120,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   newFileTemplate: "",
   embedToolbarAutoHide: false,
   fileNameAsRoot: false,
+  headingsOnly: false,
   followActiveNote: false,
   spacingScale: 100,
   fontScale: 100,
@@ -183,6 +186,17 @@ export class MindMapSettingTab extends PluginSettingTab {
       .addToggle((tg) =>
         tg.setValue(this.plugin.settings.fileNameAsRoot).onChange(async (v) => {
           this.plugin.settings.fileNameAsRoot = v;
+          await this.plugin.saveSettings();
+          this.plugin.reloadMaps();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.headingsOnly.name"))
+      .setDesc(t("settings.headingsOnly.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.headingsOnly).onChange(async (v) => {
+          this.plugin.settings.headingsOnly = v;
           await this.plugin.saveSettings();
           this.plugin.reloadMaps();
         }),

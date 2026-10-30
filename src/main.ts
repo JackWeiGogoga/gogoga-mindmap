@@ -241,7 +241,15 @@ export default class MindMapPlugin extends Plugin {
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
   rootRule(): RootRule {
-    return { rootFromH1: !this.settings.fileNameAsRoot };
+    return { rootFromH1: !this.settings.fileNameAsRoot, headingsOnly: this.settings.headingsOnly, showHidden: this.showHidden };
+  }
+
+  /** 「显示隐藏的节点」：只在这次运行里有效，所有脑图一起切换 */
+  showHidden = false;
+
+  toggleShowHidden(): void {
+    this.showHidden = !this.showHidden;
+    this.reloadMaps();
   }
 
   async saveSettings(): Promise<void> {
@@ -816,6 +824,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
     exportCommand("toggle-notes", t("command.toggleNotes"), async (v) => v.toggleNotes());
+    exportCommand("toggle-hidden", t("command.toggleHidden"), async () => this.toggleShowHidden());
     exportCommand("toggle-lock", t("command.toggleLock"), async (v) => v.toggleLock());
     exportCommand("reveal-in-markdown", t("command.revealInMarkdown"), async (v) => {
       if (v.file) await this.openAsMarkdown(v.file, v.leaf);

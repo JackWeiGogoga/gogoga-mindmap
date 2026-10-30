@@ -27,6 +27,8 @@ import {
   summaryGroups,
   visibleChildren,
   walk,
+  hideNode,
+  countHidden,
 } from "./model";
 import {
   BOX_PAD,
@@ -180,6 +182,10 @@ export interface CanvasOptions {
   onSideBySide?: () => void;
   /** 提供则工具栏出现「锁定编辑」按钮：锁住后只能看（缩放、平移、折叠），参数是锁上之后的状态 */
   onLockChange?: (locked: boolean) => void;
+  /** 「显示隐藏的节点」现在开着没有（开着时带 %%hide%% 的节点半透明地留在图里） */
+  showHidden?: () => boolean;
+  /** 工具栏 / 命令切换「显示隐藏的节点」：宿主按新规则重新解析 */
+  onToggleHidden?: () => void;
   /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
   toolbarPosition?: ToolbarPosition;
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
@@ -319,6 +325,8 @@ const ICONS: Record<string, string> = {
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  // 虚线框里一只眼睛：把藏起来的节点显示出来
+  hiddenNodes: '<svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M6 12s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="12" cy="12" r="1.5"/></svg>',
   recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
@@ -489,6 +497,7 @@ export class MindMapCanvas {
   private calloutsHidden = false;
   private peekCallout: MindNode | null = null;
   private calloutButton: HTMLElement | null = null;
+  private hiddenButton: HTMLElement | null = null;
   /** 展开的备注：卡片是 nodes 层里的 HTML（按节点 id 复用），放到分支下面离得远时引线画在 svg 里 */
   private noteLayer!: SVGGElement;
   private noteLinks: SVGPathElement[] = [];
@@ -501,6 +510,8 @@ export class MindMapCanvas {
   private cardKeys: NoteCards = {};
   /** 这次操作里因为挪动被升成标题的列表节点，notify 时提示一次 */
   private promoted: MindNode[] = [];
+  /** 只把标题当节点时，新建出了六级以下的节点（写回会变成备注）：提示过一次就不再提 */
+  private warnedDeep = false;
   private notesButton: HTMLElement | null = null;
   /** 备注里的图片、公式晚到会把卡片撑大，尺寸一变就重新排版 */
   private noteRo: ResizeObserver | null = null;
@@ -1062,6 +1073,7 @@ export class MindMapCanvas {
     this.rebuild();
     this.updateCalloutButton();
     this.updateNotesButton();
+    this.updateHiddenButton();
     // 背诵模式的「单选 / 多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
@@ -1111,7 +1123,7 @@ export class MindMapCanvas {
       const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
       // 内容签名管子节点，整体签名再叠上纯表现的部分（选中、配色、层级）；
       // 只有前者变了才重建 DOM，选一下节点不该把里面的 iframe 打回重载
-      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : ""].join("\u0001");
+      const contentSig = [node.text, node.note ? "n" : "", node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
@@ -1158,6 +1170,8 @@ export class MindMapCanvas {
         el.classList.add("has-width");
         el.style.width = `${node.width}px`;
       }
+      // 「显示隐藏的节点」开着时才会在树里遇到：半透明、虚线框，一眼看出它在脑图里是藏着的
+      if (node.hidden) el.classList.add("is-hidden-node");
       if (isUnderlineAt(theme, rel) && !node.color) {
         el.classList.add("is-underline");
       }
@@ -2113,6 +2127,49 @@ export class MindMapCanvas {
     this.render();
   }
 
+  private updateHiddenButton(): void {
+    const b = this.hiddenButton;
+    if (!b || !this.doc) return;
+    // 代码块里的脑图没有接这个开关
+    if (!this.opts.onToggleHidden) {
+      b.classList.add("is-hidden");
+      return;
+    }
+    const shown = !!this.opts.showHidden?.();
+    const any = countHidden(this.doc.root) > 0;
+    b.classList.toggle("is-hidden", !any && !shown);
+    b.classList.toggle("is-active", shown);
+    this.tip(b, shown ? t("canvas.hideHidden") : t("canvas.showHidden"), "toolbar");
+  }
+
+  /** 右键「在脑图中隐藏」：打上 %%hide%%；没开「显示隐藏的节点」时直接从图里摘掉 */
+  hideSelected(): void {
+    if (!this.opts.editable || !this.doc) return;
+    const targets = [...this.selected].filter((n) => n.parent && !n.hidden);
+    if (!targets.length) return;
+    const show = !!this.opts.showHidden?.();
+    const next = targets[0].parent!;
+    for (const n of targets) {
+      if (show) n.hidden = true;
+      else hideNode(n);
+    }
+    if (!show) {
+      this.select(next.children.find((c) => !targets.includes(c)) ?? next);
+      this.opts.host?.notice?.(t("notice.nodesHidden", { count: targets.length }));
+    }
+    this.render();
+    this.notify();
+  }
+
+  unhideSelected(): void {
+    if (!this.opts.editable) return;
+    const targets = [...this.selected].filter((n) => n.hidden);
+    for (const n of targets) n.hidden = false;
+    if (!targets.length) return;
+    this.render();
+    this.notify();
+  }
+
   private updateCalloutButton(): void {
     const b = this.calloutButton;
     if (!b || !this.doc) return;
@@ -2678,6 +2735,8 @@ export class MindMapCanvas {
     this.calloutButton = btn("callout", t("canvas.toggleCallouts"), () => this.toggleCallouts());
     // 只在图里有备注时出现
     this.notesButton = btn("note", t("canvas.toggleNotes"), () => this.toggleNotes());
+    // 只在图里有隐藏的节点时出现
+    this.hiddenButton = btn("hiddenNodes", t("canvas.showHidden"), () => this.opts.onToggleHidden?.());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
@@ -4414,6 +4473,16 @@ export class MindMapCanvas {
     }
     // 改名、挪动会让节点的文字路径变掉，先把单条备注的状态按新路径交出去
     this.emitNoteCards();
+    if (this.doc?.style.headingsOnly && !this.warnedDeep) {
+      let deep = false;
+      walk(this.doc.root, (n) => {
+        if (n !== this.doc!.root && n.kind === "list") deep = true;
+      });
+      if (deep) {
+        this.warnedDeep = true;
+        this.opts.host?.notice?.(t("notice.tooDeepForHeadings"));
+      }
+    }
     if (this.doc) this.opts.onChange?.(this.doc);
   }
 
@@ -5425,8 +5494,15 @@ export class MindMapCanvas {
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
       more.push(
         { title: t("menu.toHeading"), icon: "heading", disabled: !parent || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
-        { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list", run: () => this.convertLevel(node, "list") },
+        { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
       );
+      if (node.parent) {
+        more.push(
+          node.hidden
+            ? { title: t("menu.unhideNode"), icon: "eye", run: () => this.unhideSelected() }
+            : { title: t("menu.hideNode"), icon: "eye-off", run: () => this.hideSelected() },
+        );
+      }
       if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
       else if (node.parent && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       more.push(sep);

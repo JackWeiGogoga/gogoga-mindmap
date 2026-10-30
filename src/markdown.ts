@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { Boundary, createNode, findByPath, FloatPos, pathOf, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, pathOf, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -55,6 +55,7 @@ interface Marker {
   float?: FloatPos;
   callout?: string;
   calloutColor?: string;
+  hidden?: boolean;
 }
 
 /** 标记里的一项：box、box=3、summary=2、callout 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
@@ -126,6 +127,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       if (lower[0] === "x") fx = Number(lower.slice(2));
       else fy = Number(lower.slice(2));
     } else if (lower === "fold") marker.folded = true;
+    else if (lower === "hide") marker.hidden = true;
     else if ((COLOR_NAMES as readonly string[]).includes(lower)) marker.color = lower;
     // 内存里保留 # 前缀，直接当 CSS 颜色用
     else if (HEX_RE.test(t)) marker.color = lower.startsWith("#") ? lower : `#${lower}`;
@@ -148,19 +150,25 @@ function mergeMarker(a: Marker, b: Marker): Marker {
   return out;
 }
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor">): string {
+/** 外框 / 概要写回的跨度：范围里夹着隐藏的兄弟、在脑图里又没改过时，照文件原来写的 */
+const spanOf = (g: { span: number; raw?: HiddenSpan }) => (g.raw && g.raw.visible === g.span ? g.raw.span : g.span);
+
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
+  if (node.hidden) parts.push("hide");
   if (node.width) parts.push(`w=${Math.round(node.width)}`);
   if (node.side) parts.push(node.side);
   if (node.box) {
     const title = node.box.title.replace(/["%]/g, "").trim();
-    parts.push(`box${node.box.span > 1 ? `=${node.box.span}` : ""}${title ? ` "${title}"` : ""}`);
+    const span = spanOf(node.box);
+    parts.push(`box${span > 1 ? `=${span}` : ""}${title ? ` "${title}"` : ""}`);
   }
   if (node.summary) {
     const text = markerText(node.summary.text);
-    parts.push(`summary${node.summary.span > 1 ? `=${node.summary.span}` : ""}${text ? ` "${text}"` : ""}`);
+    const span = spanOf(node.summary);
+    parts.push(`summary${span > 1 ? `=${span}` : ""}${text ? ` "${text}"` : ""}`);
     if (node.summary.width) parts.push(`sw=${Math.round(node.summary.width)}`);
   }
   if (node.float) parts.push(`float x=${Math.round(node.float.x)} y=${Math.round(node.float.y)}`);
@@ -251,12 +259,13 @@ const NOTE_CALLOUT = "> [!note]";
  * inList：备注写在列表项下面（缩进）。不在列表里时，按 CommonMark 紧跟在文字后面的「2026. 年底」这类
  * 不从 1 开始的有序项、空列表项只是续行，不会变成节点，不用包 —— 包了会渲染成引用块，显示就变了
  */
-export function noteNeedsEscape(note: string, inList = true): boolean {
+/** listsOk：只把标题当节点时，标题备注里的列表读回来还是备注，不用包起来 */
+export function noteNeedsEscape(note: string, inList = true, listsOk = false): boolean {
   if (!note) return false;
   const tokens = tokenize(note.split("\n"));
   return tokens.some((t, i) => {
     if (t.t === "heading") return true;
-    if (t.t !== "list") return false;
+    if (t.t !== "list" || listsOk) return false;
     if (inList || !cannotInterrupt(t, tokens[i - 1])) return true;
     tokens[i] = { t: "line", raw: t.raw };
     return false;
@@ -289,8 +298,8 @@ export function unescapeNote(note: string): string {
 }
 
 /** 用户输入的原文 → 存储形式（只在必要时包装） */
-export function normalizeNote(plain: string, inList = true): string {
-  return noteNeedsEscape(plain, inList) ? escapeNote(plain) : plain;
+export function normalizeNote(plain: string, inList = true, listsOk = false): string {
+  return noteNeedsEscape(plain, inList, listsOk) ? escapeNote(plain) : plain;
 }
 
 // ---------- 剪贴板 ----------
@@ -465,10 +474,14 @@ export interface ParseOptions {
   lines?: Map<MindNode, number>;
   /** 唯一的一级标题升格为中心主题（默认）；false 时中心主题始终是 fallbackTitle，一级标题作为它的子节点 */
   rootFromH1?: boolean;
+  /** 只把标题当节点：列表照原样算进它所在标题的备注（写回时一字不动） */
+  headingsOnly?: boolean;
+  /** 带 %%hide%% 的节点也留在树里（「显示隐藏的节点」）；默认摘出去，不显示 */
+  showHidden?: boolean;
 }
 
-/** 节点路径和行号互查时要和视图用同一种根节点规则，否则路径对不上 */
-export type RootRule = Pick<ParseOptions, "rootFromH1">;
+/** 节点路径和行号互查时要和视图用同一套规则（根节点、只认标题、隐藏节点），否则路径对不上 */
+export type RootRule = Pick<ParseOptions, "rootFromH1" | "headingsOnly" | "showHidden">;
 
 export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const lines = src.replace(/\r\n?/g, "\n").split("\n");
@@ -524,6 +537,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       // 改写回 tokens：下一行的「3.」看到的前一行就是文字，同样算续行
       tok = tokens[ti] = { t: "line", raw: tok.raw };
     }
+    // 只把标题当节点：列表项就是普通的一行，跟着段落进标题的备注
+    if (tok.t === "list" && opts.headingsOnly) tok = tokens[ti] = { t: "line", raw: tok.raw };
     // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
     const lineNo = start + ti;
     if (tok.t === "heading") {
@@ -548,8 +563,9 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.box = marker.box;
         root.summary = marker.summary;
         root.width = marker.width;
-        // 中心主题上的 float 没有意义，但原样保留，写回不改用户的文本
+        // 中心主题上的 float、hide 没有意义，但原样保留，写回不改用户的文本
         root.float = marker.float;
+        root.hidden = marker.hidden;
         root.callout = marker.callout;
         root.calloutColor = marker.calloutColor;
         root.level = 1;
@@ -563,7 +579,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -583,7 +599,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, bullet: tok.bullet, blockId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);
@@ -656,6 +672,9 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     const minLevel = root.children.reduce((m, c) => (c.kind === "heading" ? Math.min(m, c.level) : m), 7);
     root.level = minLevel === 7 ? 1 : minLevel - 1;
   }
+  // 隐藏的节点摘出去（中心主题不算）；它们的行号也去掉，那几行算前面的节点。
+  // 放在算根节点级别之后：最高一级的标题全隐藏了，写回的级别也不能变
+  if (!opts.showHidden) stripHidden(root, (n) => opts.lines?.delete(n));
 
   const style: DocStyle = {
     ...DEFAULT_STYLE,
@@ -663,6 +682,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     indent: detectIndent(indents) ?? opts.style?.indent ?? DEFAULT_STYLE.indent,
     bullet: mostCommon(bullets.filter((b) => /^[-*+]$/.test(b))) ?? opts.style?.bullet ?? DEFAULT_STYLE.bullet,
     blankBeforeList: blankBeforeList ?? opts.style?.blankBeforeList ?? DEFAULT_STYLE.blankBeforeList,
+    headingsOnly: opts.headingsOnly || undefined,
   };
 
   return { root, frontmatter, preamble: joinNote(preamble), rootFromHeading, style };
@@ -710,9 +730,9 @@ export function serializeMarkdown(doc: MindDoc): string {
     if (marker) out.push(marker);
     if (node.note) {
       ensureBlank();
-      pushBlock(normalizeNote(node.note, false));
+      pushBlock(normalizeNote(node.note, false, style.headingsOnly));
     }
-    const kids = node.children;
+    const kids = allChildren(node);
     const headingKids = kids.filter((c) => c.kind === "heading" && level < 6);
     // 列表子节点先于标题子节点写出（标题会吞掉后面所有列表，顺序只能如此）
     const listKids = kids.filter((c) => !headingKids.includes(c));
@@ -722,7 +742,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     }
     if (node.tail) {
       ensureBlank();
-      pushBlock(normalizeNote(node.tail, false));
+      pushBlock(normalizeNote(node.tail, false, style.headingsOnly));
     }
     for (const c of headingKids) emitHeading(c, level + 1);
   };
@@ -742,7 +762,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     if (node.note) {
       for (const l of normalizeNote(node.note).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
     }
-    for (const c of node.children) emitList(c, depth + 1);
+    for (const c of allChildren(node)) emitList(c, depth + 1);
     if (node.tail) emitBlock(node.tail, depth + 1);
   };
 
@@ -752,18 +772,19 @@ export function serializeMarkdown(doc: MindDoc): string {
   } else {
     if (root.note) {
       ensureBlank();
-      pushBlock(normalizeNote(root.note, false));
+      pushBlock(normalizeNote(root.note, false, style.headingsOnly));
     }
     const level = Math.max(1, root.level + 1);
-    const headingKids = root.children.filter((c) => c.kind === "heading");
-    const listKids = root.children.filter((c) => c.kind !== "heading");
+    const rootKids = allChildren(root);
+    const headingKids = rootKids.filter((c) => c.kind === "heading");
+    const listKids = rootKids.filter((c) => c.kind !== "heading");
     if (listKids.length) {
       if (root.note) ensureBlank();
       for (const c of listKids) emitList(c, 0);
     }
     if (root.tail) {
       ensureBlank();
-      pushBlock(normalizeNote(root.tail, false));
+      pushBlock(normalizeNote(root.tail, false, style.headingsOnly));
     }
     for (const c of headingKids) emitHeading(c, Math.min(level, 6));
   }
@@ -779,11 +800,11 @@ export function normalizeKinds(doc: MindDoc): void {
       if (!parentIsHeading || parentLevel >= 6) node.kind = "list";
       else node.level = parentLevel + 1;
     }
-    for (const c of node.children) fix(c, node.level, node.kind === "heading");
+    for (const c of allChildren(node)) fix(c, node.level, node.kind === "heading");
   };
   const rootLevel = doc.rootFromHeading ? 1 : doc.root.level;
   doc.root.level = rootLevel;
-  for (const c of doc.root.children) fix(c, rootLevel, true);
+  for (const c of allChildren(doc.root)) fix(c, rootLevel, true);
 }
 
 /** 把某个节点的整层兄弟统一改成标题或列表；返回是否可行 */

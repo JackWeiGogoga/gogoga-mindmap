@@ -1832,3 +1832,7 @@ body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:
   stroke-dasharray: 3 3;
   opacity: 0.7;
 }
+
+/* 「显示隐藏的节点」：带 %%hide%% 的节点半透明、虚线框 */
+.gg-mm-node.is-hidden-node { opacity: 0.45; outline: 1.5px dashed var(--text-faint, #999); outline-offset: 2px; }
+.gg-mm-node.is-hidden-node.is-selected { opacity: 0.75; }

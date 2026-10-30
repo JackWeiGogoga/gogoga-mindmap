@@ -49,6 +49,14 @@ export interface MindNode {
   bullet: string;
   /** Obsidian 块引用 id（列表项末尾的 ^abc123），用于 [[笔记#^id]] */
   blockId?: string;
+  /** %%hide%%：不在脑图里显示（连同子树），笔记里照旧 */
+  hidden?: boolean;
+  /**
+   * 隐藏的节点不进 children（画布上的操作都碰不到它们），挂在它前面那个可见的兄弟身上，写回时原位放回；
+   * 排在所有可见兄弟前面的挂在父节点的 hiddenFirst 上。打开「显示隐藏的节点」时不摘，这两个都为空
+   */
+  hiddenAfter?: MindNode[];
+  hiddenFirst?: MindNode[];
   children: MindNode[];
   parent: MindNode | null;
   depth: number;
@@ -66,11 +74,20 @@ export interface Boundary {
   /** 框住的兄弟数，含本节点，至少 1 */
   span: number;
   title: string;
+  /** 范围里夹着隐藏的兄弟时，文件里写的原始跨度和摘掉隐藏节点后的跨度；没改过就按原样写回 */
+  raw?: HiddenSpan;
+}
+
+export interface HiddenSpan {
+  span: number;
+  visible: number;
 }
 
 export interface Summary {
   /** 括住的兄弟数，含本节点，至少 1 */
   span: number;
+  /** 同 Boundary.raw */
+  raw?: HiddenSpan;
   /** 行内 Markdown（链接、加粗……），不能含 " 和 %% */
   text: string;
   /** 拖出来的文字框宽度（px），文字按它换行；没有就按内容自适应。%%sw=240%% */
@@ -86,6 +103,8 @@ export interface DocStyle {
   blankBeforeList: boolean;
   /** 深于这个级别的标题节点，新建子节点时改用列表 */
   maxHeadingLevel: number;
+  /** 这张图只把标题当节点（列表都是标题的备注）：新节点都写成标题，写回时备注里的列表不用包起来 */
+  headingsOnly?: boolean;
 }
 
 export interface MindDoc {
@@ -127,6 +146,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
     blockId: init.blockId,
+    hidden: init.hidden,
     children: init.children ?? [],
     parent,
     depth: parent ? parent.depth + 1 : 0,
@@ -397,12 +417,101 @@ function releaseLead(node: MindNode): void {
   node.lead = "";
 }
 
+/** 节点要离开原来的位置：挂在它后面的隐藏兄弟留在原处，改挂到它前面的兄弟（或父节点）身上 */
+function releaseHidden(node: MindNode): void {
+  const parent = node.parent;
+  const after = node.hiddenAfter;
+  if (!parent || !after?.length) return;
+  node.hiddenAfter = undefined;
+  const prev = parent.children[parent.children.indexOf(node) - 1];
+  if (prev) prev.hiddenAfter = [...(prev.hiddenAfter ?? []), ...after];
+  else parent.hiddenFirst = [...(parent.hiddenFirst ?? []), ...after];
+}
+
+/** 写回用：可见的子节点连同挂着的隐藏节点，按文件里的顺序 */
+export function allChildren(node: MindNode): MindNode[] {
+  if (!node.hiddenFirst?.length && !node.children.some((c) => c.hiddenAfter?.length)) return node.children;
+  const out = [...(node.hiddenFirst ?? [])];
+  for (const c of node.children) out.push(c, ...(c.hiddenAfter ?? []));
+  return out;
+}
+
+/** 隐藏的节点数（含子树里的；摘掉的和显示着的都算），给工具栏按钮判断要不要出现 */
+export function countHidden(root: MindNode): number {
+  let n = 0;
+  const visit = (node: MindNode) => {
+    for (const c of allChildren(node)) {
+      if (c.hidden) n++;
+      visit(c);
+    }
+  };
+  visit(root);
+  return n;
+}
+
+/**
+ * 把带 %%hide%% 的节点从树里摘出来，挂到前面那个可见兄弟上（见 MindNode.hiddenAfter）。
+ * 外框、概要的跨度按可见的兄弟重算，原始跨度记下来，没改过就原样写回
+ */
+export function stripHidden(node: MindNode, onRemove?: (n: MindNode) => void): void {
+  const all = node.children;
+  if (all.some((c) => c.hidden)) {
+    for (let i = 0; i < all.length; i++) {
+      const c = all[i];
+      if (c.hidden) continue;
+      for (const g of [c.box, c.summary]) {
+        if (!g || g.span <= 1) continue;
+        const visible = all.slice(i, i + g.span).filter((x) => !x.hidden).length;
+        if (visible !== g.span) {
+          g.raw = { span: g.span, visible };
+          g.span = visible;
+        }
+      }
+    }
+    const kept: MindNode[] = [];
+    for (const c of all) {
+      if (!c.hidden) {
+        kept.push(c);
+        continue;
+      }
+      const prev = kept[kept.length - 1];
+      if (prev) prev.hiddenAfter = [...(prev.hiddenAfter ?? []), c];
+      else node.hiddenFirst = [...(node.hiddenFirst ?? []), c];
+      if (onRemove) walk(c, onRemove);
+    }
+    node.children = kept;
+  }
+  for (const c of node.children) stripHidden(c, onRemove);
+}
+
+/** 右键「在脑图中隐藏」：打上 %%hide%%，从树里摘掉（写回时原位放回） */
+export function hideNode(node: MindNode): boolean {
+  const parent = node.parent;
+  if (!parent) return false;
+  const idx = parent.children.indexOf(node);
+  if (idx < 0) return false;
+  node.hidden = true;
+  const prev = parent.children[idx - 1];
+  const moving = [node, ...(node.hiddenAfter ?? [])];
+  node.hiddenAfter = undefined;
+  if (prev) prev.hiddenAfter = [...(prev.hiddenAfter ?? []), ...moving];
+  else parent.hiddenFirst = [...(parent.hiddenFirst ?? []), ...moving];
+  parent.children.splice(idx, 1);
+  // 罩着它的外框 / 概要少罩一个
+  parent.children.forEach((s, i) => {
+    if (i >= idx) return;
+    for (const g of [s.box, s.summary]) if (g && i + g.span > idx) g.span = Math.max(1, g.span - 1);
+  });
+  return true;
+}
+
 export function removeNode(node: MindNode): boolean {
   const parent = node.parent;
   if (!parent) return false;
   const idx = parent.children.indexOf(node);
   if (idx < 0) return false;
   releaseLead(node);
+  releaseHidden(node);
   parent.children.splice(idx, 1);
   node.parent = null;
   return true;
@@ -436,6 +545,7 @@ export function moveNode(node: MindNode, newParent: MindNode, index: number, sty
   if (node === newParent || isAncestor(node, newParent) || !node.parent) return false;
   const oldParent = node.parent;
   releaseLead(node);
+  releaseHidden(node);
   const oldIdx = oldParent.children.indexOf(node);
   oldParent.children.splice(oldIdx, 1);
   if (oldParent === newParent && index > oldIdx) index -= 1;
@@ -547,7 +657,10 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     level: node.level,
     bullet: node.bullet,
     blockId: node.blockId,
+    hidden: node.hidden,
   });
   copy.children = node.children.map((c) => cloneTree(c, copy));
+  if (node.hiddenFirst) copy.hiddenFirst = node.hiddenFirst.map((c) => cloneTree(c, copy));
+  if (node.hiddenAfter) copy.hiddenAfter = node.hiddenAfter.map((c) => cloneTree(c, parent));
   return copy;
 }

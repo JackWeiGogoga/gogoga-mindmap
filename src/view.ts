@@ -242,6 +242,8 @@ export class MindMapView extends TextFileView {
       onSideBySide: () => {
         if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
       },
+      showHidden: () => this.plugin.showHidden,
+      onToggleHidden: () => this.plugin.toggleShowHidden(),
       onLockChange: (locked) => {
         if (this.file) this.plugin.setLocked(this.file.path, locked);
       },
@@ -493,7 +495,10 @@ export class MindMapView extends TextFileView {
 
   /** 影响解析结果的设置变了（比如中心主题规则）：按当前文本重新解析 */
   reloadFromSettings(): void {
-    if (this.doc) this.reparse();
+    if (!this.doc) return;
+    // 画布上还没落盘的编辑先交出来，再按新规则重新解析，不然就丢了
+    this.canvas?.flush();
+    this.reparse();
   }
 
   /** 按这个视图的规则解析一段文本（文件名作兜底标题、中心主题规则、新节点的写法） */
@@ -501,7 +506,8 @@ export class MindMapView extends TextFileView {
     return parseMarkdown(text, {
       fallbackTitle: this.file?.basename ?? "",
       ...this.plugin.rootRule(),
-      style: { maxHeadingLevel: this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
+      // 只把标题当节点时新节点一律写成标题，能写到六级
+      style: { maxHeadingLevel: this.plugin.settings.headingsOnly ? 6 : this.plugin.settings.maxHeadingLevel, indent: indentString(this.plugin.settings.indent) },
     });
   }
 
