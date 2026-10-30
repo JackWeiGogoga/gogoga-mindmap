@@ -20,6 +20,13 @@ export class PropertyIconDecorator {
 
   constructor(private app: App) {}
 
+  /** 主窗口和打开着的独立窗口：属性面板也可能在独立窗口里 */
+  private docs(): Document[] {
+    const docs = new Set<Document>([document]);
+    this.app.workspace.iterateAllLeaves((l) => docs.add(l.view.containerEl.doc));
+    return [...docs];
+  }
+
   /** 合并短时间内的多次触发 */
   schedule(): void {
     if (this.timer !== null) return;
@@ -32,7 +39,7 @@ export class PropertyIconDecorator {
   destroy(): void {
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
-    for (const el of Array.from(document.querySelectorAll(`.${MARK}`))) {
+    for (const el of this.docs().flatMap((d) => Array.from(d.querySelectorAll(`.${MARK}`)))) {
       el.classList.remove(MARK);
       el.querySelector(".mm-icon-prop-preview")?.remove();
     }
@@ -40,8 +47,10 @@ export class PropertyIconDecorator {
 
   private run(): void {
     try {
-      const rows = document.querySelectorAll<HTMLElement>(`.metadata-property[data-property-key="${KEY}"]`);
-      for (const row of Array.from(rows)) this.decorate(row);
+      for (const doc of this.docs()) {
+        const rows = doc.querySelectorAll<HTMLElement>(`.metadata-property[data-property-key="${KEY}"]`);
+        for (const row of Array.from(rows)) this.decorate(row);
+      }
     } catch {
       // 内部结构变了就当没这回事
     }

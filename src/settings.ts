@@ -27,18 +27,10 @@ export interface MindMapSettings {
   claimMindmapBlock: boolean;
   /** 重新打开 / 切回脑图时恢复上次的视口和选中 */
   rememberViewport: boolean;
-  /** 按文件路径记的视口，只留最近 50 个 */
-  viewports?: Record<string, SavedViewport>;
-  /** 隐藏了标注的脑图文件路径 */
-  hiddenCallouts?: string[];
   /** 备注默认展开显示在节点下面（默认关：点图标弹窗看） */
   notesExpanded: boolean;
-  /** 在工具栏上单独切换过备注展开的文件：路径 → 是否展开，优先于默认值 */
-  notesExpandedFiles?: Record<string, boolean>;
   /** 展开备注的最大高度（像素，随节点字号缩放） */
   noteMaxHeight: number;
-  /** 锁定了编辑的脑图文件路径 */
-  lockedFiles?: string[];
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
@@ -457,7 +449,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       .addToggle((tg) =>
         tg.setValue(this.plugin.settings.rememberViewport).onChange(async (v) => {
           this.plugin.settings.rememberViewport = v;
-          if (!v) delete this.plugin.settings.viewports;
+          if (!v) this.plugin.viewports.clear();
           await this.plugin.saveSettings();
         }),
       );

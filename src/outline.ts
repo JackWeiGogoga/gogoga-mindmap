@@ -216,9 +216,9 @@ export class OutlinePanel {
     row.classList.add("is-editing");
     this.editing = { node, el: text, isNew };
     text.focus();
-    const range = document.createRange();
+    const range = this.el.doc.createRange();
     range.selectNodeContents(text);
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
     const onBlur = () => {

@@ -818,7 +818,7 @@ export class MindMapCanvas {
   private flashNode(node: MindNode): void {
     const el = this.els.get(node.id);
     if (!el?.animate) return;
-    const color = getComputedStyle(el).getPropertyValue("--mm-selection").trim() || "#155dff";
+    const color = el.win.getComputedStyle(el).getPropertyValue("--mm-selection").trim() || "#155dff";
     el.animate([{ boxShadow: `0 0 0 6px ${color}` }, { boxShadow: `0 0 0 2px ${color}`, offset: 0.6 }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1200, easing: "ease-out" });
   }
 
@@ -2131,11 +2131,11 @@ export class MindMapCanvas {
     el.setAttribute("contenteditable", "plaintext-only");
     if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
     el.focus();
-    const range = document.createRange();
+    const range = this.el.doc.createRange();
     range.selectNodeContents(el);
     // 改已有的：光标放末尾，接着写
     range.collapse(false);
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
 
@@ -2303,9 +2303,9 @@ export class MindMapCanvas {
     el.setAttribute("contenteditable", "plaintext-only");
     if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
     el.focus();
-    const range = document.createRange();
+    const range = this.el.doc.createRange();
     range.selectNodeContents(el);
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
 
@@ -2390,9 +2390,9 @@ export class MindMapCanvas {
     el.setAttribute("contenteditable", "plaintext-only");
     if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
     el.focus();
-    const range = document.createRange();
+    const range = this.el.doc.createRange();
     range.selectNodeContents(el);
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
 
@@ -2487,10 +2487,12 @@ export class MindMapCanvas {
       close();
     };
     const cleanup = () => {
-      document.removeEventListener("pointerdown", onDown, true);
+      doc.removeEventListener("pointerdown", onDown, true);
       this.outsideCleanups.delete(cleanup);
     };
-    document.addEventListener("pointerdown", onDown, true);
+    // 脑图开在独立窗口里时，点击发生在那个窗口的 document 上
+    const doc = this.el.doc;
+    doc.addEventListener("pointerdown", onDown, true);
     this.outsideCleanups.add(cleanup);
     return cleanup;
   }
@@ -4632,10 +4634,10 @@ export class MindMapCanvas {
     el.classList.add("is-editing");
     label.focus({ preventScroll: true });
     // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
-    const range = document.createRange();
+    const range = this.el.doc.createRange();
     range.selectNodeContents(label);
     if (this.opts.caretAtEnd?.()) range.collapse(false);
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
     this.reflow();
@@ -4696,13 +4698,13 @@ export class MindMapCanvas {
       this.ty += a.vy;
       this.applyTransform();
       a.tick();
-      a.raf = window.requestAnimationFrame(step);
+      a.raf = this.el.win.requestAnimationFrame(step);
     };
-    this.autoScroll = { raf: window.requestAnimationFrame(step), vx, vy, tick };
+    this.autoScroll = { raf: this.el.win.requestAnimationFrame(step), vx, vy, tick };
   }
 
   private stopAutoScroll(): void {
-    if (this.autoScroll) window.cancelAnimationFrame(this.autoScroll.raf);
+    if (this.autoScroll) this.el.win.cancelAnimationFrame(this.autoScroll.raf);
     this.autoScroll = null;
   }
 
@@ -4714,9 +4716,9 @@ export class MindMapCanvas {
 
   /** 光标在 label 纯文本里的位置 */
   private caretOffset(label: HTMLElement): number | null {
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     if (!sel?.rangeCount || !sel.anchorNode || !label.contains(sel.anchorNode)) return null;
-    const r = document.createRange();
+    const r = this.el.doc.createRange();
     r.selectNodeContents(label);
     r.setEnd(sel.anchorNode, sel.anchorOffset);
     return r.toString().length;
@@ -4724,11 +4726,11 @@ export class MindMapCanvas {
 
   /** 选区在 label 纯文本里的起止 */
   private selectionRange(label: HTMLElement): { start: number; end: number } | null {
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     if (!sel?.rangeCount) return null;
     const r = sel.getRangeAt(0);
     if (!label.contains(r.startContainer) || !label.contains(r.endContainer)) return null;
-    const pre = document.createRange();
+    const pre = this.el.doc.createRange();
     pre.selectNodeContents(label);
     pre.setEnd(r.startContainer, r.startOffset);
     const start = pre.toString().length;
@@ -4756,8 +4758,8 @@ export class MindMapCanvas {
     label.textContent = before + open + inner + close + after;
     const s = before.length + open.length;
     const node = label.firstChild ?? label;
-    const sel = window.getSelection();
-    const r = document.createRange();
+    const sel = this.el.win.getSelection();
+    const r = this.el.doc.createRange();
     r.setStart(node, s);
     r.setEnd(node, s + inner.length);
     sel?.removeAllRanges();
@@ -4768,7 +4770,7 @@ export class MindMapCanvas {
 
   private setCaret(label: HTMLElement, offset: number): void {
     const node = label.firstChild ?? label;
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     sel?.collapse(node, Math.min(offset, node.textContent?.length ?? 0));
   }
 
@@ -4829,7 +4831,7 @@ export class MindMapCanvas {
     }
     this.paintLinkSuggest();
     // 跟着光标走
-    const sel = window.getSelection();
+    const sel = this.el.win.getSelection();
     const host_ = this.el.getBoundingClientRect();
     let rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
     if (!rect || (!rect.width && !rect.height)) rect = label.getBoundingClientRect();
@@ -5268,7 +5270,7 @@ export class MindMapCanvas {
         "pointerup",
         () => {
           window.clearTimeout(fallback);
-          window.requestAnimationFrame(reveal);
+          this.el.win.requestAnimationFrame(reveal);
         },
         { once: true },
       );

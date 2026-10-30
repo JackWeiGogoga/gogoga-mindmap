@@ -124,7 +124,7 @@ class MindMapEmbed extends Component {
         onLayout: (bounds) => {
           this.bounds = bounds;
           // 布局回调可能处在 ResizeObserver 链路里，推到下一帧再改高度
-          window.requestAnimationFrame(() => this.resize());
+          this.ctx.containerEl.win.requestAnimationFrame(() => this.resize());
         },
       });
       // 实时预览里嵌入框的宽度会在第一次布局之后才定下来；宽度一变就重算高度、重新适应。

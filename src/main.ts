@@ -44,6 +44,7 @@ import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { parseCustomMarkers, setCustomMarkers } from "./inline";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
+import { FileStateStore, LEGACY_KEYS, LegacyFileState, ViewportStore } from "./state";
 
 const FRONTMATTER_KEY = "mindmap";
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
@@ -53,6 +54,10 @@ const ICON_KEY = "icon";
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
+  /** 锁定、备注展开、隐藏标注：插件目录下的 state.json，和设置分开 */
+  fileState!: FileStateStore;
+  /** 视口：只存本机 */
+  viewports!: ViewportStore;
   /** 用户明确要求以 Markdown 打开的文件，跳过一次视图重定向 */
   private markdownOverride = new Set<string>();
   /** 脑图笔记临时以 Markdown 打开时，标签页右上角那个「以思维导图打开」按钮 */
@@ -130,42 +135,24 @@ export default class MindMapPlugin extends Plugin {
     });
     this.registerEvent(this.app.workspace.on("layout-change", refreshProps));
     this.registerEvent(this.app.workspace.on("active-leaf-change", refreshProps));
-    // 记住的视口、标注的隐藏状态跟着文件改名 / 删除走
+    // 记住的视口、锁定、标注隐藏这些状态跟着文件改名 / 删除走
     this.registerEvent(
       this.app.vault.on("rename", (f, oldPath) => {
-        for (const list of [this.settings.hiddenCallouts, this.settings.lockedFiles]) {
-          const hi = list?.indexOf(oldPath) ?? -1;
-          if (!list || hi < 0) continue;
-          list[hi] = f.path;
-          this.saveSettingsSoon();
-        }
-        const ne = this.settings.notesExpandedFiles;
-        if (ne && oldPath in ne) {
-          ne[f.path] = ne[oldPath];
-          delete ne[oldPath];
-          this.saveSettingsSoon();
-        }
-        const vp = this.settings.viewports?.[oldPath];
-        if (!vp || !this.settings.viewports) return;
-        delete this.settings.viewports[oldPath];
-        this.settings.viewports[f.path] = vp;
-        this.saveSettingsSoon();
+        this.fileState.rename(oldPath, f.path);
+        this.viewports.rename(oldPath, f.path);
       }),
     );
     this.registerEvent(
       this.app.vault.on("delete", (f) => {
-        if (this.settings.hiddenCallouts?.includes(f.path)) this.setCalloutsHidden(f.path, false);
-        if (this.settings.lockedFiles?.includes(f.path)) this.setLocked(f.path, false);
-        if (this.settings.notesExpandedFiles && f.path in this.settings.notesExpandedFiles) {
-          delete this.settings.notesExpandedFiles[f.path];
-          if (!Object.keys(this.settings.notesExpandedFiles).length) delete this.settings.notesExpandedFiles;
-          this.saveSettingsSoon();
-        }
-        if (!this.settings.viewports?.[f.path]) return;
-        delete this.settings.viewports[f.path];
-        this.saveSettingsSoon();
+        this.fileState.remove(f.path);
+        this.viewports.remove(f.path);
       }),
     );
+    // 别的设备同步过来改了 state.json：切回 Obsidian 时读回来，打开着的脑图跟上
+    const refreshState = () => void this.fileState.refresh().then((changed) => changed && this.applyFileState());
+    this.registerDomEvent(window, "focus", refreshState);
+    this.registerEvent(this.app.workspace.on("window-open", (win) => this.registerDomEvent(win.win, "focus", refreshState)));
+    this.register(() => void this.fileState.flush());
     this.register(() => {
       if (this.saveTimer === null) return;
       window.clearTimeout(this.saveTimer);
@@ -185,7 +172,23 @@ export default class MindMapPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<MindMapSettings> | null) };
+    const raw = ((await this.loadData()) as (Partial<MindMapSettings> & LegacyFileState) | null) ?? {};
+    this.settings = { ...DEFAULT_SETTINGS, ...raw };
+    this.fileState = new FileStateStore(this.app.vault.adapter, `${this.manifest.dir}/state.json`);
+    await this.fileState.load();
+    this.viewports = new ViewportStore(this.app);
+    // 0.28.2 以前这些按文件的状态都记在 data.json 里：搬过去，再从设置里删掉
+    if (LEGACY_KEYS.some((k) => k in raw)) {
+      const flags = (list?: string[]) => Object.fromEntries((list ?? []).map((p) => [p, true]));
+      this.fileState.fill("hiddenCallouts", flags(raw.hiddenCallouts));
+      this.fileState.fill("locked", flags(raw.lockedFiles));
+      this.fileState.fill("notesExpanded", raw.notesExpandedFiles ?? {});
+      if (raw.viewports) this.viewports.fill(raw.viewports);
+      const s = this.settings as MindMapSettings & LegacyFileState;
+      for (const k of LEGACY_KEYS) delete s[k];
+      await this.fileState.flush();
+      await this.saveSettings();
+    }
     this.settings.customThemes = this.settings.customThemes.map(normalizeCustomTheme);
     // 0.3.x 用的是借来的 lucide:git-fork；裸的 mindmap-tree 又不被文件列表插件认，统一迁到带前缀的值
     if (this.settings.listIcon === "lucide:git-fork" || this.settings.listIcon === MINDMAP_ICON) {
@@ -238,7 +241,7 @@ export default class MindMapPlugin extends Plugin {
   }
 
   private saveTimer: number | null = null;
-  /** 平移、缩放会频繁改视口，攒一下再写 data.json */
+  /** 连续改设置（拖滑块之类）时攒一下再写 data.json */
   saveSettingsSoon(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
@@ -247,46 +250,42 @@ export default class MindMapPlugin extends Plugin {
     }, 1500);
   }
 
+  /** state.json 读回了别的设备的改动：打开着的脑图跟上 */
+  private applyFileState(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      if (leaf.view instanceof MindMapView) leaf.view.applyFileState();
+    }
+  }
+
   // ---------- 标注的显示 / 隐藏（按文件记） ----------
 
   isCalloutsHidden(path: string): boolean {
-    return !!path && !!this.settings.hiddenCallouts?.includes(path);
+    return !!path && !!this.fileState.get("hiddenCallouts", path);
   }
 
   setCalloutsHidden(path: string, hidden: boolean): void {
-    if (!path) return;
-    const list = this.settings.hiddenCallouts ?? [];
-    const next = hidden ? [...new Set([...list, path])] : list.filter((p) => p !== path);
-    if (next.length) this.settings.hiddenCallouts = next;
-    else delete this.settings.hiddenCallouts;
-    this.saveSettingsSoon();
+    this.fileState.set("hiddenCallouts", path, hidden || undefined);
   }
 
   // ---------- 备注展开（默认值在设置里，工具栏上切换过的按文件记） ----------
 
   isNotesExpanded(path: string): boolean {
-    return (path ? this.settings.notesExpandedFiles?.[path] : undefined) ?? this.settings.notesExpanded;
+    return (path ? this.fileState.get("notesExpanded", path) : undefined) ?? this.settings.notesExpanded;
   }
 
   setNotesExpanded(path: string, expanded: boolean): void {
-    if (!path) return;
-    this.settings.notesExpandedFiles = { ...this.settings.notesExpandedFiles, [path]: expanded };
-    this.saveSettingsSoon();
+    this.fileState.set("notesExpanded", path, expanded);
   }
 
   // ---------- 锁定编辑（按文件记，不写进笔记） ----------
 
   isLocked(path: string): boolean {
-    return !!path && !!this.settings.lockedFiles?.includes(path);
+    return !!path && !!this.fileState.get("locked", path);
   }
 
   setLocked(path: string, locked: boolean): void {
     if (!path) return;
-    const list = this.settings.lockedFiles ?? [];
-    const next = locked ? [...new Set([...list, path])] : list.filter((p) => p !== path);
-    if (next.length) this.settings.lockedFiles = next;
-    else delete this.settings.lockedFiles;
-    this.saveSettingsSoon();
+    this.fileState.set("locked", path, locked || undefined);
     // 同一个文件开在别的标签页里的脑图跟着锁上 / 解开
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       const v = leaf.view;
@@ -297,20 +296,13 @@ export default class MindMapPlugin extends Plugin {
   // ---------- 记住视口 ----------
 
   getViewport(path: string): SavedViewport | undefined {
-    return this.settings.rememberViewport ? this.settings.viewports?.[path] : undefined;
+    return this.settings.rememberViewport ? this.viewports.get(path) : undefined;
   }
 
   rememberViewport(path: string, vp: Omit<SavedViewport, "at">): void {
     // 文件刚被删掉时视图随后关闭还会再记一次，跳过已经不存在的文件
     if (!this.settings.rememberViewport || !path || !this.app.vault.getAbstractFileByPath(path)) return;
-    const all = (this.settings.viewports ??= {});
-    all[path] = { ...vp, at: Date.now() };
-    const keys = Object.keys(all);
-    if (keys.length > 50) {
-      keys.sort((a, b) => all[a].at - all[b].at);
-      for (const k of keys.slice(0, keys.length - 50)) delete all[k];
-    }
-    this.saveSettingsSoon();
+    this.viewports.set(path, { ...vp, at: Date.now() });
   }
 
   // ---------- 自定义主题 ----------
@@ -543,12 +535,19 @@ export default class MindMapPlugin extends Plugin {
    * 脑图选中对应节点。光标移动没有公开事件，用 document 的 selectionchange（CodeMirror 会同步 DOM 选区），
    * 只认有焦点的编辑器 —— 脑图那边带过来的光标不会再弹回去
    */
+  /** 分屏联动最近一次对上的「文件 + 行」：两边互相带的时候靠它别来回弹 */
+  private lastFollowKey = "";
+
   private registerSplitSync(): void {
     let timer: number | null = null;
-    let last = "";
-    this.registerDomEvent(document, "selectionchange", () => {
+    const onSelectionChange = (ev: Event) => {
       if (!this.settings.syncSplit) return;
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      // 找这个窗口里光标所在的编辑器：不用 activeLeaf，独立窗口里的编辑器不一定是它
+      const doc = ev.target as Document;
+      const view = this.app.workspace
+        .getLeavesOfType("markdown")
+        .map((l) => l.view)
+        .find((v): v is MarkdownView => v instanceof MarkdownView && v.containerEl.doc === doc && v.editor.hasFocus());
       const file = view?.file;
       if (!view || !file || !view.editor.hasFocus()) return;
       const maps = this.visibleMapsOf(file.path);
@@ -560,12 +559,22 @@ export default class MindMapPlugin extends Plugin {
         if (!view.editor.hasFocus()) return;
         const line = view.editor.getCursor().line;
         const key = `${file.path}\u0001${line}`;
-        if (key === last) return;
-        last = key;
+        if (key === this.lastFollowKey) return;
+        this.lastFollowKey = key;
         const text = view.editor.getValue();
         for (const m of this.visibleMapsOf(file.path)) m.followLine(text, line);
       }, 200);
-    });
+    };
+    // 每个窗口有自己的 document：主窗口之外，独立窗口打开时也要挂上
+    const watched = new WeakSet<Document>();
+    const watch = (doc: Document) => {
+      if (watched.has(doc)) return;
+      watched.add(doc);
+      this.registerDomEvent(doc, "selectionchange", onSelectionChange);
+    };
+    watch(document);
+    this.registerEvent(this.app.workspace.on("window-open", (win) => watch(win.doc)));
+    this.app.workspace.onLayoutReady(() => this.allDocs().forEach(watch));
     this.register(() => {
       if (timer !== null) window.clearTimeout(timer);
     });
@@ -613,11 +622,14 @@ export default class MindMapPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       const view = leaf.view;
       if (!(view instanceof MarkdownView) || view.file?.path !== from.file.path || !view.containerEl.isShown()) continue;
-      // 用户正在那边打字：光标是他的，不去动
-      if (view.editor.hasFocus()) continue;
+      // 用户正在那边打字：光标是他的，不去动。各窗口各记各的焦点：Markdown 开在别的窗口时，
+      // 它的编辑器一直显示「有焦点」，可人正在这边点脑图，不算在打字
+      if (view.editor.hasFocus() && view.containerEl.doc === from.containerEl.doc) continue;
       const editor = view.editor;
       const line = lineOfPath(editor.getValue(), path, this.rootRule());
       if (line === null) continue;
+      // 记成已跟随过的那一行：别的窗口里的编辑器还带着焦点，这次移光标引起的 selectionchange 不再弹回脑图
+      this.lastFollowKey = `${from.file.path}\u0001${line}`;
       editor.setCursor({ line, ch: editor.getLine(line).length });
       editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
       this.flashLine(view, line);
@@ -633,12 +645,14 @@ export default class MindMapPlugin extends Plugin {
     const cm = (view.editor as unknown as { cm?: CM }).cm;
     if (!cm || line + 1 > cm.state.doc.lines) return;
     const pos = cm.state.doc.line(line + 1).from;
-    window.requestAnimationFrame(() =>
-      window.requestAnimationFrame(() => {
+    // 用编辑器所在窗口的：Markdown 开在独立窗口里时，主窗口在后台，它的动画帧会被节流
+    const win = view.containerEl.win;
+    win.requestAnimationFrame(() =>
+      win.requestAnimationFrame(() => {
         const node = cm.domAtPos(pos).node;
         const el = (node.instanceOf(HTMLElement) ? node : node.parentElement)?.closest<HTMLElement>(".cm-line");
         if (!el?.animate) return;
-        const color = getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
+        const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
         el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
       }),
     );
@@ -978,7 +992,7 @@ export default class MindMapPlugin extends Plugin {
           if (h !== lastHeight) {
             lastHeight = h;
             // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧
-            window.requestAnimationFrame(() => {
+            wrap.win.requestAnimationFrame(() => {
               wrap.style.height = `${h}px`;
             });
           }
@@ -1002,9 +1016,9 @@ export default class MindMapPlugin extends Plugin {
         let tries = 0;
         const refocus = () => {
           if (wrap.isConnected) canvas.focus();
-          else if (++tries < 10) window.requestAnimationFrame(refocus);
+          else if (++tries < 10) wrap.win.requestAnimationFrame(refocus);
         };
-        window.requestAnimationFrame(refocus);
+        wrap.win.requestAnimationFrame(refocus);
       }
       child.register(() => {
         state.selected = canvas.getSelectedPath();
@@ -1297,3 +1311,4 @@ interface BlockState {
 function joinPath(folder: string, name: string): string {
   return folder && folder !== "/" ? `${folder}/${name}` : name;
 }
+

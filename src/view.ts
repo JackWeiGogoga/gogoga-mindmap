@@ -131,6 +131,24 @@ export class MindMapView extends TextFileView {
     this.canvas?.setLocked(locked);
   }
 
+  /** state.json 被别的设备同步改过：按新的锁定、标注、备注状态更新这张图 */
+  applyFileState(): void {
+    const path = this.file?.path;
+    const c = this.canvas;
+    if (!path || !c) return;
+    if (c.isLocked() !== this.plugin.isLocked(path)) c.setLocked(this.plugin.isLocked(path));
+    let redraw = false;
+    if (c.isCalloutsHidden() !== this.plugin.isCalloutsHidden(path)) {
+      c.setCalloutsHidden(this.plugin.isCalloutsHidden(path));
+      redraw = true;
+    }
+    if (c.isNotesExpanded() !== this.plugin.isNotesExpanded(path)) {
+      c.setNotesExpanded(this.plugin.isNotesExpanded(path));
+      redraw = true;
+    }
+    if (redraw) c.render();
+  }
+
   toggleLock(): void {
     if (!this.canvas || !this.file) return;
     this.canvas.setLocked(!this.canvas.isLocked());
