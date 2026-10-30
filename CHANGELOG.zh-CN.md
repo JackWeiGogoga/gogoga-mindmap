@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-10-30
+
+### 修复
+- 中文输入法：打完拼音按回车上屏英文（比如 `cc`）时，不会再把拼音分隔符一起存进节点（系统输入法会变成 `c c`，搜狗会变成 `c'c`）。输入法组字时的回车、Esc、Tab 现在都交给输入法，节点编辑、大纲重命名、标注、概要、外框标题和搜索框都一样；组字时按 Esc 只取消组字，不会退出编辑。（[#18](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/18)）
+
 ## [0.28.1] - 2026-10-30
 
 ### 变更
@@ -380,7 +385,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...HEAD
+[0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0

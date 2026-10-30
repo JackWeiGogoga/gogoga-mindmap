@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-10-30
+
+### Fixed
+- Typing with a Chinese input method: pressing Enter to commit the Latin letters you typed (for example `cc`) no longer saves the pinyin separators too (`c c` with the macOS input method, `c'c` with Sogou). Enter, Esc and Tab now go to the input method while it is composing, in node editing, outline renames, callouts, summaries, box titles and the search box. Esc during composition only cancels the composition instead of closing the editor. ([#18](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/18))
+
 ## [0.28.1] - 2026-10-30
 
 ### Changed
@@ -380,7 +385,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...HEAD
+[0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
 [0.28.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.0...0.28.1
 [0.28.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.27.0...0.28.0
 [0.27.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.26.0...0.27.0
