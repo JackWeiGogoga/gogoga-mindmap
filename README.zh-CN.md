@@ -84,6 +84,10 @@ mindmap-theme: business
 
 想引用一张已经有的脑图，就像嵌入普通笔记一样写：脑图笔记用 `![[产品发布计划]]`，XMind 文件用 `![[竞品分析.xmind]]`。会显示一张只读预览，原文件改了预览跟着变；点工具栏的「打开」按钮或双击节点，打开原文件编辑。链接里带上节点就只显示那一支：`![[产品发布计划#时间线]]`（重名时可以写上级路径 `#团队#九月`），或者块引用 `![[产品发布计划#^abc123]]`，上方的面包屑可以回到整张图。把脑图笔记拖进白板（Canvas），卡片里也显示成脑图，铺满卡片，拉大拉小会自动适应。没有 `mindmap: true` 的普通笔记照常显示。
 
+### 让 AI 来写脑图
+
+脑图就是普通 Markdown，能写笔记的 AI 就能写脑图。[`skills/gogoga-mindmap/SKILL.md`](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/skills/gogoga-mindmap/SKILL.md) 把剩下的告诉它：哪些行会变成节点，结构和主题写在 frontmatter 的哪个键，颜色、折叠、外框、概要、标注怎么写。在 Claude Code 或其他支持 Agent Skills 的工具里，把 `skills/gogoga-mindmap` 文件夹复制到它的 skills 目录（Claude Code 是 `~/.claude/skills/`），然后让它把某个主题或某篇笔记做成脑图就行。别的 AI 工具，把这个文件的内容当提示词贴进对话即可。
+
 ### 编辑
 
 - 单击选中，双击编辑；选中后节点上方出现浮动工具栏：9 种颜色、编辑备注、删除。

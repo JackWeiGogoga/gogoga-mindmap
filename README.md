@@ -80,6 +80,10 @@ mindmap-theme: business
 
 To show a mind map you already have, embed the file like any other note: `![[Product launch]]` for a mind map note, or `![[Competitors.xmind]]` for an XMind file. It shows a read-only preview that follows the file as it changes; click the open button in its toolbar, or double-click a node, to open the file and edit it. Point at a node to show only that branch: `![[Product launch#Timeline]]` (a heading path like `#Team#September` works too) or a block reference `![[Product launch#^abc123]]`; a breadcrumb lets you step back up to the whole map. Dropped onto a Canvas, a mind map note fills its card and refits when you resize it. Notes without `mindmap: true` embed as usual.
 
+### Letting AI write mind maps
+
+Since a mind map is plain Markdown, any AI that can write a note can write a map. [`skills/gogoga-mindmap/SKILL.md`](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/skills/gogoga-mindmap/SKILL.md) tells it the rest: which lines become nodes, the frontmatter for structure and theme, and how to write colors, folding, boundaries, summaries and callouts. In Claude Code, or another tool that supports Agent Skills, copy the `skills/gogoga-mindmap` folder into its skills folder (for Claude Code, `~/.claude/skills/`), then ask for a mind map of a topic or a note. With other AI tools, paste the file's content into the conversation as instructions.
+
 ### Editing
 
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
