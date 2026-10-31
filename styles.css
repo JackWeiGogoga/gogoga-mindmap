@@ -1055,7 +1055,29 @@
 .gg-mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
 /* PDF 截区（PDF++ 画的裁切图）：外面包着 MarkdownRenderer 的段落和嵌入容器，去掉它们的边距，
    鼠标事件一律交给节点（和普通图片一样按坐标判断点没点在图上） */
-.mm-label .mm-pdf-crop { display: block; pointer-events: none; }
+.mm-label .mm-pdf-crop { display: block; position: relative; pointer-events: none; }
+/* 截区角上的「跳到 PDF」：鼠标移到节点上或选中时出现 */
+.mm-label .mm-pdf-jump {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  line-height: 22px;
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.gg-mm-node:hover .mm-pdf-jump, .gg-mm-node.is-selected .mm-pdf-jump { opacity: 1; }
+.mm-label .mm-pdf-jump:hover { background: rgba(0, 0, 0, 0.75); }
 .mm-label .mm-pdf-crop p { margin: 0; }
 .mm-label .mm-pdf-crop .internal-embed { display: block; margin: 0; }
 

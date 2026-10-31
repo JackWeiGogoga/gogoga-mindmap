@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-31
+
+### Added
+- "Delete note" in the node's context menu (and in the context menu of an expanded note); with several nodes selected, it removes all their notes.
+- More → "Split into subtopics at commas": turns "apples, pears; plums" into three subtopics. Commas inside links, math and code, and in numbers like 1,000, are left alone.
+- PDF crops show a ↗ button in the corner on hover or when selected; clicking it jumps back to that spot in the PDF.
+
+### Fixed
+- Clicking a link to a node (`[[note#^id]]` or `[[note#Heading]]`) in a mind map did nothing. It now selects and centers that node, unfolding its parents; following such a link from another note opens the map at that node.
+- Dragging the corner of an expanded note to resize it made the box flicker between the old and new size.
+- Shift + mouse wheel now pans sideways even where the system doesn't turn it into horizontal scrolling.
+
 ## [0.31.1] - 2026-10-31
 
 ### Fixed
@@ -413,7 +425,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...HEAD
+[0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0

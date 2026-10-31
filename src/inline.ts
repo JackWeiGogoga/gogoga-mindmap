@@ -438,7 +438,22 @@ function pdfCrop(target: string, param: string | undefined, opts: InlineOptions)
     }
     opts.onImageLoad?.();
   });
-  if (ok) return box;
+  if (ok) {
+    // 截区整块是图片（单击选中、双击看大图），跳回 PDF 走角上的按钮，和选区节点点文字跳过去一样
+    const jump = createEl("button", { cls: "mm-pdf-jump" });
+    jump.type = "button";
+    jump.textContent = "↗";
+    jump.setAttribute("aria-label", t("canvas.jumpToPdf"));
+    jump.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    jump.addEventListener("dblclick", (ev) => ev.stopPropagation());
+    jump.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      opts.onLink?.(target, true, ev);
+    });
+    box.append(jump);
+    return box;
+  }
   // 画不了截区：显示成指向那一页的链接
   const file = target.split("#")[0].split("/").pop() ?? target;
   const page = /[#&]page=(\d+)/.exec(target)?.[1];

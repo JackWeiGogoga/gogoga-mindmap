@@ -11,15 +11,14 @@
 
 import { App, Component, TFile } from "obsidian";
 import type MindMapPlugin from "./main";
-import { MindMapCanvas } from "./canvas";
+import { findSubpathNode, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown } from "./markdown";
 import type { MindDoc } from "./model";
 import { indentString } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { isStructure } from "./layout";
 import { describeLost, parseXmind, xmindSheetToDoc } from "./xmind";
-import { MindNode, walk } from "./model";
-import { plainText } from "./inline";
+import type { MindNode } from "./model";
 import { t } from "./i18n";
 
 interface EmbedContext {
@@ -167,37 +166,11 @@ class MindMapEmbed extends Component {
     this.canvas?.fit();
   }
 
-  /**
-   * 链接指向某个节点就聚焦到它：#^abc 按块 id 找；#甲#乙 按标题路径找（只写最后一段也行），
-   * 比较时去掉 Markdown 格式、不分大小写，和 Obsidian 找标题的方式一致。找不到就显示整张图
-   */
+  /** 链接指向某个节点就聚焦到它（见 findSubpathNode）。找不到就显示整张图 */
   private focusSubpath(root: MindNode): void {
     const canvas = this.canvas;
-    const sub = this.subpath.replace(/^#/, "");
-    if (!canvas || !sub) return;
-    const norm = (s: string) => plainText(s).replace(/\s+/g, " ").trim().toLowerCase();
-    let target: MindNode | null = null;
-    if (sub.startsWith("^")) {
-      const id = sub.slice(1);
-      walk(root, (n) => {
-        if (!target && n.blockId === id) target = n;
-      });
-    } else {
-      const parts = sub.split("#").map(norm).filter(Boolean);
-      const last = parts[parts.length - 1];
-      walk(root, (n) => {
-        if (target || norm(n.text) !== last) return;
-        // 写了上级标题的，上级也要对得上
-        let p = n.parent;
-        for (let i = parts.length - 2; i >= 0 && p; i--) {
-          while (p && norm(p.text) !== parts[i]) p = p.parent;
-          if (!p) return;
-          p = p.parent;
-        }
-        target = n;
-      });
-    }
-    const found: MindNode | null = target;
+    if (!canvas || !this.subpath) return;
+    const found = findSubpathNode(root, this.subpath);
     if (!found || found === root || canvas.getFocus() === found) return;
     canvas.focusOn(found);
     // 只读预览里不用选中它

@@ -116,7 +116,7 @@ export class FileStateStore {
       const v = this.data[s][oldPath];
       if (v === undefined) continue;
       this.set(s, oldPath, undefined);
-      this.set(s, newPath, v as never);
+      this.set(s, newPath, v);
     }
   }
 

@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-31
+
+### 新增
+- 节点右键菜单（以及展开的备注框右键菜单）加了「删除备注」；选中多个节点时一起删。
+- 「更多 → 按标点拆成子节点」：「苹果、香蕉，梨」变成三个子节点。链接、公式、代码里的标点和 1,000 这种数字里的逗号不拆。
+- PDF 截区图片在鼠标移上去或选中时，角上出现 ↗ 按钮，点它跳回 PDF 里这块区域。
+
+### 修复
+- 在脑图里点指向节点的链接（`[[笔记#^id]]`、`[[笔记#标题]]`）没有反应。现在会选中并居中那个节点，折叠着的上级自动展开；从别的笔记点这种链接，打开脑图后直接定位到那个节点。
+- 拖展开备注框的右下角改大小时，框在新旧尺寸之间来回闪。
+- Shift + 鼠标滚轮现在一定是左右平移，系统没把它换成横向滚动时也一样。
+
 ## [0.31.1] - 2026-10-31
 
 ### 修复
@@ -413,7 +425,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...HEAD
+[0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0

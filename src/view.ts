@@ -278,6 +278,17 @@ export class MindMapView extends TextFileView {
     return this.canvas?.getSelectedPath() ?? null;
   }
 
+  /** 链接带过来的 #^块id / #标题（Obsidian 打开 [[笔记#…]] 时传进来）：内容还没读进来就先记着 */
+  private pendingSubpath: string | null = null;
+
+  setEphemeralState(state: unknown): void {
+    super.setEphemeralState(state);
+    const sub = (state as { subpath?: unknown } | null)?.subpath;
+    if (typeof sub !== "string" || !sub.replace(/^#/, "")) return;
+    if (this.doc && this.canvas) this.canvas.revealSubpath(sub);
+    else this.pendingSubpath = sub;
+  }
+
   /** 选中路径对应的节点并移到中间（从 Markdown 切回来时） */
   revealPath(path: string): void {
     this.canvas?.revealPath(path);
@@ -410,6 +421,10 @@ export class MindMapView extends TextFileView {
       this.restoringViewport = false;
     }
     this.canvas?.setDoc(this.doc);
+    const sub = this.pendingSubpath;
+    this.pendingSubpath = null;
+    // 从链接点进来的，定位到链接指的节点；不然恢复上次的选中
+    if (sub && this.canvas?.revealSubpath(sub)) return;
     if (saved?.sel != null) this.canvas?.selectPath(saved.sel);
   }
 

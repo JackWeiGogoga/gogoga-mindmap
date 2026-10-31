@@ -73,7 +73,7 @@ import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, i
 import { Key, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
 import type { NoteCards, NoteCardState } from "./state";
-import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
+import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, splitByPunctuation, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
@@ -416,6 +416,38 @@ interface DropTarget {
   slot?: number;
 }
 
+/**
+ * 链接的 #… 部分指向哪个节点：#^abc 按块 id 找；#甲#乙 按标题路径找（只写最后一段也行），
+ * 比较时去掉 Markdown 格式、不分大小写，和 Obsidian 找标题的方式一致。找不到返回 null
+ */
+export function findSubpathNode(root: MindNode, subpath: string): MindNode | null {
+  const sub = subpath.replace(/^#/, "");
+  if (!sub) return null;
+  const norm = (s: string) => plainText(s).replace(/\s+/g, " ").trim().toLowerCase();
+  let target: MindNode | null = null;
+  if (sub.startsWith("^")) {
+    const id = sub.slice(1);
+    walk(root, (n) => {
+      if (!target && n.blockId === id) target = n;
+    });
+    return target;
+  }
+  const parts = sub.split("#").map(norm).filter(Boolean);
+  const last = parts[parts.length - 1];
+  walk(root, (n) => {
+    if (target || norm(n.text) !== last) return;
+    // 写了上级标题的，上级也要对得上
+    let p = n.parent;
+    for (let i = parts.length - 2; i >= 0 && p; i--) {
+      while (p && norm(p.text) !== parts[i]) p = p.parent;
+      if (!p) return;
+      p = p.parent;
+    }
+    target = n;
+  });
+  return target;
+}
+
 export class MindMapCanvas {
   readonly el: HTMLElement;
   private viewport: HTMLElement;
@@ -515,6 +547,8 @@ export class MindMapCanvas {
   private notesButton: HTMLElement | null = null;
   /** 备注里的图片、公式晚到会把卡片撑大，尺寸一变就重新排版 */
   private noteRo: ResizeObserver | null = null;
+  /** 正在拖右下角改大小的那条备注：松手前还没记进 cardState，重新布局时按它来，不然会被改回旧尺寸、一闪一闪 */
+  private cardDrag: { id: string; size: NoteCardState } | null = null;
 
   private tx = 0;
   private ty = 0;
@@ -840,6 +874,30 @@ export class MindMapCanvas {
     this.hasView = true;
   }
   private pendingReveal: string | null = null;
+
+  /**
+   * 点了指向这张图里某个节点的链接（[[笔记#^abc]]、[[笔记#标题]]）：折叠着的上级展开，
+   * 聚焦着别的分支就退出聚焦，然后选中、居中、闪一下。找不到这个节点返回 false
+   */
+  revealSubpath(subpath: string): boolean {
+    const node = this.doc && findSubpathNode(this.doc.root, subpath);
+    if (!node) return false;
+    if (this.focusRoot && node !== this.focusRoot && !isAncestor(this.focusRoot, node)) this.exitFocus(false);
+    let unfolded = false;
+    for (let p = node.parent; p; p = p.parent) {
+      if (p.folded) {
+        p.folded = false;
+        unfolded = true;
+      }
+    }
+    if (unfolded) {
+      this.render();
+      if (this.opts.editable) this.notify();
+    }
+    this.revealPath(pathOf(node));
+    this.flashNode(node);
+    return true;
+  }
 
   /** 跟随 Markdown 光标：选中节点（折叠着就选最近的可见祖先），看不见时才挪画面 */
   followPath(path: string): void {
@@ -3286,6 +3344,10 @@ export class MindMapCanvas {
           // 鼠标一格 deltaY 约 100，限幅后每格约 1.2 倍，和工具栏 +/- 一致
           const d = Math.max(-100, Math.min(100, ev.deltaY * scale));
           this.zoomBy(Math.exp(-d * 0.0018), ev.clientX - rect.left, ev.clientY - rect.top);
+        } else if (ev.shiftKey && !ev.deltaX) {
+          // Shift + 滚轮左右平移：有的系统不会把竖着滚换成横向（deltaX 还是 0），这里自己换
+          this.tx -= ev.deltaY * scale;
+          this.applyTransform();
         } else {
           this.tx -= ev.deltaX * scale;
           this.ty -= ev.deltaY * scale;
@@ -5462,6 +5524,9 @@ export class MindMapCanvas {
       }
       entries.push(
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
+      );
+      if (node.note) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
+      entries.push(
         { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
@@ -5496,6 +5561,7 @@ export class MindMapCanvas {
         { title: t("menu.toHeading"), icon: "heading", disabled: !parent || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
         { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
       );
+      more.push({ title: t("menu.splitByPunctuation"), icon: "split", disabled: !this.splittable(node).length, run: () => this.splitIntoChildren(node) });
       if (node.parent) {
         more.push(
           node.hidden
@@ -5905,6 +5971,41 @@ export class MindMapCanvas {
     this.widthHandle = handle;
   }
 
+  /** 右键的是选中的节点之一时就是选中的这几个，否则只有它；只留下文字能拆出两段以上的 */
+  private splittable(node: MindNode): { node: MindNode; parts: string[] }[] {
+    const nodes = this.selected.has(node) ? [...this.selected] : [node];
+    return nodes.flatMap((n) => {
+      // 开头的标记（emoji）和任务框留在原节点上，只拆后面的文字
+      const parts = splitByPunctuation(splitMarkers(n.text).rest.replace(/^\[( |x|X)\]\s+/, ""));
+      return parts ? [{ node: n, parts }] : [];
+    });
+  }
+
+  /** 按标点把节点文字拆成几段，每段一个子节点，接在已有的子节点后面；节点自己的文字不动 */
+  splitIntoChildren(node: MindNode): void {
+    if (!this.opts.editable || !this.doc) return;
+    const list = this.splittable(node);
+    if (!list.length) return;
+    for (const { node: n, parts } of list) {
+      n.folded = false;
+      for (const p of parts) addChild(n, this.doc.style, p);
+    }
+    this.render();
+    this.notify();
+  }
+
+  /** 删掉备注：右键的是选中的节点之一时，选中的几个一起删 */
+  deleteNote(node: MindNode): void {
+    if (!this.opts.editable) return;
+    const targets = (this.selected.has(node) ? [...this.selected] : [node]).filter((n) => n.note);
+    if (!targets.length) return;
+    // 先关掉开着的备注弹窗：关的时候会把编辑框里的内容存回去
+    this.closePopover();
+    for (const n of targets) n.note = "";
+    this.render();
+    this.notify();
+  }
+
   resetWidth(node: MindNode): void {
     if (!this.opts.editable || !node.width) return;
     node.width = undefined;
@@ -6067,7 +6168,7 @@ export class MindMapCanvas {
             body.scrollTop = 0;
             this.fillNoteBody(body, n.note);
           }
-          this.applyCardSize(el, card);
+          this.applyCardSize(el, this.cardDrag?.id === n.id ? { ...card, ...this.cardDrag.size } : card);
         }
       }
       for (const c of visibleChildren(n)) visit(c);
@@ -6118,6 +6219,7 @@ export class MindMapCanvas {
       if (!n) return;
       const entries: MenuEntry[] = [];
       if (this.opts.editable && !this.recite) entries.push({ title: t("menu.editNote"), icon: "pencil", run: () => this.editNoteCard(n, el) });
+      if (this.opts.editable && !this.recite) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(n) });
       entries.push({ title: t("canvas.collapseNote"), icon: "chevron-up", run: () => this.toggleNoteCard(n) });
       this.showContextMenu(entries, ev);
     });
@@ -6150,6 +6252,7 @@ export class MindMapCanvas {
           w: Math.round(Math.max(NOTE_CARD_MIN.w, start.w + (e.clientX - start.x) / k)),
           h: Math.round(Math.max(NOTE_CARD_MIN.h, start.h + (e.clientY - start.y) / k)),
         };
+        this.cardDrag = { id: node.id, size };
         this.applyCardSize(el, size);
         this.updateNoteFade(el);
       };
@@ -6158,6 +6261,7 @@ export class MindMapCanvas {
         grip.removeEventListener("pointerup", up);
         grip.removeEventListener("pointercancel", up);
         el.classList.remove("is-resizing");
+        this.cardDrag = null;
         if (size) this.updateCard(node, size);
         this.reflow();
       };
