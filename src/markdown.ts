@@ -310,7 +310,9 @@ export function subtreeToList(node: MindNode, indent = "\t"): string {
   const walk = (n: MindNode, depth: number) => {
     lines.push(`${indent.repeat(depth)}- ${n.text}${formatMarker(n)}`.trimEnd());
     if (n.note) {
-      for (const l of normalizeNote(n.note).split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
+      const note = normalizeNote(n.note);
+      for (const l of note.split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
+      if (isEscapedNote(note)) lines.push("");
     }
     for (const c of n.children) walk(c, depth + 1);
   };
@@ -760,7 +762,10 @@ export function serializeMarkdown(doc: MindDoc): string {
     const blockId = node.blockId ? ` ^${node.blockId}` : "";
     out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
     if (node.note) {
-      for (const l of normalizeNote(node.note).split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
+      const note = normalizeNote(node.note);
+      for (const l of note.split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
+      // 包成标注块的备注后面空一行：实时预览会把缩进的标注块后面紧跟的列表项（子节点、兄弟）也算进标注块
+      if (isEscapedNote(note)) out.push("");
     }
     for (const c of allChildren(node)) emitList(c, depth + 1);
     if (node.tail) emitBlock(node.tail, depth + 1);

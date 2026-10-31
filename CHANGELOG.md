@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- In Live Preview, the first child (or the next sibling) under a node whose note is stored as a `> [!note]` block (notes containing lists or headings) was shown inside that note. A blank line is now written after such notes. Reading view and the mind map were not affected, and existing notes stay as they are until you add the blank line yourself.
+
 ## [0.31.0] - 2026-10-31
 
 ### Added
