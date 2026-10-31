@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-10-31
+
 ### 修复
 - 备注里有列表、标题时，插件会把备注写成 `> [!note]` 引用块。在实时预览里，紧跟在它后面的第一个子节点（或下一个兄弟节点）会被显示进这个引用块。现在这类备注后面会空一行。阅读视图和脑图本身不受影响；已有的笔记不会被自动改动，需要的话手动在备注后面加一个空行即可。
 
@@ -411,7 +413,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...HEAD
+[0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0

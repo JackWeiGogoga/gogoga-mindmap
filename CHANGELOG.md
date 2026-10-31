@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-10-31
+
 ### Fixed
 - In Live Preview, the first child (or the next sibling) under a node whose note is stored as a `> [!note]` block (notes containing lists or headings) was shown inside that note. A blank line is now written after such notes. Reading view and the mind map were not affected, and existing notes stay as they are until you add the blank line yourself.
 
@@ -411,7 +413,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...HEAD
+[0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
