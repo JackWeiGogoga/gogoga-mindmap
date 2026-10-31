@@ -26,7 +26,9 @@ import {
   removeNodeKeepChildren,
   summaryGroups,
   visibleChildren,
+  Relation,
   walk,
+  walkAll,
   hideNode,
   countHidden,
 } from "./model";
@@ -41,6 +43,7 @@ import {
   LayoutOptions,
   LayoutResult,
   Placed,
+  relGeometry,
   PlacedCallout,
   PlacedSummary,
   Size,
@@ -78,6 +81,11 @@ import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, mark
 export interface CanvasHost {
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
   renderNote?: (el: HTMLElement, markdown: string) => void;
+  /**
+   * 分栏预览用：一个单独的渲染作用域，反复 render 时前一次的渲染随即释放，弹窗关掉时 dispose。
+   * 不给就没有分栏预览
+   */
+  notePreviewScope?: () => { render: (el: HTMLElement, markdown: string) => void; dispose: () => void };
   openLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
   /** 内部链接悬停：Obsidian 用来弹页面预览 */
   hoverLink?: (ev: MouseEvent, linktext: string, targetEl: HTMLElement) => void;
@@ -191,6 +199,8 @@ export interface CanvasOptions {
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
   /** 返回 true 时滚轮直接缩放、Shift+滚轮平移；每次滚动时读取，改设置立即生效 */
   wheelZoom?: () => boolean;
+  /** 编辑备注时分栏预览；每次打开编辑时读取 */
+  notePreview?: () => boolean;
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
@@ -245,6 +255,7 @@ export type NodeCommand =
   | "edit"
   | "delete"
   | "delete-only"
+  | "add-rel"
   | "move-up"
   | "move-down"
   | "outdent"
@@ -532,6 +543,7 @@ export class MindMapCanvas {
   private hiddenButton: HTMLElement | null = null;
   /** 展开的备注：卡片是 nodes 层里的 HTML（按节点 id 复用），放到分支下面离得远时引线画在 svg 里 */
   private noteLayer!: SVGGElement;
+  private relLayer!: SVGGElement;
   private noteLinks: SVGPathElement[] = [];
   private noteEls = new Map<string, HTMLElement>();
   private noteNode = new WeakMap<HTMLElement, MindNode>();
@@ -663,6 +675,9 @@ export class MindMapCanvas {
     this.noteLayer = createSvg("g");
     this.noteLayer.setAttribute("class", "mm-note-links");
     this.svg.append(this.noteLayer);
+    this.relLayer = createSvg("g");
+    this.relLayer.setAttribute("class", "mm-rels");
+    this.svg.append(this.relLayer);
     this.notesExpanded = opts.notesExpanded?.() ?? false;
     this.nodesEl = createDiv();
     this.nodesEl.className = "mm-nodes";
@@ -1508,9 +1523,422 @@ export class MindMapCanvas {
     this.drawSummaries();
     this.drawCallouts();
     this.drawNotes();
+    this.drawRels();
     this.drawRangeHandles();
     this.updateZoomLabel();
     this.opts.onLayout?.(this.layout.bounds);
+  }
+
+  // ---------- 关联线 ----------
+
+  /**
+   * 每条关联线的元素（看得见的线、加宽的透明点击区、箭头、线上的文字），按「起点节点 id:序号」复用。
+   * 线在连线层里（压在节点下面），文字在节点层里，导出时跟着一起走
+   */
+  private relEls = new Map<string, { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement }>();
+  private relOf = new WeakMap<Element, { src: MindNode; rel: Relation }>();
+  /** 单击选中的那条线：高亮、出现拖弯曲的手柄，Delete 删掉 */
+  private activeRel: Relation | null = null;
+  private editingRel: Relation | null = null;
+  /** 正在连线：从这个节点出发，等着点终点 */
+  private relFrom: MindNode | null = null;
+  private relDraft: { path: SVGPathElement; hint: HTMLElement; off: () => void } | null = null;
+
+  private drawRels(): void {
+    const layout = this.layout!;
+    const anchors = new Map<string, MindNode>();
+    walk(this.doc!.root, (n) => {
+      if (n.anchor && !anchors.has(n.anchor)) anchors.set(n.anchor, n);
+    });
+    const seen = new Set<string>();
+    walk(this.doc!.root, (src) => {
+      src.rels?.forEach((rel, i) => {
+        const dst = anchors.get(rel.to);
+        const a = layout.placed.get(src.id);
+        const b = dst && layout.placed.get(dst.id);
+        // 一头折叠、隐藏、不在聚焦的分支里，线就不画
+        if (!a || !b || dst === src) return;
+        const key = `${src.id}:${i}`;
+        seen.add(key);
+        let r = this.relEls.get(key);
+        if (!r) {
+          r = this.createRel();
+          this.relEls.set(key, r);
+        }
+        this.relOf.set(r.hit, { src, rel });
+        this.relOf.set(r.label, { src, rel });
+        const geo = relGeometry(a, b, rel.c);
+        if (r.line.getAttribute("d") !== geo.d) {
+          r.line.setAttribute("d", geo.d);
+          r.hit.setAttribute("d", geo.d);
+          r.arrow.setAttribute("d", geo.arrow);
+        }
+        const active = this.activeRel === rel;
+        r.g.classList.toggle("is-active", active);
+        if (this.editingRel !== rel && r.label.dataset.raw !== rel.label) {
+          r.label.dataset.raw = rel.label;
+          renderInline(r.label, rel.label, this.summaryInlineOptions());
+        }
+        r.label.classList.toggle("is-empty", !rel.label && this.editingRel !== rel);
+        r.label.classList.toggle("is-active", active);
+        r.label.style.left = `${round2(geo.top.x)}px`;
+        r.label.style.top = `${round2(geo.top.y)}px`;
+      });
+    });
+    for (const [key, r] of this.relEls) {
+      if (seen.has(key)) continue;
+      r.g.remove();
+      r.label.remove();
+      this.relEls.delete(key);
+    }
+  }
+
+  private createRel(): { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement } {
+    const g = createSvg("g");
+    g.setAttribute("class", "mm-rel");
+    const line = createSvg("path");
+    line.setAttribute("class", "mm-rel-line");
+    const arrow = createSvg("path");
+    arrow.setAttribute("class", "mm-rel-arrow");
+    const hit = createSvg("path");
+    hit.setAttribute("class", "mm-rel-hit");
+    g.append(line, arrow, hit);
+    this.relLayer.append(g);
+    const label = createDiv({ cls: "mm-rel-label" });
+    this.nodesEl.append(label);
+    const info = (el: Element) => this.relOf.get(el) ?? null;
+    hit.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    hit.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const r = info(hit);
+      if (r) this.activateRel(r.rel);
+    });
+    hit.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const r = info(hit);
+      if (r) this.editRelLabel(r.rel);
+    });
+    hit.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const r = info(hit);
+      if (!r || !this.opts.editable) return;
+      this.activateRel(r.rel);
+      this.showContextMenu(this.relMenuEntries(r.src, r.rel), ev);
+    });
+    // 文字（没文字时是个小圆点手柄）：拖它改弯曲，单击选中，双击改文字
+    label.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      const r = info(label);
+      if (!r || this.editingRel === r.rel || ev.button !== 0) return;
+      ev.preventDefault();
+      this.dragRelCurve(r.src, r.rel, label, ev);
+    });
+    label.addEventListener("click", (ev) => ev.stopPropagation());
+    label.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const r = info(label);
+      if (r) this.editRelLabel(r.rel);
+    });
+    label.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const r = info(label);
+      if (!r || !this.opts.editable || this.editingRel === r.rel) return;
+      this.activateRel(r.rel);
+      this.showContextMenu(this.relMenuEntries(r.src, r.rel), ev);
+    });
+    return { g, line, hit, arrow, label };
+  }
+
+  private activateRel(rel: Relation | null): void {
+    if (rel) {
+      this.select(null, "replace");
+      this.activeGroup = null;
+      this.syncRangeHandles();
+    }
+    if (this.activeRel === rel) return;
+    this.activeRel = rel;
+    if (this.layout) this.drawRels();
+  }
+
+  /** 拖线上的文字 / 手柄改弯曲：弧顶跟着鼠标走。没怎么动就当单击（选中） */
+  private dragRelCurve(src: MindNode, rel: Relation, label: HTMLElement, down: PointerEvent): void {
+    const start = { x: down.clientX, y: down.clientY };
+    const geo = this.relGeoOf(src, rel);
+    if (!geo) return;
+    const from = { ...geo.c };
+    const before = rel.c && { ...rel.c };
+    let moved = false;
+    label.setPointerCapture(down.pointerId);
+    const move = (e: PointerEvent) => {
+      const dx = (e.clientX - start.x) / this.k;
+      const dy = (e.clientY - start.y) / this.k;
+      if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+      if (!this.opts.editable) return;
+      moved = true;
+      rel.c = { x: Math.round(from.x + dx), y: Math.round(from.y + dy) };
+      this.drawRels();
+    };
+    const up = () => {
+      label.removeEventListener("pointermove", move);
+      label.removeEventListener("pointerup", up);
+      label.removeEventListener("pointercancel", up);
+      if (!moved) {
+        this.activateRel(rel);
+        return;
+      }
+      if (before?.x !== rel.c?.x || before?.y !== rel.c?.y) this.notify();
+      this.activateRel(rel);
+    };
+    label.addEventListener("pointermove", move);
+    label.addEventListener("pointerup", up);
+    label.addEventListener("pointercancel", up);
+  }
+
+  private relGeoOf(src: MindNode, rel: Relation): ReturnType<typeof relGeometry> | null {
+    const dst = this.relTarget(rel);
+    const a = this.layout?.placed.get(src.id);
+    const b = dst && this.layout?.placed.get(dst.id);
+    return a && b ? relGeometry(a, b, rel.c) : null;
+  }
+
+  private relSource(rel: Relation): MindNode | null {
+    let found: MindNode | null = null;
+    if (this.doc) walk(this.doc.root, (n) => {
+      if (!found && n.rels?.includes(rel)) found = n;
+    });
+    return found;
+  }
+
+  private relTarget(rel: Relation): MindNode | null {
+    let found: MindNode | null = null;
+    if (this.doc) walk(this.doc.root, (n) => {
+      if (!found && n.anchor === rel.to) found = n;
+    });
+    return found;
+  }
+
+  private relMenuEntries(src: MindNode, rel: Relation): MenuEntry[] {
+    return [
+      { title: t("menu.editRelLabel"), icon: "pencil", run: () => this.editRelLabel(rel) },
+      { title: t("menu.reverseRel"), icon: "arrow-left-right", run: () => this.reverseRel(src, rel) },
+      { title: t("menu.resetRelCurve"), icon: "spline", disabled: !rel.c, run: () => this.resetRelCurve(rel) },
+      { separator: true },
+      { title: t("menu.deleteRel"), icon: "trash", run: () => this.deleteRel(src, rel) },
+    ];
+  }
+
+  /** 原地改线上的文字；Enter 完成，Esc 取消，清空就是没有文字（线还在） */
+  editRelLabel(rel: Relation): void {
+    if (!this.opts.editable) return;
+    const key = [...this.relEls].find(([, r]) => this.relOf.get(r.label)?.rel === rel)?.[0];
+    const label = key ? this.relEls.get(key)?.label : null;
+    if (!label) return;
+    const before = rel.label;
+    this.activateRel(rel);
+    this.editingRel = rel;
+    label.classList.remove("is-empty");
+    label.classList.add("is-editing");
+    label.textContent = before;
+    delete label.dataset.raw;
+    label.setAttribute("contenteditable", "plaintext-only");
+    if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
+    label.focus();
+    const range = this.el.doc.createRange();
+    range.selectNodeContents(label);
+    const sel = this.el.win.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    let done = false;
+    const finish = (commit: boolean) => {
+      if (done) return;
+      done = true;
+      label.removeEventListener("keydown", onKey);
+      label.removeEventListener("blur", onBlur);
+      label.removeAttribute("contenteditable");
+      label.classList.remove("is-editing");
+      this.editingRel = null;
+      rel.label = commit ? markerText(label.textContent ?? "") : before;
+      this.drawRels();
+      if (rel.label !== before) this.notify();
+      this.el.focus({ preventScroll: true });
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      ev.stopPropagation();
+      if (ev.isComposing) return;
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        finish(true);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish(false);
+      }
+    };
+    const onBlur = () => finish(true);
+    label.addEventListener("keydown", onKey);
+    label.addEventListener("blur", onBlur);
+  }
+
+  /** 反过来：线挪到原来的终点上，指回原来的起点 */
+  reverseRel(src: MindNode, rel: Relation): void {
+    const dst = this.relTarget(rel);
+    if (!this.opts.editable || !dst || !src.rels) return;
+    src.anchor ??= this.newRelId();
+    src.rels = src.rels.filter((r) => r !== rel);
+    if (!src.rels.length) src.rels = undefined;
+    const back: Relation = { to: src.anchor, label: rel.label, c: rel.c };
+    (dst.rels ??= []).push(back);
+    this.pruneRels();
+    this.activeRel = back;
+    this.render();
+    this.notify();
+  }
+
+  resetRelCurve(rel: Relation): void {
+    if (!this.opts.editable || !rel.c) return;
+    rel.c = undefined;
+    this.render();
+    this.notify();
+  }
+
+  deleteRel(src: MindNode, rel: Relation): void {
+    if (!this.opts.editable || !src.rels) return;
+    src.rels = src.rels.filter((r) => r !== rel);
+    if (!src.rels.length) src.rels = undefined;
+    if (this.activeRel === rel) this.activeRel = null;
+    this.pruneRels();
+    this.render();
+    this.notify();
+  }
+
+  /** 一个还没用过的标识（r1、r2……），id= 和 rel= 里出现过的都避开，包括隐藏的节点 */
+  private newRelId(): string {
+    const used = new Set<string>();
+    if (this.doc) walkAll(this.doc.root, (n) => {
+      if (n.anchor) used.add(n.anchor);
+      for (const r of n.rels ?? []) used.add(r.to);
+    });
+    let i = 1;
+    while (used.has(`r${i}`)) i++;
+    return `r${i}`;
+  }
+
+  /**
+   * 删掉节点或线以后收拾：指向已经不存在的节点的线去掉，没有线指过来的 id= 也去掉。
+   * 隐藏的节点也算（它们的 id 和线还在笔记里）
+   */
+  private pruneRels(): void {
+    if (!this.doc) return;
+    const anchors = new Set<string>();
+    const targets = new Set<string>();
+    walkAll(this.doc.root, (n) => {
+      if (n.anchor) anchors.add(n.anchor);
+    });
+    walkAll(this.doc.root, (n) => {
+      if (!n.rels) return;
+      n.rels = n.rels.filter((r) => anchors.has(r.to));
+      if (!n.rels.length) n.rels = undefined;
+      for (const r of n.rels ?? []) targets.add(r.to);
+    });
+    walkAll(this.doc.root, (n) => {
+      if (n.anchor && !targets.has(n.anchor)) n.anchor = undefined;
+    });
+  }
+
+  /** 粘贴进来的节点：id= 和图里已有的撞了就换一个，粘贴的这批内部的线跟着换 */
+  private remapPastedAnchors(nodes: MindNode[]): void {
+    if (!this.doc) return;
+    const used = new Set<string>();
+    walkAll(this.doc.root, (n) => {
+      if (n.anchor) used.add(n.anchor);
+      for (const r of n.rels ?? []) used.add(r.to);
+    });
+    const map = new Map<string, string>();
+    for (const root of nodes) walkAll(root, (n) => {
+      if (!n.anchor || !used.has(n.anchor)) return;
+      let i = 1;
+      while (used.has(`r${i}`)) i++;
+      const id = `r${i}`;
+      used.add(id);
+      map.set(n.anchor, id);
+      n.anchor = id;
+    });
+    for (const root of nodes) walkAll(root, (n) => {
+      for (const r of n.rels ?? []) r.to = map.get(r.to) ?? r.to;
+    });
+  }
+
+  /** 开始连线：从这个节点拉出一条跟着鼠标的虚线，点一个节点连上，点空白处或 Esc 取消 */
+  startRel(node: MindNode): void {
+    if (!this.opts.editable || !this.layout?.placed.get(node.id)) return;
+    this.cancelRel();
+    this.relFrom = node;
+    const path = createSvg("path");
+    path.setAttribute("class", "mm-rel-draft");
+    this.relLayer.append(path);
+    const hint = this.el.createDiv({ cls: "mm-rel-hint", text: t("canvas.relHint") });
+    this.el.classList.add("is-connecting");
+    const toCanvas = (ev: PointerEvent) => {
+      const r = this.el.getBoundingClientRect();
+      return { x: (ev.clientX - r.left - this.tx) / this.k, y: (ev.clientY - r.top - this.ty) / this.k };
+    };
+    const onMove = (ev: PointerEvent) => {
+      const a = this.relFrom && this.layout?.placed.get(this.relFrom.id);
+      if (!a) return;
+      const p = toCanvas(ev);
+      const geo = relGeometry(a, { x: p.x, y: p.y, w: 0, h: 0 });
+      path.setAttribute("d", geo.d);
+    };
+    const onDown = (ev: PointerEvent) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const nodeEl = (ev.target as HTMLElement).closest?.<HTMLElement>(".gg-mm-node");
+      const target = nodeEl ? this.nodeFromEl(nodeEl) : null;
+      const from = this.relFrom;
+      this.cancelRel();
+      if (target && from && target !== from) this.addRel(from, target);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.stopPropagation();
+      ev.preventDefault();
+      this.cancelRel();
+    };
+    this.el.addEventListener("pointermove", onMove);
+    this.el.addEventListener("pointerdown", onDown, true);
+    this.el.addEventListener("keydown", onKey, true);
+    this.relDraft = {
+      path,
+      hint,
+      off: () => {
+        this.el.removeEventListener("pointermove", onMove);
+        this.el.removeEventListener("pointerdown", onDown, true);
+        this.el.removeEventListener("keydown", onKey, true);
+      },
+    };
+    this.el.focus({ preventScroll: true });
+  }
+
+  private cancelRel(): void {
+    this.relFrom = null;
+    if (!this.relDraft) return;
+    this.relDraft.off();
+    this.relDraft.path.remove();
+    this.relDraft.hint.remove();
+    this.relDraft = null;
+    this.el.classList.remove("is-connecting");
+  }
+
+  addRel(from: MindNode, to: MindNode): void {
+    if (!this.opts.editable || from === to) return;
+    to.anchor ??= this.newRelId();
+    const rel: Relation = { to: to.anchor, label: "" };
+    (from.rels ??= []).push(rel);
+    this.select(null, "replace");
+    this.activeRel = rel;
+    this.render();
+    this.notify();
   }
 
   /** 外框的 rect 和标题；layout.boxes 是由内向外，倒过来画让里层压在外层上面 */
@@ -1735,6 +2163,7 @@ export class MindMapCanvas {
   private activateGroup(start: MindNode | null): void {
     if (start) this.select(null, "replace");
     this.activeGroup = start;
+    this.activateRel(null);
     this.syncRangeHandles();
   }
   private hoverTimer = 0;
@@ -3754,6 +4183,19 @@ export class MindMapCanvas {
       this.activateGroup(null);
       return;
     }
+    if (this.activeRel && !this.selected.size && this.opts.editable) {
+      const src = this.doc && this.relSource(this.activeRel);
+      if (src && (ev.key === "Delete" || ev.key === "Backspace")) {
+        ev.preventDefault();
+        this.deleteRel(src, this.activeRel);
+        return;
+      }
+      if (src && (ev.key === "Enter" || ev.key === "F2" || ev.key === " ")) {
+        ev.preventDefault();
+        this.editRelLabel(this.activeRel);
+        return;
+      }
+    }
     const sel = this.primary;
     if (!sel) return;
     if (ev.altKey && this.opts.editable && ev.key.startsWith("Arrow")) {
@@ -3859,6 +4301,7 @@ export class MindMapCanvas {
       el.classList.toggle("is-selected", node !== null);
     }
     if (this.selected.size) this.activeGroup = null;
+    if (this.selected.size && this.activeRel) this.activateRel(null);
     this.syncRangeHandles();
     this.positionNodebar();
     this.opts.onSelectionChange?.(this.primary, [...this.selected]);
@@ -4677,6 +5120,8 @@ export class MindMapCanvas {
     const parent = primary.parent!;
     const idx = parent.children.indexOf(primary);
     for (const v of victims) removeNode(v);
+    // 删掉的节点上连出去、连进来的关联线一起去掉
+    this.pruneRels();
     const next = parent.children[Math.min(idx, parent.children.length - 1)] ?? parent;
     this.select(next);
     this.render();
@@ -4723,6 +5168,8 @@ export class MindMapCanvas {
         return this.deleteSelected();
       case "delete-only":
         return this.deleteOnlySelected();
+      case "add-rel":
+        return this.startRel(sel);
       case "move-up":
         this.moveSelection("up");
         break;
@@ -4778,6 +5225,7 @@ export class MindMapCanvas {
       while (x?.parent) x = x.parent;
       return x === root;
     };
+    this.pruneRels();
     this.select(alive(next) ? next : root);
     this.render();
     this.notify();
@@ -5346,6 +5794,7 @@ export class MindMapCanvas {
     const nodes = parseClipboard(text);
     if (!nodes.length) return;
     if (this.editing) this.commitEdit();
+    this.remapPastedAnchors(nodes);
     const target = this.primary ?? this.doc.root;
     if (target.folded) target.folded = false;
     for (const n of nodes) attachSubtree(n, target, this.doc.style);
@@ -5528,6 +5977,7 @@ export class MindMapCanvas {
       if (node.note) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(
         { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
+        { title: t("menu.addRel"), icon: "spline", run: () => this.startRel(node) },
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
@@ -6504,6 +6954,13 @@ export class MindMapCanvas {
       ta.value = plain;
       ta.rows = Math.min(12, Math.max(3, plain.split("\n").length + 1));
       const initial = node.note;
+      // 分栏预览：旁边（窄的时候在下面）实时渲染，停手 150ms 后刷新
+      const scope = this.opts.notePreview?.() ? this.opts.host?.notePreviewScope?.() : undefined;
+      let preview: HTMLElement | null = null;
+      let previewTimer = 0;
+      const refreshPreview = () => {
+        if (preview && scope) scope.render(preview, ta.value);
+      };
       const apply = () => {
         const next = normalizeNote(ta.value.replace(/\s+$/, ""), node.kind === "list");
         if (next === node.note) return false;
@@ -6515,6 +6972,8 @@ export class MindMapCanvas {
         if (saved) return;
         saved = true;
         this.popoverApply = null;
+        window.clearTimeout(previewTimer);
+        scope?.dispose();
         apply();
         if (node.note !== initial) {
           this.render();
@@ -6523,8 +6982,35 @@ export class MindMapCanvas {
       };
       ta.addEventListener("input", () => {
         if (apply() && !this.opts.embedded) this.scheduleNotify();
+        if (preview) {
+          window.clearTimeout(previewTimer);
+          previewTimer = window.setTimeout(refreshPreview, 150);
+        }
       });
+      // 在预览里点、拖滚动条、选文字会让输入框失焦，这时不能当成编辑结束；松手后焦点还回输入框
+      // （选中了预览里的文字就不抢，方便复制）
+      let downInPop = false;
+      pop.addEventListener(
+        "pointerdown",
+        () => {
+          downInPop = true;
+          const doc = this.el.ownerDocument;
+          const up = () => {
+            doc.removeEventListener("pointerup", up, true);
+            downInPop = false;
+            if (!ta.isConnected || doc.activeElement === ta) return;
+            const sel = doc.getSelection();
+            if (sel && !sel.isCollapsed && preview?.contains(sel.anchorNode)) return;
+            ta.focus({ preventScroll: true });
+          };
+          doc.addEventListener("pointerup", up, true);
+        },
+        true,
+      );
       ta.addEventListener("blur", () => {
+        if (downInPop) return;
+        // 失焦给了预览里的东西（比如复制完文字）也不关
+        if (preview && preview.contains(this.el.ownerDocument.activeElement)) return;
         if (this.popover === pop) this.closePopover();
       });
       // 编辑备注时粘贴 / 拖入图片：存成附件，在光标处插入 ![[图片]]，和在 Markdown 里粘贴一样
@@ -6580,11 +7066,40 @@ export class MindMapCanvas {
       });
       this.popoverSave = save;
       this.popoverApply = apply;
-      pop.append(ta);
+      if (scope) {
+        preview = createDiv({ cls: "mm-popover-body mm-note-preview markdown-rendered" });
+        this.wireNoteBody(preview);
+        const split = createDiv({ cls: "mm-note-split" });
+        split.append(ta, preview);
+        pop.append(split);
+        pop.classList.add("has-preview");
+        refreshPreview();
+        // 输入框滚到哪，预览按比例跟到哪
+        ta.addEventListener("scroll", () => {
+          if (!preview) return;
+          const room = ta.scrollHeight - ta.clientHeight;
+          preview.scrollTop = room > 0 ? (ta.scrollTop / room) * (preview.scrollHeight - preview.clientHeight) : 0;
+        });
+      } else {
+        pop.append(ta);
+      }
       this.el.append(pop);
-      if (keep) {
+      if (keep && scope) {
+        // 从查看切过来、开着分栏预览：位置和高度沿用，宽度放宽到够左右两栏（不超出画布）
+        const host = this.el.getBoundingClientRect();
+        const w = Math.round(Math.max(keep.w, Math.min(680, host.width - 16)));
+        const left = Math.max(8, Math.min(parseFloat(keep.left) || 8, host.width - w - 8));
+        pop.classList.add("is-sized");
+        pop.setCssStyles({ width: `${w}px`, height: `${keep.h}px`, left: `${left}px`, top: keep.top });
+      } else if (keep) {
         pop.classList.add("is-sized");
         pop.setCssStyles({ width: `${keep.w}px`, height: `${keep.h}px`, left: keep.left, top: keep.top });
+      } else if (scope) {
+        // 分栏要宽一些：两栏各有地方写字
+        const host = this.el.getBoundingClientRect();
+        pop.classList.add("is-sized");
+        pop.setCssStyles({ width: `${Math.round(Math.max(160, Math.min(680, host.width - 16)))}px`, height: `${Math.round(Math.max(120, Math.min(340, host.height - 16)))}px` });
+        this.placePopover(pop, nodeEl);
       } else {
         this.placePopover(pop, nodeEl);
       }

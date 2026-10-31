@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-31
+
+### Added
+- Relationships: right-click a node → "Add relationship" (also a command), then click the node to connect to. A dashed, curved arrow joins the two; double-click it to add a label, drag the label (or the dot on a selected line) to change the curve, and right-click it to edit, reverse, reset the curve or delete. Stored as `%%rel=r1 "Text"%%` on the start node and `%%id=r1%%` on the end node, so renaming or moving nodes never breaks a line. Lines are included in PNG/SVG exports, and relationships in .xmind files are now imported. ([#3](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/3))
+- "Preview notes while editing" setting (off by default): when you edit a note, the rendered note appears next to the text box (below it when the window is narrow) and updates as you type. ([#6](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/6))
+
 ## [0.32.0] - 2026-10-31
 
 ### Added
@@ -425,7 +431,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...HEAD
+[0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0

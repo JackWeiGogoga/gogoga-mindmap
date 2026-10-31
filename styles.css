@@ -140,6 +140,79 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* 关联线：虚线箭头，压在节点下面；加宽的透明路径负责点选 */
+.mm-rel-line {
+  fill: none;
+  stroke: var(--mm-rel, var(--mm-line));
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+.mm-rel-arrow { fill: var(--mm-rel, var(--mm-line)); stroke: none; opacity: 0.75; }
+.mm-rel-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.mm-rel:hover .mm-rel-line, .mm-rel:hover .mm-rel-arrow { opacity: 1; }
+.mm-rel.is-active .mm-rel-line { stroke: var(--mm-selection); opacity: 1; }
+.mm-rel.is-active .mm-rel-arrow { fill: var(--mm-selection); opacity: 1; }
+.mm-rel-draft {
+  fill: none;
+  stroke: var(--mm-selection);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+/* 线上的文字放在弧顶，盖住底下那段线；拖它改弯曲。没文字时平常不显示，选中线时变成一个小圆点手柄 */
+.mm-rel-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 200px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--mm-bg, transparent);
+  font-family: var(--mm-font);
+  font-size: 12px;
+  line-height: 17px;
+  color: inherit;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grab;
+  user-select: none;
+}
+.mm-rel-label.is-active { opacity: 1; box-shadow: 0 0 0 1.5px var(--mm-selection); }
+.mm-rel-label.is-editing { cursor: text; user-select: text; min-width: 40px; outline: none; box-shadow: 0 0 0 1.5px var(--mm-selection); text-overflow: clip; }
+.mm-rel-label.is-empty { display: none; }
+.mm-rel-label.is-empty.is-active {
+  display: block;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--mm-selection);
+  box-shadow: 0 0 0 2px var(--mm-bg);
+}
+.mm-rel-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--mm-selection);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.is-connecting .gg-mm-node { cursor: crosshair; }
+
 .mm-summary {
   position: absolute;
   box-sizing: border-box;
@@ -738,6 +811,22 @@
   resize: both;
 }
 .mm-popover.is-sized .mm-note-editor { flex: 1; width: auto; max-width: none; min-height: 0; resize: none; }
+/* 分栏预览：左边写、右边实时渲染；弹窗窄于 460px 时改成上下排 */
+.mm-popover.has-preview { container-type: inline-size; overflow: hidden; }
+.mm-note-split { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.mm-note-split > .mm-note-editor { flex: 1 1 0; width: auto; max-width: none; min-width: 0; min-height: 0; resize: none; }
+.mm-note-preview {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-left: 12px;
+  border-left: 1px solid var(--background-modifier-border, #e3e3e3);
+}
+@container (max-width: 460px) {
+  .mm-note-split { flex-direction: column; gap: 8px; }
+  .mm-note-preview { padding-left: 0; padding-top: 8px; border-left: none; border-top: 1px solid var(--background-modifier-border, #e3e3e3); }
+}
 .mm-popover-edit {
   all: unset;
   display: block;

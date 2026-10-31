@@ -29,6 +29,8 @@ export interface MindMapSettings {
   rememberViewport: boolean;
   /** 备注默认展开显示在节点下面（默认关：点图标弹窗看） */
   notesExpanded: boolean;
+  /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
+  notePreview: boolean;
   /** 展开备注的最大高度（像素，随节点字号缩放） */
   noteMaxHeight: number;
   /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
@@ -125,6 +127,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   spacingScale: 100,
   fontScale: 100,
   notesExpanded: false,
+  notePreview: false,
   noteMaxHeight: 240,
   noteMaxWidth: 320,
   customThemes: [],
@@ -337,6 +340,15 @@ export class MindMapSettingTab extends PluginSettingTab {
           this.plugin.settings.notesExpanded = v;
           await this.plugin.saveSettings();
           syncNotesExpandedAll();
+        }),
+      );
+    new Setting(containerEl)
+      .setName(t("settings.notePreview.name"))
+      .setDesc(t("settings.notePreview.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.notePreview).onChange(async (v) => {
+          this.plugin.settings.notePreview = v;
+          await this.plugin.saveSettings();
         }),
       );
     let noteHeight: { setValue(v: number): unknown } | null = null;

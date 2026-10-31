@@ -51,6 +51,10 @@ export interface MindNode {
   blockId?: string;
   /** %%hide%%：不在脑图里显示（连同子树），笔记里照旧 */
   hidden?: boolean;
+  /** 关联线的终点标识：%%id=r1%%，别的节点用 rel=r1 指过来。只在注释里，改名、挪动都不受影响 */
+  anchor?: string;
+  /** 从这个节点出发的关联线：%%rel=r1 "文字" c=40,-60%%，一个节点可以有好几条 */
+  rels?: Relation[];
   /**
    * 隐藏的节点不进 children（画布上的操作都碰不到它们），挂在它前面那个可见的兄弟身上，写回时原位放回；
    * 排在所有可见兄弟前面的挂在父节点的 hiddenFirst 上。打开「显示隐藏的节点」时不摘，这两个都为空
@@ -64,6 +68,15 @@ export interface MindNode {
 
 export const NODE_MIN_WIDTH = 60;
 export const NODE_MAX_WIDTH = 1200;
+
+/** 一条关联线：从所在节点指向 anchor 为 to 的节点 */
+export interface Relation {
+  to: string;
+  /** 线上的文字，行内 Markdown，不能含 " 和 %%；没有就是空串 */
+  label: string;
+  /** 线的弯曲：弧顶相对两个节点中心连线中点的偏移（px）；没拖过就按默认弯法 */
+  c?: { x: number; y: number };
+}
 
 export interface FloatPos {
   x: number;
@@ -147,6 +160,8 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     bullet: init.bullet ?? "",
     blockId: init.blockId,
     hidden: init.hidden,
+    anchor: init.anchor,
+    rels: init.rels,
     children: init.children ?? [],
     parent,
     depth: parent ? parent.depth + 1 : 0,
@@ -158,6 +173,16 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
 export function walk(node: MindNode, fn: (n: MindNode) => void): void {
   fn(node);
   for (const c of node.children) walk(c, fn);
+}
+
+/** 连隐藏的节点（hiddenFirst / hiddenAfter 里摘出去的）也走到；关联线的端点可能藏着 */
+export function walkAll(node: MindNode, fn: (n: MindNode) => void): void {
+  fn(node);
+  for (const h of node.hiddenFirst ?? []) walkAll(h, fn);
+  for (const c of node.children) {
+    walkAll(c, fn);
+    for (const h of c.hiddenAfter ?? []) walkAll(h, fn);
+  }
 }
 
 /** 外框 / 概要的跨度不能超出后面剩下的兄弟（删掉兄弟后收窄）；根节点没有兄弟 */
@@ -658,6 +683,8 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     bullet: node.bullet,
     blockId: node.blockId,
     hidden: node.hidden,
+    anchor: node.anchor,
+    rels: node.rels?.map((r) => ({ ...r, c: r.c && { ...r.c } })),
   });
   copy.children = node.children.map((c) => cloneTree(c, copy));
   if (node.hiddenFirst) copy.hiddenFirst = node.hiddenFirst.map((c) => cloneTree(c, copy));

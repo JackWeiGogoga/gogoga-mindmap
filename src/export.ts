@@ -143,12 +143,14 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
       return `<rect x="${a("x")}" y="${a("y")}" width="${a("width")}" height="${a("height")}" rx="${a("rx")}" fill="${cs.fill}" fill-opacity="${cs.fillOpacity}" stroke="${cs.stroke}" stroke-opacity="${cs.strokeOpacity}" stroke-width="${cs.strokeWidth}" stroke-dasharray="${cs.strokeDasharray}"/>`;
     });
   // 连线和概要的括号；用不上的 path 只是藏起来（display: none）留着复用，不能导出去
-  const paths = [...edges.querySelectorAll<SVGPathElement>("path")].filter((p) => p.style.display !== "none" && !p.classList.contains("is-peek")).map((p) => {
+  const paths = [...edges.querySelectorAll<SVGPathElement>("path")].filter((p) => p.style.display !== "none" && !p.classList.contains("is-peek") && !p.classList.contains("mm-rel-hit") && !p.classList.contains("mm-rel-draft")).map((p) => {
     const cs = getComputedStyle(p);
     const d = p.getAttribute("d") ?? "";
     const dash = cs.strokeDasharray && cs.strokeDasharray !== "none" ? ` stroke-dasharray="${cs.strokeDasharray}"` : "";
     // 标注的尖角是填色的三角形，其余都是线
     if (p.classList.contains("mm-callout-tail")) return `<path d="${d}" fill="${cs.fill}" stroke="none"/>`;
+    if (p.classList.contains("mm-rel-arrow")) return `<path d="${d}" fill="${cs.fill}" fill-opacity="${cs.opacity}" stroke="none"/>`;
+    if (p.classList.contains("mm-rel-line")) return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-opacity="${cs.opacity}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}"${dash}/>`;
     return `<path d="${d}" fill="none" stroke="${cs.stroke}" stroke-width="${cs.strokeWidth}" stroke-linecap="${cs.strokeLinecap}" stroke-linejoin="${cs.strokeLinejoin}"${dash}/>`;
   });
 
@@ -181,7 +183,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "nowrap" });
   });
   clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold, .mm-note-card-resize, .mm-quiz-tag, .mm-pdf-jump").forEach((t) => t.remove());
-  clone.querySelectorAll(".is-selected, .is-drop-target").forEach((n) => {
+  clone.querySelectorAll(".is-selected, .is-drop-target, .mm-rel-label.is-active").forEach((n) => {
     (n as HTMLElement).setCssStyles({ boxShadow: "none" });
   });
   // 去掉类名让导出不依赖插件 CSS；但 MathJax 的字形靠 .mjx-cXXXX::before 的 content 规则，那一棵要保留

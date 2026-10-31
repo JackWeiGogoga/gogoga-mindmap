@@ -249,6 +249,7 @@ export class MindMapView extends TextFileView {
       },
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
+      notePreview: () => this.plugin.settings.notePreview,
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
       dragToFloat: () => this.plugin.settings.dragToFloat,

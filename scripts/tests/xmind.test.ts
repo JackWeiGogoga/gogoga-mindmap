@@ -200,9 +200,10 @@ mindmap: true
   const comments = `<comments><comment object-id="t2" author="a"><content>hi</content></comment><comment object-id="zz"/></comments>`;
   const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
   // 中心主题下的自由主题转过来；挂在别的主题下的自由主题还不支持，仍算丢掉
-  assert.deepEqual(x.lost, { detached: 1, relationships: 1, summaries: 0, comments: 1 });
+  // 两端都是主题的关联线转过来了，不算丢
+  assert.deepEqual(x.lost, { detached: 1, relationships: 0, summaries: 0, comments: 1 });
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮\n%%float x=-240 y=90%%/);
-  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲\n%%box=2 "两个" summary=2 "概括"%%/);
+  assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲\n%%box=2 "两个" summary=2 "概括" rel=r1%%\n\n## 乙\n%%id=r1%%/);
 });
 
 test("标注：content.json 的 children.callout、content.xml 的 topics type=callout 导入成 %%callout%%，多条按行合并", async () => {
@@ -253,4 +254,28 @@ mindmap: true
   const [s2] = await parseXmind(makeZip({ "content.xml": xml }));
   assert.match(xmindSheetToMarkdown(s2, { maxHeadingLevel: 3 }), /## 甲\n%%callout "甲的标注"%%/);
   assert.equal(s2.root.children.length, 1, "标注不会变成子主题");
+});
+
+test("关联线：两端都是主题的转成 %%rel%% / %%id%%，连到找不到的主题上的算丢掉", async () => {
+  const json = JSON.stringify([
+    {
+      title: "S",
+      rootTopic: {
+        id: "root",
+        title: "根",
+        children: { attached: [{ id: "a", title: "甲" }, { id: "b", title: "乙" }, { id: "c", title: "丙" }] },
+      },
+      relationships: [
+        { id: "r1", end1Id: "a", end2Id: "c", title: "依赖" },
+        { id: "r2", end1Id: "b", end2Id: "c" },
+        { id: "r3", end1Id: "a", end2Id: "summary-x" },
+      ],
+    },
+  ]);
+  const [sheet] = await parseXmind(makeZip({ "content.json": json }));
+  assert.equal(sheet.lost.relationships, 1);
+  assert.equal(
+    xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
+    '---\nmindmap: true\n---\n\n# 根\n\n## 甲\n%%rel=r1 "依赖"%%\n\n## 乙\n%%rel=r1%%\n\n## 丙\n%%id=r1%%\n',
+  );
 });

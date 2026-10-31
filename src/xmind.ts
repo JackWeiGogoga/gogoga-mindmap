@@ -32,10 +32,19 @@ export interface XmindLost {
   comments: number;
 }
 
+/** XMind 的关联线：两端是主题 id */
+export interface XmindRelationship {
+  from: string;
+  to: string;
+  title: string;
+}
+
 export interface XmindSheet {
   title: string;
   root: XmindTopic;
   lost: XmindLost;
+  /** 转换时两端都找得到主题的才画出来，找不到的算进 lost.relationships */
+  relationships?: XmindRelationship[];
 }
 
 const noLoss = (): XmindLost => ({ detached: 0, relationships: 0, summaries: 0, comments: 0 });
@@ -132,7 +141,7 @@ interface JsonTopic {
 interface JsonSheet {
   title?: string;
   rootTopic?: JsonTopic;
-  relationships?: unknown[];
+  relationships?: { end1Id?: string; end2Id?: string; title?: string }[];
 }
 
 function cleanTitle(s: string | undefined): string {
@@ -185,14 +194,25 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false)
   return topic;
 }
 
+/** 两端都是这张图里的主题的关联线留下；连到概要、外框这些上的画不了，算丢掉 */
+function withRelationships(sheet: XmindSheet, rels: XmindRelationship[]): XmindSheet {
+  const ids = new Set<string>();
+  collectIds(sheet.root, ids);
+  const ok = rels.filter((r) => r.from && r.to && r.from !== r.to && ids.has(r.from) && ids.has(r.to));
+  sheet.lost.relationships += rels.length - ok.length;
+  if (ok.length) sheet.relationships = ok;
+  return sheet;
+}
+
 function parseContentJson(text: string): XmindSheet[] {
   const sheets = JSON.parse(text) as JsonSheet[];
   return sheets
     .filter((s) => s.rootTopic)
     .map((s, i) => {
       const lost = noLoss();
-      lost.relationships = s.relationships?.length ?? 0;
-      return { title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root: fromJsonTopic(s.rootTopic!, lost, true), lost };
+      const relationships = (s.relationships ?? []).map((r) => ({ from: r.end1Id ?? "", to: r.end2Id ?? "", title: cleanTitle(r.title) }));
+      const root = fromJsonTopic(s.rootTopic!, lost, true);
+      return withRelationships({ title: cleanTitle(s.title) || t("xmind.sheet", { n: i + 1 }), root, lost }, relationships);
     });
 }
 
@@ -347,8 +367,11 @@ function parseContentXml(text: string): XmindSheet[] {
       const topic = childrenByName(s, "topic")[0];
       if (!topic) return null;
       const lost = noLoss();
-      for (const r of childrenByName(s, "relationships")) lost.relationships += childrenByName(r, "relationship").length;
-      return { title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root: fromXmlTopic(topic, lost, true), lost };
+      const relationships = childrenByName(s, "relationships")
+        .flatMap((r) => childrenByName(r, "relationship"))
+        .map((r) => ({ from: r.attrs["end1"] ?? "", to: r.attrs["end2"] ?? "", title: cleanTitle(childrenByName(r, "title")[0]?.text ?? "") }));
+      const root = fromXmlTopic(topic, lost, true);
+      return withRelationships({ title: cleanTitle(childrenByName(s, "title")[0]?.text ?? "") || t("xmind.sheet", { n: i + 1 }), root, lost }, relationships);
     })
     .filter((s): s is XmindSheet => !!s);
 }
@@ -386,6 +409,7 @@ export function describeLost(lost: XmindLost): string {
 export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}): MindDoc {
   const st: DocStyle = { ...DEFAULT_STYLE, ...style };
   const maxHeading = Math.min(6, Math.max(1, st.maxHeadingLevel));
+  const byId = new Map<string, MindNode>();
   const build = (t: XmindTopic, parent: MindNode | null, depth: number): MindNode => {
     const asHeading = depth + 1 <= maxHeading;
     const node = createNode({
@@ -401,11 +425,20 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });
+    if (t.id) byId.set(t.id, node);
     node.children = t.children.map((c) => build(c, node, depth + 1));
     return node;
   };
   const root = build(sheet.root, null, 0);
   if (!root.text) root.text = sheet.title;
+  let n = 0;
+  for (const r of sheet.relationships ?? []) {
+    const from = byId.get(r.from);
+    const to = byId.get(r.to);
+    if (!from || !to) continue;
+    to.anchor ??= `r${++n}`;
+    (from.rels ??= []).push({ to: to.anchor, label: r.title.replace(/["%]/g, "").trim() });
+  }
   return { root, frontmatter: "---\nmindmap: true\n---", preamble: "", rootFromHeading: true, style: st };
 }
 

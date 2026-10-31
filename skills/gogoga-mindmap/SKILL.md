@@ -50,6 +50,7 @@ One `%%…%%` comment per node holds all its markers, separated by spaces, for e
 | `summary "Text"` / `summary=2 "Text"` | Curly brace on the outer side of this node and its whole branch, with the summary text after it; `=2` stretches it over the next sibling too. To summarize several siblings, put it on the first one |
 | `callout "Text"` | Small always-visible bubble next to the node; `<br>` for a line break, add `cc=yellow` to fill it |
 | `hide` | Kept in the note but not shown in the map |
+| `id=r1` and `rel=r1 "Text"` | Relationship: a dashed arrow from the node with `rel=r1` to the node with `id=r1`. Pick any short id (letters, digits, `-`, `_`); one `id=` per node, several `rel=` allowed |
 
 Text inside a marker can't contain straight double quotes `"` or `%%`.
 

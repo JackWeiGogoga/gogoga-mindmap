@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-31
+
+### 新增
+- 关联线：右键节点 →「添加关联线」（也有同名命令），再点要连到的节点，两个节点之间出现一条弯曲的虚线箭头。双击线写文字，拖线上的文字（或选中后出现的小圆点）改弯曲，右键可以编辑文字、反转方向、恢复默认弯曲、删除。存成起点上的 `%%rel=r1 "文字"%%` 和终点上的 `%%id=r1%%`，节点改名、挪位置都不会断。导出 PNG/SVG 时带上，打开 .xmind 文件时里面的关联线也会转过来。（[#3](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/3)）
+- 新设置「编辑备注时分栏预览」（默认关）：编辑备注时，输入框旁边（窗口窄时在下面）实时显示渲染效果，公式、列表、图片和阅读视图里一样。（[#6](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/6)）
+
 ## [0.32.0] - 2026-10-31
 
 ### 新增
@@ -425,7 +431,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...HEAD
+[0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0

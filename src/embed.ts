@@ -113,6 +113,7 @@ class MindMapEmbed extends Component {
         embedded: true,
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
+        notePreview: () => settings.notePreview,
         marqueeDrag: () => settings.leftDrag === "select",
         caretAtEnd: () => settings.editCaret === "end",
         dragToFloat: () => settings.dragToFloat,

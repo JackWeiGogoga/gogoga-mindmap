@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, pathOf, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -56,10 +56,18 @@ interface Marker {
   callout?: string;
   calloutColor?: string;
   hidden?: boolean;
+  anchor?: string;
+  rels?: Relation[];
 }
 
-/** 标记里的一项：box、box=3、summary=2、callout 可带一个 "文字"（文字里不能有 " 和 %%），其余按空白切 */
-const MARKER_TOKEN_RE = /(box|summary|callout)(?:=(\d+))?(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|\S+/g;
+/** 关联线两头的标识：字母、数字、- 和 _ */
+const REL_ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
+
+/**
+ * 标记里的一项：box、box=3、summary=2、callout 可带一个 "文字"（文字里不能有 " 和 %%）；
+ * rel=r1 也可以带 "文字"；其余按空白切
+ */
+const MARKER_TOKEN_RE = /(box|summary|callout)(?:=(\d+))?(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|rel=([A-Za-z0-9_-]{1,32})(?:[ \t]*"((?:[^"%]|%(?!%))*)")?(?=\s|$)|\S+/g;
 
 /** 写进标记的文字：去掉会截断标记的 " 和 %%（单个 % 留着） */
 export function markerText(s: string): string {
@@ -103,7 +111,15 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
   for (const tok of tokens) {
     const t = tok[0];
     const lower = t.toLowerCase();
-    if (tok[1] === "box") {
+    if (tok[4] !== undefined) {
+      (marker.rels ??= []).push({ to: tok[4], label: tok[5]?.trim() ?? "" });
+    } else if (/^c=-?\d{1,6},-?\d{1,6}$/.test(lower) && marker.rels?.length) {
+      // 弯曲跟着前面最近的那条 rel
+      const [x, y] = lower.slice(2).split(",").map(Number);
+      marker.rels[marker.rels.length - 1].c = { x, y };
+    } else if (/^id=/.test(lower) && REL_ID_RE.test(t.slice(3))) {
+      marker.anchor = t.slice(3);
+    } else if (tok[1] === "box") {
       marker.box = { span: Math.max(1, Number(tok[2] ?? 1)), title: tok[3]?.trim() ?? "" };
     } else if (tok[1] === "summary") {
       marker.summary = { span: Math.max(1, Number(tok[2] ?? 1)), text: tok[3]?.trim() ?? "" };
@@ -153,7 +169,7 @@ function mergeMarker(a: Marker, b: Marker): Marker {
 /** 外框 / 概要写回的跨度：范围里夹着隐藏的兄弟、在脑图里又没改过时，照文件原来写的 */
 const spanOf = (g: { span: number; raw?: HiddenSpan }) => (g.raw && g.raw.visible === g.span ? g.raw.span : g.span);
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden">): string {
+export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "anchor" | "rels">): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
@@ -175,6 +191,12 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
   const callout = node.callout ? calloutToMarker(node.callout) : "";
   if (callout) parts.push(`callout "${callout}"`);
   if (callout && node.calloutColor) parts.push(`cc=${node.calloutColor.startsWith("#") ? node.calloutColor.slice(1) : node.calloutColor}`);
+  if (node.anchor) parts.push(`id=${node.anchor}`);
+  for (const r of node.rels ?? []) {
+    const label = markerText(r.label);
+    parts.push(`rel=${r.to}${label ? ` "${label}"` : ""}`);
+    if (r.c) parts.push(`c=${Math.round(r.c.x)},${Math.round(r.c.y)}`);
+  }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }
 
@@ -570,6 +592,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.hidden = marker.hidden;
         root.callout = marker.callout;
         root.calloutColor = marker.calloutColor;
+        root.anchor = marker.anchor;
+        root.rels = marker.rels;
         root.level = 1;
         root.kind = "heading";
         opts.lines?.set(root, lineNo);
@@ -581,7 +605,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -601,7 +625,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, bullet: tok.bullet, blockId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);

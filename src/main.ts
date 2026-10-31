@@ -837,6 +837,7 @@ export default class MindMapPlugin extends Plugin {
       ["insert-parent", "insert-parent", "command.insertParent"],
       ["edit-node", "edit", "command.editNode"],
       ["edit-callout", "callout", "command.editCallout"],
+      ["add-relationship", "add-rel", "command.addRel"],
       ["delete-node", "delete", "command.deleteNode"],
       ["delete-node-only", "delete-only", "command.deleteNodeOnly"],
       ["move-up", "move-up", "command.moveUp"],
@@ -984,6 +985,7 @@ export default class MindMapPlugin extends Plugin {
         embedded: true,
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
+        notePreview: () => this.settings.notePreview,
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,
@@ -1163,6 +1165,20 @@ export default class MindMapPlugin extends Plugin {
 
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
+      notePreviewScope: () => {
+        const scope = new Component();
+        scope.load();
+        let child: Component | null = null;
+        return {
+          render: (el, markdown) => {
+            if (child) scope.removeChild(child);
+            child = scope.addChild(new Component());
+            el.empty();
+            void MarkdownRenderer.render(this.app, markdown, el, sourcePath(), child);
+          },
+          dispose: () => scope.unload(),
+        };
+      },
       renderNote: (el, markdown) => {
         void MarkdownRenderer.render(this.app, markdown, el, sourcePath(), component).then(() => {
           // 备注里的代码块：MarkdownRenderer 不一定跑高亮，补一次

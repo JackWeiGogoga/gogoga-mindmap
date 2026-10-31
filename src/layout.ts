@@ -744,3 +744,87 @@ export function treePath(e: EdgeGeometry, radius = 8): string {
 function r(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
+
+// ---------- 关联线 ----------
+
+export interface Pt {
+  x: number;
+  y: number;
+}
+
+export interface RelGeometry {
+  /** 线：二次曲线，从起点节点边上出发、到终点节点边上（箭头尖前面一点）结束 */
+  d: string;
+  /** 箭头：填色的三角形 */
+  arrow: string;
+  /** 弧顶：曲线 t=0.5 处，线上的文字和拖弯曲的手柄都在这里 */
+  top: Pt;
+  /** 弧顶相对两个节点中心连线中点的偏移（就是存进 c= 的值） */
+  c: Pt;
+}
+
+const REL_GAP = 4;
+const ARROW_LEN = 9;
+const ARROW_HALF = 4.5;
+
+/** 默认的弯法：往连线的一侧鼓出去，鼓出量是距离的四分之一（最多 80），朝上鼓 */
+export function defaultRelOffset(a: Pt, b: Pt): Pt {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return { x: 0, y: -60 };
+  let nx = -dy / len;
+  let ny = dx / len;
+  if (ny > 0 || (ny === 0 && nx > 0)) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const amount = Math.min(80, len * 0.25);
+  return { x: nx * amount, y: ny * amount };
+}
+
+/** 从矩形中心朝 toward 方向的射线和矩形边（外扩 REL_GAP）的交点 */
+function rectExit(r: { x: number; y: number; w: number; h: number }, toward: Pt): Pt {
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  const dx = toward.x - cx;
+  const dy = toward.y - cy;
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return { x: cx, y: cy - r.h / 2 - REL_GAP };
+  const hw = r.w / 2 + REL_GAP;
+  const hh = r.h / 2 + REL_GAP;
+  const s = Math.min(Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : Infinity);
+  return { x: cx + dx * s, y: cy + dy * s };
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * 两个节点之间的关联线。c 是弧顶相对两中心连线中点的偏移，没有就用默认弯法。
+ * 两端从节点中心朝弧顶的方向出发，落在节点边框外一点；二次曲线的控制点取成让 t=0.5 正好经过弧顶
+ */
+export function relGeometry(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, c?: Pt): RelGeometry {
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const off = c ?? defaultRelOffset(ca, cb);
+  const top = { x: (ca.x + cb.x) / 2 + off.x, y: (ca.y + cb.y) / 2 + off.y };
+  const s = rectExit(a, top);
+  const e = rectExit(b, top);
+  const q = { x: 2 * top.x - (s.x + e.x) / 2, y: 2 * top.y - (s.y + e.y) / 2 };
+  // 箭头方向：曲线在终点的切线（终点 - 控制点）
+  let ux = e.x - q.x;
+  let uy = e.y - q.y;
+  let ul = Math.hypot(ux, uy);
+  if (ul < 1e-6) {
+    ux = e.x - s.x;
+    uy = e.y - s.y;
+    ul = Math.hypot(ux, uy) || 1;
+  }
+  ux /= ul;
+  uy /= ul;
+  const base = { x: e.x - ux * ARROW_LEN, y: e.y - uy * ARROW_LEN };
+  // 线停在箭头底边上，不从尖上戳出去
+  const end = { x: e.x - ux * (ARROW_LEN - 1), y: e.y - uy * (ARROW_LEN - 1) };
+  const d = `M${r2(s.x)},${r2(s.y)} Q${r2(q.x)},${r2(q.y)} ${r2(end.x)},${r2(end.y)}`;
+  const arrow = `M${r2(e.x)},${r2(e.y)} L${r2(base.x - uy * ARROW_HALF)},${r2(base.y + ux * ARROW_HALF)} L${r2(base.x + uy * ARROW_HALF)},${r2(base.y - ux * ARROW_HALF)} Z`;
+  return { d, arrow, top, c: off };
+}
