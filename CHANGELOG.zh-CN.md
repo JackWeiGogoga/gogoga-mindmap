@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-31
+
+### 新增
+- 在脑图中隐藏节点：右键节点选「更多 → 在脑图中隐藏」，或者在笔记里节点后面写 `%%hide%%`。这个节点连同分支还留在笔记里，只是不在脑图里显示，⌘Z 可以撤销。脑图里有隐藏节点时，工具栏会出现「显示隐藏的节点」（也有命令），打开后隐藏的节点半透明、带虚线框，右键「更多 → 取消隐藏」就恢复。保存时隐藏节点按原位置写回，前后的节点挪动、删除都不影响它；外框和概要的范围里夹着隐藏节点时，原来的跨度照原样保留。
+- 新设置「只把标题当节点」（默认关）：笔记的脑图只把标题当节点，标题下面的列表和段落算作它的备注，一字不动。新建的节点写成下一级标题，最深到六级，再深的存成上一级标题的备注，并提示一次。代码块里的脑图不受影响。（[#14](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/14)）
+
 ## [0.30.0] - 2026-10-31
 
 ### 新增
@@ -402,7 +408,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...HEAD
+[0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2

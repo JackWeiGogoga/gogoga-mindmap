@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-31
+
+### Added
+- Hide nodes from the mind map: right-click a node and choose More → Hide in mind map, or write `%%hide%%` after it in the note. The node and its branch stay in the note but leave the map; press Mod+Z to undo. When a map has hidden nodes, the toolbar shows "Show hidden nodes" (also a command): they appear faded with a dashed outline, and More → Unhide brings them back. Saving puts hidden nodes back exactly where they were, even when you move or delete the nodes around them, and boxes and summaries spanning them keep their original range.
+- "Only headings as nodes" setting (off by default): mind maps of notes show only headings as nodes, and the lists and paragraphs under a heading become its note, kept exactly as written. New nodes are written as headings one level down, up to level 6; deeper ones are saved as part of the heading's note, with a notice. Code-block mind maps are not affected. ([#14](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/14))
+
 ## [0.30.0] - 2026-10-31
 
 ### Added
@@ -402,7 +408,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.0...HEAD
+[0.31.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.29.0...0.30.0
 [0.29.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.2...0.29.0
 [0.28.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.28.1...0.28.2
