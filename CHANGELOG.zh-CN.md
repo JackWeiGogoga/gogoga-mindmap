@@ -4,6 +4,13 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-01
+
+### 新增
+- 打开 .xmind 文件时显示主题上的图片：只有图片的主题显示成图片节点，有文字的主题按 XMind 里的位置把图片放在文字前面或后面，宽度跟 XMind 里一致。新版（XMind Zen / 2020 之后）和 XMind 8 的文件都支持，`![[文件.xmind]]` 嵌入里也显示。
+- 「转换为 Markdown 笔记」时，图片按 Obsidian 的附件位置设置存成附件，节点里写成 `![[附件|宽度]]`。以前图片会被直接丢掉，也没有提示。
+- 主题上有图片、但 .xmind 文件里缺图片文件的，会算进顶部「以下内容暂不支持」的提示里。
+
 ## [0.33.2] - 2026-11-01
 
 ### 修复
@@ -446,7 +453,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...HEAD
+[0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0

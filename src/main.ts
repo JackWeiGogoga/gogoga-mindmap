@@ -1291,7 +1291,7 @@ export default class MindMapPlugin extends Plugin {
         return true;
       },
       resolveImage: (link) => {
-        if (/^(https?:|data:|app:)/.test(link)) return link;
+        if (/^(https?:|data:|app:|blob:)/.test(link)) return link;
         const file = this.app.metadataCache.getFirstLinkpathDest(link.split("#")[0], sourcePath());
         return file ? this.app.vault.getResourcePath(file) : null;
       },

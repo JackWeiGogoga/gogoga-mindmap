@@ -3,7 +3,7 @@ import { MindMapCanvas } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { indentString } from "./settings";
-import { describeLost, parseXmind, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
+import { describeLost, imageExt, parseXmind, sheetImageUrls, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
 import { VIEW_TYPE_MINDMAP } from "./view";
 import type MindMapPlugin from "./main";
 
@@ -16,6 +16,8 @@ export class XmindView extends FileView {
   private current = 0;
   private sheetBar: HTMLElement | null = null;
   private lostBar: HTMLElement | null = null;
+  /** 当前工作表图片的 blob: 地址，换工作表、关视图时释放 */
+  private releaseImages: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: MindMapPlugin) {
     super(leaf);
@@ -54,6 +56,8 @@ export class XmindView extends FileView {
     await super.onClose();
     this.canvas?.destroy();
     this.canvas = null;
+    this.releaseImages?.();
+    this.releaseImages = null;
   }
 
   async onLoadFile(file: TFile): Promise<void> {
@@ -78,8 +82,16 @@ export class XmindView extends FileView {
     this.lostBar?.remove();
     this.lostBar = null;
     const sheet = this.sheets[this.current];
-    if (!sheet) return;
-    this.canvas.setDoc(xmindSheetToDoc(sheet, this.docStyle()));
+    const prev = this.releaseImages;
+    this.releaseImages = null;
+    if (!sheet) {
+      prev?.();
+      return;
+    }
+    const urls = sheetImageUrls(sheet);
+    this.releaseImages = urls.revoke;
+    this.canvas.setDoc(xmindSheetToDoc(sheet, this.docStyle(), urls.link));
+    prev?.();
     const lost = describeLost(sheet.lost);
     if (lost) {
       this.lostBar = this.canvas.el.createDiv({ cls: "mm-xmind-lost", text: lost });
@@ -103,9 +115,6 @@ export class XmindView extends FileView {
     const file = this.file;
     const sheet = this.sheets[this.current];
     if (!file || !sheet) return;
-    let md = xmindSheetToMarkdown(sheet, this.docStyle());
-    const icon = this.plugin.settings.listIcon;
-    if (icon) md = md.replace(/^---\nmindmap: true\n/, `---\nmindmap: true\nicon: ${icon}\n`);
     const folder = file.parent?.path ?? "";
     const base = this.sheets.length > 1 ? `${file.basename} - ${sheet.title}` : file.basename;
     let name = `${base}.md`;
@@ -113,6 +122,17 @@ export class XmindView extends FileView {
       name = `${base} ${i}.md`;
     }
     const path = folder && folder !== "/" ? `${folder}/${name}` : name;
+    // 图片按 Obsidian 的附件位置设置存成附件，节点里写 ![[附件|宽度]]
+    const links = new Map<string, string>();
+    let n = 0;
+    for (const [src, data] of sheet.images ?? []) {
+      const attachment = await this.app.fileManager.getAvailablePathForAttachment(`${name.replace(/\.md$/, "")} ${++n}.${imageExt(src)}`, path);
+      const saved = await this.app.vault.createBinary(attachment, data.slice().buffer);
+      links.set(src, this.app.metadataCache.fileToLinktext(saved, path));
+    }
+    let md = xmindSheetToMarkdown(sheet, this.docStyle(), (src) => links.get(src) ?? null);
+    const icon = this.plugin.settings.listIcon;
+    if (icon) md = md.replace(/^---\nmindmap: true\n/, `---\nmindmap: true\nicon: ${icon}\n`);
     const created = await this.app.vault.create(path, md);
     await this.leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: created.path }, active: true });
     const lost = describeLost(sheet.lost);

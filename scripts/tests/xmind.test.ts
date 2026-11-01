@@ -162,7 +162,7 @@ test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数
   ]);
   const [sheet] = await parseXmind(makeZip({ "content.json": json }));
   // 中心主题下的自由主题能转过来，不再算丢失
-  assert.deepEqual(sheet.lost, { detached: 0, relationships: 2, summaries: 1, comments: 0 });
+  assert.deepEqual(sheet.lost, { detached: 0, relationships: 2, summaries: 1, comments: 0, images: 0 });
   assert.equal(
     xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
     `---
@@ -185,7 +185,7 @@ mindmap: true
 `,
   );
   assert.ok(describeLost(sheet.lost).length > 0);
-  assert.equal(describeLost({ detached: 0, relationships: 0, summaries: 0, comments: 0 }), "");
+  assert.equal(describeLost({ detached: 0, relationships: 0, summaries: 0, comments: 0, images: 0 }), "");
 
   const xml = `<xmap-content><sheet id="s"><title>X</title>
     <topic id="t1"><title>根</title>
@@ -201,7 +201,7 @@ mindmap: true
   const [x] = await parseXmind(makeZip({ "content.xml": xml, "comments.xml": comments }));
   // 中心主题下的自由主题转过来；挂在别的主题下的自由主题还不支持，仍算丢掉
   // 两端都是主题的关联线转过来了，不算丢
-  assert.deepEqual(x.lost, { detached: 1, relationships: 0, summaries: 0, comments: 1 });
+  assert.deepEqual(x.lost, { detached: 1, relationships: 0, summaries: 0, comments: 1, images: 0 });
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 浮\n%%float x=-240 y=90%%/);
   assert.match(xmindSheetToMarkdown(x, { maxHeadingLevel: 2 }), /## 甲\n%%box=2 "两个" summary=2 "概括" rel=r1%%\n\n## 乙\n%%id=r1%%/);
 });
@@ -278,4 +278,61 @@ test("关联线：两端都是主题的转成 %%rel%% / %%id%%，连到找不到
     xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
     '---\nmindmap: true\n---\n\n# 根\n\n## 甲\n%%rel=r1 "依赖"%%\n\n## 乙\n%%rel=r1%%\n\n## 丙\n%%id=r1%%\n',
   );
+});
+
+test("图片节点：两种格式都读出图片，按 XMind 的位置放在文字前后，包里缺的算丢失", async () => {
+  const json = JSON.stringify([
+    {
+      title: "S",
+      rootTopic: {
+        title: "根",
+        children: {
+          attached: [
+            { id: "a", title: "", image: { src: "xap:resources/one.png", width: 240, height: 140 } },
+            { id: "b", title: "图在下", image: { src: "xap:resources/two.jpg", align: "bottom" } },
+            { id: "c", title: "图在上", image: { src: "xap:resources/two.jpg", width: 120.4 } },
+            { id: "d", title: "缺图", image: { src: "xap:resources/missing.png" } },
+            { id: "e", title: "外链图", image: { src: "https://example.com/x.png" } },
+          ],
+        },
+      },
+    },
+  ]);
+  const [s1] = await parseXmind(makeZip({ "content.json": json, "resources/one.png": "PNG1", "resources/two.jpg": "JPG2" }));
+  assert.deepEqual([...(s1.images?.keys() ?? [])].sort(), ["resources/one.png", "resources/two.jpg"]);
+  assert.equal(new TextDecoder().decode(s1.images?.get("resources/one.png")), "PNG1");
+  assert.equal(s1.lost.images, 1);
+  assert.match(describeLost(s1.lost), /1 张图片|1 images/);
+  const link = (src: string) => `附件/${src.split("/").pop()}`;
+  assert.equal(
+    xmindSheetToMarkdown(s1, {}, link),
+    `---
+mindmap: true
+---
+
+# 根
+
+## ![[附件/one.png|240]]
+
+## 图在下 ![[附件/two.jpg]]
+
+## ![[附件/two.jpg|120]] 图在上
+
+## 缺图
+
+## 外链图
+`,
+  );
+  // 不给 imageLink（或拿不到链接）时只留文字，不会出现半截语法
+  assert.ok(!xmindSheetToMarkdown(s1).includes("!["));
+
+  const xml = `<xmap-content xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:svg="http://www.w3.org/2000/svg"><sheet id="s"><title>X</title>
+    <topic id="t1"><title>根</title><children><topics type="attached">
+      <topic id="t2"><xhtml:img svg:width="200" svg:height="100" xhtml:src="xap:attachments/p.png"/><title></title></topic>
+      <topic id="t3"><xhtml:img xhtml:src="xap:attachments/gone.png"/><title>缺</title></topic>
+    </topics></children></topic></sheet></xmap-content>`;
+  const [s2] = await parseXmind(makeZip({ "content.xml": xml, "attachments/p.png": "P" }));
+  assert.equal(s2.lost.images, 1);
+  assert.match(xmindSheetToMarkdown(s2, {}, link), /^## !\[\[附件\/p\.png\|200\]\]$/m);
+  assert.match(xmindSheetToMarkdown(s2, {}, link), /^## 缺$/m);
 });

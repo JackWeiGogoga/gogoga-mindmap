@@ -17,7 +17,7 @@ import type { MindDoc } from "./model";
 import { indentString } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { isStructure } from "./layout";
-import { describeLost, parseXmind, xmindSheetToDoc } from "./xmind";
+import { describeLost, parseXmind, sheetImageUrls, xmindSheetToDoc } from "./xmind";
 import type { MindNode } from "./model";
 import { t } from "./i18n";
 
@@ -62,6 +62,8 @@ class MindMapEmbed extends Component {
   private canvas: MindMapCanvas | null = null;
   private wrap: HTMLElement | null = null;
   private lastHeight = 0;
+  /** 嵌入的 .xmind 里的图片做成的 blob: 地址，重读或卸载时释放 */
+  private releaseImages: (() => void) | null = null;
   private bounds: { w: number; h: number } | null = null;
 
   constructor(
@@ -88,6 +90,8 @@ class MindMapEmbed extends Component {
   }
 
   onunload(): void {
+    this.releaseImages?.();
+    this.releaseImages = null;
     this.canvas?.destroy();
     this.canvas = null;
     this.wrap?.remove();
@@ -95,8 +99,11 @@ class MindMapEmbed extends Component {
   }
 
   async loadFile(): Promise<void> {
-    const { doc, lost } = await this.readDoc();
-    if (!doc) return;
+    const { doc, lost, release } = await this.readDoc();
+    if (!doc) {
+      release?.();
+      return;
+    }
     const settings = this.plugin.settings;
     const fm = (k: string) => frontmatterValue(doc.frontmatter, k);
     const structure = fm("mindmap-structure");
@@ -140,6 +147,9 @@ class MindMapEmbed extends Component {
       this.register(() => ro.disconnect());
     }
     this.canvas.setDoc(doc);
+    // 旧节点用的图片地址要等新图换上之后再释放
+    this.releaseImages?.();
+    this.releaseImages = release ?? null;
     this.focusSubpath(doc.root);
     this.wrap?.querySelector(".mm-xmind-lost")?.remove();
     if (lost) this.wrap?.createDiv({ cls: "mm-xmind-lost", text: lost });
@@ -178,7 +188,8 @@ class MindMapEmbed extends Component {
     canvas.select(null);
   }
 
-  private async readDoc(): Promise<{ doc: MindDoc | null; lost: string }> {
+  /** release：.xmind 图片的 blob: 地址，换上新图之后再释放 */
+  private async readDoc(): Promise<{ doc: MindDoc | null; lost: string; release?: () => void }> {
     const settings = this.plugin.settings;
     const style = { maxHeadingLevel: settings.maxHeadingLevel, indent: indentString(settings.indent) };
     const vault = this.plugin.app.vault;
@@ -186,7 +197,9 @@ class MindMapEmbed extends Component {
       if (this.file.extension === "xmind") {
         // 多个画布的只显示第一个；要看别的打开文件切换
         const sheet = (await parseXmind(await vault.readBinary(this.file)))[0];
-        return sheet ? { doc: xmindSheetToDoc(sheet, style), lost: describeLost(sheet.lost) } : { doc: null, lost: "" };
+        if (!sheet) return { doc: null, lost: "" };
+        const urls = sheetImageUrls(sheet);
+        return { doc: xmindSheetToDoc(sheet, style, urls.link), lost: describeLost(sheet.lost), release: urls.revoke };
       }
       return { doc: parseMarkdown(await vault.cachedRead(this.file), { fallbackTitle: this.file.basename, style, ...this.plugin.rootRule() }), lost: "" };
     } catch (e) {

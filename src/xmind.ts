@@ -21,6 +21,8 @@ export interface XmindTopic {
   float?: { x: number; y: number };
   /** 标注（XMind 的 callout 主题）；一个主题有好几条时按行合并 */
   callout?: string;
+  /** 主题上的图片：src 是包里的路径（去掉 xap: 前缀），after 为真时图片排在文字后面 */
+  image?: { src: string; width?: number; after?: boolean };
   children: XmindTopic[];
 }
 
@@ -30,6 +32,8 @@ export interface XmindLost {
   relationships: number;
   summaries: number;
   comments: number;
+  /** 主题上有图片、包里却找不到图片文件的 */
+  images: number;
 }
 
 /** XMind 的关联线：两端是主题 id */
@@ -45,9 +49,25 @@ export interface XmindSheet {
   lost: XmindLost;
   /** 转换时两端都找得到主题的才画出来，找不到的算进 lost.relationships */
   relationships?: XmindRelationship[];
+  /** 这张图用到、包里也找得到的图片：包内路径 → 文件内容 */
+  images?: Map<string, Uint8Array>;
 }
 
-const noLoss = (): XmindLost => ({ detached: 0, relationships: 0, summaries: 0, comments: 0 });
+const noLoss = (): XmindLost => ({ detached: 0, relationships: 0, summaries: 0, comments: 0, images: 0 });
+
+/** "xap:resources/a.png" → "resources/a.png"；不是包内图片（外链等）返回 null */
+function packagePath(src: string | undefined): string | null {
+  const m = /^xap:(.+)$/.exec((src ?? "").trim());
+  return m ? m[1] : null;
+}
+
+function imageOf(src: string | undefined, width: number | undefined, align: string | undefined): XmindTopic["image"] {
+  const path = packagePath(src);
+  if (!path) return undefined;
+  const w = Number.isFinite(width) && width! > 0 ? Math.round(width!) : undefined;
+  // XMind 默认图片在文字上方；align 为 bottom / right 时在文字后面
+  return { src: path, width: w, after: align === "bottom" || align === "right" || undefined };
+}
 
 /** 把 XMind 的 boundary range 落到子主题上："(0,2)" 框住第 0–2 个子主题，"master" 框住主题自己 */
 function applyBoundary(topic: XmindTopic, range: string | undefined, title: string): void {
@@ -131,6 +151,7 @@ interface JsonTopic {
   summaries?: { range?: string; topicId?: string }[];
   comments?: unknown[];
   notes?: { plain?: { content?: string } };
+  image?: { src?: string; width?: number; height?: number; align?: string };
   children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[]; callout?: JsonTopic[] };
   position?: { x?: number; y?: number };
   branch?: string;
@@ -180,6 +201,7 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false)
     color,
     folded: t.branch === "folded" || undefined,
     callout: calloutText((t.children?.callout ?? []).map((c) => c.title)),
+    image: imageOf(t.image?.src, t.image?.width, t.image?.align),
     children: [
       ...(t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
       ...(isRoot ? detached.map((d, i) => ({ ...fromJsonTopic(d, lost), float: floatPos(d.position?.x, d.position?.y, i) })) : []),
@@ -333,10 +355,12 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): Xmin
   }
   // 自由主题排在普通子主题之后，外框 / 概要按下标换算时不受影响
   children.push(...floats);
+  const img = childrenByName(el, "img")[0];
   const topic: XmindTopic = {
     id: el.attrs["id"],
     title,
     note: plain || undefined,
+    image: img ? imageOf(img.attrs["xhtml:src"] ?? img.attrs["src"], Number(img.attrs["svg:width"]), img.attrs["align"]) : undefined,
     folded: el.attrs["branch"] === "folded" || undefined,
     callout: calloutText(callouts),
     children,
@@ -383,6 +407,7 @@ export async function parseXmind(buf: ArrayBuffer): Promise<XmindSheet[]> {
   const xml = entries.get("content.xml");
   const sheets = json ? parseContentJson(decoder.decode(json)) : xml ? parseContentXml(decoder.decode(xml)) : null;
   if (!sheets) throw new Error(t("xmind.noContent"));
+  for (const sheet of sheets) attachImages(sheet, sheet.root, entries);
   // XMind 8 的评论在单独的 comments.xml 里，按 object-id 归到所在的工作表
   const comments = entries.get("comments.xml");
   if (comments) {
@@ -396,9 +421,54 @@ export async function parseXmind(buf: ArrayBuffer): Promise<XmindSheet[]> {
   return sheets;
 }
 
+/** 把主题用到的图片从包里取出来挂到工作表上；包里没有的去掉，算进丢失 */
+function attachImages(sheet: XmindSheet, topic: XmindTopic, entries: Map<string, Uint8Array>): void {
+  if (topic.image) {
+    const data = entries.get(topic.image.src);
+    if (data) (sheet.images ??= new Map()).set(topic.image.src, data);
+    else {
+      sheet.lost.images += 1;
+      topic.image = undefined;
+    }
+  }
+  for (const c of topic.children) attachImages(sheet, c, entries);
+}
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+};
+
+export function imageExt(src: string): string {
+  return /\.([a-z0-9]+)$/i.exec(src)?.[1].toLowerCase() ?? "png";
+}
+
+/**
+ * 只读显示用：把工作表里的图片做成 blob: 地址。不往 vault 里写文件；
+ * 换工作表、关掉视图时调 revoke 释放
+ */
+export function sheetImageUrls(sheet: XmindSheet): { link: (src: string) => string | null; revoke: () => void } {
+  const urls = new Map<string, string>();
+  for (const [src, data] of sheet.images ?? []) {
+    urls.set(src, URL.createObjectURL(new Blob([data as BlobPart], { type: IMAGE_TYPES[imageExt(src)] ?? "application/octet-stream" })));
+  }
+  return {
+    link: (src) => urls.get(src) ?? null,
+    revoke: () => {
+      for (const u of urls.values()) URL.revokeObjectURL(u);
+      urls.clear();
+    },
+  };
+}
+
 /** 提示里列出的丢失项；没有返回空串 */
 export function describeLost(lost: XmindLost): string {
-  const items = (["detached", "relationships", "summaries", "comments"] as const)
+  const items = (["detached", "relationships", "summaries", "comments", "images"] as const)
     .filter((k) => lost[k] > 0)
     .map((k) => t(`xmind.lost.${k}`, { n: lost[k] }));
   return items.length ? t("xmind.lost", { items: items.join(t("xmind.lost.sep")) }) : "";
@@ -406,7 +476,19 @@ export function describeLost(lost: XmindLost): string {
 
 // ---------- → Markdown ----------
 
-export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}): MindDoc {
+/** 节点文字加上图片：`![[链接|宽度]]` 按 XMind 里的位置放在文字前或后 */
+function withImage(title: string, image: XmindTopic["image"], link: string | null): string {
+  if (!image || !link) return title;
+  const img = `![[${link}${image.width ? `|${image.width}` : ""}]]`;
+  if (!title) return img;
+  return image.after ? `${title} ${img}` : `${img} ${title}`;
+}
+
+/**
+ * imageLink：把包内图片路径换成节点里能用的链接（只读显示用 blob: 地址，转换时用存进 vault 的附件）；
+ * 不给或返回 null 时只留文字
+ */
+export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}, imageLink?: (src: string) => string | null): MindDoc {
   const st: DocStyle = { ...DEFAULT_STYLE, ...style };
   const maxHeading = Math.min(6, Math.max(1, st.maxHeadingLevel));
   const byId = new Map<string, MindNode>();
@@ -414,7 +496,7 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
     const asHeading = depth + 1 <= maxHeading;
     const node = createNode({
       parent,
-      text: t.title,
+      text: withImage(t.title, t.image, t.image && imageLink ? imageLink(t.image.src) : null),
       note: t.note ?? "",
       color: t.color,
       folded: !!t.folded,
@@ -442,6 +524,6 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
   return { root, frontmatter: "---\nmindmap: true\n---", preamble: "", rootFromHeading: true, style: st };
 }
 
-export function xmindSheetToMarkdown(sheet: XmindSheet, style: Partial<DocStyle> = {}): string {
-  return serializeMarkdown(xmindSheetToDoc(sheet, style));
+export function xmindSheetToMarkdown(sheet: XmindSheet, style: Partial<DocStyle> = {}, imageLink?: (src: string) => string | null): string {
+  return serializeMarkdown(xmindSheetToDoc(sheet, style, imageLink));
 }

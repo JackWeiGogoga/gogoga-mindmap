@@ -4,6 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-01
+
+### Added
+- Opening a .xmind file now shows topic images: image-only topics become image nodes, and topics with text get the image before or after the text as placed in XMind, at the XMind width. Works for XMind Zen / 2020+ and XMind 8 files, and in `![[file.xmind]]` embeds.
+- "Convert to Markdown note" saves the images as attachments (following Obsidian's attachment location setting) and writes them as `![[attachment|width]]` in the nodes. Images used to be dropped silently.
+- Topics whose image file is missing from the .xmind are counted in the "not supported yet" notice at the top.
+
 ## [0.33.2] - 2026-11-01
 
 ### Fixed
@@ -446,7 +453,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...HEAD
+[0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0

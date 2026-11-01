@@ -75,6 +75,7 @@ const en = {
   "xmind.lost.relationships": "{n} relationships",
   "xmind.lost.summaries": "{n} summaries",
   "xmind.lost.comments": "{n} comments",
+  "xmind.lost.images": "{n} images missing from the file",
 
   // export.ts
   "export.readFailed": "Read failed",
@@ -540,6 +541,7 @@ const zh: Record<Key, string> = {
   "xmind.lost.relationships": "{n} 条联系线",
   "xmind.lost.summaries": "{n} 个概要",
   "xmind.lost.comments": "{n} 条评论",
+  "xmind.lost.images": "{n} 张图片（文件里缺图片）",
 
   "export.readFailed": "读取失败",
   "export.nothing": "没有可导出的内容",
