@@ -3901,7 +3901,7 @@ export class MindMapCanvas {
       if (target) void this.handleDrop(ev, target);
     });
 
-    this.on(el, "paste", (ev) => {
+    const onPaste = (ev: ClipboardEvent) => {
       // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
       if (this.opts.editable && this.editing && (ev.target as HTMLElement).closest?.(".mm-label")) {
         const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
@@ -3921,6 +3921,13 @@ export class MindMapCanvas {
       if (this.opts.embedded) ev.stopPropagation();
       if (files.length) void this.insertImageFiles(files, this.primary ?? this.doc?.root ?? null);
       else this.pasteText(text);
+    };
+    this.on(el, "paste", onPaste);
+    // 浏览器把粘贴事件发给页面上选区所在的元素，不看焦点：PDF 里刚选过文字（PDF++ 选中即复制）、
+    // 选区还留在 PDF 上时，点节点再 ⌘V，事件落在 PDF 的文字层，画布收不到。焦点在画布上就接过来
+    this.on(el.ownerDocument, "paste", (ev) => {
+      if (el.contains(ev.target as Node) || el.ownerDocument.activeElement !== el) return;
+      onPaste(ev);
     });
 
     this.on(el, "input", (ev) => {
