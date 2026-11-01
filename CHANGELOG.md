@@ -4,6 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-11-01
+
+### Fixed
+- Clicking the task checkbox on a node a second time removed the checkbox (the item became a plain list item). It now toggles between open and done; use the context menu "Task checkbox" to remove it.
+- Edits to a mind map code block inside a Canvas text card failed with "Failed to write back to the code block: File not found" and were lost. They are now written back to the card text.
+- Pressing F2 on a selected node of a mind map embedded in a note triggered Obsidian's "Rename file". F2 now edits the node as usual.
+
+### Changed
+- Clicking outside an embedded mind map (note text, empty canvas) clears the selection, so the floating node toolbar goes away. With "Hide the toolbar of embedded maps" on, the bottom toolbar also hides once the mouse and focus leave the map, including while you are editing it and on canvas cards.
+
 ## [0.33.1] - 2026-11-01
 
 ### Fixed
@@ -436,7 +446,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...HEAD
+[0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0

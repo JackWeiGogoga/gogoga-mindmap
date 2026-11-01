@@ -136,12 +136,14 @@ test("标记 emoji：同组互斥、再点移除、顺序固定", () => {
   assert.ok(MARKER_GROUPS.length >= 4);
 });
 
-test("任务复选框切换：无 → 空 → 勾 → 无；标记保留在前面", () => {
+test("任务复选框切换：点复选框只在空和勾之间来回，不会把复选框去掉；标记保留在前面", () => {
   assert.equal(toggleTask("事项"), "[ ] 事项");
   assert.equal(toggleTask("[ ] 事项"), "[x] 事项");
-  assert.equal(toggleTask("[x] 事项"), "事项");
+  assert.equal(toggleTask("[x] 事项"), "[ ] 事项");
+  assert.equal(toggleTask("[X] 事项"), "[ ] 事项");
   assert.equal(toggleTask("🚩 [ ] 事项"), "🚩 [x] 事项");
   assert.equal(toggleTask("[ ] 事项", "add-remove"), "事项");
+  assert.equal(toggleTask("[x] 事项", "add-remove"), "事项");
 });
 
 test("聚焦分支时布局按相对深度算间距", () => {

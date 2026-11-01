@@ -106,14 +106,17 @@ export function isAnswer(text: string): boolean {
 
 const TASK_RE = /^\[( |x|X)\]\s+/;
 
-/** 切换任务复选框：无 → [ ]，[ ] → [x]，[x] → 去掉 */
-export function toggleTask(text: string, mode: "cycle" | "add-remove" = "cycle"): string {
+/**
+ * 切换任务复选框。check（点节点上的复选框）：[ ] ⇄ [x]，没有就加 [ ]；
+ * add-remove（菜单「任务复选框」）：有就去掉，没有就加 [ ]
+ */
+export function toggleTask(text: string, mode: "check" | "add-remove" = "check"): string {
   const { markers, rest } = splitMarkers(text);
   const m = TASK_RE.exec(rest);
   let body: string;
   if (!m) body = `[ ] ${rest}`;
-  else if (mode === "add-remove" || m[1] !== " ") body = rest.slice(m[0].length);
-  else body = `[x] ${rest.slice(m[0].length)}`;
+  else if (mode === "add-remove") body = rest.slice(m[0].length);
+  else body = `${m[1] === " " ? "[x]" : "[ ]"} ${rest.slice(m[0].length)}`;
   return [...markers, body].join(" ");
 }
 

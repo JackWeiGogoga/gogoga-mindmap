@@ -1818,10 +1818,11 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 }
 .gg-mm-root.is-recite :is(.mm-callout, .mm-callout-tail, .mm-note-card, .mm-note-link).is-answer-covered { visibility: hidden; }
 
-/* 设置「嵌入的脑图隐藏工具栏」：阅读模式不显示；编辑模式鼠标移上来或正在编辑时才显示。白板卡片里照常 */
+/* 设置「嵌入的脑图隐藏工具栏」：阅读模式不显示；编辑模式和白板卡片里鼠标移上来或焦点在图里时才显示。
+   改图的时候（is-editable）也一样，鼠标移开、点到外面就收起来 */
 body.gg-mm-embed-toolbar-autohide .markdown-preview-view .gg-mm-root.is-embedded:not(.is-editable):not(.canvas-node *) .mm-toolbar { display: none; }
-body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded .mm-toolbar { transition: opacity 0.15s; }
-body.gg-mm-embed-toolbar-autohide .markdown-source-view .gg-mm-root.is-embedded:not(.is-editable):not(:hover):not(:focus-within):not(.canvas-node *) .mm-toolbar { opacity: 0; pointer-events: none; }
+body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-mm-root.is-embedded .mm-toolbar { transition: opacity 0.15s; }
+body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-mm-root.is-embedded:not(:hover):not(:focus-within) .mm-toolbar { opacity: 0; pointer-events: none; }
 
 /* 白板卡片里的嵌入脑图：铺满卡片 */
 .mm-file-embed.mm-in-canvas { height: 100%; }

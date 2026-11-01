@@ -79,6 +79,8 @@ import type { NoteCards, NoteCardState } from "./state";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, splitByPunctuation, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
+  /** 嵌入的图拿到焦点时，截下会和画布按键撞车的 Obsidian 全局热键交给 onKey；返回注销函数 */
+  claimKeys?: (el: HTMLElement, onKey: (ev: KeyboardEvent) => void) => () => void;
   /** 渲染节点备注（Obsidian 里用 MarkdownRenderer），缺省为纯文本 */
   renderNote?: (el: HTMLElement, markdown: string) => void;
   /**
@@ -589,6 +591,7 @@ export class MindMapCanvas {
   /** 按下时落在图片上：双击 / 连点两下就看大图，不进编辑 */
   private downOnImage: HTMLImageElement | null = null;
   private lightbox: HTMLElement | null = null;
+  private keysHandled = new WeakSet<KeyboardEvent>();
   private pendingSelectPath: string | null = null;
   /** 触屏：按住节点不动一段时间才进入拖拽，期间手指移动视为平移 */
   private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
@@ -3795,6 +3798,25 @@ export class MindMapCanvas {
         if (field && el.contains(field)) return;
         ev.preventDefault();
       });
+      const releaseKeys = this.opts.host?.claimKeys?.(el, (ev) => this.onKeyDown(ev));
+      if (releaseKeys) this.disposers.push(releaseKeys);
+      // 嵌入的图点到外面（正文、白板空白处）就取消选中，节点浮动栏跟着收起来。
+      // 画布自己的菜单、弹层和 Obsidian 的菜单、弹窗、悬停预览可能挂在 body 上，不算外面；
+      // 正在编辑的标签先由它自己的 blur 提交，等它提交完再取消选中
+      this.on(
+        this.el.doc,
+        "pointerdown",
+        (ev) => {
+          const target = ev.target as HTMLElement;
+          if (el.contains(target) || target.closest?.(".mm-menu, .mm-popover, .menu, .modal-container, .suggestion-container, .popover")) return;
+          if (!this.selected.size) return;
+          window.setTimeout(() => {
+            if (!el.isConnected || this.editing || !this.selected.size) return;
+            this.select(null);
+          });
+        },
+        { capture: true },
+      );
     }
 
     this.on(el, "dblclick", (ev) => {
@@ -3984,6 +4006,9 @@ export class MindMapCanvas {
   }
 
   private onKeyDown(ev: KeyboardEvent): void {
+    // 被 claimKeys 截下来处理过的按键，冒泡到画布时不再处理第二遍
+    if (this.keysHandled.has(ev)) return;
+    this.keysHandled.add(ev);
     if (this.opts.embedded) {
       this.handleKeyEmbedded(ev);
       return;

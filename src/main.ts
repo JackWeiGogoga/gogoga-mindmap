@@ -18,6 +18,7 @@ import {
   setTooltip,
   Plugin,
   renderMath,
+  Scope,
   TAbstractFile,
   TFile,
   TFolder,
@@ -1063,10 +1064,19 @@ export default class MindMapPlugin extends Plugin {
 
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
   private async replaceCodeBlock(ctx: MarkdownPostProcessorContext, el: HTMLElement, expectedInner: string, nextInner: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
-    if (!(file instanceof TFile)) throw new Error(t("error.fileNotFound", { path: ctx.sourcePath }));
     const info = ctx.getSectionInfo(el);
     const hint = info ? { lineStart: info.lineStart, lineEnd: info.lineEnd } : null;
+    // 白板的文本卡片没有宿主笔记（sourcePath 是空的），块在卡片自己的文字里
+    const card = this.canvasTextCard(el);
+    if (card) {
+      const range = locateBlock(card.node.text, hint, expectedInner);
+      if (!range) throw new Error(t("error.blockNotFound"));
+      card.node.setText(replaceBlock(card.node.text, range, nextInner));
+      card.canvas.requestSave();
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+    if (!(file instanceof TFile)) throw new Error(t("error.fileNotFound", { path: ctx.sourcePath }));
 
     const views = this.app.workspace
       .getLeavesOfType("markdown")
@@ -1091,6 +1101,36 @@ export default class MindMapPlugin extends Plugin {
       return replaceBlock(data, range, nextInner);
     });
     if (failed) throw new Error(t("error.blockNotFound"));
+  }
+
+  /**
+   * 代码块所在的白板文本卡片。白板没有公开 API：从打开着的白板视图里找 nodeEl 包含它、带 text 的卡片；
+   * 文件卡片（嵌入的笔记）有自己的宿主笔记，不在这里处理
+   */
+  private canvasTextCard(el: HTMLElement): { canvas: { requestSave(): void }; node: { text: string; setText(text: string): void } } | null {
+    if (!el.closest(".canvas-node")) return null;
+    type CanvasNode = { nodeEl?: HTMLElement; text?: unknown; setText?: (text: string) => void };
+    type Canvas = { nodes?: Map<string, CanvasNode>; requestSave?: () => void };
+    for (const leaf of this.app.workspace.getLeavesOfType("canvas")) {
+      const canvas = (leaf.view as unknown as { canvas?: Canvas }).canvas;
+      if (!canvas?.nodes || typeof canvas.requestSave !== "function") continue;
+      for (const node of canvas.nodes.values()) {
+        if (!node.nodeEl?.contains(el)) continue;
+        if (typeof node.text !== "string" || typeof node.setText !== "function") return null;
+        const setText = node.setText.bind(node);
+        const requestSave = canvas.requestSave.bind(canvas);
+        return {
+          canvas: { requestSave },
+          node: {
+            get text() {
+              return node.text as string;
+            },
+            setText,
+          },
+        };
+      }
+    }
+    return null;
   }
 
   /**
@@ -1165,6 +1205,37 @@ export default class MindMapPlugin extends Plugin {
 
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
+      claimKeys: (el, onKey) => {
+        // Obsidian 的热键在 window 捕获阶段就处理了，画布自己的 keydown 来不及拦：
+        // F2 默认是「重命名文件」，在笔记里嵌入的图上按 F2 会跑去改文件名。
+        // 焦点在图里时压一层 Scope 先截下来交给画布，返回 false 让 Obsidian 不再往下处理
+        const scope = new Scope(this.app.scope);
+        scope.register([], "F2", (ev) => {
+          onKey(ev);
+          return false;
+        });
+        let pushed = false;
+        const pop = () => {
+          if (!pushed) return;
+          this.app.keymap.popScope(scope);
+          pushed = false;
+        };
+        const onIn = () => {
+          if (pushed) return;
+          this.app.keymap.pushScope(scope);
+          pushed = true;
+        };
+        const onOut = (ev: FocusEvent) => {
+          if (!el.contains(ev.relatedTarget as Node | null)) pop();
+        };
+        el.addEventListener("focusin", onIn);
+        el.addEventListener("focusout", onOut);
+        return () => {
+          el.removeEventListener("focusin", onIn);
+          el.removeEventListener("focusout", onOut);
+          pop();
+        };
+      },
       notePreviewScope: () => {
         const scope = new Component();
         scope.load();

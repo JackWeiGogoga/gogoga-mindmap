@@ -4,6 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-11-01
+
+### 修复
+- 点节点上的任务复选框，第二下会把复选框整个去掉（变成普通列表项）。现在只在未完成和已完成之间来回切换；要去掉复选框用右键菜单「任务复选框」。
+- 白板（Canvas）文本卡片里的脑图代码块，改了之后提示「写回代码块失败：找不到文件」，改动没存下来。现在直接写回卡片文字。
+- 在笔记里嵌入的脑图上选中节点按 F2，会触发 Obsidian 的「重命名文件」。现在 F2 照常进入编辑节点。
+
+### 改进
+- 嵌入的脑图点到外面（正文、白板空白处）就取消选中，节点浮动工具栏跟着收起。开了「嵌入的脑图隐藏工具栏」时，编辑中的图和白板卡片里的图在鼠标移开、焦点离开后也会收起底部工具栏。
+
 ## [0.33.1] - 2026-11-01
 
 ### 修复
@@ -436,7 +446,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...HEAD
+[0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.31.1...0.32.0
