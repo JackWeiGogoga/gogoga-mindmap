@@ -19,6 +19,7 @@ import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { isStructure } from "./layout";
 import { describeLost, parseXmind, sheetImageUrls, xmindSheetToDoc } from "./xmind";
 import type { MindNode } from "./model";
+import { parseColorList } from "./format";
 import { t } from "./i18n";
 
 interface EmbedContext {
@@ -121,6 +122,9 @@ class MindMapEmbed extends Component {
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
         notePreview: () => settings.notePreview,
+        formatBar: () => settings.formatBar,
+        textColors: () => parseColorList(settings.textColors),
+        highlightColors: () => parseColorList(settings.highlightColors),
         marqueeDrag: () => settings.leftDrag === "select",
         caretAtEnd: () => settings.editCaret === "end",
         dragToFloat: () => settings.dragToFloat,

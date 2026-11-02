@@ -442,6 +442,44 @@
   color: inherit;
   border-radius: 2px;
 }
+/* 编辑时选中文字浮出的格式栏 */
+.mm-format-bar {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  border-radius: 8px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.gg-mm-root .mm-format-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-normal, #1f1f1f);
+  cursor: pointer;
+}
+.gg-mm-root .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
+.gg-mm-root .mm-format-btn.is-bold { font-weight: 700; }
+.gg-mm-root .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
+.gg-mm-root .mm-format-btn.is-color { font-weight: 700; }
+.gg-mm-root .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
+.gg-mm-root .mm-format-btn .mm-icon { font-size: 15px; }
+.mm-format-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--background-modifier-border, #e3e3e3); }
 .mm-link {
   color: var(--link-color, var(--mm-selection));
   text-decoration: none;
@@ -1137,9 +1175,10 @@
   object-fit: contain;
   pointer-events: none;
 }
-/* 有明确宽度的图片不受缩略图上限约束；含图片的节点也不受文字换行宽度限制 */
+/* 有明确宽度的图片不受缩略图上限约束。含图片的节点照样按最大宽度给文字换行，
+   图片比最大宽度还宽时，min-width（最宽那张图）压过 max-width，节点按图片宽度来 */
 .mm-label img.mm-img.has-size { max-width: none; max-height: none; }
-.gg-mm-node.has-image { align-items: flex-start; max-width: none; }
+.gg-mm-node.has-image { align-items: flex-start; min-width: min-content; }
 .gg-mm-node.has-image .mm-label { display: block; text-align: center; }
 .gg-mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
 /* PDF 截区（PDF++ 画的裁切图）：外面包着 MarkdownRenderer 的段落和嵌入容器，去掉它们的边距，
@@ -1773,6 +1812,8 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 }
 .gg-mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
 .gg-mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
+/* 荧光笔的底色写在行内样式里，遮挡时要压过它 */
+.gg-mm-root.is-recite .mm-label mark.mm-bg:not(.is-revealed) { background: rgba(127, 127, 127, 0.12) !important; }
 /* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
 .gg-mm-root.is-recite .mm-task { cursor: default; }
 .gg-mm-root.is-recite .gg-mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }

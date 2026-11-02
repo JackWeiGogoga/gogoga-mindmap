@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-03
+
+### Added
+- Color part of a node's text: while editing a node, select some text and use the commands "Text color 1–5", "Highlighter color 1–5", "Highlight the selected text" or "Clear text and highlighter colors", all bindable in Settings → Hotkeys; outside editing they apply to the whole text of the selected nodes. Saved as `<span style="color:…">` and `<mark style="background:…">` (the same as the Highlightr plugin), so Markdown shows the colors too; recite mode covers highlighter colors like `==highlights==`.
+- "Format bar when selecting text" setting (off by default): selecting text while editing a node shows bold, italic, highlight, text color, highlighter and clear buttons above it.
+- "Text colors" and "Highlighter colors" settings: choose your own colors, separated by commas (three of each by default).
+- Bold and italic are now commands too, so you can rebind them.
+
+### Fixed
+- A node with both text and an image ignored the maximum width, so the text never wrapped. Text now wraps as usual, and a node only grows wider than the maximum when an image needs it. A custom theme's maximum width now applies to these nodes too.
+- ⌘B / ⌘I (Ctrl+B / Ctrl+I on Windows) did nothing in the map (Obsidian's editor bold/italic hotkeys took them). They now bold or italicize the selected nodes, or only the selected text while editing a node.
+
 ## [0.34.0] - 2026-11-01
 
 ### Added
@@ -453,7 +465,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...HEAD
+[0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1

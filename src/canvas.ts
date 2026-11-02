@@ -50,6 +50,7 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
+import { applyInlineFormat, type InlineFormat } from "./format";
 import {
   fromEditableText,
   IMAGE_MAX_WIDTH,
@@ -203,6 +204,11 @@ export interface CanvasOptions {
   wheelZoom?: () => boolean;
   /** 编辑备注时分栏预览；每次打开编辑时读取 */
   notePreview?: () => boolean;
+  /** 编辑节点文字时选中一段文字弹出格式栏 */
+  formatBar?: () => boolean;
+  /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
+  textColors?: () => string[];
+  highlightColors?: () => string[];
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
@@ -338,6 +344,8 @@ const ICONS: Record<string, string> = {
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  highlighter: '<svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>',
+  eraser: '<svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>',
   // 虚线框里一只眼睛：把藏起来的节点显示出来
   hiddenNodes: '<svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M6 12s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="12" cy="12" r="1.5"/></svg>',
   recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
@@ -643,6 +651,9 @@ export class MindMapCanvas {
   private retries = 0;
   private disposers: (() => void)[] = [];
   private opts: CanvasOptions;
+  private formatBar: HTMLElement | null = null;
+  /** 编辑节点期间才挂的 selectionchange 监听（格式栏跟着选区走），提交编辑时摘掉 */
+  private stopSelectionWatch: (() => void) | null = null;
 
   constructor(container: HTMLElement, opts: CanvasOptions) {
     this.opts = { ...opts };
@@ -1054,6 +1065,7 @@ export class MindMapCanvas {
 
   destroy(): void {
     liveCanvases.delete(this);
+    this.stopSelectionWatch?.();
     this.ro?.disconnect();
     this.noteRo?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
@@ -3945,6 +3957,7 @@ export class MindMapCanvas {
       else this.pasteText(text);
     };
     this.on(el, "paste", onPaste);
+
     // 浏览器把粘贴事件发给页面上选区所在的元素，不看焦点：PDF 里刚选过文字（PDF++ 选中即复制）、
     // 选区还留在 PDF 上时，点节点再 ⌘V，事件落在 PDF 的文字层，画布收不到。焦点在画布上就接过来
     this.on(el.ownerDocument, "paste", (ev) => {
@@ -4121,6 +4134,10 @@ export class MindMapCanvas {
         ev.preventDefault();
         this.commitEdit();
         this.addChildToSelected();
+      } else if (mod && !ev.shiftKey && !ev.altKey && (ev.key.toLowerCase() === "b" || ev.key.toLowerCase() === "i")) {
+        // 编辑中 ⌘B / ⌘I 作用于选中的那段文字
+        ev.preventDefault();
+        this.formatText({ kind: ev.key.toLowerCase() === "b" ? "bold" : "italic" });
       }
       return;
     }
@@ -4172,7 +4189,7 @@ export class MindMapCanvas {
     if (mod && (ev.key.toLowerCase() === "b" || ev.key.toLowerCase() === "i")) {
       if (this.opts.editable && this.selected.size) {
         ev.preventDefault();
-        this.toggleInlineStyle(ev.key.toLowerCase() === "b" ? "**" : "*");
+        this.formatText({ kind: ev.key.toLowerCase() === "b" ? "bold" : "italic" });
       }
       return;
     }
@@ -5276,6 +5293,12 @@ export class MindMapCanvas {
     this.editingIsNew = isNew;
     this.positionNodebar();
     label.textContent = toEditableText(node.text);
+    if (this.opts.formatBar?.() && !this.stopSelectionWatch) {
+      const doc = label.ownerDocument;
+      const onChange = () => this.updateFormatBar();
+      doc.addEventListener("selectionchange", onChange);
+      this.stopSelectionWatch = () => doc.removeEventListener("selectionchange", onChange);
+    }
     label.setAttribute("contenteditable", "plaintext-only");
     if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
@@ -5297,6 +5320,9 @@ export class MindMapCanvas {
     const isNew = this.editingIsNew;
     this.editing = null;
     this.editingIsNew = false;
+    this.stopSelectionWatch?.();
+    this.stopSelectionWatch = null;
+    this.updateFormatBar();
     const label = this.els.get(node.id)?.querySelector<HTMLElement>(".mm-label");
     const raw = fromEditableText(label?.textContent ?? "");
     const text = cancel ? node.text : raw;
@@ -6104,14 +6130,169 @@ export class MindMapCanvas {
   }
 
   /** 选中节点整体加粗/斜体：包一层或去掉一层 */
-  private toggleInlineStyle(wrap: "**" | "*"): void {
-    for (const n of this.selected) {
-      const { markers, rest } = splitMarkers(n.text);
-      const inner = rest.startsWith(wrap) && rest.endsWith(wrap) && rest.length > wrap.length * 2 ? rest.slice(wrap.length, -wrap.length) : `${wrap}${rest}${wrap}`;
-      n.text = [...markers, inner].join(" ");
+  // ---------- 局部格式 ----------
+
+  /**
+   * 粗体、斜体、高亮、文字颜色、荧光笔。编辑中作用于选中的那段文字（没选就是整段）；
+   * 不在编辑就作用于每个选中节点的整段文字（开头的标记和任务框不动）
+   */
+  formatText(fmt: InlineFormat): void {
+    if (!this.opts.editable) return;
+    if (this.editing) {
+      this.formatEditing(fmt);
+      return;
     }
+    if (!this.selected.size) return;
+    let changed = false;
+    for (const n of this.selected) {
+      const editable = toEditableText(n.text);
+      const { rest } = splitMarkers(n.text);
+      const task = /^\[( |x|X)\]\s+/.exec(rest)?.[0].length ?? 0;
+      const start = editable.length - toEditableText(rest).length + task;
+      if (start >= editable.length) continue;
+      const next = fromEditableText(applyInlineFormat(editable, start, editable.length, fmt).text);
+      if (next !== n.text) {
+        n.text = next;
+        changed = true;
+      }
+    }
+    if (!changed) return;
     this.render();
     this.notify();
+  }
+
+  /** 用设置里第 index 个常用颜色上色；没有这一个就不动 */
+  formatColor(kind: "color" | "bg", index: number): void {
+    const color = (kind === "color" ? this.opts.textColors?.() : this.opts.highlightColors?.())?.[index];
+    if (color) this.formatText({ kind, color });
+  }
+
+  private formatEditing(fmt: InlineFormat): void {
+    const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
+    if (!label) return;
+    const text = label.textContent ?? "";
+    const [s, e] = this.labelSelection(label);
+    const r = applyInlineFormat(text, s, e, fmt);
+    if (r.text === text) return;
+    // 整段替换走 insertText：编辑框自己的 ⌘Z 能撤回这一步
+    const sel = this.el.win.getSelection();
+    const all = this.el.doc.createRange();
+    all.selectNodeContents(label);
+    sel?.removeAllRanges();
+    sel?.addRange(all);
+    const ok = this.el.doc.execCommand("insertText", false, r.text);
+    if (!ok || label.textContent !== r.text) label.textContent = r.text;
+    this.setLabelSelection(label, r.start, r.end);
+    this.reflow(this.editing ?? undefined);
+    this.updateFormatBar();
+  }
+
+  /** 编辑框里选区的起止（按 textContent 计的字符位置）；选区不在框里就当没选 */
+  private labelSelection(label: HTMLElement): [number, number] {
+    const sel = this.el.win.getSelection();
+    if (!sel?.rangeCount) return [0, 0];
+    const r = sel.getRangeAt(0);
+    if (!label.contains(r.startContainer) || !label.contains(r.endContainer)) return [0, 0];
+    const pre = this.el.doc.createRange();
+    pre.selectNodeContents(label);
+    pre.setEnd(r.startContainer, r.startOffset);
+    const s = pre.toString().length;
+    return [s, s + r.toString().length];
+  }
+
+  private setLabelSelection(label: HTMLElement, start: number, end: number): void {
+    const walker = this.el.doc.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+    const range = this.el.doc.createRange();
+    range.selectNodeContents(label);
+    range.collapse(false);
+    let pos = 0;
+    let startSet = false;
+    for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+      const len = n.data.length;
+      if (!startSet && start <= pos + len) {
+        range.setStart(n, start - pos);
+        startSet = true;
+      }
+      if (startSet && end <= pos + len) {
+        range.setEnd(n, end - pos);
+        break;
+      }
+      pos += len;
+    }
+    const sel = this.el.win.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  /** 编辑中选中一段文字时浮在它上面的格式栏（设置里打开才有） */
+  private updateFormatBar(): void {
+    const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
+    const sel = this.el.win.getSelection();
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+    if (!label || !this.opts.formatBar?.() || !range || range.collapsed || !label.contains(range.commonAncestorContainer)) {
+      this.formatBar?.remove();
+      this.formatBar = null;
+      return;
+    }
+    if (!this.formatBar) this.formatBar = this.buildFormatBar();
+    const bar = this.formatBar;
+    const rect = range.getBoundingClientRect();
+    const host = this.el.getBoundingClientRect();
+    // 竖直方向避开整个节点（选区在第一行时，紧贴选区放会压住节点边框）
+    const nodeRect = (label.closest(".gg-mm-node") ?? label).getBoundingClientRect();
+    const w = bar.offsetWidth;
+    const h = bar.offsetHeight;
+    const left = Math.max(4, Math.min(host.width - w - 4, rect.left + rect.width / 2 - host.left - w / 2));
+    // 上面放不下就放到选区下面
+    const above = Math.min(rect.top, nodeRect.top) - host.top - h - 6;
+    const top = above >= 4 ? above : Math.max(rect.bottom, nodeRect.bottom) - host.top + 6;
+    bar.style.left = `${Math.round(left)}px`;
+    bar.style.top = `${Math.round(top)}px`;
+  }
+
+  private buildFormatBar(): HTMLElement {
+    const bar = createDiv({ cls: "mm-format-bar" });
+    // 按下时不能让编辑框失焦，否则选区没了、编辑也提交了
+    bar.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
+    const btn = (cls: string, title: string, fmt: InlineFormat, fill?: (b: HTMLButtonElement) => void) => {
+      const b = createEl("button", { cls: `mm-format-btn ${cls}` });
+      b.type = "button";
+      b.setAttribute("aria-label", title);
+      this.tip(b, title);
+      fill?.(b);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.formatText(fmt);
+      });
+      bar.append(b);
+      return b;
+    };
+    btn("is-bold", t("format.bold"), { kind: "bold" }, (b) => (b.textContent = "B"));
+    btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
+    btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(icon("highlighter")));
+    const sep = () => bar.append(createSpan({ cls: "mm-format-sep" }));
+    const colors = this.opts.textColors?.() ?? [];
+    if (colors.length) sep();
+    for (const c of colors)
+      btn("is-color", t("format.textColor", { color: c }), { kind: "color", color: c }, (b) => {
+        b.textContent = "A";
+        b.style.color = c;
+      });
+    const bgs = this.opts.highlightColors?.() ?? [];
+    if (bgs.length) sep();
+    for (const c of bgs)
+      btn("is-bg", t("format.highlightColor", { color: c }), { kind: "bg", color: c }, (b) => {
+        b.textContent = "A";
+        b.style.background = c;
+      });
+    sep();
+    btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(icon("eraser")));
+    this.el.append(bar);
+    return bar;
   }
 
   // ---------- 标记选择器 ----------

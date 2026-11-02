@@ -1,8 +1,10 @@
 /**
  * 节点标签的行内 Markdown 渲染：粗体、斜体、行内代码、删除线、高亮、
- * wiki 链接、普通链接、任务复选框。只做一层，不嵌套；输出全部用 DOM API 构造，不拼 HTML。
+ * wiki 链接、普通链接、任务复选框、局部颜色。粗体、斜体、删除线、高亮和颜色里面可以再套格式；
+ * 输出全部用 DOM API 构造，不拼 HTML。
  */
 
+import { BG_OPEN_SRC, COLOR_OPEN_SRC } from "./format";
 import { t } from "./i18n";
 
 export interface InlineOptions {
@@ -171,13 +173,16 @@ export const TOKEN_RE = new RegExp(
     `|${IFRAME}` +
     // 反斜杠转义：\<td\>、\*、\[ 之类只显示后面那个标点。反斜杠在被转义的符号前面，
     // 最左优先保证它先于以那个符号开头的标记被匹配到
-    String.raw`|\\([!-/:-@[-\x60{-~])`,
+    String.raw`|\\([!-/:-@[-\x60{-~])` +
+    // 局部颜色：<span style="color:…">文字</span>、<mark style="background:…">文字</mark>，里面还能有别的格式
+    `|${COLOR_OPEN_SRC}(.+?)</span>` +
+    `|${BG_OPEN_SRC}(.+?)</mark>`,
   "gu",
 );
 
 // 分组含义：1-2 ![[图片|参数]]  3-4 ![alt](url)  5 $公式$  6-7 [[链接|别名]]  8-9 [文字](url)
 // 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签  18 裸 URL  19 <iframe> 的属性串
-// 20 被反斜杠转义的标点
+// 20 被反斜杠转义的标点  21-22 文字颜色  23-24 荧光笔颜色
 
 const BR_RE = /<br\s*\/?>/i;
 
@@ -191,9 +196,9 @@ export function renderInline(el: HTMLElement, text: string, opts: InlineOptions 
   });
 }
 
-function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void {
+function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, nested = false): void {
   let rest = text;
-  if (el.childElementCount === 0) {
+  if (!nested && el.childElementCount === 0) {
     const { markers, rest: afterMarkers } = splitMarkers(rest);
     if (markers.length) {
       const span = createSpan();
@@ -203,7 +208,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       rest = afterMarkers;
     }
   }
-  const task = /^\[( |x|X)\]\s+/.exec(rest);
+  const task = nested ? null : /^\[( |x|X)\]\s+/.exec(rest);
   if (task) {
     const box = createSpan();
     box.className = "mm-task" + (task[1] === " " ? "" : " is-done");
@@ -234,15 +239,15 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
     } else if (m[8] !== undefined) {
       el.appendChild(link(m[8], m[9], false, opts));
     } else if (m[10] !== undefined || m[11] !== undefined) {
-      el.appendChild(wrap("strong", m[10] ?? m[11]));
+      el.appendChild(nest("strong", m[10] ?? m[11], opts));
     } else if (m[12] !== undefined) {
       el.appendChild(wrap("code", m[12]));
     } else if (m[13] !== undefined) {
-      el.appendChild(wrap("del", m[13]));
+      el.appendChild(nest("del", m[13], opts));
     } else if (m[14] !== undefined) {
-      el.appendChild(wrap("mark", m[14]));
+      el.appendChild(nest("mark", m[14], opts));
     } else if (m[15] !== undefined || m[16] !== undefined) {
-      el.appendChild(wrap("em", m[15] ?? m[16]));
+      el.appendChild(nest("em", m[15] ?? m[16], opts));
     } else if (m[17] !== undefined) {
       el.appendChild(tag(m[17], opts));
     } else if (m[18] !== undefined) {
@@ -251,6 +256,13 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions): void
       el.appendChild(frame(m[19], m[0], opts));
     } else if (m[20] !== undefined) {
       el.appendChild(document.createTextNode(m[20]));
+    } else if (m[21] !== undefined || m[23] !== undefined) {
+      const e = createEl(m[21] !== undefined ? "span" : "mark");
+      if (m[21] !== undefined) e.style.color = m[21];
+      else e.style.background = m[23];
+      e.classList.add(m[21] !== undefined ? "mm-color" : "mm-bg");
+      renderSegment(e, m[22] ?? m[24], opts, true);
+      el.appendChild(e);
     }
   }
   if (last < rest.length) el.appendChild(document.createTextNode(rest.slice(last)));
@@ -477,6 +489,13 @@ function tag(name: string, opts: InlineOptions): HTMLElement {
   return a;
 }
 
+/** 粗体、斜体这类里面还能再有格式（比如粗体里的一段颜色） */
+function nest(tag: keyof HTMLElementTagNameMap, text: string, opts: InlineOptions): HTMLElement {
+  const e = createEl(tag);
+  renderSegment(e, text, opts, true);
+  return e;
+}
+
 function wrap(tag: keyof HTMLElementTagNameMap, text: string): HTMLElement {
   const e = createEl(tag);
   e.textContent = text;
@@ -519,6 +538,7 @@ export function fromEditableText(text: string): string {
 export function plainText(text: string): string {
   return text
     .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/?(?:span|mark)\b[^>]*>/gi, "")
     .replace(/!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_: string, a: string, b?: string) => b ?? a)

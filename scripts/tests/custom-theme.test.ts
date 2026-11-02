@@ -13,7 +13,7 @@ const theme: CustomTheme = {
 
 test("自定义主题样式表：按层级出规则，颜色标记和手动宽度优先，下划线层不画边框", () => {
   const css = customThemeCss([theme]);
-  assert.match(css, /\.gg-mm-root\[data-custom="custom-abc"\] \.gg-mm-node\[data-depth="1"\]:not\(\.has-width\):not\(\.has-image\) \{ max-width: 120px; \}/);
+  assert.match(css, /\.gg-mm-root\[data-custom="custom-abc"\] \.gg-mm-node\[data-depth="1"\]:not\(\.has-width\) \{ max-width: 120px; \}/);
   assert.match(css, /\.gg-mm-node\[data-depth="0"\]:not\(\.has-color\):not\(\.is-underline\) \{ background: #3c3489; color: #ffffff; \}/);
   assert.match(css, /\.mm-edge\[data-depth="2"\] \{ stroke: #7f77dd; stroke-width: 2px; \}/);
   assert.ok(!/\.mm-edge\[data-depth="0"\]/.test(css), "中心主题没有入线");

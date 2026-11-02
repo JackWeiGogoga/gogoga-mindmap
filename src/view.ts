@@ -3,6 +3,7 @@ import { buildSvg, svgToPng } from "./export";
 import { preserveFormat } from "./merge";
 import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
+import { parseColorList, type InlineFormat } from "./format";
 import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
@@ -46,6 +47,17 @@ export class MindMapView extends TextFileView {
       else this.canvas?.handleModEnter(ev);
       return false;
     });
+    // ⌘B / ⌘I 是 Obsidian 编辑器「加粗 / 斜体」的默认热键，在脑图里也会被它截走（然后因为没有编辑器什么都不做），
+    // 得在这里截下来自己处理；用户把这两个键绑给了本插件的命令就执行那个
+    for (const [k, kind] of [["b", "bold"], ["i", "italic"]] as const) {
+      this.scope.register(["Mod"], k, (ev) => {
+        const own = this.plugin.ownHotkeyCommand(ev);
+        const commands = (this.app as unknown as { commands?: { executeCommandById?: (id: string) => boolean } }).commands;
+        if (own && commands?.executeCommandById) commands.executeCommandById(own);
+        else this.canvas?.formatText({ kind });
+        return false;
+      });
+    }
   }
 
   linkSelectedToNote(): Promise<void> {
@@ -169,6 +181,14 @@ export class MindMapView extends TextFileView {
     if (n) this.canvas?.fitBranch(n);
   }
 
+  formatText(fmt: InlineFormat): void {
+    this.canvas?.formatText(fmt);
+  }
+
+  formatColor(kind: "color" | "bg", index: number): void {
+    this.canvas?.formatColor(kind, index);
+  }
+
   toggleBoxOnSelected(): void {
     this.canvas?.toggleBoxOnSelected();
   }
@@ -250,6 +270,9 @@ export class MindMapView extends TextFileView {
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       notePreview: () => this.plugin.settings.notePreview,
+      formatBar: () => this.plugin.settings.formatBar,
+      textColors: () => parseColorList(this.plugin.settings.textColors),
+      highlightColors: () => parseColorList(this.plugin.settings.highlightColors),
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
       dragToFloat: () => this.plugin.settings.dragToFloat,

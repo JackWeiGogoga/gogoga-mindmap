@@ -29,6 +29,7 @@ import {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
 import { preserveFormat } from "./merge";
+import { parseColorList } from "./format";
 import { Key, setLocale, t } from "./i18n";
 import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
@@ -848,6 +849,14 @@ export default class MindMapPlugin extends Plugin {
       ["expand-branch", "expand-branch", "command.expandBranch"],
     ];
     for (const [id, cmd, name] of nodeCommands) exportCommand(id, t(name), async (v) => v.runNodeCommand(cmd));
+    exportCommand("format-bold", t("command.formatBold"), async (v) => v.formatText({ kind: "bold" }));
+    exportCommand("format-italic", t("command.formatItalic"), async (v) => v.formatText({ kind: "italic" }));
+    exportCommand("format-highlight", t("command.formatHighlight"), async (v) => v.formatText({ kind: "highlight" }));
+    for (const n of [1, 2, 3, 4, 5]) {
+      exportCommand(`format-text-color-${n}`, t("command.formatTextColor", { n }), async (v) => v.formatColor("color", n - 1));
+      exportCommand(`format-highlight-color-${n}`, t("command.formatHighlightColor", { n }), async (v) => v.formatColor("bg", n - 1));
+    }
+    exportCommand("format-clear", t("command.formatClear"), async (v) => v.formatText({ kind: "clear" }));
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
     exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());
@@ -987,6 +996,9 @@ export default class MindMapPlugin extends Plugin {
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,
+        formatBar: () => this.settings.formatBar,
+        textColors: () => parseColorList(this.settings.textColors),
+        highlightColors: () => parseColorList(this.settings.highlightColors),
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,
@@ -1214,6 +1226,13 @@ export default class MindMapPlugin extends Plugin {
           onKey(ev);
           return false;
         });
+        // ⌘B / ⌘I 同理：不截的话会交给外面笔记的编辑器去加粗它自己的选区
+        for (const k of ["b", "i"]) {
+          scope.register(["Mod"], k, (ev) => {
+            onKey(ev);
+            return false;
+          });
+        }
         let pushed = false;
         const pop = () => {
           if (!pushed) return;

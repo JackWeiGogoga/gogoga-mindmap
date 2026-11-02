@@ -58,7 +58,7 @@ Use markers sparingly: color the main topics to tell branches apart, fold branch
 
 ## Inside node text
 
-Inline Markdown works: `**bold**`, `==highlight==`, `[[Note]]` links, `[text](https://…)`, `#tags`, `$E=mc^2$` math, `![[image.png|160]]` images. `[ ]` / `[x]` at the start renders as a checkbox. Markers (priority, progress and so on) are emoji at the start of the text, such as ✅ ⏳ ❗ 1️⃣.
+Inline Markdown works: `**bold**`, `==highlight==`, `[[Note]]` links, `[text](https://…)`, `#tags`, `$E=mc^2$` math, `![[image.png|160]]` images. `[ ]` / `[x]` at the start renders as a checkbox. Colored text is `<span style="color:#e03e3e">text</span>` and a colored highlighter is `<mark style="background:#ffd43b99">text</mark>`; both can wrap other inline formatting. Markers (priority, progress and so on) are emoji at the start of the text, such as ✅ ⏳ ❗ 1️⃣.
 
 ## Example: a mind map note
 

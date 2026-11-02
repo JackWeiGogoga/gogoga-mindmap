@@ -31,6 +31,11 @@ export interface MindMapSettings {
   notesExpanded: boolean;
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
+  /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
+  formatBar: boolean;
+  /** 常用文字颜色、荧光笔颜色（逗号隔开） */
+  textColors: string;
+  highlightColors: string;
   /** 展开备注的最大高度（像素，随节点字号缩放） */
   noteMaxHeight: number;
   /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
@@ -99,6 +104,10 @@ export const TOOLBAR_POSITIONS: { id: ToolbarPosition; readonly label: string }[
   { id: "right", get label() { return t("toolbarPos.right"); } },
 ];
 
+/** 默认三种常用颜色：红、蓝、绿；荧光笔带一点透明，暗色主题下浅色文字也看得清 */
+export const DEFAULT_TEXT_COLORS = "#e03e3e, #2f80ed, #27ae60";
+export const DEFAULT_HIGHLIGHT_COLORS = "#ffd43b99, #69db7c99, #ff8fab99";
+
 export const DEFAULT_SETTINGS: MindMapSettings = {
   defaultStructure: "logic-right",
   defaultTheme: "snow",
@@ -128,6 +137,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   fontScale: 100,
   notesExpanded: false,
   notePreview: false,
+  formatBar: false,
+  textColors: DEFAULT_TEXT_COLORS,
+  highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
   noteMaxWidth: 320,
   customThemes: [],
@@ -351,6 +363,32 @@ export class MindMapSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+    new Setting(containerEl)
+      .setName(t("settings.formatBar.name"))
+      .setDesc(t("settings.formatBar.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.formatBar).onChange(async (v) => {
+          this.plugin.settings.formatBar = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+    for (const [key, def] of [
+      ["textColors", DEFAULT_TEXT_COLORS],
+      ["highlightColors", DEFAULT_HIGHLIGHT_COLORS],
+    ] as const) {
+      new Setting(containerEl)
+        .setName(t(`settings.${key}.name`))
+        .setDesc(t(`settings.${key}.desc`))
+        .addText((text) =>
+          text
+            .setPlaceholder(def)
+            .setValue(this.plugin.settings[key])
+            .onChange(async (v) => {
+              this.plugin.settings[key] = v;
+              await this.plugin.saveSettings();
+            }),
+        );
+    }
     let noteHeight: { setValue(v: number): unknown } | null = null;
     new Setting(containerEl)
       .setName(t("settings.noteMaxHeight.name"))

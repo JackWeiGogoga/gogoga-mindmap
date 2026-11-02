@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-03
+
+### 新增
+- 节点里部分文字上色：编辑节点时选中一段文字，用命令「文字颜色 1–5」「荧光笔颜色 1–5」「高亮选中的文字」「清除文字颜色和荧光笔」上色，都能在「设置 → 快捷键」里绑键；不在编辑时作用于选中节点的整段文字。存成 `<span style="color:…">` 和 `<mark style="background:…">`（和 Highlightr 插件一样），Markdown 里也显示颜色，背诵模式下荧光笔和 `==高亮==` 一样遮住。
+- 「选中文字时显示格式栏」设置（默认关）：编辑节点时选中文字，上方浮出加粗、斜体、高亮、文字颜色、荧光笔和清除按钮。
+- 「常用文字颜色」「常用荧光笔颜色」设置：自己定常用的颜色，逗号隔开，默认各 3 个。
+- 「加粗」「斜体」也注册成了命令，可以改绑快捷键。
+
+### 修复
+- 节点里有文字又有图片时，宽度不受最大宽度限制，文字一直不换行。现在文字照常换行；图片比最大宽度还宽时，节点按图片宽度来。自定义主题里设的最大宽度对这类节点也生效了。
+- ⌘B / ⌘I（Windows 上是 Ctrl+B / Ctrl+I）在脑图里没有反应（被 Obsidian 编辑器的加粗、斜体热键截走了）。现在给选中节点加粗、斜体；编辑节点文字时只作用于选中的那段字。
+
 ## [0.34.0] - 2026-11-01
 
 ### 新增
@@ -453,7 +465,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...HEAD
+[0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2
 [0.33.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.0...0.33.1
