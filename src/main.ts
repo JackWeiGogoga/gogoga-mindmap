@@ -54,6 +54,56 @@ const HOVER_SOURCE = "gogoga-mindmap";
 /** 文件列表插件（Notebook Navigator、Iconize 等）读的图标属性 */
 const ICON_KEY = "icon";
 
+/**
+ * 阅读视图的分段（没有公开 API）：每段有起止行号；页眉页脚、属性区这些界面块带 mod-ui，跳过。
+ * 列表是一整段，里面每个列表项的 data-line 是相对这一段开头的行偏移
+ */
+type PreviewSection = {
+  el: HTMLElement;
+  start?: { line: number };
+  end?: { line: number };
+  rendered?: boolean;
+  /** 标题是 1–6，其余是 7 */
+  level?: number;
+  headingCollapsed?: boolean;
+  /** 被折叠的标题藏起来时为 false */
+  shown?: boolean;
+};
+function previewSections(view: MarkdownView): (PreviewSection & { start: { line: number }; end: { line: number } })[] {
+  const sections = (view.previewMode as unknown as { renderer?: { sections?: PreviewSection[] } }).renderer?.sections ?? [];
+  return sections.filter((s): s is PreviewSection & { start: { line: number }; end: { line: number } } => !!s.el && !!s.start && !!s.end && !s.el.classList.contains("mod-ui"));
+}
+
+/** 阅读视图里某一行对应的元素；那一段还没渲染出来（懒渲染）时 ready 为 false */
+function previewElAtLine(view: MarkdownView, line: number): { el: HTMLElement; ready: boolean } | null {
+  const sec = previewSections(view).filter((s) => s.start.line <= line && line <= s.end.line).pop();
+  if (!sec) return null;
+  const ready = sec.rendered !== false && sec.shown !== false && sec.el.childElementCount > 0;
+  const li = [...sec.el.querySelectorAll<HTMLElement>("li[data-line]")].find((l) => sec.start.line + Number(l.dataset.line) === line);
+  return { el: li ?? sec.el, ready };
+}
+
+/** 那一行在阅读视图里被折叠的标题藏着：把它上面折叠着的各级标题都展开（点标题的折叠箭头，和手点一样） */
+function unfoldPreviewLine(view: MarkdownView, line: number): void {
+  const secs = previewSections(view);
+  const i = secs.findIndex((s) => s.start.line <= line && line <= s.end.line);
+  if (i < 0) return;
+  let level = secs[i].level ?? 7;
+  for (let j = i - 1; j >= 0 && level > 1; j--) {
+    const h = secs[j];
+    if ((h.level ?? 7) >= level) continue;
+    level = h.level ?? 7;
+    if (h.headingCollapsed) h.el.querySelector<HTMLElement>(".heading-collapse-indicator")?.click();
+  }
+}
+
+function previewLineAt(view: MarkdownView, target: HTMLElement): number | null {
+  const sec = previewSections(view).find((s) => s.el.contains(target));
+  if (!sec) return null;
+  const li = target.closest<HTMLElement>("li[data-line]");
+  return li && sec.el.contains(li) ? sec.start.line + Number(li.dataset.line) : sec.start.line;
+}
+
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
   /** 锁定、备注展开、隐藏标注：插件目录下的 state.json，和设置分开 */
@@ -592,12 +642,32 @@ export default class MindMapPlugin extends Plugin {
         for (const m of this.visibleMapsOf(file.path)) m.followLine(text, line);
       }, 200);
     };
+    // 阅读模式没有光标：点到哪一段（列表项）就让脑图选中哪个节点
+    const onPreviewClick = (ev: MouseEvent) => {
+      if (!this.settings.syncSplit) return;
+      const target = ev.target as HTMLElement | null;
+      if (!target?.closest?.(".markdown-reading-view")) return;
+      const view = this.app.workspace
+        .getLeavesOfType("markdown")
+        .map((l) => l.view)
+        .find((v): v is MarkdownView => v instanceof MarkdownView && v.getMode() === "preview" && v.containerEl.contains(target));
+      const file = view?.file;
+      if (!view || !file) return;
+      const line = previewLineAt(view, target);
+      if (line === null) return;
+      const maps = this.visibleMapsOf(file.path);
+      if (!maps.length) return;
+      this.lastFollowKey = `${file.path}\u0001${line}`;
+      const text = view.editor.getValue();
+      for (const m of maps) m.followLine(text, line);
+    };
     // 每个窗口有自己的 document：主窗口之外，独立窗口打开时也要挂上
     const watched = new WeakSet<Document>();
     const watch = (doc: Document) => {
       if (watched.has(doc)) return;
       watched.add(doc);
       this.registerDomEvent(doc, "selectionchange", onSelectionChange);
+      this.registerDomEvent(doc, "click", onPreviewClick);
     };
     watch(document);
     this.registerEvent(this.app.workspace.on("window-open", (win) => watch(win.doc)));
@@ -649,6 +719,13 @@ export default class MindMapPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       const view = leaf.view;
       if (!(view instanceof MarkdownView) || view.file?.path !== from.file.path || !view.containerEl.isShown()) continue;
+      if (view.getMode() === "preview") {
+        const line = lineOfPath(view.editor.getValue(), path, this.rootRule());
+        if (line === null) continue;
+        this.lastFollowKey = `${from.file.path}\u0001${line}`;
+        this.revealPreviewLine(view, line);
+        continue;
+      }
       // 用户正在那边打字：光标是他的，不去动。各窗口各记各的焦点：Markdown 开在别的窗口时，
       // 它的编辑器一直显示「有焦点」，可人正在这边点脑图，不算在打字
       if (view.editor.hasFocus() && view.containerEl.doc === from.containerEl.doc) continue;
@@ -661,6 +738,31 @@ export default class MindMapPlugin extends Plugin {
       editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
       this.flashLine(view, line);
     }
+  }
+
+  /**
+   * 阅读模式：滚到那一行并闪一下。阅读视图是按段懒渲染的，先用 applyScroll 让那一段画出来，
+   * 等它渲染好再找到元素居中（列表项找到那一项，其余是整段）
+   */
+  private revealPreviewLine(view: MarkdownView, line: number): void {
+    unfoldPreviewLine(view, line);
+    view.previewMode.applyScroll(line);
+    const win = view.containerEl.win;
+    let frames = 0;
+    const tick = () => {
+      const hit = previewElAtLine(view, line);
+      if (!hit) return;
+      if (!hit.ready && ++frames < 20) {
+        win.requestAnimationFrame(tick);
+        return;
+      }
+      const el = hit.el;
+      el.scrollIntoView({ block: "center" });
+      if (!el.animate) return;
+      const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
+      el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
+    };
+    win.requestAnimationFrame(tick);
   }
 
   /**
@@ -997,6 +1099,7 @@ export default class MindMapPlugin extends Plugin {
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
+        copyPlain: () => this.settings.copyPlain,
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors),
         marqueeDrag: () => this.settings.leftDrag === "select",

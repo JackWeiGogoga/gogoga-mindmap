@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-03
+
+### Added
+- "Sync with Markdown side by side" now works with reading view: selecting a node scrolls reading view to that block or list item and flashes it, expanding collapsed headings; clicking a block or list item in reading view selects the matching node.
+- "Copy nodes without map markers" setting (off by default): copied nodes go to the clipboard as plain Markdown, without markers like `%%w=…%%`, so they paste cleanly elsewhere; pasting back into a map still restores width, callouts and the like.
+
 ## [0.35.0] - 2026-11-03
 
 ### Added
@@ -465,7 +471,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...HEAD
+[0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2

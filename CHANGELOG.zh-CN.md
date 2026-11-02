@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-03
+
+### 新增
+- 「和 Markdown 分屏联动」支持阅读模式：选中节点，阅读视图滚到那一段或那个列表项并闪一下，折叠着的标题会自动展开；在阅读视图里点某一段、某个列表项，脑图选中对应的节点。
+- 「复制节点时去掉脑图标记」设置（默认关）：复制的节点在剪贴板里是干净的 Markdown，不带 `%%w=…%%` 这类标记，方便贴到别处；粘回脑图时宽度、标注这些照样还原。
+
 ## [0.35.0] - 2026-11-03
 
 ### 新增
@@ -465,7 +471,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...HEAD
+[0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0
 [0.33.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.1...0.33.2

@@ -33,6 +33,8 @@ export interface MindMapSettings {
   notePreview: boolean;
   /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
   formatBar: boolean;
+  /** 复制节点时去掉 %%…%% 标记（默认关） */
+  copyPlain: boolean;
   /** 常用文字颜色、荧光笔颜色（逗号隔开） */
   textColors: string;
   highlightColors: string;
@@ -138,6 +140,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   notesExpanded: false,
   notePreview: false,
   formatBar: false,
+  copyPlain: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
@@ -369,6 +372,15 @@ export class MindMapSettingTab extends PluginSettingTab {
       .addToggle((tg) =>
         tg.setValue(this.plugin.settings.formatBar).onChange(async (v) => {
           this.plugin.settings.formatBar = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+    new Setting(containerEl)
+      .setName(t("settings.copyPlain.name"))
+      .setDesc(t("settings.copyPlain.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.copyPlain).onChange(async (v) => {
+          this.plugin.settings.copyPlain = v;
           await this.plugin.saveSettings();
         }),
       );

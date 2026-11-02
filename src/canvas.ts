@@ -204,6 +204,8 @@ export interface CanvasOptions {
   wheelZoom?: () => boolean;
   /** 编辑备注时分栏预览；每次打开编辑时读取 */
   notePreview?: () => boolean;
+  /** 复制节点时剪贴板里不带 %%…%% 标记 */
+  copyPlain?: () => boolean;
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
@@ -403,6 +405,9 @@ function colorLabel(color: string): string {
   const key = COLOR_LABEL_KEYS[color];
   return key ? t(key) : color;
 }
+
+/** 最近一次复制的节点：剪贴板里放的版本和带标记的完整版（各个脑图共用，跨图粘贴也能还原） */
+let lastCopy: { plain: string; full: string } | null = null;
 
 function icon(name: string): HTMLElement {
   const span = createSpan({ cls: "mm-icon" });
@@ -5803,8 +5808,12 @@ export class MindMapCanvas {
     if (!nodes.length) return null;
     const text = nodes.map((n) => subtreeToList(n)).join("");
     this.clipboardText = text;
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
-    return text;
+    // 设置里打开「复制时去掉脑图标记」：剪贴板里放干净的 Markdown，带标记的完整版记在本地，
+    // 粘回脑图时认出是同一份就用完整版，宽度、标注这些不丢
+    const plain = this.opts.copyPlain?.() ? nodes.map((n) => subtreeToList(n, "\t", true)).join("") : text;
+    lastCopy = { plain, full: text };
+    void navigator.clipboard?.writeText(plain).catch(() => undefined);
+    return plain;
   }
 
   cutSelection(): void {
@@ -5849,6 +5858,7 @@ export class MindMapCanvas {
   /** 把文本解析成节点挂到当前节点下（无选中则挂到根） */
   pasteText(text: string): void {
     if (!this.opts.editable || !this.doc) return;
+    if (lastCopy && lastCopy.plain !== lastCopy.full && text.replace(/\r/g, "") === lastCopy.plain) text = lastCopy.full;
     const nodes = parseClipboard(text);
     if (!nodes.length) return;
     if (this.editing) this.commitEdit();

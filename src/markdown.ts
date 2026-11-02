@@ -327,10 +327,11 @@ export function normalizeNote(plain: string, inList = true, listsOk = false): st
 // ---------- 剪贴板 ----------
 
 /** 把子树写成缩进列表：复制节点时放进剪贴板，任何地方都能粘贴成 Markdown */
-export function subtreeToList(node: MindNode, indent = "\t"): string {
+/** plain：不带 %%…%% 标记（宽度、折叠、标注这些只有脑图用得上），复制到别处用 */
+export function subtreeToList(node: MindNode, indent = "\t", plain = false): string {
   const lines: string[] = [];
   const walk = (n: MindNode, depth: number) => {
-    lines.push(`${indent.repeat(depth)}- ${n.text}${formatMarker(n)}`.trimEnd());
+    lines.push(`${indent.repeat(depth)}- ${n.text}${plain ? "" : formatMarker(n)}`.trimEnd());
     if (n.note) {
       const note = normalizeNote(n.note);
       for (const l of note.split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
