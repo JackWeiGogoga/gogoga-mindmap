@@ -427,7 +427,41 @@
   user-select: text;
   -webkit-user-select: text;
   white-space: pre-wrap;
-  min-width: 2em;
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+.mm-node-editor.cm-editor { background: transparent; color: inherit; font: inherit; text-align: inherit; }
+.mm-node-editor.cm-editor.cm-focused { outline: none; }
+.mm-node-editor .cm-scroller { font: inherit; line-height: inherit; overflow: visible; }
+.mm-node-editor .cm-content { padding: 0; min-height: 1em; caret-color: currentColor; }
+.mm-node-editor .cm-line { padding: 0; }
+/* The node owns the frame and spacing; its embedded editor adds neither. */
+.gg-mm-node.is-editing .mm-label,
+.gg-mm-node .mm-node-editor.cm-editor,
+.gg-mm-node .mm-node-editor .cm-scroller,
+.gg-mm-node .mm-node-editor .cm-content,
+.gg-mm-node .mm-node-editor .cm-content:focus,
+.gg-mm-node .mm-node-editor .cm-line {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+.mm-editor-mode {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 5px);
+  font: 11px/1.4 var(--font-interface);
+  padding: 2px 6px;
+  height: auto;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  cursor: pointer;
 }
 .mm-label strong { font-weight: 700; }
 .mm-label code {

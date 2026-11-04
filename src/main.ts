@@ -29,6 +29,7 @@ import {
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
 import { preserveFormat } from "./merge";
+import { markdownColors } from "./markdown-colors";
 import { parseColorList } from "./format";
 import { Key, setLocale, t } from "./i18n";
 import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
@@ -123,6 +124,7 @@ export default class MindMapPlugin extends Plugin {
     setLocale(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
+    this.registerEditorExtension(markdownColors((path) => this.isMindMapFile(path)));
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();

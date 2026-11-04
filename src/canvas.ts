@@ -51,6 +51,7 @@ import {
   STRUCTURES,
 } from "./layout";
 import { applyInlineFormat, type InlineFormat } from "./format";
+import { NodeEditor } from "./node-editor";
 import {
   fromEditableText,
   IMAGE_MAX_WIDTH,
@@ -665,6 +666,9 @@ export class MindMapCanvas {
   private disposers: (() => void)[] = [];
   private opts: CanvasOptions;
   private formatBar: HTMLElement | null = null;
+  private nodeEditor: NodeEditor | null = null;
+  private editingBefore = "";
+  private editingGeometry: { el: HTMLElement; width: string; minHeight: string; w: number; h: number } | null = null;
   /** 编辑节点期间才挂的 selectionchange 监听（格式栏跟着选区走），提交编辑时摘掉 */
   private stopSelectionWatch: (() => void) | null = null;
 
@@ -1102,7 +1106,7 @@ export class MindMapCanvas {
     let changed = false;
     if (this.editing) {
       const label = this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
-      const text = fromEditableText(label?.textContent ?? "");
+      const text = fromEditableText(this.nodeEditor?.savedText ?? label?.textContent ?? "");
       if (text && text !== this.editing.text) {
         this.editing.text = text;
         changed = true;
@@ -1124,6 +1128,8 @@ export class MindMapCanvas {
   }
 
   destroy(): void {
+    this.nodeEditor?.destroy();
+    this.nodeEditor = null;
     liveCanvases.delete(this);
     this.stopSelectionWatch?.();
     this.ro?.disconnect();
@@ -1478,6 +1484,7 @@ export class MindMapCanvas {
     for (const list of byDepth.values()) {
       const max = Math.max(...list.map((x) => this.naturalSizes.get(x.id)?.w ?? 0));
       for (const { el, id } of list) {
+        if (id === this.editing?.id) continue;
         const size = this.naturalSizes.get(id);
         if (!size) continue;
         if (size.w < max) {
@@ -1504,11 +1511,11 @@ export class MindMapCanvas {
     if (remeasure && this.naturalSizes.size === this.els.size) {
       const el = this.els.get(remeasure.id);
       if (el) {
-        if (this.alignedEls.delete(el)) el.setCssStyles({ width: "" });
+        if (remeasure !== this.editing && this.alignedEls.delete(el)) el.setCssStyles({ width: "" });
         this.naturalSizes.set(remeasure.id, { w: el.offsetWidth, h: el.offsetHeight });
       }
     } else {
-      for (const el of this.alignedEls) el.setCssStyles({ width: "" });
+      for (const el of this.alignedEls) if (el !== this.editingGeometry?.el) el.setCssStyles({ width: "" });
       this.alignedEls.clear();
       this.naturalSizes.clear();
       for (const [id, el] of this.els) this.naturalSizes.set(id, { w: el.offsetWidth, h: el.offsetHeight });
@@ -4016,7 +4023,7 @@ export class MindMapCanvas {
       if (files.length) void this.insertImageFiles(files, this.primary ?? this.doc?.root ?? null);
       else this.pasteText(text);
     };
-    this.on(el, "paste", onPaste);
+    this.on(el, "paste", onPaste, { capture: true });
 
     // 浏览器把粘贴事件发给页面上选区所在的元素，不看焦点：PDF 里刚选过文字（PDF++ 选中即复制）、
     // 选区还留在 PDF 上时，点节点再 ⌘V，事件落在 PDF 的文字层，画布收不到。焦点在画布上就接过来
@@ -4044,11 +4051,13 @@ export class MindMapCanvas {
       this.wrapSelection(label, range.start, range.end, ie.data);
     });
     this.on(el, "compositionstart", () => {
+      if (this.nodeEditor) return;
       const label = this.editingLabel();
       const range = label && this.selectionRange(label);
       this.compositionSel = label && range && range.start !== range.end ? { ...range, text: (label.textContent ?? "").slice(range.start, range.end) } : null;
     });
     this.on(el, "compositionend", (ev) => {
+      if (this.nodeEditor) return;
       const label = this.editingLabel();
       const saved = this.compositionSel;
       this.compositionSel = null;
@@ -4153,7 +4162,7 @@ export class MindMapCanvas {
     if (target.closest(".gg-mm-search")) return;
     // 输入法组字中的回车、Esc、Tab 归输入法（回车上屏英文、Esc 取消组字）；
     // 这时提交编辑会把拼音里的分隔符（自带输入法的空格、搜狗的 '）一起存进去
-    if (ev.isComposing || ev.keyCode === 229) return;
+    if (ev.isComposing || ev.keyCode === 229 || this.nodeEditor?.composing) return;
     // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
     if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {
@@ -5105,7 +5114,7 @@ export class MindMapCanvas {
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
     this.notifyTimer = window.setTimeout(() => {
       this.notifyTimer = null;
-      this.notify();
+      if (!this.syncPending()) this.notify();
     }, delay);
   }
 
@@ -5349,28 +5358,40 @@ export class MindMapCanvas {
     if (!el || !label) return;
     this.closePopover();
     this.select(node);
+    this.editingGeometry = { el, width: el.style.width, minHeight: el.style.minHeight, w: node.text ? el.offsetWidth : Math.max(120, el.offsetWidth), h: el.offsetHeight };
+    el.style.width = `${this.editingGeometry.w}px`;
+    el.style.minHeight = `${this.editingGeometry.h}px`;
     this.editing = node;
+    this.editingBefore = node.text;
     this.editingIsNew = isNew;
     this.positionNodebar();
-    label.textContent = toEditableText(node.text);
     if (this.opts.formatBar?.() && !this.stopSelectionWatch) {
       const doc = label.ownerDocument;
       const onChange = () => this.updateFormatBar();
       doc.addEventListener("selectionchange", onChange);
       this.stopSelectionWatch = () => doc.removeEventListener("selectionchange", onChange);
     }
-    label.setAttribute("contenteditable", "plaintext-only");
-    if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
-    label.focus({ preventScroll: true });
-    // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(label);
-    if (this.opts.caretAtEnd?.()) range.collapse(false);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    this.reflow();
+    this.nodeEditor = new NodeEditor(label, toEditableText(node.text), !!this.opts.caretAtEnd?.(), (changed, geometryChanged) => {
+      if (!this.editing) return;
+      if (!this.nodeEditor?.composing) this.updateLinkSuggest();
+      if (changed || geometryChanged) this.reflowEditedNode();
+      this.updateFormatBar();
+      if (changed && !this.opts.embedded) this.scheduleNotify();
+    }, () => this.commitEdit(), (ev) => this.onKeyDown(ev));
+    this.reflowEditedNode();
+  }
+
+  /** Selection changes never relayout the map; actual text wrapping can change height. */
+  private reflowEditedNode(): void {
+    const geometry = this.editingGeometry;
+    if (!this.editing || !geometry) return;
+    const w = geometry.el.offsetWidth;
+    const h = geometry.el.offsetHeight;
+    if (w === geometry.w && h === geometry.h) return;
+    geometry.w = w;
+    geometry.h = h;
+    this.reflow(this.editing);
   }
 
   commitEdit(cancel = false, refocus = true): void {
@@ -5384,18 +5405,27 @@ export class MindMapCanvas {
     this.stopSelectionWatch = null;
     this.updateFormatBar();
     const label = this.els.get(node.id)?.querySelector<HTMLElement>(".mm-label");
-    const raw = fromEditableText(label?.textContent ?? "");
-    const text = cancel ? node.text : raw;
+    const raw = fromEditableText(this.nodeEditor?.savedText ?? label?.textContent ?? "");
+    this.nodeEditor?.destroy();
+    this.nodeEditor = null;
+    if (this.editingGeometry) {
+      const { el, width, minHeight } = this.editingGeometry;
+      el.style.width = width;
+      el.style.minHeight = minHeight;
+      this.editingGeometry = null;
+    }
+    const text = cancel ? this.editingBefore : raw;
     // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
     if (text === "" && isNew && !node.note) {
       const parent = node.parent;
       removeNode(node);
       this.select(parent);
       this.render();
+      this.notify();
       if (refocus) this.el.focus({ preventScroll: true });
       return;
     }
-    const changed = !cancel && (text !== node.text || isNew);
+    const changed = text !== node.text || (!cancel && isNew);
     node.text = text;
     // startEdit 把 label 换成了 contenteditable 的原文。文字没改的话签名跟着没变，
     // rebuild 会认为这个节点不用动，于是原文就留在那儿了 —— 纯文字节点看不出来，
@@ -5449,6 +5479,7 @@ export class MindMapCanvas {
 
   /** 光标在 label 纯文本里的位置 */
   private caretOffset(label: HTMLElement): number | null {
+    if (this.nodeEditor && label === this.editingLabel()) return this.nodeEditor.caret;
     const sel = this.el.win.getSelection();
     if (!sel?.rangeCount || !sel.anchorNode || !label.contains(sel.anchorNode)) return null;
     const r = this.el.doc.createRange();
@@ -5459,6 +5490,7 @@ export class MindMapCanvas {
 
   /** 选区在 label 纯文本里的起止 */
   private selectionRange(label: HTMLElement): { start: number; end: number } | null {
+    if (this.nodeEditor && label === this.editingLabel()) return this.nodeEditor.selection;
     const sel = this.el.win.getSelection();
     if (!sel?.rangeCount) return null;
     const r = sel.getRangeAt(0);
@@ -5475,7 +5507,7 @@ export class MindMapCanvas {
    * 已经被【】或 [] 包着时再打一次，就升级成 [[文字]] 链接
    */
   private wrapSelection(label: HTMLElement, start: number, end: number, ch: string): void {
-    const text = label.textContent ?? "";
+    const text = this.nodeEditor?.text ?? label.textContent ?? "";
     let before = text.slice(0, start);
     let after = text.slice(end);
     const inner = text.slice(start, end);
@@ -5488,8 +5520,13 @@ export class MindMapCanvas {
       open = "[[";
       close = "]]";
     }
-    label.textContent = before + open + inner + close + after;
     const s = before.length + open.length;
+    if (this.nodeEditor) {
+      this.nodeEditor.replace(before + open + inner + close + after, s, s + inner.length);
+      this.closeLinkSuggest();
+      return;
+    }
+    label.textContent = before + open + inner + close + after;
     const node = label.firstChild ?? label;
     const sel = this.el.win.getSelection();
     const r = this.el.doc.createRange();
@@ -5502,6 +5539,10 @@ export class MindMapCanvas {
   }
 
   private setCaret(label: HTMLElement, offset: number): void {
+    if (this.nodeEditor && label === this.editingLabel()) {
+      this.nodeEditor.setSelection(offset);
+      return;
+    }
     const node = label.firstChild ?? label;
     const sel = this.el.win.getSelection();
     sel?.collapse(node, Math.min(offset, node.textContent?.length ?? 0));
@@ -5517,13 +5558,14 @@ export class MindMapCanvas {
     if (!label || !host?.listLinkTargets) return this.closeLinkSuggest();
     const caret = this.caretOffset(label);
     if (caret === null) return this.closeLinkSuggest();
-    let text = label.textContent ?? "";
+    let text = this.nodeEditor?.text ?? label.textContent ?? "";
     // 光标前最后一个「【【」（后面没有更晚的 [[）换成 [[；紧挨光标的「】】」换成 ]]。长度不变，光标不用挪
     const cn = text.slice(0, caret).lastIndexOf("【【");
     if (cn >= 0 && text.slice(0, caret).lastIndexOf("[[") < cn) text = text.slice(0, cn) + "[[" + text.slice(cn + 2);
     if (text.slice(0, caret).endsWith("】】")) text = text.slice(0, caret - 2) + "]]" + text.slice(caret);
-    if (text !== label.textContent) {
-      label.textContent = text;
+    if (text !== (this.nodeEditor?.text ?? label.textContent)) {
+      if (this.nodeEditor) this.nodeEditor.replace(text, caret);
+      else label.textContent = text;
       this.setCaret(label, caret);
     }
     const before = text.slice(0, caret);
@@ -5607,12 +5649,14 @@ export class MindMapCanvas {
     const label = this.editingLabel();
     const target = s?.items[index];
     if (!s || !label || !target) return;
-    const caret = this.caretOffset(label) ?? (label.textContent ?? "").length;
-    const text = label.textContent ?? "";
+    const text = this.nodeEditor?.text ?? label.textContent ?? "";
+    const caret = this.caretOffset(label) ?? text.length;
     // 光标后面已经有 ]]（比如自动补的）就一起吞掉，不留重复的括号
     const end = text.slice(caret).startsWith("]]") ? caret + 2 : caret;
     const link = `[[${target.linktext}]]`;
-    label.textContent = text.slice(0, s.open) + link + text.slice(end);
+    const next = text.slice(0, s.open) + link + text.slice(end);
+    if (this.nodeEditor) this.nodeEditor.replace(next, s.open + link.length);
+    else label.textContent = next;
     this.setCaret(label, s.open + link.length);
     this.closeLinkSuggest();
     if (this.editing) this.reflow(this.editing);
@@ -6235,10 +6279,14 @@ export class MindMapCanvas {
   private formatEditing(fmt: InlineFormat): void {
     const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
     if (!label) return;
-    const text = label.textContent ?? "";
+    const text = this.nodeEditor?.text ?? label.textContent ?? "";
     const [s, e] = this.labelSelection(label);
     const r = applyInlineFormat(text, s, e, fmt);
     if (r.text === text) return;
+    if (this.nodeEditor) {
+      this.nodeEditor.replace(r.text, r.start, r.end);
+      return;
+    }
     // 整段替换走 insertText：编辑框自己的 ⌘Z 能撤回这一步
     const sel = this.el.win.getSelection();
     const all = this.el.doc.createRange();
@@ -6254,6 +6302,10 @@ export class MindMapCanvas {
 
   /** 编辑框里选区的起止（按 textContent 计的字符位置）；选区不在框里就当没选 */
   private labelSelection(label: HTMLElement): [number, number] {
+    if (this.nodeEditor && label === this.editingLabel()) {
+      const { start, end } = this.nodeEditor.selection;
+      return [start, end];
+    }
     const sel = this.el.win.getSelection();
     if (!sel?.rangeCount) return [0, 0];
     const r = sel.getRangeAt(0);
@@ -6266,6 +6318,10 @@ export class MindMapCanvas {
   }
 
   private setLabelSelection(label: HTMLElement, start: number, end: number): void {
+    if (this.nodeEditor && label === this.editingLabel()) {
+      this.nodeEditor.setSelection(start, end);
+      return;
+    }
     const walker = this.el.doc.createTreeWalker(label, NodeFilter.SHOW_TEXT);
     const range = this.el.doc.createRange();
     range.selectNodeContents(label);
@@ -6294,14 +6350,16 @@ export class MindMapCanvas {
     const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
     const sel = this.el.win.getSelection();
     const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    if (!label || !this.opts.formatBar?.() || !range || range.collapsed || !label.contains(range.commonAncestorContainer)) {
+    const rect = this.nodeEditor
+      ? this.nodeEditor.selectionRect()
+      : range && !range.collapsed && label?.contains(range.commonAncestorContainer) ? range.getBoundingClientRect() : null;
+    if (!label || !this.opts.formatBar?.() || !rect) {
       this.formatBar?.remove();
       this.formatBar = null;
       return;
     }
     if (!this.formatBar) this.formatBar = this.buildFormatBar();
     const bar = this.formatBar;
-    const rect = range.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
     // 竖直方向避开整个节点（选区在第一行时，紧贴选区放会压住节点边框）
     const nodeRect = (label.closest(".gg-mm-node") ?? label).getBoundingClientRect();

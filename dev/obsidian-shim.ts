@@ -17,6 +17,20 @@ const g = globalThis as unknown as Record<string, unknown>;
 g.createEl ??= make;
 g.createDiv ??= (o?: Info | string) => make("div", o);
 g.createSpan ??= (o?: Info | string) => make("span", o);
+// This shim implements the Obsidian helpers themselves, so native DOM creation is required.
+g.createSvg ??= (tag: string) => document.createElementNS("http://www.w3.org/2000/svg", tag);
+
+if (!("doc" in Node.prototype)) Object.defineProperty(Node.prototype, "doc", { get(this: Node) { return this.ownerDocument ?? this; } });
+if (!("win" in Node.prototype)) Object.defineProperty(Node.prototype, "win", { get(this: Node) { return this.ownerDocument?.defaultView ?? window; } });
+const html = HTMLElement.prototype as unknown as Record<string, unknown>;
+html.createEl ??= function (this: HTMLElement, tag: keyof HTMLElementTagNameMap, info?: Info | string) {
+  const child = make(tag, info);
+  this.append(child);
+  return child;
+};
+html.createDiv ??= function (this: HTMLElement, info?: Info | string) { const child = make("div", info); this.append(child); return child; };
+html.createSpan ??= function (this: HTMLElement, info?: Info | string) { const child = make("span", info); this.append(child); return child; };
+html.empty ??= function (this: HTMLElement) { this.replaceChildren(); };
 
 for (const proto of [HTMLElement.prototype, SVGElement.prototype] as unknown as Record<string, unknown>[]) {
   proto.setCssStyles ??= function (this: HTMLElement, styles: Partial<CSSStyleDeclaration>) {

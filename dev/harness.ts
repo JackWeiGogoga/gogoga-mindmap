@@ -20,7 +20,7 @@ mindmap: true
 两天一夜，四个人，开一辆车。
 
 ## 装备清单 %%green%%
-- 住宿
+- <span style="color:#e03e3e">住宿</span> 与 <mark style="background:#ffd43b">装备</mark>
 	- 帐篷 2 顶
 	- 睡袋 4 个
 	- 防潮垫 4 张
@@ -79,6 +79,9 @@ function build() {
     structure: $<HTMLSelectElement>("structure").value as Structure,
     theme: $<HTMLSelectElement>("theme").value as ThemeName,
     editable: $<HTMLInputElement>("editable").checked,
+    formatBar: () => true,
+    textColors: () => ["#e03e3e", "#2f80ed"],
+    highlightColors: () => ["#ffd43b"],
     host: {
       openLink: (href, internal) => console.debug("open link", href, internal),
     },

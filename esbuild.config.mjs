@@ -11,7 +11,7 @@ const outfile = harness ? "dev/harness.js" : "dist/main.js";
 const context = await esbuild.context({
   entryPoints: [entry],
   bundle: true,
-  external: ["obsidian", "electron", ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
+  external: ["obsidian", "electron", ...(harness ? [] : ["@codemirror/*", "@lezer/*"]), ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
   format: harness ? "iife" : "cjs",
   target: "es2020",
   platform: "browser",

@@ -148,7 +148,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   fontScale: 100,
   notesExpanded: false,
   notePreview: false,
-  formatBar: false,
+  formatBar: true,
   copyPlain: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
