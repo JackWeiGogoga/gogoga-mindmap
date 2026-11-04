@@ -124,6 +124,7 @@ class MindMapEmbed extends Component {
         notePreview: () => settings.notePreview,
         formatBar: () => settings.formatBar,
         copyPlain: () => settings.copyPlain,
+        showNodebar: () => settings.showNodebar,
         textColors: () => parseColorList(settings.textColors),
         highlightColors: () => parseColorList(settings.highlightColors),
         marqueeDrag: () => settings.leftDrag === "select",

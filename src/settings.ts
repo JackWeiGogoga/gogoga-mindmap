@@ -56,6 +56,8 @@ export interface MindMapSettings {
   listIcon: string;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
+  /** 选中节点时显示浮动工具栏 */
+  showNodebar: boolean;
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
   /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
@@ -128,6 +130,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineOpen: false,
   outlineWrap: false,
   toolbarPosition: "bottom",
+  showNodebar: true,
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
@@ -468,6 +471,16 @@ export class MindMapSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
             this.plugin.applyToolbarPosition();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings.showNodebar.name"))
+      .setDesc(t("settings.showNodebar.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.showNodebar).onChange(async (v) => {
+          this.plugin.settings.showNodebar = v;
+          await this.plugin.saveSettings();
+        }),
       );
 
     new Setting(containerEl)

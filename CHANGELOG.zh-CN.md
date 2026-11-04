@@ -4,6 +4,17 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-04
+
+### 新增
+- 「选中节点时显示浮动工具栏」设置（默认开）：选中节点时上方那排小工具挡着点旁边的节点时可以关掉，上面的操作右键菜单里都有。（[#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22)）
+
+### 改进
+- 工具栏按钮的提示出得更快，鼠标停一下就能看到是什么功能，不用再等一两秒。（[#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22)）
+
+### 修复
+- 和 Markdown 分屏联动时，光标在 Markdown 里，第一次点脑图节点不跳转；点的如果是光标所在、已经选中的节点，怎么点都不跳，要先点别的节点才恢复。现在点哪个节点都直接跳过去。（[#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22)）
+
 ## [0.38.0] - 2026-11-04
 
 ### 改进
@@ -492,7 +503,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...HEAD
+[0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0
 [0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0
 [0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0

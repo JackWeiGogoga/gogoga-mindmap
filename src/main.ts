@@ -1156,6 +1156,7 @@ export default class MindMapPlugin extends Plugin {
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
         copyPlain: () => this.settings.copyPlain,
+        showNodebar: () => this.settings.showNodebar,
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors),
         marqueeDrag: () => this.settings.leftDrag === "select",
@@ -1534,7 +1535,8 @@ export default class MindMapPlugin extends Plugin {
         return f instanceof TFile ? f.basename : p.replace(/\.md$/, "").split("/").pop() ?? p;
       },
       notice: (m) => new Notice(m),
-      setTooltip: (el, text, placement) => setTooltip(el, text, { placement }),
+      // 工具栏按钮只有图标：提示别让人等（Obsidian 默认要停一会儿才出）
+      setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
       openLink: (href, internal, ev) => {
         const newTab = ev.metaKey || ev.ctrlKey;
         if (internal && !newTab && this.revealInOpenPdf(href, sourcePath())) return;

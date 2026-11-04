@@ -4,6 +4,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-04
+
+### Added
+- "Floating toolbar on selected nodes" setting (on by default): turn it off if the small toolbar above the selected node gets in the way of clicking nearby nodes; everything on it is also in the node's context menu. ([#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22))
+
+### Improved
+- Toolbar button tooltips show up right away instead of after a second or two. ([#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22))
+
+### Fixed
+- With side-by-side sync on and the cursor in Markdown, the first click on a map node didn't jump, and clicking the node the cursor was already on never jumped until you clicked another node. Clicking any node now jumps straight there. ([#22](https://github.com/JackWeiGogoga/gogoga-mindmap/issues/22))
+
 ## [0.38.0] - 2026-11-04
 
 ### Improved
@@ -492,7 +503,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...HEAD
+[0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0
 [0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0
 [0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0

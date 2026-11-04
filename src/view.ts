@@ -281,6 +281,7 @@ export class MindMapView extends TextFileView {
       notePreview: () => this.plugin.settings.notePreview,
       formatBar: () => this.plugin.settings.formatBar,
       copyPlain: () => this.plugin.settings.copyPlain,
+      showNodebar: () => this.plugin.settings.showNodebar,
       textColors: () => parseColorList(this.plugin.settings.textColors),
       highlightColors: () => parseColorList(this.plugin.settings.highlightColors),
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",

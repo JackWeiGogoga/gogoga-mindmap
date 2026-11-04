@@ -207,6 +207,8 @@ export interface CanvasOptions {
   notePreview?: () => boolean;
   /** 复制节点时剪贴板里不带 %%…%% 标记 */
   copyPlain?: () => boolean;
+  /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
+  showNodebar?: () => boolean;
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
@@ -3521,7 +3523,15 @@ export class MindMapCanvas {
   private positionNodebar(): void {
     this.updateImageHandle();
     // 只读（包括选中节点后才锁定）时不显示，留着的要收掉
-    const show = this.opts.editable && this.primary && this.selected.size > 0 && !this.editing && !this.drag && !this.marquee && this.els.has(this.primary.id);
+    const show =
+      this.opts.editable &&
+      this.opts.showNodebar?.() !== false &&
+      this.primary &&
+      this.selected.size > 0 &&
+      !this.editing &&
+      !this.drag &&
+      !this.marquee &&
+      this.els.has(this.primary.id);
     if (!show) {
       this.nodebar?.remove();
       this.nodebar = null;
@@ -3624,11 +3634,16 @@ export class MindMapCanvas {
         if (this.editing === node) return;
         if (this.editing) this.commitEdit();
         this.closePopover();
+        // 先拿焦点再选中：选中会通知分屏联动，联动见旁边的 Markdown 编辑器还有焦点会当成用户在那边打字、不跳过去
+        this.el.focus({ preventScroll: true });
         if (ev.shiftKey) this.select(node, "add");
         else if (ev.metaKey || ev.ctrlKey) this.select(node, "toggle");
         else if (!this.selected.has(node)) this.select(node, "replace");
-        else this.setPrimary(node);
-        this.el.focus({ preventScroll: true });
+        else {
+          // 点的是已经选中的节点（比如 Markdown 光标就在这一行，脑图跟着选中了它）：选中没变也照样通知，联动才会跳回去
+          this.setPrimary(node);
+          this.opts.onSelectionChange?.(this.primary, [...this.selected]);
+        }
         if (ev.pointerType === "touch") {
           // 触屏没有悬停，按住 400ms 不动才拖节点；一动就当作平移画布
           this.cancelTouchPress();

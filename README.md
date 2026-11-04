@@ -86,7 +86,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 
 ### Editing
 
-- Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
+- Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete. If it gets in the way of clicking nearby nodes, turn off "Floating toolbar on selected nodes" in settings; the same actions are in the context menu.
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color, delete, dragging and Alt+arrow reordering / promoting / demoting apply to the whole group (drag any one of them and the rest come along).
   Coming from XMind? Set Settings → Left-drag on empty space to "Select": a plain left-drag draws the selection box, right- or middle-drag pans, and a right-click on empty space still opens the menu.

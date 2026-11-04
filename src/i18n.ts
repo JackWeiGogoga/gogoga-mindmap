@@ -414,6 +414,8 @@ const en = {
   "settings.rememberView.desc": "On: switching adds mindmap: true to the properties, so the note always opens as a mind map. Off: only the current tab switches and the file is left alone, so it opens as Markdown next time. To write and watch side by side, use the command \"Markdown and mind map side by side\".",
   "settings.toolbar.desc":
     "Top and bottom are horizontal bars, left and right are vertical bars. You can also right-click the toolbar to change it.",
+  "settings.showNodebar.name": "Floating toolbar on selected nodes",
+  "settings.showNodebar.desc": "The small toolbar (colors, add child, markers…) above the selected node. Turn it off if it gets in the way of clicking nearby nodes; everything on it is also in the node's context menu.",
   "settings.wheel.name": "Mouse wheel",
   "settings.wheel.desc": "Pan: the wheel scrolls the map, Cmd/Ctrl + wheel zooms. Zoom: the wheel zooms, Shift + wheel scrolls.",
   "settings.wheel.pan": "Pan",
@@ -890,6 +892,8 @@ const zh: Record<Key, string> = {
   "settings.rememberView.name": "切换成思维导图时记住",
   "settings.rememberView.desc": "开启：切换时在属性里写入 mindmap: true，以后打开这篇笔记都是思维导图。关闭：只切换当前标签页，不改文件，下次打开还是 Markdown。只想边写边看，也可以用命令「Markdown 和思维导图分屏对照」。",
   "settings.toolbar.desc": "上下是水平条，左右是垂直条。在工具栏上右键也能切换。",
+  "settings.showNodebar.name": "选中节点时显示浮动工具栏",
+  "settings.showNodebar.desc": "选中节点时上方那排小工具（颜色、加子节点、标记……）。挡着点旁边的节点时可以关掉，上面的操作右键菜单里都有。",
   "settings.wheel.name": "鼠标滚轮",
   "settings.wheel.desc": "平移：滚轮移动画布，Cmd/Ctrl + 滚轮缩放。缩放：滚轮直接缩放，Shift + 滚轮移动画布。",
   "settings.wheel.pan": "平移",
