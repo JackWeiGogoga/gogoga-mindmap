@@ -6076,7 +6076,10 @@ export class MindMapCanvas {
   private formatEditing(fmt: InlineFormat): void {
     const ed = this.nodeEditor;
     if (!ed) return;
-    const { from, to } = ed.selection;
+    // 选中的只是藏起来的标记、一个看得见的字都没有：不动（不然会当成没选，整段都上格式）
+    const raw = ed.selection;
+    const { from, to } = ed.visibleSelection;
+    if (raw.from !== raw.to && from === to) return;
     const r = applyInlineFormat(ed.text, from, to, fmt);
     if (r.text !== ed.text) ed.setText(r.text, r.start, r.end);
   }

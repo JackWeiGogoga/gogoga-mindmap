@@ -145,11 +145,23 @@ function dropEmpty(text: string, kind: ColorKind): string {
  * - 选区在一段同类颜色里面：把选区从那段里拆出来，再上新色（同色就是取消）
  * - 选区跨过同类标签的边界：先扩到整对标签，免得标签交错
  */
-function applyColor(text: string, s: number, e: number, kind: ColorKind, color: string | null): FormatResult {
-  // 扩选区：选区里有一半的标签对，就把整对框进来
+/** 一个完整的颜色标签（开头或收尾），用来从选区两头剥掉 */
+const ANY_TAG = `${COLOR_OPEN_SRC}|${BG_OPEN_SRC}|</span>|</mark>`;
+const LEADING_TAG = new RegExp(`^(?:${ANY_TAG})`);
+const TRAILING_TAG = new RegExp(`(?:${ANY_TAG})$`);
+
+/**
+ * 让选区和颜色标签的结构对齐，格式化后标签不会交错（<span><mark></span></mark> 这种渲染不出来）：
+ * 两头是完整的标签就剥掉（编辑框里标签藏着，选的时候很容易带上看不见的 </span>）；
+ * 选区只框了某一对标签的一半，就扩到整对
+ */
+function alignToTags(text: string, s: number, e: number): [number, number] {
+  for (let m: RegExpExecArray | null; s < e && (m = LEADING_TAG.exec(text.slice(s, e))); ) s += m[0].length;
+  for (let m: RegExpExecArray | null; s < e && (m = TRAILING_TAG.exec(text.slice(s, e))); ) e -= m[0].length;
+  if (s === e) return [s, e];
   for (let changed = true; changed; ) {
     changed = false;
-    for (const p of pairs(text, kind)) {
+    for (const p of [...pairs(text, "color"), ...pairs(text, "bg")]) {
       const openIn = p.openStart >= s && p.openStart < e;
       const closeIn = p.closeEnd > s && p.closeEnd <= e;
       if (openIn !== closeIn) {
@@ -159,6 +171,10 @@ function applyColor(text: string, s: number, e: number, kind: ColorKind, color: 
       }
     }
   }
+  return [s, e];
+}
+
+function applyColor(text: string, s: number, e: number, kind: ColorKind, color: string | null): FormatResult {
   // 选区正好是一整对（连标签一起选中）：当成选中了里面的文字
   const exact = pairs(text, kind).find((p) => p.openStart === s && p.closeEnd === e);
   if (exact) {
@@ -218,6 +234,7 @@ function applyColor(text: string, s: number, e: number, kind: ColorKind, color: 
 export function applyInlineFormat(text: string, start: number, end: number, fmt: InlineFormat): FormatResult {
   let [s, e] = start === end ? [0, text.length] : [Math.min(start, end), Math.max(start, end)];
   [s, e] = trimRange(text, s, e);
+  [s, e] = alignToTags(text, s, e);
   if (s === e) return { text, start, end };
   switch (fmt.kind) {
     case "bold":

@@ -71,3 +71,20 @@ test("荧光笔和文字颜色可以叠加，清除格式两种都去掉", () =>
 test("颜色列表：逗号或空格隔开，非法的忽略", () => {
   assert.deepEqual(parseColorList("#e03e3e, #2f80ed，red  rgba(1,2,3,0.5) 不是颜色 #12"), ["#e03e3e", "#2f80ed", "red", "rgba(1,2,3,0.5)"]);
 });
+
+test("选区两头带上了看不见的标签：剥掉再格式化，标签不交错", () => {
+  const GREEN = { kind: "bg", color: "#69db7c99" } as const;
+  // 编辑框里 </span> 藏着，从末尾往回选「了」会把它一起选上
+  assert.equal(
+    run('阿<span style="color:#27ae60">[了</span>]', GREEN),
+    '阿<span style="color:#27ae60"><mark style="background:#69db7c99">[了]</mark></span>',
+  );
+  assert.equal(run('阿<span style="color:#27ae60">[了</span>]', { kind: "bold" }), '阿<span style="color:#27ae60">**[了]**</span>');
+  // 只选中了一个看不见的标签：什么都不做
+  assert.equal(run('阿<span style="color:#27ae60">了[</span>]', GREEN), '阿<span style="color:#27ae60">了[</span>]');
+});
+
+test("选区只框住另一种颜色标签的一半：扩到整对，结构保持完整", () => {
+  const out = run('[甲<span style="color:#e03e3e">乙]丙</span>', { kind: "bg", color: "#ffd43b" });
+  assert.equal(out, '<mark style="background:#ffd43b">[甲<span style="color:#e03e3e">乙丙</span>]</mark>');
+});

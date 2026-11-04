@@ -158,6 +158,39 @@ export class InlineEditor {
     return { from, to };
   }
 
+  /**
+   * 主选区去掉两头藏起来的标记符：用户看见选中了哪几个字，就是哪几个字。
+   * 从末尾往回选很容易带上看不见的 </span> 或 **，拿去上格式会把标签弄交错
+   */
+  get visibleSelection(): { from: number; to: number } {
+    let { from, to } = this.selection;
+    const hidden = this.view.plugin(livePreview)?.atomic;
+    if (from === to || !hidden) return { from, to };
+    for (let moved = true; moved && from < to; ) {
+      moved = false;
+      hidden.between(from, to, (a, b) => {
+        if (a === from && b <= to) {
+          from = b;
+          moved = true;
+          return false;
+        }
+        return undefined;
+      });
+    }
+    for (let moved = true; moved && from < to; ) {
+      moved = false;
+      hidden.between(from, to, (a, b) => {
+        if (b === to && a >= from) {
+          to = a;
+          moved = true;
+          return false;
+        }
+        return undefined;
+      });
+    }
+    return { from, to };
+  }
+
   get composing(): boolean {
     return this.view.composing;
   }
