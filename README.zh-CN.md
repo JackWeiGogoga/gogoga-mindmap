@@ -206,8 +206,16 @@ mindmap-theme: rainbow       # 可选：snow（默认）| rainbow | business | w
 
 ## 开发
 
+开发环境使用 Node.js 22 和 pnpm 10，与发布流程保持一致。使用 vfox 时，先在项目根目录执行：
+
 ```bash
-pnpm install
+vfox install --all     # 安装 .tool-versions 中指定的 Node.js
+vfox use -p nodejs@22.22.3
+corepack enable pnpm  # 使用 package.json 中固定的 pnpm 版本
+```
+
+```bash
+pnpm install --frozen-lockfile
 pnpm test            # Markdown 往返与布局的单元测试
 pnpm typecheck
 pnpm lint            # 与 Obsidian 社区目录审核相同的 ESLint 规则

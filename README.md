@@ -200,8 +200,16 @@ The node context menu has these too, so you don't need to remember the keys: **I
 
 ## Development
 
+Use Node.js 22 and pnpm 10 to match the release workflow. With vfox, run these commands from the project root first:
+
 ```bash
-pnpm install
+vfox install --all     # install the Node.js version recorded in .tool-versions
+vfox use -p nodejs@22.22.3
+corepack enable pnpm  # use the pnpm version pinned in package.json
+```
+
+```bash
+pnpm install --frozen-lockfile
 pnpm test            # unit tests for Markdown round-tripping and layout
 pnpm typecheck
 pnpm lint            # the same ESLint rules the Obsidian community directory runs

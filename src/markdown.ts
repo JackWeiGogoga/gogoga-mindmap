@@ -42,6 +42,7 @@ export const DEFAULT_STYLE: DocStyle = {
   indent: "\t",
   bullet: "-",
   blankBeforeList: false,
+  blankBeforeHeading: true,
   maxHeadingLevel: 3,
 };
 
@@ -552,6 +553,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   let blankBeforeList: boolean | null = null;
   let prevTokenWasHeading = false;
   let blankSinceHeading = false;
+  const headingGaps: boolean[] = [];
+  let seenHeading = false;
 
   for (let ti = 0; ti < tokens.length; ti++) {
     let tok = tokens[ti];
@@ -567,6 +570,11 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
     const lineNo = start + ti;
     if (tok.t === "heading") {
+      if (seenHeading) {
+        const previous = tokens[ti - 1];
+        headingGaps.push(previous?.t === "line" && previous.raw.trim() === "");
+      }
+      seenHeading = true;
       const split = splitMarker(tok.text);
       const { text } = split;
       let { marker } = split;
@@ -709,6 +717,9 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     indent: detectIndent(indents) ?? opts.style?.indent ?? DEFAULT_STYLE.indent,
     bullet: mostCommon(bullets.filter((b) => /^[-*+]$/.test(b))) ?? opts.style?.bullet ?? DEFAULT_STYLE.bullet,
     blankBeforeList: blankBeforeList ?? opts.style?.blankBeforeList ?? DEFAULT_STYLE.blankBeforeList,
+    blankBeforeHeading: headingGaps.length
+      ? headingGaps.filter(Boolean).length > headingGaps.length / 2
+      : opts.style?.blankBeforeHeading ?? DEFAULT_STYLE.blankBeforeHeading,
     headingsOnly: opts.headingsOnly || undefined,
   };
 
@@ -750,7 +761,10 @@ export function serializeMarkdown(doc: MindDoc): string {
   const { style } = doc;
 
   const emitHeading = (node: MindNode, level: number) => {
-    ensureBlank();
+    const last = out[out.length - 1] ?? "";
+    const followsNode = HEADING_RE.test(last) || LIST_RE.test(last) || (last.trim().startsWith("%%") && splitMarker(last.trim()).text === "");
+    // 紧凑笔记里的新增标题不补空行；备注、段落、代码块等仍保留块间分隔。
+    if (style.blankBeforeHeading !== false || !followsNode) ensureBlank();
     out.push(`${"#".repeat(level)} ${node.text}`.trimEnd());
     // 标记单独一行写在标题下面，不进标题文字（见解析处的说明）
     const marker = formatMarker(node).trim();

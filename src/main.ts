@@ -1081,7 +1081,7 @@ export default class MindMapPlugin extends Plugin {
   /** 内置的起始内容：跟随界面语言；只影响新建的文件 */
   private defaultContent(title: string): string {
     const iconLine = this.settings.listIcon ? `${ICON_KEY}: ${this.settings.listIcon}\n` : "";
-    const topics = [1, 2, 3].map((n) => `## ${t("newFile.topic", { n })}\n`).join("\n");
+    const topics = [1, 2, 3].map((n) => `## ${t("newFile.topic", { n })}\n`).join("");
     return `---\n${FRONTMATTER_KEY}: true\n${iconLine}---\n\n# ${title}\n\n${topics}`;
   }
 

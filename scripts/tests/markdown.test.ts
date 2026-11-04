@@ -153,13 +153,11 @@ text
   assert.equal(
     once,
     `# R
-
 ## A
 
 - a1
 * a2
    - a3
-
 ## B
 
 text

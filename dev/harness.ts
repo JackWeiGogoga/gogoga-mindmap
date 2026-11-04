@@ -3,6 +3,7 @@ import "./obsidian-shim";
 import { MindMapCanvas } from "../src/canvas";
 import { buildSvg, svgToPng } from "../src/export";
 import { parseMarkdown, serializeMarkdown } from "../src/markdown";
+import { preserveFormat } from "../src/merge";
 import { setLocale } from "../src/i18n";
 import type { Structure } from "../src/layout";
 import type { ThemeName } from "../src/theme";
@@ -82,9 +83,11 @@ function build() {
       openLink: (href, internal) => console.debug("open link", href, internal),
     },
     onChange: (doc) => {
+      const next = preserveFormat(current, serializeMarkdown(doc), (text) => serializeMarkdown(parseMarkdown(text, { fallbackTitle: "样例" })));
+      if (next === current) return;
       history.push(current);
       future = [];
-      current = serializeMarkdown(doc);
+      current = next;
       out.textContent = current;
     },
     onUndo: () => {
