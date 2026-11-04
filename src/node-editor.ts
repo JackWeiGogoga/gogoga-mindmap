@@ -4,6 +4,7 @@ import { defaultKeymap, history, historyKeymap, insertNewline, isolateHistory } 
 import { colorEditing, colorSourceChange } from "./color-editing";
 import { dropEmptyColors } from "./color-source";
 import { t } from "./i18n";
+import { editingSpans, type RenderOptions } from "./markdown-source";
 
 /** One source-backed editor exists only for the node currently being edited. */
 export class NodeEditor {
@@ -12,21 +13,23 @@ export class NodeEditor {
   private source = false;
   private dead = false;
 
-  constructor(host: HTMLElement, text: string, caretAtEnd: boolean, onChange: (changed: boolean, geometryChanged: boolean) => void, onBlur: () => void, onKey: (ev: KeyboardEvent) => void) {
+  constructor(host: HTMLElement, text: string, caretAtEnd: boolean, onChange: (changed: boolean, geometryChanged: boolean) => void, onBlur: () => void, onKey: (ev: KeyboardEvent) => void, render: RenderOptions = { html: true, markdown: true }) {
     host.replaceChildren();
     const button = host.createEl("button", { cls: "mm-editor-mode", text: t("format.editSource") });
     button.type = "button";
     button.setAttribute("aria-label", t("format.editSource"));
+    button.addEventListener("pointerdown", (ev) => { ev.preventDefault(); ev.stopPropagation(); });
     button.addEventListener("mousedown", (ev) => ev.preventDefault());
     button.addEventListener("click", (ev) => {
       ev.stopPropagation();
       this.source = !this.source;
       button.textContent = t(this.source ? "format.editVisual" : "format.editSource");
       button.setAttribute("aria-label", button.textContent);
-      this.view.dispatch({ effects: this.mode.reconfigure(this.source ? [] : colorEditing()) });
+      this.view.dispatch({ effects: this.mode.reconfigure(this.source ? [] : visual()) });
       this.view.focus();
       onChange(false, true);
     });
+    const visual = () => colorEditing({ parse: (source) => editingSpans(source, render) });
     this.view = new EditorView({
       parent: host,
       root: host.getRootNode() as Document | ShadowRoot,
@@ -37,7 +40,7 @@ export class NodeEditor {
           history(),
           // Let node commands and link suggestions handle Enter/Tab/arrows before CM keymaps.
           Prec.highest(EditorView.domEventHandlers({ keydown: (ev) => { onKey(ev); return ev.defaultPrevented; } })),
-          this.mode.of(colorEditing()),
+          this.mode.of(visual()),
           EditorView.lineWrapping,
           EditorView.editorAttributes.of({ class: "mm-node-editor" }),
           keymap.of([{ key: "Shift-Enter", run: insertNewline }, ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),

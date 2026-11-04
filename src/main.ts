@@ -124,7 +124,7 @@ export default class MindMapPlugin extends Plugin {
     setLocale(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
-    this.registerEditorExtension(markdownColors((path) => this.isMindMapFile(path)));
+    this.registerEditorExtension(markdownColors((path) => this.isMindMapFile(path) || this.hasMapForFile(path), () => this.settings));
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();
@@ -309,6 +309,35 @@ export default class MindMapPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private markdownRenderingApplied = new WeakMap<MarkdownView, string>();
+
+  private hasMapForFile(path: string): boolean {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).some((leaf) => (leaf.view as MindMapView).file?.path === path);
+  }
+
+  /** Use Obsidian's own Live Preview/source switch for full Markdown documents. */
+  applyEditorRendering(): void {
+    this.app.workspace.updateOptions();
+    this.applySplitRendering();
+  }
+
+  private applySplitRendering(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) continue;
+      if (!view.file || !this.hasMapForFile(view.file.path)) {
+        this.markdownRenderingApplied.delete(view);
+        continue;
+      }
+      if (view.getMode() !== "source") continue;
+      const key = `${view.file.path}:${this.settings.markdownMarkdownRendering}`;
+      if (this.markdownRenderingApplied.get(view) === key) continue;
+      this.markdownRenderingApplied.set(view, key);
+      const current = leaf.getViewState();
+      void leaf.setViewState({ ...current, state: { ...current.state, mode: "source", source: !this.settings.markdownMarkdownRendering } });
+    }
   }
 
   private saveTimer: number | null = null;
@@ -592,6 +621,7 @@ export default class MindMapPlugin extends Plugin {
    */
   /** 和脑图视图右上角的「以 Markdown 打开」对称：带 mindmap: true 的笔记在 Markdown 里显示时给一个回脑图的按钮 */
   private syncMapButtons(): void {
+    this.applySplitRendering();
     const live = new Set<MarkdownView>();
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       const view = leaf.view;
@@ -1157,6 +1187,8 @@ export default class MindMapPlugin extends Plugin {
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
+        nodeHtmlRendering: () => this.settings.nodeHtmlRendering,
+        nodeMarkdownRendering: () => this.settings.nodeMarkdownRendering,
         copyPlain: () => this.settings.copyPlain,
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors),

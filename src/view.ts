@@ -280,6 +280,8 @@ export class MindMapView extends TextFileView {
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       notePreview: () => this.plugin.settings.notePreview,
       formatBar: () => this.plugin.settings.formatBar,
+      nodeHtmlRendering: () => this.plugin.settings.nodeHtmlRendering,
+      nodeMarkdownRendering: () => this.plugin.settings.nodeMarkdownRendering,
       copyPlain: () => this.plugin.settings.copyPlain,
       textColors: () => parseColorList(this.plugin.settings.textColors),
       highlightColors: () => parseColorList(this.plugin.settings.highlightColors),

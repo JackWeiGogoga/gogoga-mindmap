@@ -86,7 +86,9 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 
 ### Editing
 
-- Editing a node keeps text colors and highlighters visible while hiding their `<span>` / `<mark>` tags. Use the Source / Visual button to inspect the original text; other Markdown syntax remains editable as source. Live Preview in mind map notes uses the same color display, while Source mode shows the full HTML. Code examples are left alone.
+- Node editing renders bold, italic, strikethrough, highlight, inline code, Markdown links and wiki links while hiding their markers. Text colors and highlighters hide their `<span>` / `<mark>` tags too. Separate HTML and Markdown settings control these features (on by default, applied when entering node editing); the Source / Visual button temporarily shows the original text. Code contents, incomplete syntax and unsupported tags stay as source.
+- Separate split Markdown settings control Obsidian Live Preview versus Source mode and HTML color rendering. This allows Markdown source with rendered HTML colors. Reading view is unchanged.
+- Enable the Markdown selection format bar to format selected text in Markdown editors too: bold, italic, highlight, text color, highlighter and clear colors. Both editors share the text/highlighter palettes. Add or remove comma/newline-separated colors in settings to change the number of buttons, without a fixed limit; an empty palette hides that color group.
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete.
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color, delete, dragging and Alt+arrow reordering / promoting / demoting apply to the whole group (drag any one of them and the rest come along).

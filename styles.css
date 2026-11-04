@@ -414,6 +414,7 @@
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
 }
 .gg-mm-node.is-editing {
+  z-index: 5;
   box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px var(--mm-selection);
 }
 
@@ -453,7 +454,8 @@
 .mm-editor-mode {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 5px);
+  top: calc(100% + 6px);
+  white-space: nowrap;
   font: 11px/1.4 var(--font-interface);
   padding: 2px 6px;
   height: auto;
@@ -492,7 +494,7 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.gg-mm-root .mm-format-btn {
+.mm-format-bar .mm-format-btn {
   all: unset;
   box-sizing: border-box;
   display: flex;
@@ -507,12 +509,20 @@
   color: var(--text-normal, #1f1f1f);
   cursor: pointer;
 }
-.gg-mm-root .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
-.gg-mm-root .mm-format-btn.is-bold { font-weight: 700; }
-.gg-mm-root .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
-.gg-mm-root .mm-format-btn.is-color { font-weight: 700; }
-.gg-mm-root .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
-.gg-mm-root .mm-format-btn .mm-icon { font-size: 15px; }
+.mm-format-bar .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
+.mm-format-bar .mm-format-btn.is-bold { font-weight: 700; }
+.mm-format-bar .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
+.mm-format-bar .mm-format-btn.is-color { font-weight: 700; }
+.mm-format-bar .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
+.mm-format-bar .mm-format-btn .mm-icon { font-size: 15px; }
+.mm-format-bar { flex-wrap: wrap; max-width: min(600px, calc(100vw - 8px)); }
+.mm-markdown-format-bar { position: fixed; z-index: var(--layer-popover, 100); }
+.mm-edit-bold { font-weight: 700; }
+.mm-edit-italic { font-style: italic; }
+.mm-edit-strike { text-decoration: line-through; }
+.mm-edit-highlight { background-color: var(--text-highlight-bg, #ffd43b66); }
+.mm-edit-code { font-family: var(--font-monospace, monospace); background: var(--code-background, #8882); border-radius: 3px; }
+.mm-edit-link { color: var(--link-color, #2f80ed); text-decoration: underline; }
 .mm-format-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--background-modifier-border, #e3e3e3); }
 .mm-link {
   color: var(--link-color, var(--mm-selection));

@@ -3,6 +3,7 @@
  * 内联编辑、备注编辑、键盘操作。不依赖 obsidian 模块，浏览器调试页和代码块渲染器共用。
  */
 
+import { buildFormatBar } from "./format-bar";
 import {
   addChild,
   addSibling,
@@ -209,6 +210,8 @@ export interface CanvasOptions {
   copyPlain?: () => boolean;
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
+  nodeHtmlRendering?: () => boolean;
+  nodeMarkdownRendering?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
@@ -5378,7 +5381,10 @@ export class MindMapCanvas {
       if (changed || geometryChanged) this.reflowEditedNode();
       this.updateFormatBar();
       if (changed && !this.opts.embedded) this.scheduleNotify();
-    }, () => this.commitEdit(), (ev) => this.onKeyDown(ev));
+    }, () => this.commitEdit(), (ev) => this.onKeyDown(ev), {
+      html: this.opts.nodeHtmlRendering?.() ?? true,
+      markdown: this.opts.nodeMarkdownRendering?.() ?? true,
+    });
     this.reflowEditedNode();
   }
 
@@ -6358,7 +6364,12 @@ export class MindMapCanvas {
       this.formatBar = null;
       return;
     }
-    if (!this.formatBar) this.formatBar = this.buildFormatBar();
+    const palette = JSON.stringify([this.opts.textColors?.() ?? [], this.opts.highlightColors?.() ?? []]);
+    if (this.formatBar?.dataset.palette !== palette) {
+      this.formatBar?.remove();
+      this.formatBar = this.buildFormatBar();
+      this.formatBar.dataset.palette = palette;
+    }
     const bar = this.formatBar;
     const host = this.el.getBoundingClientRect();
     // 竖直方向避开整个节点（选区在第一行时，紧贴选区放会压住节点边框）
@@ -6374,46 +6385,7 @@ export class MindMapCanvas {
   }
 
   private buildFormatBar(): HTMLElement {
-    const bar = createDiv({ cls: "mm-format-bar" });
-    // 按下时不能让编辑框失焦，否则选区没了、编辑也提交了
-    bar.addEventListener("pointerdown", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
-    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
-    const btn = (cls: string, title: string, fmt: InlineFormat, fill?: (b: HTMLButtonElement) => void) => {
-      const b = createEl("button", { cls: `mm-format-btn ${cls}` });
-      b.type = "button";
-      b.setAttribute("aria-label", title);
-      this.tip(b, title);
-      fill?.(b);
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        this.formatText(fmt);
-      });
-      bar.append(b);
-      return b;
-    };
-    btn("is-bold", t("format.bold"), { kind: "bold" }, (b) => (b.textContent = "B"));
-    btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
-    btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(icon("highlighter")));
-    const sep = () => bar.append(createSpan({ cls: "mm-format-sep" }));
-    const colors = this.opts.textColors?.() ?? [];
-    if (colors.length) sep();
-    for (const c of colors)
-      btn("is-color", t("format.textColor", { color: c }), { kind: "color", color: c }, (b) => {
-        b.textContent = "A";
-        b.style.color = c;
-      });
-    const bgs = this.opts.highlightColors?.() ?? [];
-    if (bgs.length) sep();
-    for (const c of bgs)
-      btn("is-bg", t("format.highlightColor", { color: c }), { kind: "bg", color: c }, (b) => {
-        b.textContent = "A";
-        b.style.background = c;
-      });
-    sep();
-    btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(icon("eraser")));
+    const bar = buildFormatBar({ text: this.opts.textColors?.() ?? [], highlight: this.opts.highlightColors?.() ?? [] }, (format) => this.formatText(format));
     this.el.append(bar);
     return bar;
   }

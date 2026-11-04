@@ -1,18 +1,22 @@
 /** Supported color markup stays in the source; these ranges drive visual editing. */
 import { BG_OPEN_SRC, COLOR_OPEN_SRC } from "./format";
 
-export interface ColorSpan {
+export interface MarkupSpan {
   from: number;
   openEnd: number;
   closeStart: number;
   to: number;
+  className?: string;
+}
+
+export interface ColorSpan extends MarkupSpan {
   kind: "color" | "bg";
   color: string;
 }
 
 /** Ignore code, escaped tags and incomplete/misnested markup rather than hiding it. */
 export function colorSpans(source: string): ColorSpan[] {
-  const tokens = new RegExp(`${COLOR_OPEN_SRC}|${BG_OPEN_SRC}|</span>|</mark>|\x60+|^ {0,3}~{3,}[^\n]*`, "gm");
+  const tokens = new RegExp(`${COLOR_OPEN_SRC}|${BG_OPEN_SRC}|<mark>|</span>|</mark>|\x60+|^ {0,3}~{3,}[^\n]*`, "gm");
   const stack: Omit<ColorSpan, "closeStart" | "to">[] = [];
   const spans: ColorSpan[] = [];
   let code = "";
@@ -29,8 +33,8 @@ export function colorSpans(source: string): ColorSpan[] {
       continue;
     }
     if (code || token.includes("\n")) continue;
-    if (m[1] !== undefined || m[2] !== undefined) {
-      stack.push({ from, openEnd: from + token.length, kind: m[1] !== undefined ? "color" : "bg", color: m[1] ?? m[2] });
+    if (m[1] !== undefined || m[2] !== undefined || token === "<mark>") {
+      stack.push({ from, openEnd: from + token.length, kind: m[1] !== undefined ? "color" : "bg", color: m[1] ?? m[2] ?? "var(--text-highlight-bg, #ffd43b66)" });
     } else {
       const kind = token === "</span>" ? "color" : "bg";
       const open = stack.pop();

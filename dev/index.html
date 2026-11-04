@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>mindmap harness</title>
-<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../styles.css?v=visual-editing-2">
 <style>
   body {
     margin: 0;
@@ -37,6 +37,8 @@
   <label>结构 <select id="structure"><option value="logic-right">logic-right</option><option value="mindmap">mindmap</option></select></label>
   <label><input type="checkbox" id="dark"> 深色</label>
   <label><input type="checkbox" id="editable" checked> 可编辑</label>
+  <label><input type="checkbox" id="nodeHtml" checked> HTML 渲染</label>
+  <label><input type="checkbox" id="nodeMarkdown" checked> Markdown 渲染</label>
   <button id="reload">重新载入样例</button>
   <button id="exportSvg">导出 SVG</button>
   <button id="exportPng">导出 PNG</button>

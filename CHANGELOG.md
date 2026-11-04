@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Hide inline Markdown markers during node editing for bold, italic, strikethrough, highlights, code, Markdown links and wiki links, preserving source, undo/redo and cross-format edits.
+- Independent HTML and Markdown rendering settings for nodes and split Markdown panes, on by default. Split Markdown uses Obsidian Live Preview/Source mode, with independent HTML color rendering.
+- Optional selection format bar in Markdown editors. Both editors share editable text/highlighter palettes with comma/newline-separated colors, no fixed count and a current color count in settings.
+
+### Fixed
+- Move the node source toggle away from the selection format bar so color buttons cannot cover it.
+
 ## [0.37.0] - 2026-11-04
 
 ### Added

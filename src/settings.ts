@@ -10,6 +10,7 @@ import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-mo
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import { syncNotesExpandedAll } from "./canvas";
+import { parseColorList } from "./format";
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
@@ -31,8 +32,13 @@ export interface MindMapSettings {
   notesExpanded: boolean;
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
-  /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
+  /** 编辑节点文字时，选中一段文字弹出格式栏 */
   formatBar: boolean;
+  nodeHtmlRendering: boolean;
+  nodeMarkdownRendering: boolean;
+  markdownHtmlRendering: boolean;
+  markdownMarkdownRendering: boolean;
+  markdownFormatBar: boolean;
   /** 复制节点时去掉 %%…%% 标记（默认关） */
   copyPlain: boolean;
   /** 常用文字颜色、荧光笔颜色（逗号隔开） */
@@ -149,6 +155,11 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   notesExpanded: false,
   notePreview: false,
   formatBar: true,
+  nodeHtmlRendering: true,
+  nodeMarkdownRendering: true,
+  markdownHtmlRendering: true,
+  markdownMarkdownRendering: true,
+  markdownFormatBar: true,
   copyPlain: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
@@ -384,6 +395,16 @@ export class MindMapSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+    for (const key of ["nodeHtmlRendering", "nodeMarkdownRendering", "markdownHtmlRendering", "markdownMarkdownRendering", "markdownFormatBar"] as const) {
+      new Setting(containerEl)
+        .setName(t(`settings.${key}.name`))
+        .setDesc(t(`settings.${key}.desc`))
+        .addToggle((toggle) => toggle.setValue(this.plugin.settings[key]).onChange(async (value) => {
+          this.plugin.settings[key] = value;
+          await this.plugin.saveSettings();
+          this.plugin.applyEditorRendering();
+        }));
+    }
     new Setting(containerEl)
       .setName(t("settings.copyPlain.name"))
       .setDesc(t("settings.copyPlain.desc"))
@@ -397,16 +418,18 @@ export class MindMapSettingTab extends PluginSettingTab {
       ["textColors", DEFAULT_TEXT_COLORS],
       ["highlightColors", DEFAULT_HIGHLIGHT_COLORS],
     ] as const) {
-      new Setting(containerEl)
+      const setting = new Setting(containerEl)
         .setName(t(`settings.${key}.name`))
-        .setDesc(t(`settings.${key}.desc`))
-        .addText((text) =>
+        .setDesc(t(`settings.${key}.desc`) + " " + t("settings.paletteCount", { n: parseColorList(this.plugin.settings[key]).length }))
+        .addTextArea((text) =>
           text
             .setPlaceholder(def)
             .setValue(this.plugin.settings[key])
             .onChange(async (v) => {
               this.plugin.settings[key] = v;
               await this.plugin.saveSettings();
+              setting.setDesc(t(`settings.${key}.desc`) + " " + t("settings.paletteCount", { n: parseColorList(v).length }));
+              this.plugin.applyEditorRendering();
             }),
         );
     }
