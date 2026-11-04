@@ -257,9 +257,14 @@ export function preserveFormat(original: string, next: string, canonical: (text:
   // 换行符按原文的来：整篇都是 \r\n 才先换成 \n 合并、结束后再换回；混着用的不动，\r 就当那一行原有的内容
   const crlf = original.includes("\r\n") && !/(^|[^\r])\n/.test(original);
   const ours = crlf ? original.replace(/\r\n/g, "\n") : original;
+  // 每条出路都按原文收尾：规范文本总以换行结尾，原文结尾没有换行就去掉；整篇 \r\n 的换回 \r\n
+  const finish = (text: string): string => {
+    const ended = ours === "" || ours.endsWith("\n") ? text : text.replace(/\n$/, "");
+    return crlf ? ended.replace(/\n/g, "\r\n") : ended;
+  };
   const base = canonical(ours);
   // 原文本来就是插件的格式（插件新建的脑图）：没有要保留的东西
-  if (base === ours) return next;
+  if (base === ours) return finish(next);
   if (base === next) return original;
   // 合并结果必须和这次编辑想要的完全是同一棵树：先按最细的粒度合并，不对就把相邻的改动并起来再试，还不对宁可整篇重写
   // 依次试：冲突组细合并（保留原文的空白）→ 冲突组按新格式 → 相邻改动也并成组
@@ -268,8 +273,8 @@ export function preserveFormat(original: string, next: string, canonical: (text:
   for (const [touching, refine] of [[false, true], [false, false], [true, true], [true, false]]) {
     const lines = merge3(baseLines, oursLines, next.split("\n"), touching, refine);
     for (const merged of [restoreMoved(baseLines, oursLines, lines).join("\n"), lines.join("\n")]) {
-      if (canonical(merged) === next) return crlf ? merged.replace(/\n/g, "\r\n") : merged;
+      if (canonical(merged) === next) return finish(merged);
     }
   }
-  return next;
+  return finish(next);
 }

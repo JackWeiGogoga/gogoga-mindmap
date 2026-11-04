@@ -42,6 +42,7 @@ export const DEFAULT_STYLE: DocStyle = {
   indent: "\t",
   bullet: "-",
   blankBeforeList: false,
+  blankBeforeHeading: true,
   maxHeadingLevel: 3,
 };
 
@@ -552,6 +553,12 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   let blankBeforeList: boolean | null = null;
   let prevTokenWasHeading = false;
   let blankSinceHeading = false;
+  // 标题紧跟在上一个节点行（标题、它的标记行、列表项）后面时，原文中间空没空行，数一数按多的来。
+  // 中心主题后面、备注和段落后面的不算：那里空一行是另一回事
+  let afterNode = false;
+  let blankSinceNode = false;
+  let headingGaps = 0;
+  let headingTight = 0;
 
   for (let ti = 0; ti < tokens.length; ti++) {
     let tok = tokens[ti];
@@ -567,6 +574,10 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     // tokenize 一行出一个 token，所以 token 序号加上 frontmatter 的行数就是源文本行号
     const lineNo = start + ti;
     if (tok.t === "heading") {
+      if (afterNode) {
+        if (blankSinceNode) headingGaps++;
+        else headingTight++;
+      }
       const split = splitMarker(tok.text);
       const { text } = split;
       let { marker } = split;
@@ -603,6 +614,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         preamble.push(...pre);
         noteBuf.delete(root);
         target = { node: root, buf: noteBuf };
+        afterNode = false;
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
@@ -611,12 +623,14 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
         target = { node, buf: noteBuf };
+        afterNode = true;
       }
       listStack = [];
       lastListItem = null;
       prevWasBlank = false;
       prevTokenWasHeading = true;
       blankSinceHeading = false;
+      blankSinceNode = false;
       continue;
     }
 
@@ -644,6 +658,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       if (prevTokenWasHeading && blankBeforeList === null) blankBeforeList = blankSinceHeading;
       prevWasBlank = false;
       prevTokenWasHeading = false;
+      afterNode = true;
+      blankSinceNode = false;
       continue;
     }
 
@@ -653,9 +669,11 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       push(target, "");
       prevWasBlank = true;
       if (prevTokenWasHeading) blankSinceHeading = true;
+      if (afterNode) blankSinceNode = true;
       continue;
     }
     prevTokenWasHeading = false;
+    afterNode = false;
     if (listStack.length) {
       const indent = indentWidth(leadingWs(raw));
       if (!prevWasBlank && lastListItem && !interruptsParagraph(raw)) {
@@ -709,6 +727,8 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     indent: detectIndent(indents) ?? opts.style?.indent ?? DEFAULT_STYLE.indent,
     bullet: mostCommon(bullets.filter((b) => /^[-*+]$/.test(b))) ?? opts.style?.bullet ?? DEFAULT_STYLE.bullet,
     blankBeforeList: blankBeforeList ?? opts.style?.blankBeforeList ?? DEFAULT_STYLE.blankBeforeList,
+    // 一样多（或没有可比的）时保持插件原来的写法：空一行
+    blankBeforeHeading: headingGaps + headingTight ? headingGaps >= headingTight : (opts.style?.blankBeforeHeading ?? DEFAULT_STYLE.blankBeforeHeading),
     headingsOnly: opts.headingsOnly || undefined,
   };
 
@@ -748,13 +768,20 @@ export function serializeMarkdown(doc: MindDoc): string {
   }
 
   const { style } = doc;
+  // 最近写出的节点行（标题连同标记行、列表项）是谁、写完时 out 有多长：之后没再写别的，下一个标题就是紧跟着它
+  let lastNode: MindNode | null = null;
+  let nodeEnd = -1;
 
   const emitHeading = (node: MindNode, level: number) => {
-    ensureBlank();
+    // 原文标题习惯紧挨着写时，紧跟在节点后面的标题不空行；中心主题后面、备注段落后面照样空一行
+    const tight = !style.blankBeforeHeading && out.length === nodeEnd && lastNode !== doc.root;
+    if (!tight) ensureBlank();
     out.push(`${"#".repeat(level)} ${node.text}`.trimEnd());
     // 标记单独一行写在标题下面，不进标题文字（见解析处的说明）
     const marker = formatMarker(node).trim();
     if (marker) out.push(marker);
+    lastNode = node;
+    nodeEnd = out.length;
     if (node.note) {
       ensureBlank();
       pushBlock(normalizeNote(node.note, false, style.headingsOnly));
@@ -786,6 +813,8 @@ export function serializeMarkdown(doc: MindDoc): string {
     const bullet = node.bullet || style.bullet;
     const blockId = node.blockId ? ` ^${node.blockId}` : "";
     out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
+    lastNode = node;
+    nodeEnd = out.length;
     if (node.note) {
       const note = normalizeNote(node.note);
       for (const l of note.split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);

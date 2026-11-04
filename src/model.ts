@@ -114,6 +114,8 @@ export interface DocStyle {
   bullet: string;
   /** 标题与其下列表之间是否空一行 */
   blankBeforeList: boolean;
+  /** 紧跟在上一个节点后面的标题前是否空一行（中心主题后面总是空一行；跟在备注、段落后面的也总是空） */
+  blankBeforeHeading: boolean;
   /** 深于这个级别的标题节点，新建子节点时改用列表 */
   maxHeadingLevel: number;
   /** 这张图只把标题当节点（列表都是标题的备注）：新节点都写成标题，写回时备注里的列表不用包起来 */

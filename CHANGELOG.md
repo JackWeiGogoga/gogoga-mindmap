@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- In notes whose headings sit on consecutive lines (no blank line between them), every node added from the map got a blank line in front of it in Markdown. New headings now follow the note's own style: if most headings sit right after the previous node, new ones do too; a blank line is still kept after the central topic and after notes and paragraphs. Maps created by the plugin, which put a blank line between headings, are unaffected.
+- Adding a node to a note that doesn't end with a newline no longer adds one at the end.
+- Notes that use \r\n line endings throughout no longer get switched to \n by some write-backs.
+
 ## [0.37.0] - 2026-11-04
 
 ### Added

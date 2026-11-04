@@ -28,7 +28,8 @@ test("#10：标题挪到列表兄弟前面，保持标题，后面的列表兄�
   assert.ok(moveNode(h2, doc.root, 0, doc.style, promoted));
   assert.deepEqual(promoted.map((n) => n.text), ["Bullet Point 1"]);
   const md = serializeMarkdown(doc);
-  assert.equal(md, "# Heading h1\n\n## Heading h2\n- Bullet Point 2\n\n## Bullet Point 1\n");
+  // 原文标题紧跟在列表项后面（不空行），写回也照这个习惯；中心主题后面照样空一行
+  assert.equal(md, "# Heading h1\n\n## Heading h2\n- Bullet Point 2\n## Bullet Point 1\n");
   // 写回再读，顺序和层级都还在
   assert.deepEqual(outline(parseMarkdown(md).root), ["#Heading h2", "  -Bullet Point 2", "#Bullet Point 1"]);
 });
