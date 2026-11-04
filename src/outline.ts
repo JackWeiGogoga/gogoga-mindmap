@@ -235,7 +235,7 @@ export class OutlinePanel {
     const e = this.editing;
     if (!e) return;
     this.editing = null;
-    const raw = e.editor.text.replace(/\s*\n\s*/g, " ").trim();
+    const raw = e.editor.savedText.replace(/\s*\n\s*/g, " ").trim();
     e.editor.destroy();
     if (cancel ? e.isNew : raw === "" && e.isNew) {
       this.canvas.deleteNode(e.node);

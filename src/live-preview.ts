@@ -18,10 +18,12 @@ export interface FormatSpan {
   innerTo: number;
   /** 文字颜色 / 荧光笔的颜色 */
   color?: string;
+  /** 标记是 HTML 标签（颜色、<mark>）：很长，露出来会把排版整个挤开，编辑时始终藏着 */
+  html?: boolean;
 }
 
 /** TOKEN_RE 里带格式的分组：分组号 → 种类、收尾标记的长度、里面能不能再套格式 */
-const GROUPS: { group: number; kind: SpanKind; close: number; nested: boolean; colorGroup?: number }[] = [
+const GROUPS: { group: number; kind: SpanKind; close: number; nested: boolean; colorGroup?: number; html?: boolean }[] = [
   { group: 10, kind: "strong", close: 2, nested: true },
   { group: 11, kind: "strong", close: 2, nested: true },
   { group: 12, kind: "code", close: 1, nested: false },
@@ -29,9 +31,9 @@ const GROUPS: { group: number; kind: SpanKind; close: number; nested: boolean; c
   { group: 14, kind: "mark", close: 2, nested: true },
   { group: 15, kind: "em", close: 1, nested: true },
   { group: 16, kind: "em", close: 1, nested: true },
-  { group: 22, kind: "color", close: "</span>".length, nested: true, colorGroup: 21 },
-  { group: 24, kind: "bg", close: "</mark>".length, nested: true, colorGroup: 23 },
-  { group: 25, kind: "mark", close: "</mark>".length, nested: true },
+  { group: 22, kind: "color", close: "</span>".length, nested: true, colorGroup: 21, html: true },
+  { group: 24, kind: "bg", close: "</mark>".length, nested: true, colorGroup: 23, html: true },
+  { group: 25, kind: "mark", close: "</mark>".length, nested: true, html: true },
 ];
 
 /** 编辑框文字（换行是 \n）里所有带格式的段落，外层在前 */
@@ -54,15 +56,18 @@ function scan(text: string, offset: number, out: FormatSpan[]): void {
     const to = from + m[0].length;
     const innerTo = to - g.close;
     const innerFrom = innerTo - inner.length;
-    out.push({ kind: g.kind, from, to, innerFrom, innerTo, ...(g.colorGroup ? { color: m[g.colorGroup] } : {}) });
+    out.push({ kind: g.kind, from, to, innerFrom, innerTo, ...(g.colorGroup ? { color: m[g.colorGroup] } : {}), ...(g.html ? { html: true } : {}) });
     if (g.nested) scan(inner, innerFrom, out);
   }
 }
 
 /**
- * 光标停在这一段里（或紧贴两头）时露出它的源码，和 Obsidian 的实时预览一样。
- * 选中了文字不算：进入编辑时默认全选，这时看到的仍是效果
+ * 要不要露出这一段的源码。HTML 标签（颜色、<mark>）始终藏着。Markdown 标记（** == ~~ ` *）在光标或选区的
+ * 一头落在这一段里（含紧贴两头）时露出，从点进去到拖选一直露着，不会忽开忽收；
+ * 选区把整段都包进去（比如进入编辑时的全选）时不露，看到的仍是效果
  */
-export function revealed(span: FormatSpan, cursors: readonly number[]): boolean {
-  return cursors.some((c) => c >= span.from && c <= span.to);
+export function revealed(span: FormatSpan, ranges: readonly { from: number; to: number }[]): boolean {
+  if (span.html) return false;
+  const inside = (p: number) => p >= span.from && p <= span.to;
+  return ranges.some((r) => (r.from === r.to ? inside(r.from) : !(r.from <= span.from && r.to >= span.to) && (inside(r.from) || inside(r.to))));
 }

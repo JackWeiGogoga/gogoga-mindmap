@@ -135,6 +135,13 @@ function toggleMark(text: string, s: number, e: number, kind: "bold" | "italic" 
 }
 
 /** 去掉空的颜色标签（拆分后可能在边上留下 <span …></span>） */
+/**
+ * 去掉空的颜色标签：编辑时颜色标签藏着，把一段彩色字整个删掉会留下看不见的 <span …></span>，提交时清掉
+ */
+export function dropEmptyColors(text: string): string {
+  return dropEmpty(dropEmpty(text, "color"), "bg");
+}
+
 function dropEmpty(text: string, kind: ColorKind): string {
   const re = new RegExp(`${kind === "color" ? COLOR_OPEN_SRC : BG_OPEN_SRC}${closeTag(kind).replace("/", "\\/")}`, "g");
   return text.replace(re, "");

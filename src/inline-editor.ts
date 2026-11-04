@@ -8,6 +8,7 @@
 import { EditorSelection, EditorState, Prec, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, placeholder, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, insertNewline } from "@codemirror/commands";
+import { dropEmptyColors } from "./format";
 import { formatSpans, revealed, type FormatSpan } from "./live-preview";
 
 export interface InlineEditorOptions {
@@ -49,12 +50,11 @@ function contentMark(span: FormatSpan): Decoration {
 }
 
 function build(state: EditorState): { deco: DecorationSet; atomic: DecorationSet } {
-  const cursors = state.selection.ranges.filter((r) => r.empty).map((r) => r.head);
   const deco: Range<Decoration>[] = [];
   const atomic: Range<Decoration>[] = [];
   for (const span of formatSpans(state.doc.toString())) {
     deco.push(contentMark(span).range(span.innerFrom, span.innerTo));
-    if (revealed(span, cursors)) {
+    if (revealed(span, state.selection.ranges)) {
       deco.push(SYNTAX.range(span.from, span.innerFrom), SYNTAX.range(span.innerTo, span.to));
     } else {
       // 藏起来的标记符做成原子范围：光标一步跳过，删除也是整个删，不会删出半个标签
@@ -150,6 +150,11 @@ export class InlineEditor {
 
   get text(): string {
     return this.view.state.doc.toString();
+  }
+
+  /** 拿去保存的文字：颜色标签编辑时藏着，把彩色字整个删掉会留下看不见的空标签，这里去掉 */
+  get savedText(): string {
+    return dropEmptyColors(this.text);
   }
 
   /** 主选区 */

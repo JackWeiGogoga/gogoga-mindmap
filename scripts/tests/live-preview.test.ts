@@ -34,10 +34,27 @@ test("多行：按行找，位置按整段文字算", () => {
   assert.equal(text.slice(s.innerFrom, s.innerTo), "第二");
 });
 
-test("光标停在段里或贴着两头才露出源码", () => {
+const at = (c: number) => ({ from: c, to: c });
+
+test("Markdown 标记：光标或选区一头落在段里（含贴着两头）就露出源码", () => {
   const [s] = formatSpans("ab **粗** cd");
-  assert.equal(revealed(s, [3]), true);
-  assert.equal(revealed(s, [s.to]), true);
-  assert.equal(revealed(s, [1, 10]), false);
+  assert.equal(revealed(s, [at(3)]), true);
+  assert.equal(revealed(s, [at(s.to)]), true);
+  assert.equal(revealed(s, [at(1), at(10)]), false);
+  // 在段里拖选：一直露着，不会一选就收起
+  assert.equal(revealed(s, [{ from: s.innerFrom, to: s.innerFrom + 1 }]), true);
+  // 从段外选进来
+  assert.equal(revealed(s, [{ from: 0, to: s.innerFrom + 1 }]), true);
+  // 整段包进去（进入编辑时的全选）：不露
+  assert.equal(revealed(s, [{ from: 0, to: 11 }]), false);
   assert.equal(revealed(s, []), false);
+});
+
+test("HTML 颜色标签和 <mark>：始终藏着，光标在里面也不露", () => {
+  for (const text of ['a <span style="color:red">红</span> b', 'a <mark style="background:#ffd43b">黄</mark> b', "a <mark>亮</mark> b"]) {
+    const [s] = formatSpans(text);
+    assert.equal(s.html, true, text);
+    assert.equal(revealed(s, [at(s.innerFrom)]), false, text);
+  }
+  assert.equal(formatSpans("a ==亮== b")[0].html, undefined);
 });

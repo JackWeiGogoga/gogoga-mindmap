@@ -1101,7 +1101,7 @@ export class MindMapCanvas {
   syncPending(): boolean {
     let changed = false;
     if (this.editing && this.nodeEditor) {
-      const text = fromEditableText(this.nodeEditor.text);
+      const text = fromEditableText(this.nodeEditor.savedText);
       if (text && text !== this.editing.text) {
         this.editing.text = text;
         changed = true;
@@ -2984,7 +2984,7 @@ export class MindMapCanvas {
     const finish = (commit: boolean) => {
       if (finished) return;
       finished = true;
-      const text = editor.text;
+      const text = editor.savedText;
       editor.destroy();
       opts.done(commit, text);
     };
@@ -5267,7 +5267,7 @@ export class MindMapCanvas {
     const isNew = this.editingIsNew;
     this.editing = null;
     this.editingIsNew = false;
-    const raw = fromEditableText(this.nodeEditor?.text ?? "");
+    const raw = fromEditableText(this.nodeEditor?.savedText ?? "");
     this.nodeEditor?.destroy();
     this.nodeEditor = null;
     this.updateFormatBar();
