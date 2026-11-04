@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchLines, merge3, preserveFormat } from "../../src/merge";
+import { matchLines, merge3, mergeExternal, preserveFormat } from "../../src/merge";
 import { parseMarkdown, serializeMarkdown } from "../../src/markdown";
 import { findByPath } from "../../src/model";
 
@@ -76,4 +76,20 @@ test("保留格式：只删父节点时，子节点按新层级写，不换回�
   yi.parent!.children.splice(0, 1, kid);
   kid.parent = yi.parent;
   assert.equal(preserveFormat(src, serializeMarkdown(doc), canon), "# A\n## 乙\n- 乙一一\n- 乙二\n## 丙\n");
+});
+
+test("外部改动合并：两边改不同的地方都留下，改到同一处算冲突，一样的改动只算一次", () => {
+  const base = "# 根\n\n## 甲\n\n## 乙\n\n## 丙\n";
+  const ours = "# 根\n\n## 甲改\n\n## 乙\n\n## 丙\n";
+  const theirs = "# 根\n\n## 甲\n\n## 乙\n\n## 丙改\n\n## 丁\n";
+  assert.equal(mergeExternal(base, ours, theirs), "# 根\n\n## 甲改\n\n## 乙\n\n## 丙改\n\n## 丁\n");
+  // 只有一边改了
+  assert.equal(mergeExternal(base, base, theirs), theirs);
+  assert.equal(mergeExternal(base, ours, base), ours);
+  // 同一行两边改法不同
+  assert.equal(mergeExternal(base, ours, "# 根\n\n## 甲另改\n\n## 乙\n\n## 丙\n"), null);
+  // 两边做了同样的改动，另一边还多改了一处
+  assert.equal(mergeExternal(base, ours, "# 根\n\n## 甲改\n\n## 乙改\n\n## 丙\n"), "# 根\n\n## 甲改\n\n## 乙改\n\n## 丙\n");
+  // 同一位置都插入了不同的行
+  assert.equal(mergeExternal(base, base + "\n## 戊\n", base + "\n## 己\n"), null);
 });

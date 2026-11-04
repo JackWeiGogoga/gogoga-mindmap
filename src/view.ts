@@ -1,6 +1,6 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
-import { preserveFormat } from "./merge";
+import { mergeExternal, preserveFormat } from "./merge";
 import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { parseColorList, type InlineFormat } from "./format";
@@ -8,7 +8,7 @@ import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
-import { frontmatterValue, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
+import { frontmatterValue, parseMarkdown, parseNodeColors, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
 import { pathOf, walk, type MindDoc } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -37,6 +37,8 @@ export class MindMapView extends TextFileView {
 
   constructor(leaf: WorkspaceLeaf, private plugin: MindMapPlugin) {
     super(leaf);
+    // 文件在外部被改动时不要 Obsidian 按字符合并（两边改同一行会拼成一团），由 setViewData 按行合并、冲突时保留脑图的
+    (this as unknown as { isPlaintext: boolean }).isPlaintext = false;
     // 视图激活时 ⌘F 归我们，否则会被 Obsidian 的「搜索当前文件」截走
     this.scope = new Scope(this.app.scope);
     this.scope.register(["Mod"], "f", () => {
@@ -282,6 +284,7 @@ export class MindMapView extends TextFileView {
       formatBar: () => this.plugin.settings.formatBar,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
+      nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),
       textColors: () => parseColorList(this.plugin.settings.textColors),
       highlightColors: () => parseColorList(this.plugin.settings.highlightColors),
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
@@ -430,18 +433,35 @@ export class MindMapView extends TextFileView {
     return this.data;
   }
 
+  /** 脑图这边的文本。文件在外部变了时，Obsidian 调 setViewData 之前已经把 this.data 换成磁盘内容，本地版本靠这个找回 */
+  private local = "";
+  /** 上次读入或写盘时磁盘上的文本，外部改动和本地没落盘的编辑合并时的基准 */
+  private disk: string | null = null;
+
+  async save(clear?: boolean): Promise<void> {
+    const saving = super.save(clear);
+    // TextFileView 在真正写盘前就同步记下了要写的文本（没变、正在写的不记）
+    const saved = (this as unknown as { lastSavedData: string | null }).lastSavedData;
+    if (saved !== null) this.disk = saved;
+    return saving;
+  }
+
   setViewData(data: string, clear: boolean): void {
     if (clear) this.history.reset();
     if (!clear && this.canvas) {
-      // 文件在外部变了（Obsidian 已把 this.data 设成磁盘内容）。若画布上还有没落盘的编辑，
-      // flush 会通过 onDocChange 把 this.data 改回本地版本；这时以本地为准，不用磁盘内容覆盖
-      this.canvas.flush();
-      if (this.data !== data) {
+      const merged = this.mergeWithLocal(data);
+      this.disk = data;
+      if (merged !== data) {
+        if (merged !== this.data) {
+          this.data = this.local = merged;
+          this.reparse();
+        }
         this.requestSave();
         return;
       }
     }
-    this.data = data;
+    this.disk = data;
+    this.data = this.local = data;
     this.doc = this.parseText(data);
     this.lastFolds = foldedSignature(this.doc);
     this.applyFrontmatterOptions(this.doc);
@@ -465,6 +485,23 @@ export class MindMapView extends TextFileView {
   }
 
   /**
+   * 文件在外部变了：脑图这边没落盘的编辑（已经进了文本的，和画布上还没提交的）和磁盘上的改动合到一起。
+   * 两边改到同一处时以脑图这边为准，提示一下；磁盘上那次改动会被下次保存覆盖
+   */
+  private mergeWithLocal(disk: string): string {
+    const base = this.disk;
+    this.data = this.local;
+    // 提交画布上的编辑；这里可能顺手存一次盘（折叠跟随），基准得在这之前取
+    this.canvas?.flush();
+    const ours = this.data;
+    if (base === null) return ours;
+    const merged = mergeExternal(base, ours, disk);
+    if (merged !== null) return merged;
+    new Notice(t("notice.externalConflict", { file: this.file?.basename ?? "" }));
+    return ours;
+  }
+
+  /**
    * 旁边的 Markdown 编辑器正在改同一个文件：不等它落盘（约 2 秒），直接跟上。
    * 脑图这边有没提交的编辑时跳过，等落盘后走 setViewData 的正常合并。
    */
@@ -475,7 +512,8 @@ export class MindMapView extends TextFileView {
   }
 
   clear(): void {
-    this.data = "";
+    this.data = this.local = "";
+    this.disk = null;
     this.doc = null;
     this.history.reset();
   }
@@ -499,7 +537,7 @@ export class MindMapView extends TextFileView {
     if (this.file && next !== this.data) this.plugin.fixHeadingLinks(this.file, strippedMarkerRenames(this.data, next));
     if (next === this.data) return;
     this.history.push(this.data);
-    this.data = next;
+    this.data = this.local = next;
     // 「Markdown 跟着脑图折叠」：折叠状态变了就马上存，不等 Obsidian 两秒的延迟保存，Markdown 那边才跟得上
     const folds = this.plugin.settings.foldFollow ? foldedSignature(doc) : null;
     if (folds !== null && folds !== this.lastFolds) {
@@ -540,7 +578,7 @@ export class MindMapView extends TextFileView {
     if (this.canvas?.isLocked()) return;
     const prev = this.history.undo(this.data);
     if (prev === null) return;
-    this.data = prev;
+    this.data = this.local = prev;
     this.reparse();
     this.requestSave();
   }
@@ -549,7 +587,7 @@ export class MindMapView extends TextFileView {
     if (this.canvas?.isLocked()) return;
     const next = this.history.redo(this.data);
     if (next === null) return;
-    this.data = next;
+    this.data = this.local = next;
     this.reparse();
     this.requestSave();
   }

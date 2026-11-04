@@ -38,6 +38,20 @@ export function newBlockId(): string {
 // 即使它在 %% 注释里也一样。读的时候两种都认，写的时候一律去掉 #。
 const HEX_RE = /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+/**
+ * 设置里填的节点颜色：逗号或空格隔开，可以是内置的颜色名（跟着主题和暗色模式变），也可以是 #ff8800 这样的色值（固定不变）。
+ * 认不出的忽略、重复的去掉；一个都没有时用内置的九种
+ */
+export function parseNodeColors(input: string): string[] {
+  const out: string[] = [];
+  for (const raw of input.split(/[,，\s]+/)) {
+    const t = raw.trim().toLowerCase();
+    const c = (COLOR_NAMES as readonly string[]).includes(t) ? t : HEX_RE.test(t) && t.startsWith("#") ? t : null;
+    if (c && !out.includes(c)) out.push(c);
+  }
+  return out.length ? out : [...COLOR_NAMES];
+}
+
 export const DEFAULT_STYLE: DocStyle = {
   indent: "\t",
   bullet: "-",

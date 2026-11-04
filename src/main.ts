@@ -38,7 +38,7 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
-import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
+import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
@@ -119,6 +119,10 @@ export default class MindMapPlugin extends Plugin {
   private propertyIcons: PropertyIconDecorator | null = null;
 
   async onload(): Promise<void> {
+    // 只在 Obsidian 启动时把打开着的脑图笔记换成脑图视图（工作区恢复时可能早于 setViewState 的拦截）。
+    // 插件被重新加载、更新、启用时工作区早就好了，用户这时以 Markdown 开着的是他自己选的，不去动。
+    // 要在任何 await 之前判断：启动时等加载设置的工夫里工作区就可能好了
+    const atStartup = !this.app.workspace.layoutReady;
     // 界面语言跟随 Obsidian；必须在注册命令、视图、功能区图标和设置页之前定下来
     setLocale(getLanguage());
     registerMindMapIcon();
@@ -220,7 +224,7 @@ export default class MindMapPlugin extends Plugin {
     });
 
     this.app.workspace.onLayoutReady(() => {
-      this.convertOpenLeaves();
+      if (atStartup) this.convertOpenLeaves();
       this.propertyIcons?.schedule();
     });
   }
@@ -1005,6 +1009,9 @@ export default class MindMapPlugin extends Plugin {
       ["outdent", "outdent", "command.outdent"],
       ["indent", "indent", "command.indent"],
       ["expand-branch", "expand-branch", "command.expandBranch"],
+      ["collapse-branch", "collapse-branch", "command.collapseBranch"],
+      ["expand-level", "expand-level", "command.expandLevel"],
+      ["collapse-level", "collapse-level", "command.collapseLevel"],
     ];
     for (const [id, cmd, name] of nodeCommands) exportCommand(id, t(name), async (v) => v.runNodeCommand(cmd));
     exportCommand("format-bold", t("command.formatBold"), async (v) => v.formatText({ kind: "bold" }));
@@ -1157,6 +1164,7 @@ export default class MindMapPlugin extends Plugin {
         formatBar: () => this.settings.formatBar,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
+        nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors),
         marqueeDrag: () => this.settings.leftDrag === "select",
@@ -1189,7 +1197,9 @@ export default class MindMapPlugin extends Plugin {
           writeBack(keepFormat(serializeMarkdown(d)));
         },
         onLayout: (bounds) => {
-          const h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96)));
+          // 工具栏在上下边时多留出它的高度，最靠边的节点才不会被挡住
+          const bar = canvas.toolbarInsets();
+          const h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96 + bar.top + bar.bottom)));
           if (h !== lastHeight) {
             lastHeight = h;
             // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧

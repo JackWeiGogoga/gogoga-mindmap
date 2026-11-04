@@ -1,5 +1,6 @@
-import { AbstractInputSuggest, App, PluginSettingTab, Setting, setIcon, TFile } from "obsidian";
+import { AbstractInputSuggest, App, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
+import { COLOR_NAMES, parseNodeColors } from "./markdown";
 import { MINDMAP_LIST_ICON } from "./icon";
 import { IconPickerModal, storedValue } from "./icon-picker";
 import { displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
@@ -58,6 +59,8 @@ export interface MindMapSettings {
   toolbarPosition: ToolbarPosition;
   /** 选中节点时显示浮动工具栏 */
   showNodebar: boolean;
+  /** 浮动工具栏里的节点颜色（逗号隔开的颜色名或 #色值） */
+  nodeColors: string;
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
   /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
@@ -116,6 +119,8 @@ export const TOOLBAR_POSITIONS: { id: ToolbarPosition; readonly label: string }[
 ];
 
 /** 默认三种常用颜色：红、蓝、绿；荧光笔带一点透明，暗色主题下浅色文字也看得清 */
+/** 默认的节点颜色：内置九种，跟着主题和暗色模式变 */
+export const DEFAULT_NODE_COLORS = COLOR_NAMES.join(", ");
 export const DEFAULT_TEXT_COLORS = "#e03e3e, #2f80ed, #27ae60";
 export const DEFAULT_HIGHLIGHT_COLORS = "#ffd43b99, #69db7c99, #ff8fab99";
 
@@ -131,6 +136,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineWrap: false,
   toolbarPosition: "bottom",
   showNodebar: true,
+  nodeColors: DEFAULT_NODE_COLORS,
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
@@ -165,526 +171,327 @@ export function indentString(s: MindMapSettings["indent"]): string {
   return s === "tab" ? "\t" : " ".repeat(Number(s));
 }
 
+/**
+ * Obsidian 1.13 起有声明式设置：插件给一份清单，Obsidian 来画，设置项进全局的设置搜索。
+ * 更早的版本没有，就按同一份清单自己逐项画（renderFallback），不维护两份
+ */
+function declarative(): boolean {
+  return "getControlValue" in PluginSettingTab.prototype;
+}
+
+type Key = keyof MindMapSettings;
+/** 下拉框只认字符串，这几项存的是数字 */
+const NUMBER_DROPDOWNS = new Set<string>(["maxHeadingLevel"]);
+
 export class MindMapSettingTab extends PluginSettingTab {
-  constructor(app: App, private plugin: MindMapPlugin) {
+  constructor(
+    app: App,
+    private plugin: MindMapPlugin,
+  ) {
     super(app, plugin);
   }
 
   display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    new Setting(containerEl)
-      .setName(t("settings.rememberView.name"))
-      .setDesc(t("settings.rememberView.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.rememberView).onChange(async (v) => {
-          this.plugin.settings.rememberView = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.structure.name"))
-      .setDesc(t("settings.structure.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions(Object.fromEntries(STRUCTURES.map((s) => [s.id, s.label])))
-          .setValue(this.plugin.settings.defaultStructure)
-          .onChange(async (v) => {
-            this.plugin.settings.defaultStructure = v as Structure;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.theme.name"))
-      .setDesc(t("settings.theme.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions(Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])))
-          .setValue(this.plugin.settings.defaultTheme)
-          .onChange(async (v) => {
-            this.plugin.settings.defaultTheme = v as ThemeId;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.fileNameAsRoot.name"))
-      .setDesc(t("settings.fileNameAsRoot.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.fileNameAsRoot).onChange(async (v) => {
-          this.plugin.settings.fileNameAsRoot = v;
-          await this.plugin.saveSettings();
-          this.plugin.reloadMaps();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.headingsOnly.name"))
-      .setDesc(t("settings.headingsOnly.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.headingsOnly).onChange(async (v) => {
-          this.plugin.settings.headingsOnly = v;
-          await this.plugin.saveSettings();
-          this.plugin.reloadMaps();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.headingLevel.name"))
-      .setDesc(t("settings.headingLevel.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions({ "2": t("settings.headingLevel.h2"), "3": "H3", "4": "H4", "5": "H5", "6": "H6" })
-          .setValue(String(this.plugin.settings.maxHeadingLevel))
-          .onChange(async (v) => {
-            this.plugin.settings.maxHeadingLevel = Number(v);
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.indent.name"))
-      .setDesc(t("settings.indent.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions({ tab: t("settings.indent.tab"), "2": t("settings.indent.spaces", { n: 2 }), "4": t("settings.indent.spaces", { n: 4 }) })
-          .setValue(this.plugin.settings.indent)
-          .onChange(async (v) => {
-            this.plugin.settings.indent = v as MindMapSettings["indent"];
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.template.name"))
-      .setDesc(t("settings.template.desc"))
-      .addText((text) => {
-        text
-          .setPlaceholder(t("settings.template.placeholder"))
-          .setValue(this.plugin.settings.newFileTemplate)
-          .onChange(async (v) => {
-            this.plugin.settings.newFileTemplate = v.trim();
-            await this.plugin.saveSettings();
-          });
-        new NoteSuggest(this.app, text.inputEl);
-      });
-
-    const iconSetting = new Setting(containerEl)
-      .setName(t("settings.listIcon.name"))
-      .setDesc(t("settings.listIcon.desc", { command: t("command.addListIcons") }));
-
-    const preview = iconSetting.controlEl.createSpan({ cls: "mm-setting-icon-preview" });
-    const label = iconSetting.controlEl.createSpan({ cls: "mm-setting-icon-value" });
-    const refresh = () => {
-      const v = this.plugin.settings.listIcon;
-      preview.empty();
-      preview.toggleClass("is-emoji", isEmojiValue(v));
-      if (!v) {
-        label.setText(t("settings.listIcon.none"));
-        return;
-      }
-      if (isEmojiValue(v)) preview.setText(displayEmoji(v));
-      else {
-        const id = iconIdOf(v);
-        if (id) setIcon(preview, id);
-      }
-      label.setText(v);
-    };
-    refresh();
-
-    iconSetting
-      .addButton((b) =>
-        b
-          .setButtonText(t("settings.listIcon.choose"))
-          .setCta()
-          .onClick(() => {
-            new IconPickerModal(this.app, (pick) => {
-              if (!pick) return;
-              void (async () => {
-                this.plugin.settings.listIcon = storedValue(pick);
-                await this.plugin.saveSettings();
-                refresh();
-              })();
-            }).open();
-          }),
-      )
-      .addExtraButton((b) =>
-        b
-          .setIcon("rotate-ccw")
-          .setTooltip(t("settings.listIcon.reset"))
-          .onClick(async () => {
-            this.plugin.settings.listIcon = MINDMAP_LIST_ICON;
-            await this.plugin.saveSettings();
-            refresh();
-          }),
-      )
-      .addExtraButton((b) =>
-        b
-          .setIcon("x")
-          .setTooltip(t("settings.listIcon.clear"))
-          .onClick(async () => {
-            this.plugin.settings.listIcon = "";
-            await this.plugin.saveSettings();
-            refresh();
-          }),
-      );
-
-    const scaleSetting = (name: string, desc: string, key: "spacingScale" | "fontScale", min: number, max: number) => {
-      let slider: { setValue(v: number): unknown } | null = null;
-      new Setting(containerEl)
-        .setName(name)
-        .setDesc(desc)
-        .addSlider((s) => {
-          slider = s;
-          s.setLimits(min, max, 5)
-            .setValue(this.plugin.settings[key])
-            .onChange(async (v) => {
-              this.plugin.settings[key] = v;
-              await this.plugin.saveSettings();
-              this.plugin.applyDisplayScale();
-            });
-        })
-        .addExtraButton((b) =>
-          b.setIcon("rotate-ccw").setTooltip(t("settings.reset")).onClick(async () => {
-            this.plugin.settings[key] = 100;
-            slider?.setValue(100);
-            await this.plugin.saveSettings();
-            this.plugin.applyDisplayScale();
-          }),
-        );
-    };
-    scaleSetting(t("settings.spacing.name"), t("settings.spacing.desc"), "spacingScale", 50, 200);
-    scaleSetting(t("settings.fontScale.name"), t("settings.fontScale.desc"), "fontScale", 70, 150);
-
-    new Setting(containerEl)
-      .setName(t("settings.notesExpanded.name"))
-      .setDesc(t("settings.notesExpanded.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.notesExpanded).onChange(async (v) => {
-          this.plugin.settings.notesExpanded = v;
-          await this.plugin.saveSettings();
-          syncNotesExpandedAll();
-        }),
-      );
-    new Setting(containerEl)
-      .setName(t("settings.notePreview.name"))
-      .setDesc(t("settings.notePreview.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.notePreview).onChange(async (v) => {
-          this.plugin.settings.notePreview = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-    new Setting(containerEl)
-      .setName(t("settings.formatBar.name"))
-      .setDesc(t("settings.formatBar.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.formatBar).onChange(async (v) => {
-          this.plugin.settings.formatBar = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-    new Setting(containerEl)
-      .setName(t("settings.copyPlain.name"))
-      .setDesc(t("settings.copyPlain.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.copyPlain).onChange(async (v) => {
-          this.plugin.settings.copyPlain = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-    for (const [key, def] of [
-      ["textColors", DEFAULT_TEXT_COLORS],
-      ["highlightColors", DEFAULT_HIGHLIGHT_COLORS],
-    ] as const) {
-      new Setting(containerEl)
-        .setName(t(`settings.${key}.name`))
-        .setDesc(t(`settings.${key}.desc`))
-        .addText((text) =>
-          text
-            .setPlaceholder(def)
-            .setValue(this.plugin.settings[key])
-            .onChange(async (v) => {
-              this.plugin.settings[key] = v;
-              await this.plugin.saveSettings();
-            }),
-        );
+    if (declarative()) {
+      super.display();
+      return;
     }
-    let noteHeight: { setValue(v: number): unknown } | null = null;
-    new Setting(containerEl)
-      .setName(t("settings.noteMaxHeight.name"))
-      .setDesc(t("settings.noteMaxHeight.desc"))
-      .addSlider((s) => {
-        noteHeight = s;
-        s.setLimits(120, 800, 20)
-          .setValue(this.plugin.settings.noteMaxHeight)
-          .onChange(async (v) => {
-            this.plugin.settings.noteMaxHeight = v;
-            await this.plugin.saveSettings();
-            this.plugin.applyDisplayScale();
-          });
-      })
-      .addExtraButton((b) =>
-        b.setIcon("rotate-ccw").setTooltip(t("settings.resetNoteHeight")).onClick(async () => {
-          this.plugin.settings.noteMaxHeight = DEFAULT_SETTINGS.noteMaxHeight;
-          noteHeight?.setValue(DEFAULT_SETTINGS.noteMaxHeight);
-          await this.plugin.saveSettings();
-          this.plugin.applyDisplayScale();
-        }),
-      );
-
-    let noteWidth: { setValue(v: number): unknown } | null = null;
-    new Setting(containerEl)
-      .setName(t("settings.noteMaxWidth.name"))
-      .setDesc(t("settings.noteMaxWidth.desc"))
-      .addSlider((s) => {
-        noteWidth = s;
-        s.setLimits(160, 960, 20)
-          .setValue(this.plugin.settings.noteMaxWidth)
-          .onChange(async (v) => {
-            this.plugin.settings.noteMaxWidth = v;
-            await this.plugin.saveSettings();
-            this.plugin.applyDisplayScale();
-          });
-      })
-      .addExtraButton((b) =>
-        b.setIcon("rotate-ccw").setTooltip(t("settings.resetNoteWidth")).onClick(async () => {
-          this.plugin.settings.noteMaxWidth = DEFAULT_SETTINGS.noteMaxWidth;
-          noteWidth?.setValue(DEFAULT_SETTINGS.noteMaxWidth);
-          await this.plugin.saveSettings();
-          this.plugin.applyDisplayScale();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.toolbar.name"))
-      .setDesc(t("settings.toolbar.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions(Object.fromEntries(TOOLBAR_POSITIONS.map((p) => [p.id, p.label])))
-          .setValue(this.plugin.settings.toolbarPosition)
-          .onChange(async (v) => {
-            this.plugin.settings.toolbarPosition = v as ToolbarPosition;
-            await this.plugin.saveSettings();
-            this.plugin.applyToolbarPosition();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.showNodebar.name"))
-      .setDesc(t("settings.showNodebar.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.showNodebar).onChange(async (v) => {
-          this.plugin.settings.showNodebar = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.wheel.name"))
-      .setDesc(t("settings.wheel.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions({ pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") })
-          .setValue(this.plugin.settings.wheelAction)
-          .onChange(async (v) => {
-            this.plugin.settings.wheelAction = v as MindMapSettings["wheelAction"];
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.editCaret.name"))
-      .setDesc(t("settings.editCaret.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions({ select: t("settings.editCaret.select"), end: t("settings.editCaret.end") })
-          .setValue(this.plugin.settings.editCaret)
-          .onChange(async (v) => {
-            this.plugin.settings.editCaret = v as MindMapSettings["editCaret"];
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.dragToFloat.name"))
-      .setDesc(t("settings.dragToFloat.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.dragToFloat).onChange(async (v) => {
-          this.plugin.settings.dragToFloat = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.leftDrag.name"))
-      .setDesc(t("settings.leftDrag.desc"))
-      .addDropdown((d) =>
-        d
-          .addOptions({ pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") })
-          .setValue(this.plugin.settings.leftDrag)
-          .onChange(async (v) => {
-            this.plugin.settings.leftDrag = v as MindMapSettings["leftDrag"];
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.hover.name"))
-      .setDesc(t("settings.hover.desc", { source: t("hover.display") }));
-
-    new Setting(containerEl)
-      .setName(t("settings.codeBlockHeight.name"))
-      .setDesc(t("settings.codeBlockHeight.desc"))
-      .addText((text) =>
-        text.setValue(String(this.plugin.settings.codeBlockMaxHeight)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isFinite(n) && n >= 120) {
-            this.plugin.settings.codeBlockMaxHeight = n;
-            await this.plugin.saveSettings();
-          }
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.followActive.name"))
-      .setDesc(t("settings.followActive.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.followActiveNote).onChange(async (v) => {
-          this.plugin.settings.followActiveNote = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.embedToolbar.name"))
-      .setDesc(t("settings.embedToolbar.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.embedToolbarAutoHide).onChange(async (v) => {
-          this.plugin.settings.embedToolbarAutoHide = v;
-          await this.plugin.saveSettings();
-          this.plugin.applyEmbedToolbar();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.outlineWrap.name"))
-      .setDesc(t("settings.outlineWrap.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.outlineWrap).onChange(async (v) => {
-          this.plugin.settings.outlineWrap = v;
-          await this.plugin.saveSettings();
-          this.plugin.applyEmbedToolbar();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.rememberViewport.name"))
-      .setDesc(t("settings.rememberViewport.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.rememberViewport).onChange(async (v) => {
-          this.plugin.settings.rememberViewport = v;
-          if (!v) this.plugin.viewports.clear();
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.openView.name"))
-      .setDesc(t("settings.openView.desc"))
-      .addDropdown((d) =>
-        d
-          .addOption("fit", t("settings.openView.fit"))
-          .addOption("center", t("settings.openView.center"))
-          .setValue(this.plugin.settings.openView)
-          .onChange(async (v) => {
-            this.plugin.settings.openView = v === "center" ? "center" : "fit";
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.syncSplit.name"))
-      .setDesc(t("settings.syncSplit.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.syncSplit).onChange(async (v) => {
-          this.plugin.settings.syncSplit = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-    new Setting(containerEl)
-      .setName(t("settings.followExpand.name"))
-      .setDesc(t("settings.followExpand.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.followExpand).onChange(async (v) => {
-          this.plugin.settings.followExpand = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-    new Setting(containerEl)
-      .setName(t("settings.foldFollow.name"))
-      .setDesc(t("settings.foldFollow.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.foldFollow).onChange(async (v) => {
-          this.plugin.settings.foldFollow = v;
-          await this.plugin.saveSettings();
-          if (v) this.plugin.syncFolds();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.customMarkers.name"))
-      .setDesc(t("settings.customMarkers.desc"))
-      .addText((text) =>
-        text
-          .setPlaceholder("🎯 📎 ★ ◆")
-          .setValue(this.plugin.settings.customMarkers)
-          .onChange(async (v) => {
-            this.plugin.settings.customMarkers = v;
-            await this.plugin.saveSettings();
-            this.plugin.applyCustomMarkers();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.customMarkersExclusive.name"))
-      .setDesc(t("settings.customMarkersExclusive.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.customMarkersExclusive).onChange(async (v) => {
-          this.plugin.settings.customMarkersExclusive = v;
-          await this.plugin.saveSettings();
-          this.plugin.applyCustomMarkers();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("settings.claimBlock.name"))
-      .setDesc(t("settings.claimBlock.desc"))
-      .addToggle((tg) =>
-        tg.setValue(this.plugin.settings.claimMindmapBlock).onChange(async (v) => {
-          this.plugin.settings.claimMindmapBlock = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    this.renderCustomThemes(containerEl);
-
-    new Setting(containerEl)
-      .setName(t("settings.support.name"))
-      .setDesc(t("settings.support.desc"))
-      .addButton((b) =>
-        b.setButtonText(t("settings.support.button")).onClick(() => {
-          window.open(FUNDING_URL);
-        }),
-      );
+    this.containerEl.empty();
+    renderFallback(this.containerEl, this.getSettingDefinitions(), this);
   }
 
-  /** 自定义主题：列表（编辑 / 复制 / 删除）+ 选基础主题新建 */
-  private renderCustomThemes(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName(t("customTheme.heading")).setHeading();
+  /**
+   * 列表变了（自定义主题增删）之后重画。新版用 update()：重新取清单、刷新搜索、只重画当前这一页，
+   * 人还停在子页面里；display() 会把子页面画空。旧版没有 update()，整页重画
+   */
+  private refresh(): void {
+    const tab = this as unknown as { update?: () => void };
+    if (declarative() && typeof tab.update === "function") tab.update();
+    else this.display();
+  }
+
+  getControlValue(key: string): unknown {
+    const v = (this.plugin.settings as unknown as Record<string, unknown>)[key];
+    return NUMBER_DROPDOWNS.has(key) ? String(v) : v;
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    const settings = this.plugin.settings as unknown as Record<string, unknown>;
+    settings[key] = NUMBER_DROPDOWNS.has(key) ? Number(value) : value;
+    if (key === "rememberViewport" && !value) this.plugin.viewports.clear();
+    await this.plugin.saveSettings();
+    this.afterChange(key as Key, value);
+  }
+
+  /** 改完要立刻生效的设置：重排、重画、挪工具栏…… */
+  private afterChange(key: Key, value: unknown): void {
+    const p = this.plugin;
+    switch (key) {
+      case "fileNameAsRoot":
+      case "headingsOnly":
+        return p.reloadMaps();
+      case "notesExpanded":
+        return syncNotesExpandedAll();
+      case "toolbarPosition":
+        return p.applyToolbarPosition();
+      case "embedToolbarAutoHide":
+      case "outlineWrap":
+        return p.applyEmbedToolbar();
+      case "customMarkers":
+      case "customMarkersExclusive":
+        return p.applyCustomMarkers();
+      case "foldFollow":
+        if (value) p.syncFolds();
+        return;
+      default:
+        return;
+    }
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const toggle = (key: Key, name: string, desc: string, aliases?: string[]): SettingDefinition => ({ name, desc, aliases, control: { type: "toggle", key } });
+    const dropdown = (key: Key, name: string, desc: string, options: Record<string, string>, aliases?: string[]): SettingDefinition => ({
+      name,
+      desc,
+      aliases,
+      control: { type: "dropdown", key, options },
+    });
+    const text = (key: Key, name: string, desc: string, placeholder: string, aliases?: string[]): SettingDefinition => ({
+      name,
+      desc,
+      aliases,
+      control: { type: "text", key, placeholder },
+    });
+    const group = (heading: string, items: SettingDefinition[]): SettingDefinitionItem => ({ type: "group", heading, items });
+    /** 子页面：入口页一行一个，desc 说里面有什么；displayValue 让人不点进去也看得到当前状态 */
+    const page = (name: string, desc: string, items: SettingDefinitionItem[], displayValue?: () => string): SettingDefinitionItem => ({
+      type: "page",
+      name,
+      desc,
+      items,
+      displayValue,
+    });
+    const settings = this.plugin.settings;
+
+    return [
+      page(
+        t("settings.group.open"),
+        t("settings.page.open"),
+        [
+          dropdown("openView", t("settings.openView.name"), t("settings.openView.desc"), { fit: t("settings.openView.fit"), center: t("settings.openView.center") }),
+          toggle("rememberViewport", t("settings.rememberViewport.name"), t("settings.rememberViewport.desc")),
+          toggle("rememberView", t("settings.rememberView.name"), t("settings.rememberView.desc")),
+          dropdown("defaultStructure", t("settings.structure.name"), t("settings.structure.desc"), Object.fromEntries(STRUCTURES.map((x) => [x.id, x.label])), ["layout", "布局"]),
+          dropdown("defaultTheme", t("settings.theme.name"), t("settings.theme.desc"), Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])), ["style", "风格", "配色"]),
+          this.scaleSetting("spacingScale", t("settings.spacing.name"), t("settings.spacing.desc"), 50, 200),
+          this.scaleSetting("fontScale", t("settings.fontScale.name"), t("settings.fontScale.desc"), 70, 150),
+        ],
+        () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
+      ),
+      page(t("settings.group.edit"), t("settings.page.edit"), [
+        dropdown("editCaret", t("settings.editCaret.name"), t("settings.editCaret.desc"), { select: t("settings.editCaret.select"), end: t("settings.editCaret.end") }, ["cursor", "光标"]),
+        dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
+        dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),
+        toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
+        toggle("copyPlain", t("settings.copyPlain.name"), t("settings.copyPlain.desc"), ["clipboard", "剪贴板"]),
+        { name: t("settings.hover.name"), desc: t("settings.hover.desc", { source: t("hover.display") }), aliases: ["page preview", "页面预览"] },
+        group(t("settings.group.markers"), [
+          text("customMarkers", t("settings.customMarkers.name"), t("settings.customMarkers.desc"), "🎯 📎 ★ ◆", ["emoji", "icon", "图标"]),
+          toggle("customMarkersExclusive", t("settings.customMarkersExclusive.name"), t("settings.customMarkersExclusive.desc")),
+        ]),
+      ]),
+      page(
+        t("settings.group.toolbar"),
+        t("settings.page.toolbar"),
+        [
+          dropdown("toolbarPosition", t("settings.toolbar.name"), t("settings.toolbar.desc"), Object.fromEntries(TOOLBAR_POSITIONS.map((x) => [x.id, x.label]))),
+          toggle("showNodebar", t("settings.showNodebar.name"), t("settings.showNodebar.desc")),
+          text("nodeColors", t("settings.nodeColors.name"), t("settings.nodeColors.desc"), DEFAULT_NODE_COLORS, ["palette", "色块", "调色板"]),
+          toggle("formatBar", t("settings.formatBar.name"), t("settings.formatBar.desc")),
+          text("textColors", t("settings.textColors.name"), t("settings.textColors.desc"), DEFAULT_TEXT_COLORS, ["font color", "字体颜色"]),
+          text("highlightColors", t("settings.highlightColors.name"), t("settings.highlightColors.desc"), DEFAULT_HIGHLIGHT_COLORS, ["highlight", "高亮", "背景色"]),
+        ],
+        () => t("settings.page.colorCount", { n: parseNodeColors(settings.nodeColors).length }),
+      ),
+      page(t("settings.group.notes"), t("settings.page.notes"), [
+        toggle("notesExpanded", t("settings.notesExpanded.name"), t("settings.notesExpanded.desc")),
+        this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
+        this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
+        toggle("notePreview", t("settings.notePreview.name"), t("settings.notePreview.desc")),
+      ]),
+      page(t("settings.group.markdown"), t("settings.page.markdown"), [
+        group(t("settings.group.parse"), [
+          toggle("headingsOnly", t("settings.headingsOnly.name"), t("settings.headingsOnly.desc")),
+          dropdown("maxHeadingLevel", t("settings.headingLevel.name"), t("settings.headingLevel.desc"), { "2": t("settings.headingLevel.h2"), "3": "H3", "4": "H4", "5": "H5", "6": "H6" }),
+        ]),
+        group(t("settings.group.sync"), [
+          toggle("syncSplit", t("settings.syncSplit.name"), t("settings.syncSplit.desc"), ["split", "分屏", "联动"]),
+          toggle("followExpand", t("settings.followExpand.name"), t("settings.followExpand.desc")),
+          toggle("foldFollow", t("settings.foldFollow.name"), t("settings.foldFollow.desc"), ["fold", "折叠"]),
+          toggle("followActiveNote", t("settings.followActive.name"), t("settings.followActive.desc"), ["sidebar", "侧边栏"]),
+          toggle("outlineWrap", t("settings.outlineWrap.name"), t("settings.outlineWrap.desc"), ["outline", "大纲"]),
+        ]),
+        group(t("settings.group.embed"), [
+          toggle("claimMindmapBlock", t("settings.claimBlock.name"), t("settings.claimBlock.desc"), ["code block", "代码块"]),
+          {
+            name: t("settings.codeBlockHeight.name"),
+            desc: t("settings.codeBlockHeight.desc"),
+            control: { type: "number", key: "codeBlockMaxHeight", min: 120, validate: (v) => (Number.isFinite(v) && v >= 120 ? undefined : "≥ 120") },
+          },
+          toggle("embedToolbarAutoHide", t("settings.embedToolbar.name"), t("settings.embedToolbar.desc")),
+        ]),
+      ]),
+      page(t("settings.group.newMap"), t("settings.page.newMap"), [
+        this.templateSetting(),
+        dropdown("indent", t("settings.indent.name"), t("settings.indent.desc"), {
+          tab: t("settings.indent.tab"),
+          "2": t("settings.indent.spaces", { n: 2 }),
+          "4": t("settings.indent.spaces", { n: 4 }),
+        }),
+        toggle("fileNameAsRoot", t("settings.fileNameAsRoot.name"), t("settings.fileNameAsRoot.desc")),
+        this.listIconSetting(),
+      ]),
+      this.customThemesPage(),
+      {
+        name: t("settings.support.name"),
+        desc: t("settings.support.desc"),
+        render: (setting) => {
+          setting.addButton((b) => b.setButtonText(t("settings.support.button")).onClick(() => window.open(FUNDING_URL)));
+        },
+      },
+    ];
+  }
+
+  /** 节点间距、字号：滑块加一个恢复 100% 的按钮（声明式的滑块没有按钮，自己画） */
+  private scaleSetting(key: "spacingScale" | "fontScale", name: string, desc: string, min: number, max: number): SettingDefinition {
+    return this.sliderWithReset(key, name, desc, min, max, 5, 100, t("settings.reset"), () => this.plugin.applyDisplayScale());
+  }
+
+  private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
+    return this.sliderWithReset(key, name, desc, min, max, 20, DEFAULT_SETTINGS[key], resetTip, () => this.plugin.applyDisplayScale());
+  }
+
+  private sliderWithReset(
+    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth",
+    name: string,
+    desc: string,
+    min: number,
+    max: number,
+    step: number,
+    reset: number,
+    resetTip: string,
+    apply: () => void,
+  ): SettingDefinition {
+    return {
+      name,
+      desc,
+      render: (setting) => {
+        let slider: { setValue(v: number): unknown } | null = null;
+        setting
+          .addSlider((s) => {
+            slider = s;
+            s.setLimits(min, max, step)
+              .setValue(this.plugin.settings[key])
+              .onChange(async (v) => {
+                this.plugin.settings[key] = v;
+                await this.plugin.saveSettings();
+                apply();
+              });
+          })
+          .addExtraButton((b) =>
+            b
+              .setIcon("rotate-ccw")
+              .setTooltip(resetTip)
+              .onClick(async () => {
+                this.plugin.settings[key] = reset;
+                slider?.setValue(reset);
+                await this.plugin.saveSettings();
+                apply();
+              }),
+          );
+      },
+    };
+  }
+
+  /** 模板：文字框带笔记补全 */
+  private templateSetting(): SettingDefinition {
+    return {
+      name: t("settings.template.name"),
+      desc: t("settings.template.desc"),
+      render: (setting) => {
+        setting.addText((text) => {
+          text
+            .setPlaceholder(t("settings.template.placeholder"))
+            .setValue(this.plugin.settings.newFileTemplate)
+            .onChange(async (v) => {
+              this.plugin.settings.newFileTemplate = v.trim();
+              await this.plugin.saveSettings();
+            });
+          new NoteSuggest(this.app, text.inputEl);
+        });
+      },
+    };
+  }
+
+  /** 文件列表里的图标：预览 + 选择 / 恢复默认 / 去掉 */
+  private listIconSetting(): SettingDefinition {
+    return {
+      name: t("settings.listIcon.name"),
+      desc: t("settings.listIcon.desc", { command: t("command.addListIcons") }),
+      aliases: ["icon", "图标"],
+      render: (setting) => {
+        const preview = setting.controlEl.createSpan({ cls: "mm-setting-icon-preview" });
+        const label = setting.controlEl.createSpan({ cls: "mm-setting-icon-value" });
+        const refresh = () => {
+          const v = this.plugin.settings.listIcon;
+          preview.empty();
+          preview.toggleClass("is-emoji", isEmojiValue(v));
+          if (!v) {
+            label.setText(t("settings.listIcon.none"));
+            return;
+          }
+          if (isEmojiValue(v)) preview.setText(displayEmoji(v));
+          else {
+            const id = iconIdOf(v);
+            if (id) setIcon(preview, id);
+          }
+          label.setText(v);
+        };
+        refresh();
+        const set = async (v: string) => {
+          this.plugin.settings.listIcon = v;
+          await this.plugin.saveSettings();
+          refresh();
+        };
+        setting
+          .addButton((b) =>
+            b
+              .setButtonText(t("settings.listIcon.choose"))
+              .setCta()
+              .onClick(() => {
+                new IconPickerModal(this.app, (pick) => {
+                  if (pick) void set(storedValue(pick));
+                }).open();
+              }),
+          )
+          .addExtraButton((b) =>
+            b
+              .setIcon("rotate-ccw")
+              .setTooltip(t("settings.listIcon.reset"))
+              .onClick(() => void set(MINDMAP_LIST_ICON)),
+          )
+          .addExtraButton((b) =>
+            b
+              .setIcon("x")
+              .setTooltip(t("settings.listIcon.clear"))
+              .onClick(() => void set("")),
+          );
+      },
+    };
+  }
+
+  /** 自定义主题：一个子页面，列表（编辑 / 复制 / 删除）+ 选基础主题新建 */
+  private customThemesPage(): SettingDefinitionItem {
     const plugin = this.plugin;
     const save = async (theme: CustomTheme) => {
       const list = plugin.settings.customThemes;
@@ -693,54 +500,116 @@ export class MindMapSettingTab extends PluginSettingTab {
       else list.push(theme);
       await plugin.saveSettings();
       plugin.applyCustomThemes();
-      this.display();
+      this.refresh();
     };
-    for (const theme of plugin.settings.customThemes) {
-      new Setting(containerEl)
-        .setName(theme.name)
-        .setDesc(t("customTheme.basedOn", { base: themeShortLabel(theme.base) }))
-        .addButton((b) => b.setButtonText(t("customTheme.edit")).onClick(() => new CustomThemeModal(this.app, plugin, theme, (x) => void save(x)).open()))
-        .addButton((b) =>
-          b.setButtonText(t("customTheme.duplicate")).onClick(() => {
-            const copy = { ...structuredClone(theme), id: newCustomThemeId(), name: t("customTheme.copyName", { name: theme.name }) };
-            void save(copy);
-          }),
-        )
-        .addExtraButton((b) =>
-          b
-            .setIcon("trash")
-            .setTooltip(t("customTheme.delete"))
-            .onClick(() =>
-              new ConfirmModal(this.app, t("customTheme.deleteConfirm", { name: theme.name }), () => {
-                plugin.settings.customThemes = plugin.settings.customThemes.filter((x) => x.id !== theme.id);
-                if (plugin.settings.defaultTheme === theme.id) plugin.settings.defaultTheme = "snow";
-                void plugin.saveSettings().then(() => {
-                  plugin.applyCustomThemes();
-                  this.display();
-                });
-              }).open(),
-            ),
-        );
-    }
+    const rows: SettingDefinition[] = plugin.settings.customThemes.map((theme) => ({
+      name: theme.name,
+      desc: t("customTheme.basedOn", { base: themeShortLabel(theme.base) }),
+      render: (setting) => {
+        setting
+          .addButton((b) => b.setButtonText(t("customTheme.edit")).onClick(() => new CustomThemeModal(this.app, plugin, theme, (x) => void save(x)).open()))
+          .addButton((b) =>
+            b.setButtonText(t("customTheme.duplicate")).onClick(() => {
+              const copy = { ...structuredClone(theme), id: newCustomThemeId(), name: t("customTheme.copyName", { name: theme.name }) };
+              void save(copy);
+            }),
+          )
+          .addExtraButton((b) =>
+            b
+              .setIcon("trash")
+              .setTooltip(t("customTheme.delete"))
+              .onClick(() =>
+                new ConfirmModal(this.app, t("customTheme.deleteConfirm", { name: theme.name }), () => {
+                  plugin.settings.customThemes = plugin.settings.customThemes.filter((x) => x.id !== theme.id);
+                  if (plugin.settings.defaultTheme === theme.id) plugin.settings.defaultTheme = "snow";
+                  void plugin.saveSettings().then(() => {
+                    plugin.applyCustomThemes();
+                    this.refresh();
+                  });
+                }).open(),
+              ),
+          );
+      },
+    }));
     let base: ThemeName = "snow";
-    new Setting(containerEl)
-      .setName(t("customTheme.new"))
-      .setDesc(t("customTheme.newDesc"))
-      .addDropdown((d) =>
-        d
-          .addOptions(Object.fromEntries(THEME_LIST.map((th) => [th.name, themeShortLabel(th.name)])))
-          .setValue(base)
-          .onChange((v) => (base = v as ThemeName)),
-      )
-      .addButton((b) =>
-        b
-          .setButtonText(t("customTheme.create"))
-          .setCta()
-          .onClick(() => {
-            const name = t("customTheme.defaultName", { n: plugin.settings.customThemes.length + 1 });
-            new CustomThemeModal(this.app, plugin, themeFromBase(base, name, newCustomThemeId()), (x) => void save(x)).open();
-          }),
-      );
+    rows.push({
+      name: t("customTheme.new"),
+      desc: t("customTheme.newDesc"),
+      render: (setting) => {
+        setting
+          .addDropdown((d) =>
+            d
+              .addOptions(Object.fromEntries(THEME_LIST.map((th) => [th.name, themeShortLabel(th.name)])))
+              .setValue(base)
+              .onChange((v) => (base = v as ThemeName)),
+          )
+          .addButton((b) =>
+            b
+              .setButtonText(t("customTheme.create"))
+              .setCta()
+              .onClick(() => {
+                const name = t("customTheme.defaultName", { n: plugin.settings.customThemes.length + 1 });
+                new CustomThemeModal(this.app, plugin, themeFromBase(base, name, newCustomThemeId()), (x) => void save(x)).open();
+              }),
+          );
+      },
+    });
+    return {
+      type: "page",
+      name: t("customTheme.heading"),
+      desc: t("settings.customThemes.desc"),
+      displayValue: () => t("settings.page.themeCount", { n: plugin.settings.customThemes.length }),
+      items: rows,
+    };
+  }
+}
+
+/**
+ * 旧版 Obsidian（没有声明式设置）：按清单逐项画。分组画成小标题，子页面就地展开；
+ * 控件只有清单里用到的几种（开关、下拉、文字、数字），其余是 render 自己画
+ */
+function renderFallback(el: HTMLElement, items: readonly unknown[], tab: MindMapSettingTab): void {
+  for (const raw of items) {
+    const item = raw as SettingDefinitionItem;
+    if ("type" in item && (item.type === "group" || item.type === "list" || item.type === "page")) {
+      const heading = item.type === "page" ? item.name : item.heading;
+      if (heading) new Setting(el).setName(heading).setHeading();
+      renderFallback(el, item.items ?? [], tab);
+      continue;
+    }
+    const def = item as SettingDefinition;
+    const setting = new Setting(el).setName(def.name);
+    if (def.desc) setting.setDesc(def.desc);
+    if (def.render) {
+      def.render(setting, undefined as never);
+      continue;
+    }
+    const c = def.control;
+    if (!c) continue;
+    const value = tab.getControlValue(c.key);
+    const set = (v: unknown) => void tab.setControlValue(c.key, v);
+    switch (c.type) {
+      case "toggle":
+        setting.addToggle((tg) => tg.setValue(Boolean(value)).onChange(set));
+        break;
+      case "dropdown":
+        setting.addDropdown((d) => d.addOptions(c.options).setValue(String(value)).onChange(set));
+        break;
+      case "text":
+        setting.addText((tx) => tx.setPlaceholder(c.placeholder ?? "").setValue(typeof value === "string" ? value : "").onChange(set));
+        break;
+      case "number":
+        setting.addText((tx) => {
+          tx.inputEl.type = "number";
+          tx.setValue(String(value)).onChange((v) => {
+            const n = Number(v);
+            if (!c.validate || !c.validate(n)) set(n);
+          });
+        });
+        break;
+      default:
+        break;
+    }
   }
 }
 

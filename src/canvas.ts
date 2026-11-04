@@ -209,6 +209,8 @@ export interface CanvasOptions {
   copyPlain?: () => boolean;
   /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
   showNodebar?: () => boolean;
+  /** 浮动工具栏和标注颜色菜单里列出的节点颜色（颜色名或 #色值），见 parseNodeColors */
+  nodeColors?: () => string[];
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
@@ -274,6 +276,9 @@ export type NodeCommand =
   | "outdent"
   | "indent"
   | "expand-branch"
+  | "collapse-branch"
+  | "expand-level"
+  | "collapse-level"
   | "callout";
 
 /** label 用 getter：模块加载时界面语言还没定，用到时再查字典 */
@@ -1175,13 +1180,42 @@ export class MindMapCanvas {
     const cw = this.el.clientWidth;
     const ch = this.el.clientHeight;
     if (!cw || !ch) return false;
-    let k = Math.min(maxK, (cw - FIT_PADDING * 2) / bounds.w, (ch - FIT_PADDING * 2) / bounds.h);
+    // 工具栏那一边留出它占的地方，不然最靠边的节点会被盖住（预览框矮的时候最明显）
+    const bar = this.toolbarInsets();
+    const pad = (inset: number) => (inset ? Math.max(FIT_PADDING, inset + 12) : FIT_PADDING);
+    const [top, right, bottom, left] = [pad(bar.top), pad(bar.right), pad(bar.bottom), pad(bar.left)];
+    let k = Math.min(maxK, (cw - left - right) / bounds.w, (ch - top - bottom) / bounds.h);
     if (k > 0.96 && k < 1.04) k = 1;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
-    this.tx = cw / 2 - (bounds.x + bounds.w / 2) * this.k;
-    this.ty = ch / 2 - (bounds.y + bounds.h / 2) * this.k;
+    this.tx = (left + cw - right) / 2 - (bounds.x + bounds.w / 2) * this.k;
+    this.ty = (top + ch - bottom) / 2 - (bounds.y + bounds.h / 2) * this.k;
     this.applyTransform();
     return true;
+  }
+
+  /**
+   * 工具栏从画布各边往里占了多少像素（没显示、嵌入时设成自动隐藏的都算 0）。
+   * 适应画布时让开这一块；嵌入的预览框算高度时也要加上
+   */
+  toolbarInsets(): { top: number; right: number; bottom: number; left: number } {
+    const none = { top: 0, right: 0, bottom: 0, left: 0 };
+    const bar = this.toolbar;
+    if (!bar?.isConnected) return none;
+    if (this.opts.embedded && this.el.doc.body.hasClass("gg-mm-embed-toolbar-autohide")) return none;
+    const b = bar.getBoundingClientRect();
+    if (!b.width || !b.height) return none;
+    const e = this.el.getBoundingClientRect();
+    const clip = (v: number) => Math.max(0, Math.round(v));
+    switch (bar.dataset.pos as ToolbarPosition) {
+      case "top":
+        return { ...none, top: clip(b.bottom - e.top) };
+      case "left":
+        return { ...none, left: clip(b.right - e.left) };
+      case "right":
+        return { ...none, right: clip(e.right - b.left) };
+      default:
+        return { ...none, bottom: clip(e.bottom - b.top) };
+    }
   }
 
   /** 根节点居中，缩放归 100% */
@@ -2569,7 +2603,7 @@ export class MindMapCanvas {
       checked: (node.calloutColor ?? null) === color,
       run: () => this.setCalloutColor(node, color),
     });
-    return [entry(null), ...COLOR_NAMES.map(entry)];
+    return [entry(null), ...this.nodeColors().map(entry)];
   }
 
   setCalloutColor(node: MindNode, color: string | null): void {
@@ -3460,7 +3494,7 @@ export class MindMapCanvas {
       b.type = "button";
       b.className = "mm-swatch";
       this.tip(b, color ? t("canvas.colorTip", { color: colorLabel(color) }) : t("canvas.clearColor"));
-      if (color) b.style.setProperty("--swatch", `var(--mm-c-${color})`);
+      if (color) b.style.setProperty("--swatch", color.startsWith("#") ? color : `var(--mm-c-${color})`);
       else b.append(icon("none"));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -3469,7 +3503,7 @@ export class MindMapCanvas {
       colors.append(b);
     };
     swatch(null);
-    for (const c of COLOR_NAMES) swatch(c);
+    for (const c of this.nodeColors()) swatch(c);
     const sep = createSpan();
     sep.className = "mm-tool-sep";
     bar.append(colors, sep, tools);
@@ -3578,6 +3612,11 @@ export class MindMapCanvas {
     this.nodebar.style.top = `${top}px`;
     const hidden = r.y + r.height < 0 || r.y > this.el.clientHeight || r.x + r.width < 0 || r.x > this.el.clientWidth;
     this.nodebar.classList.toggle("is-hidden", hidden);
+  }
+
+  /** 设置里的节点颜色；没设过（或嵌入的图没传）就是内置的九种 */
+  private nodeColors(): string[] {
+    return this.opts.nodeColors?.() ?? [...COLOR_NAMES];
   }
 
   private applyColor(color: string | null): void {
@@ -4157,6 +4196,17 @@ export class MindMapCanvas {
     if (mod && ev.shiftKey && (ev.key === "0" || ev.code === "Digit0")) {
       ev.preventDefault();
       if (this.primary) this.fitBranch(this.primary);
+      return;
+    }
+    // ⇧0 折叠全部子分支（和 0 展开全部成对）；= / - 展开一级、折叠一级
+    if (!mod && !ev.altKey && ev.shiftKey && ev.code === "Digit0") {
+      ev.preventDefault();
+      this.collapseBranch(this.primary);
+      return;
+    }
+    if (!mod && !ev.altKey && (ev.code === "Equal" || ev.code === "Minus")) {
+      ev.preventDefault();
+      this.stepFoldLevel(this.primary, ev.code === "Equal" ? 1 : -1);
       return;
     }
     // 数字键：选中节点往下只显示 N 层，0 = 这一支全部展开；选中的是根或没选就是整张图。
@@ -5144,10 +5194,11 @@ export class MindMapCanvas {
   runNodeCommand(cmd: NodeCommand): void {
     const sel = this.primary;
     if (!sel) return;
-    if (cmd === "expand-branch") {
-      this.setFoldLevel(null, sel);
-      return;
-    }
+    // 折叠展开只是看：锁着也能用（不写文件，见 setFoldLevel）
+    if (cmd === "expand-branch") return this.setFoldLevel(null, sel);
+    if (cmd === "collapse-branch") return this.collapseBranch(sel);
+    if (cmd === "expand-level") return this.stepFoldLevel(sel, 1);
+    if (cmd === "collapse-level") return this.stepFoldLevel(sel, -1);
     if (!this.opts.editable) return;
     if (this.editing) this.commitEdit();
     switch (cmd) {
@@ -5499,6 +5550,31 @@ export class MindMapCanvas {
     if (base === top) this.fit();
     else this.ensureVisible(base);
     if (this.opts.editable) this.notify();
+  }
+
+  /**
+   * 折叠全部子分支：这个节点连同下面所有分支都折起来，以后一层层展开时下面的还收着。
+   * 对中心主题（或没选）就是整张图只露出主主题
+   */
+  collapseBranch(from?: MindNode | null): void {
+    if (!this.doc) return;
+    const top = this.focusRoot ?? this.doc.root;
+    this.setFoldLevel(!from || from === top ? 1 : 0, from);
+  }
+
+  /**
+   * 展开一级 / 折叠一级：这一支现在露出几层，就按「只显示到第 N 层」（数字键那套）多露一层或少露一层。
+   * 中心主题至少留一层，别的节点可以一直收到只剩自己
+   */
+  stepFoldLevel(from: MindNode | null | undefined, step: 1 | -1): void {
+    if (!this.doc) return;
+    const top = this.focusRoot ?? this.doc.root;
+    const base = from && from !== top && isAncestor(top, from) ? from : top;
+    const shown = (n: MindNode): number => (n.folded ? 0 : Math.max(0, ...visibleChildren(n).map((c) => 1 + shown(c))));
+    const now = shown(base);
+    const next = Math.max(base === top ? 1 : 0, now + step);
+    if (next === now) return;
+    this.setFoldLevel(next, base);
   }
 
   /** 把某个分支（含外框）缩放到正好占满画布 */
@@ -5922,23 +5998,31 @@ export class MindMapCanvas {
         sep,
       );
     }
-    if (node.children.length) {
-      entries.push({
+    const leaf = !node.children.length;
+    // 展开全部 / 折叠全部是高频操作，成对放在第一层；一层层收放、聚焦、缩放放进「折叠与视图 ▸」，第一层别太长
+    if (!leaf) {
+      entries.push(
+        { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
+        { title: `${t("menu.collapseBranch")}  ${sc("Shift", "0")}`, icon: "chevrons-down-up", run: () => this.collapseBranch(node) },
+      );
+    }
+    entries.push(
+      {
         title: t("menu.foldGroup"),
         icon: node.folded ? "chevron-down" : "chevron-right",
         submenu: [
-          { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", run: () => this.toggleFold(node) },
-          // 和数字键一样从这个节点往下算：0 = 全部展开，1 = 只露出下一级
-          { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
-          { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", run: () => this.setFoldLevel(1, node) },
+          { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", disabled: leaf, run: () => this.toggleFold(node) },
+          { title: `${t("menu.expandLevel")}  =`, icon: "chevron-down", disabled: leaf, run: () => this.stepFoldLevel(node, 1) },
+          { title: `${t("menu.collapseLevel")}  -`, icon: "chevron-up", disabled: leaf, run: () => this.stepFoldLevel(node, -1) },
+          // 和数字键一样从这个节点往下算：1 = 只露出下一级
+          { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", disabled: leaf, run: () => this.setFoldLevel(1, node) },
+          sep,
+          this.focusRoot === node
+            ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
+            : { title: t("menu.focusBranch"), icon: "focus", disabled: leaf, run: () => this.focusOn(node) },
+          { title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) },
         ],
-      });
-    }
-    entries.push(
-      this.focusRoot === node
-        ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
-        : { title: t("menu.focusBranch"), icon: "focus", disabled: !node.children.length, run: () => this.focusOn(node) },
-      { title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) },
+      },
       sep,
     );
     if (editable) {

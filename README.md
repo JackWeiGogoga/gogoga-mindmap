@@ -86,7 +86,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 
 ### Editing
 
-- Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete. If it gets in the way of clicking nearby nodes, turn off "Floating toolbar on selected nodes" in settings; the same actions are in the context menu.
+- Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete. Choose which colors it offers in the "Node colors" setting: built-in names (which follow the theme and dark mode) or hex values like `#ff8800` (which stay fixed), separated by commas. If it gets in the way of clicking nearby nodes, turn off "Floating toolbar on selected nodes" in settings; the same actions are in the context menu.
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color, delete, dragging and Alt+arrow reordering / promoting / demoting apply to the whole group (drag any one of them and the rest come along).
   Coming from XMind? Set Settings → Left-drag on empty space to "Select": a plain left-drag draws the selection box, right- or middle-drag pans, and a right-click on empty space still opens the menu.
@@ -113,7 +113,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 - **Themes**: switch with the palette button in the toolbar. Seven themes: **Snow** (the default: dark center with gray node backgrounds), **Rainbow** (one color per branch), **Business** (blue tones with right-angle elbow lines), **Warm** (orange tones with large rounded corners), **Mono** (black-and-white outlines with thin lines), **Line** (text-only nodes with thin elbow lines), and **Forest** (green-toned branches).
   Your choice is written to `mindmap-theme` and applies per file; the **Default theme** setting changes the theme for new files. Every theme has a dark mode.
 - **Math and images**: `$E=mc^2$` in a label renders as math, and `$$…$$` renders in display style. For multi-line formulas use `\begin{aligned}…\end{aligned}` with `\\` line breaks, or put a `$$` block in the note. `![[image.png|160]]` or `![alt](url)` renders as a thumbnail, where the number is the width; select it and drag the handle in the bottom-right corner to resize. Double-click an image to view it full size (click or press Esc to close). Code blocks in notes get syntax highlighting. Math and images are embedded when exporting PNG/SVG.
-- **Context menu**: available on nodes and on empty space. The first level of the node menu holds the everyday actions (edit, add child or sibling, focus, link, note, callout, markers, task, boundary, summary, copy and paste, delete); related actions sit in submenus: **Insert ▸** (insert before, insert parent), **Fold / unfold ▸**, **Boundary ▸** and **Summary ▸** (once the node has one), and **More ▸** (convert level to headings or lists, split into subtopics at commas, make floating topic, copy node link, show in Markdown).
+- **Context menu**: available on nodes and on empty space. The first level of the node menu holds the everyday actions (edit, add child or sibling, expand or collapse all sub-branches, link, note, callout, markers, task, boundary, summary, copy and paste, delete); related actions sit in submenus: **Insert ▸** (insert before, insert parent), **Fold & view ▸** (fold or unfold, expand one level, collapse one level, show next level only, focus on branch, zoom to branch), **Boundary ▸** and **Summary ▸** (once the node has one), and **More ▸** (convert level to headings or lists, split into subtopics at commas, make floating topic, copy node link, show in Markdown).
 - **Split at commas**: right-click a node → **More → Split into subtopics at commas** turns "apples, pears; plums" into three subtopics, splitting at Chinese and English commas, the Chinese enumeration comma and semicolons. Commas inside links, math and code, and in numbers like 1,000, are left alone; the node keeps its own text.
 - **Focus on a branch**: show one branch on its own as if it were the root. The breadcrumb at the top takes you back to the full map or any ancestor in one click; Esc also exits.
 - **Markers**: the star button in the node toolbar opens a picker with five groups, **Priority**, **Progress**, **Flags**, **Symbols**, and **Recite** (the 🙈 answer marker, see recite mode). Markers are stored as emoji at the start of the text, so they display anywhere. Add your own in the "Custom markers" setting (emoji or symbols separated by spaces): they show up as a **Custom** group, optionally limited to one per node. Letters, digits and ASCII symbols are ignored, since node text often starts with them.
@@ -188,6 +188,8 @@ A paragraph here becomes the central topic's note.
 | Drag node | Change parent or reorder |
 | / | Fold or unfold the selected node |
 | 1–9 / 0 | Show only N levels below the selected node / expand its whole branch; other branches stay as they are. With the central topic (or nothing) selected it applies to the whole map and fits the view |
+| ⇧0 | Collapse the whole branch (the pair of 0); with the central topic (or nothing) selected, only the main topics stay visible |
+| = / - | Expand / collapse the branch by one level |
 | ⌘⇧0 | Zoom to the selected branch |
 
 | Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch; the view follows when the selection leaves the screen) |
@@ -195,9 +197,9 @@ A paragraph here becomes the central topic's note.
 | Scroll wheel / drag empty space | Pan; Shift + wheel pans sideways (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |
 
-These keys are handled by the map itself. Adding a child or sibling, inserting before, inserting a parent, editing, deleting, deleting only the node, moving up or down, promoting, demoting and expanding all sub-branches, as well as folding, showing down to a level, zooming to a branch, boundaries, summaries and callouts, are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map"), for example to match XMind. The built-in keys keep working; a key you bind to one of these commands takes priority, even Tab or Enter.
+These keys are handled by the map itself. Adding a child or sibling, inserting before, inserting a parent, editing, deleting, deleting only the node, moving up or down, promoting, demoting, expanding or collapsing all sub-branches and expanding or collapsing one level, as well as folding, showing down to a level, zooming to a branch, boundaries, summaries and callouts, are also commands, so you can bind your own keys in Settings → Hotkeys (search for "gogoga Mind Map"), for example to match XMind. The built-in keys keep working; a key you bind to one of these commands takes priority, even Tab or Enter.
 
-The node context menu has these too, so you don't need to remember the keys: **Insert ▸** holds insert sibling before and insert parent, **Fold / unfold ▸** holds expand all sub-branches and show next level only, and "Delete this node only" is on the first level.
+The node context menu has these too, so you don't need to remember the keys: **Insert ▸** holds insert sibling before and insert parent, "Expand all sub-branches" and "Collapse all sub-branches" sit as a pair on the first level, **Fold & view ▸** holds expand one level, collapse one level and show next level only, and "Delete this node only" is on the first level.
 
 ## Development
 
@@ -208,7 +210,6 @@ pnpm typecheck
 pnpm lint            # the same ESLint rules the Obsidian community directory runs
 pnpm build           # outputs dist/main.js
 pnpm install-vault   # copies the build into the vault set by OBSIDIAN_VAULT=...
-pnpm harness         # watch-builds dev/harness.js; open dev/index.html with any static server
 pnpm gen-bench 3000  # writes a large mind map note into the vault's inbox for stress testing
 ```
 
@@ -216,8 +217,6 @@ pnpm gen-bench 3000  # writes a large mind map note into the vault's inbox for s
 
 With 3,000 nodes (measured in Obsidian desktop, after optimization): opening takes 195 ms, a single render 11 ms, each relayout while typing 7 ms, panning 0.2 ms per frame, folding to level 2 55 ms, and exporting PNG 785 ms. With 1,000 nodes the figures are 53 ms / 2 ms / 1.6 ms / 0.2 ms / 10 ms.
 Rendering reuses DOM elements by node ID and only rebuilds elements whose content changed; connectors reuse their path and only update `d`; while typing, only the node being edited is re-measured.
-
-`dev/index.html` is a debug page that runs outside Obsidian. It can switch themes, structures, and dark mode, and prints the Markdown being written back in real time.
 
 ### Structure
 

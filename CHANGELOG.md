@@ -4,6 +4,20 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-05
+
+### Added
+- The node context menu now has "Expand all sub-branches" and "Collapse all sub-branches" as a pair on the first level, and the submenu, renamed **Fold & view ▸**, adds "Expand one level" and "Collapse one level" and now also holds "Focus on this branch" and "Zoom to this branch", so the first level doesn't get longer. Keys: ⇧0 collapses the whole branch (the pair of 0), = / - expand or collapse one level; all of them are commands too.
+- "Node colors" setting: choose which colors the floating toolbar and the callout color menu offer. Remove the ones you don't use or add hex values like `#ff8800`; built-in names follow the theme and dark mode, hex values stay the same everywhere.
+
+### Improved
+- Settings now use sub-pages: the first page lists Opening and display, Editing and interaction, Toolbars and colors, Notes, Markdown and embeds, New maps and Custom themes, each with a one-line summary and, for some, the current value (such as how many node colors), and the settings themselves are one click in. On Obsidian 1.13 and later, the plugin's settings show up in the "Search settings" box of the settings window, including common synonyms (searching "palette" finds "Node colors"); older versions show the same page without search.
+
+### Fixed
+- After the plugin was updated (or reloaded, or re-enabled), mind map notes you had open as Markdown were switched back to the map view. Open tabs are now only converted when Obsidian starts, so updating the plugin leaves them as they are.
+- When a note was changed elsewhere (a sync service, another device, another plugin or editor) within the couple of seconds before the map auto-saved, one side's changes could be lost: a node being edited overwrote the outside change, and edits to the same line got spliced together. Changes are now merged line by line, so edits to different places are both kept; when both sides changed the same place, the map's version is kept and a notice says so.
+- In code blocks and embedded maps, the toolbar (at the bottom and always shown by default) covered the nodes nearest that edge, so they couldn't be clicked. Fit to view now leaves room for the toolbar and the preview grows to match; when the toolbar is set to auto-hide no room is reserved. Fit to view in the main view also keeps clear of the toolbar.
+
 ## [0.39.0] - 2026-11-04
 
 ### Added
@@ -503,7 +517,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...HEAD
+[0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0
 [0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0
 [0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0
 [0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0

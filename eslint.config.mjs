@@ -3,7 +3,7 @@ import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
-  { ignores: ["dist/", "node_modules/", "scripts/", "esbuild.config.mjs", "dev/harness.js"] },
+  { ignores: ["dist/", "node_modules/", "scripts/", "esbuild.config.mjs"] },
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {

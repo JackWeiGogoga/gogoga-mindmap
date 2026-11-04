@@ -278,3 +278,20 @@ export function preserveFormat(original: string, next: string, canonical: (text:
   }
   return finish(next);
 }
+
+/**
+ * 文件在外部被改动、脑图这边还有没落盘的编辑时，把两边的改动合到一起：base 是上次落盘的文本，
+ * ours 是脑图这边的，theirs 是磁盘上新的。两边改到同一段（内容又不一样）就算冲突，返回 null，由调用方决定留哪边
+ */
+export function mergeExternal(base: string, ours: string, theirs: string): string | null {
+  if (ours === base || ours === theirs) return theirs;
+  if (theirs === base) return ours;
+  const b = base.split("\n");
+  const mine = hunksOf(b, ours.split("\n"));
+  const other = hunksOf(b, theirs.split("\n"));
+  const same = (x: Hunk, y: Hunk) => x.start === y.start && x.end === y.end && x.lines.join("\n") === y.lines.join("\n");
+  // 两边做了同一处改动的只算一次
+  const extra = other.filter((h) => !mine.some((m) => same(m, h)));
+  if (mine.some((m) => extra.some((h) => clash(m, h, false)))) return null;
+  return applyHunks(b, 0, b.length, [...mine, ...extra].sort((x, y) => x.start - y.start || x.end - y.end)).join("\n");
+}

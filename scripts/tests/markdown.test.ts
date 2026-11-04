@@ -866,3 +866,10 @@ test("标题迁到新写法时，找出要跟着改链接的旧标题", async ()
   // 标题真的改名（不只是去掉标记）不算
   assert.deepEqual([...strippedMarkerRenames("# 甲 %%red%%\n", "# 丙\n%%red%%\n")], []);
 });
+
+test("节点颜色设置：颜色名和色值都认，认不出的忽略，空了用内置九种", async () => {
+  const { parseNodeColors, COLOR_NAMES } = await import("../../src/markdown");
+  assert.deepEqual(parseNodeColors("red, #FF8800，green 不是颜色 #12 red"), ["red", "#ff8800", "green"]);
+  assert.deepEqual(parseNodeColors(""), [...COLOR_NAMES]);
+  assert.deepEqual(parseNodeColors("乱写"), [...COLOR_NAMES]);
+});

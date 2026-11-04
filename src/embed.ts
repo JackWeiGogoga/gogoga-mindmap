@@ -12,7 +12,7 @@
 import { App, Component, TFile } from "obsidian";
 import type MindMapPlugin from "./main";
 import { findSubpathNode, MindMapCanvas } from "./canvas";
-import { frontmatterValue, parseMarkdown } from "./markdown";
+import { frontmatterValue, parseMarkdown, parseNodeColors } from "./markdown";
 import type { MindDoc } from "./model";
 import { indentString } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -125,6 +125,7 @@ class MindMapEmbed extends Component {
         formatBar: () => settings.formatBar,
         copyPlain: () => settings.copyPlain,
         showNodebar: () => settings.showNodebar,
+        nodeColors: () => parseNodeColors(settings.nodeColors),
         textColors: () => parseColorList(settings.textColors),
         highlightColors: () => parseColorList(settings.highlightColors),
         marqueeDrag: () => settings.leftDrag === "select",
@@ -175,12 +176,18 @@ class MindMapEmbed extends Component {
       return;
     }
     const k = Math.min(1, Math.max(0.2, (wrap.clientWidth - 96) / Math.max(1, b.w)));
-    const h = Math.min(this.plugin.settings.codeBlockMaxHeight, Math.max(200, Math.round(b.h * k + 96)));
+    const h = Math.min(this.plugin.settings.codeBlockMaxHeight, Math.max(200, Math.round(b.h * k + 96 + this.toolbarRoom())));
     if (h !== this.lastHeight) {
       this.lastHeight = h;
       wrap.setCssStyles({ height: `${h}px` });
     }
     this.canvas?.fit();
+  }
+
+  /** 工具栏在上下边时，预览框要多出它占的高度，图才不会被挡住 */
+  private toolbarRoom(): number {
+    const bar = this.canvas?.toolbarInsets();
+    return bar ? bar.top + bar.bottom : 0;
   }
 
   /** 链接指向某个节点就聚焦到它（见 findSubpathNode）。找不到就显示整张图 */
