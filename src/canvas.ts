@@ -5361,9 +5361,17 @@ export class MindMapCanvas {
     if (!el || !label) return;
     this.closePopover();
     this.select(node);
-    this.editingGeometry = { el, width: el.style.width, minHeight: el.style.minHeight, w: node.text ? el.offsetWidth : Math.max(120, el.offsetWidth), h: el.offsetHeight };
-    el.style.width = `${this.editingGeometry.w}px`;
-    el.style.minHeight = `${this.editingGeometry.h}px`;
+    // offsetWidth/Height round to integers. Losing even a fraction of a pixel can
+    // wrap the last character when the label shares its width with a note icon.
+    // Computed dimensions are unscaled, even when the map is zoomed out.
+    const style = el.win.getComputedStyle(el);
+    // Round outwards only at subpixel precision: computed CSS strings can also
+    // truncate the measured width slightly when converted back to inline CSS.
+    const width = Math.max(node.text ? 0 : 120, Math.ceil((parseFloat(style.width) || el.offsetWidth) * 64) / 64);
+    const height = parseFloat(style.height) || el.offsetHeight;
+    this.editingGeometry = { el, width: el.style.width, minHeight: el.style.minHeight, w: Math.round(width), h: Math.round(height) };
+    el.style.width = `${width}px`;
+    el.style.minHeight = `${height}px`;
     this.editing = node;
     this.editingBefore = node.text;
     this.editingIsNew = isNew;

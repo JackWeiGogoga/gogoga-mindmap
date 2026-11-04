@@ -10,6 +10,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Optional selection format bar in Markdown editors. Both editors share editable text/highlighter palettes with comma/newline-separated colors, no fixed count and a current color count in settings.
 
 ### Fixed
+- Preserve fractional node dimensions when entering editing, preventing labels beside note icons from wrapping because of width rounding.
 - Move the node source toggle away from the selection format bar so color buttons cannot cover it.
 
 ## [0.37.0] - 2026-11-04

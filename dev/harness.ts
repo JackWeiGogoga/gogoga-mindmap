@@ -61,6 +61,14 @@ mindmap: true
 		- 归还租借装备 %%green%%
 		- 拍合照
 		- 加油
+
+## 代码示例
+
+\`<span style="color:red">代码中的标签</span>\`
+
+\`\`\`html
+<span style="color:red">代码块中的标签</span>
+\`\`\`
 `;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
