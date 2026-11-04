@@ -4,6 +4,17 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-04
+
+### 新增
+- 「Markdown 跟着脑图折叠」设置（默认关）：脑图里折叠的分支，在同一篇笔记的 Markdown 编辑器和阅读视图里也折起来，在脑图里展开也跟着展开；在 Markdown 里自己折的不受影响。
+- 「联动定位时展开折叠的节点」设置（默认关）：分屏联动时，Markdown 光标移到脑图里折叠着的分支，脑图展开到对应的那个节点，而不是只选中折叠着的上级。
+- 节点里的 `<mark>文字</mark>` 显示成高亮，和 `==文字==` 一样，背诵模式下也会遮住。
+
+### 修复
+- 在右侧边栏（或别的窄窗格）打开脑图时，恢复的是在宽窗格里记下的位置，中心主题跑到画面外面。现在记下位置时一起记下窗格大小，换到大小不同的窗格时保持画面中心不变。
+- 窄窗格里底部工具栏放不下，右边一截被截掉。现在折成两行显示。
+
 ## [0.36.0] - 2026-11-03
 
 ### 新增
@@ -471,7 +482,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...HEAD
+[0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0

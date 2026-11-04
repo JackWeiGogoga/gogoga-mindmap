@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -921,6 +921,36 @@ export function pathAtLine(src: string, line: number, rule: RootRule = {}): stri
     }
   }
   return best ? pathOf(best) : null;
+}
+
+/**
+ * Markdown 跟着脑图折叠用：文本里每个节点所在的行，以及折叠着（%%fold%%、有子节点）的节点要折起来的行范围
+ * [from, to]（0 起，含两端）：从节点那一行到它整个分支（连同备注）最后一个非空行。根节点不折。
+ * paths 是折叠着的节点路径，内容没变、只是行号挪了的时候靠它判断要不要重新应用
+ */
+export function foldPlan(
+  src: string,
+  rule: RootRule = {},
+): { nodeLines: Set<number>; lineOf: Map<string, number>; folds: { from: number; to: number }[]; paths: string[] } {
+  const lines = new Map<MindNode, number>();
+  parseMarkdown(src, { lines, ...rule });
+  const text = src.split("\n");
+  const sorted = [...lines.entries()].sort((a, b) => a[1] - b[1]);
+  const folds: { from: number; to: number }[] = [];
+  const paths: string[] = [];
+  for (const [node, from] of sorted) {
+    if (!node.folded || !node.parent || !node.children.length) continue;
+    // 分支到下一个不在它下面的节点为止；后面没有了就到文末
+    const next = sorted.find(([n, l]) => l > from && n !== node && !isAncestor(node, n));
+    let to = (next ? next[1] : text.length) - 1;
+    while (to > from && !text[to].trim()) to--;
+    if (to <= from) continue;
+    folds.push({ from, to });
+    paths.push(pathOf(node));
+  }
+  const lineOf = new Map<string, number>();
+  for (const [node, l] of sorted) lineOf.set(pathOf(node), l);
+  return { nodeLines: new Set(lines.values()), lineOf, folds, paths };
 }
 
 /** 拆分时不能从中间断开的片段：双链、链接、图片、行内代码、公式、HTML 标签、网址 */

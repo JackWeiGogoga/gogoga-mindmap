@@ -285,6 +285,9 @@ export interface ViewState {
   tx: number;
   ty: number;
   k: number;
+  /** 记下视口时画布的宽高：换到大小不同的窗格（比如侧边栏）恢复时，按它保持画面中心不变 */
+  cw?: number;
+  ch?: number;
 }
 
 /** 链接补全最多列多少条；超出一屏的滚动查看 */
@@ -581,6 +584,11 @@ export class MindMapCanvas {
   private ty = 0;
   private k = 1;
   private hasView = false;
+  /**
+   * 恢复的视口：画面中心对着的内容坐标，以及按它摆好后的平移量。窗格大小还在变（侧边栏展开、代码块重新渲染）时
+   * 每次都把这个点放回中心；平移量被别处改过（用户拖动、缩放、定位）就作废
+   */
+  private viewAnchor: { cx: number; cy: number; tx: number; ty: number } | null = null;
   /** 聚焦 / 退出聚焦后重新适应画布，不走「打开脑图时」的设置 */
   private refitOnly = false;
   private needsRender = false;
@@ -720,6 +728,14 @@ export class MindMapCanvas {
 
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => {
+        // 窄窗格（侧边栏）：底部工具栏折成两行
+        const w = this.el.clientWidth;
+        if (w) this.el.classList.toggle("is-narrow", w < 480);
+        // 恢复的视口：按现在的大小把原来的中心放回中间（下面的重画会直接返回，所以放在前面）
+        if (this.viewAnchor) {
+          this.applyViewAnchor();
+          this.applyTransform();
+        }
         if (this.needsRender) {
           this.render();
           return;
@@ -933,11 +949,27 @@ export class MindMapCanvas {
     return true;
   }
 
-  /** 跟随 Markdown 光标：选中节点（折叠着就选最近的可见祖先），看不见时才挪画面 */
-  followPath(path: string): void {
+  /**
+   * 跟随 Markdown 光标：选中节点，看不见时才挪画面。折叠着的：expand 时展开上级（和点链接跳过来一样，
+   * 展开会写进笔记），否则选最近的可见祖先
+   */
+  followPath(path: string, expand = false): void {
     if (!this.doc || this.editing || this.editingCallout) return;
     let node = findByPath(this.doc.root, path);
     if (!node) return;
+    if (expand && this.opts.editable) {
+      let unfolded = false;
+      for (let a = node.parent; a; a = a.parent) {
+        if (a.folded) {
+          a.folded = false;
+          unfolded = true;
+        }
+      }
+      if (unfolded) {
+        this.render();
+        this.notify();
+      }
+    }
     for (let a = node.parent; a; a = a.parent) if (a.folded) node = a;
     if (!this.layout?.placed.get(node.id)) return;
     this.select(node);
@@ -961,7 +993,9 @@ export class MindMapCanvas {
   }
 
   getViewState(): ViewState {
-    return { tx: this.tx, ty: this.ty, k: this.k };
+    const cw = this.el.clientWidth;
+    const ch = this.el.clientHeight;
+    return cw && ch ? { tx: this.tx, ty: this.ty, k: this.k, cw, ch } : { tx: this.tx, ty: this.ty, k: this.k };
   }
 
   /** 恢复视口；之后首次渲染不再自动适应画布 */
@@ -970,7 +1004,28 @@ export class MindMapCanvas {
     this.ty = state.ty;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, state.k));
     this.hasView = true;
+    this.viewAnchor =
+      state.cw && state.ch ? { cx: (state.cw / 2 - this.tx) / this.k, cy: (state.ch / 2 - this.ty) / this.k, tx: this.tx, ty: this.ty } : null;
+    this.applyViewAnchor();
     this.applyTransform();
+  }
+
+  /**
+   * 视口是在别的大小的窗格里记下的（宽窗格里记的，拿到侧边栏里恢复），或者画布大小还在变：
+   * 让原来在画面中间的内容还在中间。大小没量出来（侧边栏正在展开）就等 ResizeObserver 再来
+   */
+  private applyViewAnchor(): void {
+    const a = this.viewAnchor;
+    if (!a) return;
+    if (this.tx !== a.tx || this.ty !== a.ty) {
+      this.viewAnchor = null;
+      return;
+    }
+    const cw = this.el.clientWidth;
+    const ch = this.el.clientHeight;
+    if (!cw || !ch) return;
+    a.tx = this.tx = cw / 2 - a.cx * this.k;
+    a.ty = this.ty = ch / 2 - a.cy * this.k;
   }
 
   isEditable(): boolean {

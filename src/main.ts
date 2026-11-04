@@ -38,7 +38,7 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
-import { fillTemplate, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
+import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
@@ -176,6 +176,7 @@ export default class MindMapPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEditorSync();
     this.registerSplitSync();
+    this.registerFoldFollow();
     this.registerFollowActive();
     const syncButtons = () => this.syncMapButtons();
     this.registerEvent(this.app.workspace.on("layout-change", syncButtons));
@@ -701,6 +702,61 @@ export default class MindMapPlugin extends Plugin {
     };
     this.registerEvent(this.app.workspace.on("file-open", follow));
     this.registerEvent(this.app.workspace.on("active-leaf-change", follow));
+  }
+
+  /** Markdown 跟着脑图折叠：每个 Markdown 视图上次跟着脑图折起来的节点（路径）。按它算增减，用户自己折的不碰 */
+  private appliedFolds = new WeakMap<MarkdownView, { mode: string; paths: Set<string> }>();
+
+  private registerFoldFollow(): void {
+    let timer: number | null = null;
+    // 脑图改了折叠要等文件写回、Markdown 视图更新；打开 Markdown、切换编辑 / 阅读模式时 layout-change 会来
+    const soon = () => {
+      if (!this.settings.foldFollow) return;
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        this.syncFolds();
+      }, 300);
+    };
+    this.registerEvent(this.app.workspace.on("layout-change", soon));
+    this.registerEvent(
+      this.app.vault.on("modify", (f) => {
+        if (f instanceof TFile && this.app.workspace.getLeavesOfType("markdown").some((l) => (l.view as MarkdownView).file?.path === f.path)) soon();
+      }),
+    );
+    this.register(() => {
+      if (timer !== null) window.clearTimeout(timer);
+    });
+  }
+
+  /**
+   * 把文件里的 %%fold%% 应用到打开着的同一篇 Markdown（编辑器和阅读视图都有 getFoldInfo / applyFoldInfo，
+   * Obsidian 记折叠状态用的就是它们，没有公开 API，取不到就跳过）。只增减跟着脑图走的那些节点的折叠
+   */
+  syncFolds(): void {
+    if (!this.settings.foldFollow) return;
+    type FoldInfo = { folds: { from: number; to: number }[]; lines: number };
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || !view.file) continue;
+      if (!this.isMindMapFile(view.file.path) && !this.visibleMapsOf(view.file.path).length) continue;
+      const mode = view.currentMode as unknown as { getFoldInfo?: () => FoldInfo | null; applyFoldInfo?: (info: FoldInfo) => void };
+      if (typeof mode?.getFoldInfo !== "function" || typeof mode.applyFoldInfo !== "function") continue;
+      const plan = foldPlan(view.editor.getValue(), this.rootRule());
+      const now = new Set(plan.paths);
+      const prev = this.appliedFolds.get(view);
+      const modeName = `${view.file.path}\u0001${view.getMode()}`;
+      // 换了笔记或模式（编辑 ⇄ 阅读的折叠状态各管各的），当成第一次
+      const before = prev && prev.mode === modeName ? prev.paths : new Set<string>();
+      if (prev && prev.mode === modeName && before.size === now.size && [...now].every((p) => before.has(p))) continue;
+      this.appliedFolds.set(view, { mode: modeName, paths: now });
+      const unfold = new Set([...before].filter((p) => !now.has(p)).map((p) => plan.lineOf.get(p)).filter((l): l is number => l !== undefined));
+      const add = plan.folds.filter((f) => !before.has(plan.paths[plan.folds.indexOf(f)]));
+      const cur = mode.getFoldInfo()?.folds ?? [];
+      const kept = cur.filter((f) => !unfold.has(f.from) && !add.some((a) => a.from === f.from));
+      const folds = [...kept, ...add].sort((a, b) => a.from - b.from);
+      mode.applyFoldInfo({ folds, lines: view.editor.lineCount() });
+    }
   }
 
   /** 正在显示（不是藏在别的标签页后面）的同一文件的脑图 */

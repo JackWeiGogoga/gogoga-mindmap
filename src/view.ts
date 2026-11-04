@@ -9,13 +9,22 @@ import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
-import type { MindDoc } from "./model";
+import { pathOf, walk, type MindDoc } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import type MindMapPlugin from "./main";
 import { indentString, ToolbarPosition } from "./settings";
 
 export const VIEW_TYPE_MINDMAP = "mindmap";
+
+/** 折叠着的节点路径串，比较折叠状态有没有变 */
+function foldedSignature(doc: MindDoc): string {
+  const out: string[] = [];
+  walk(doc.root, (n) => {
+    if (n.folded) out.push(pathOf(n));
+  });
+  return out.join("\n");
+}
 
 export class MindMapView extends TextFileView {
   /** 页面预览（hover-link）需要宿主提供这个字段 */
@@ -120,7 +129,7 @@ export class MindMapView extends TextFileView {
     if (path === null || path === this.canvas.getSelectedPath()) return;
     this.following = true;
     try {
-      this.canvas.followPath(path);
+      this.canvas.followPath(path, this.plugin.settings.followExpand);
     } finally {
       this.following = false;
     }
@@ -433,6 +442,7 @@ export class MindMapView extends TextFileView {
     }
     this.data = data;
     this.doc = this.parseText(data);
+    this.lastFolds = foldedSignature(this.doc);
     this.applyFrontmatterOptions(this.doc);
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
     const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
@@ -478,6 +488,9 @@ export class MindMapView extends TextFileView {
     this.canvas.setEdge(edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)));
   }
 
+  /** 上次保存时折叠着的节点（路径），判断这次改动有没有改折叠 */
+  private lastFolds: string | null = null;
+
   private onDocChange(doc: MindDoc): void {
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
     const next = preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text)));
@@ -486,6 +499,13 @@ export class MindMapView extends TextFileView {
     if (next === this.data) return;
     this.history.push(this.data);
     this.data = next;
+    // 「Markdown 跟着脑图折叠」：折叠状态变了就马上存，不等 Obsidian 两秒的延迟保存，Markdown 那边才跟得上
+    const folds = this.plugin.settings.foldFollow ? foldedSignature(doc) : null;
+    if (folds !== null && folds !== this.lastFolds) {
+      this.lastFolds = folds;
+      void this.save();
+      return;
+    }
     this.requestSave();
   }
 

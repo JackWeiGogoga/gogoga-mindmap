@@ -176,13 +176,15 @@ export const TOKEN_RE = new RegExp(
     String.raw`|\\([!-/:-@[-\x60{-~])` +
     // 局部颜色：<span style="color:…">文字</span>、<mark style="background:…">文字</mark>，里面还能有别的格式
     `|${COLOR_OPEN_SRC}(.+?)</span>` +
-    `|${BG_OPEN_SRC}(.+?)</mark>`,
+    `|${BG_OPEN_SRC}(.+?)</mark>` +
+    // 不带颜色的 <mark>文字</mark>：和 ==高亮== 一样
+    String.raw`|<mark>(.+?)</mark>`,
   "gu",
 );
 
 // 分组含义：1-2 ![[图片|参数]]  3-4 ![alt](url)  5 $公式$  6-7 [[链接|别名]]  8-9 [文字](url)
 // 10-11 粗体  12 行内代码  13 删除线  14 高亮  15-16 斜体  17 #标签  18 裸 URL  19 <iframe> 的属性串
-// 20 被反斜杠转义的标点  21-22 文字颜色  23-24 荧光笔颜色
+// 20 被反斜杠转义的标点  21-22 文字颜色  23-24 荧光笔颜色  25 <mark> 高亮
 
 const BR_RE = /<br\s*\/?>/i;
 
@@ -244,8 +246,8 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
       el.appendChild(wrap("code", m[12]));
     } else if (m[13] !== undefined) {
       el.appendChild(nest("del", m[13], opts));
-    } else if (m[14] !== undefined) {
-      el.appendChild(nest("mark", m[14], opts));
+    } else if (m[14] !== undefined || m[25] !== undefined) {
+      el.appendChild(nest("mark", m[14] ?? m[25], opts));
     } else if (m[15] !== undefined || m[16] !== undefined) {
       el.appendChild(nest("em", m[15] ?? m[16], opts));
     } else if (m[17] !== undefined) {

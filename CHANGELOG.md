@@ -4,6 +4,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-04
+
+### Added
+- "Fold Markdown along with the map" setting (off by default): branches collapsed in the map are folded in the Markdown editor and reading view of the same note too, and unfolded when you expand them in the map; folds you make yourself in Markdown are left alone.
+- "Expand collapsed nodes when syncing" setting (off by default): with side-by-side sync, moving the Markdown cursor into a branch collapsed in the map expands the map down to that node instead of selecting the collapsed ancestor.
+- `<mark>text</mark>` in a node shows as a highlight, the same as `==text==`, and is covered in recite mode.
+
+### Fixed
+- Opening a map in the right sidebar (or another narrow pane) restored the position remembered from a wide pane, leaving the central topic off screen. The pane size is now remembered too, and the view keeps its center when restored in a pane of a different size.
+- In a narrow pane the bottom toolbar didn't fit and its right end was cut off. It now wraps onto two rows.
+
 ## [0.36.0] - 2026-11-03
 
 ### Added
@@ -471,7 +482,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...HEAD
+[0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.33.2...0.34.0

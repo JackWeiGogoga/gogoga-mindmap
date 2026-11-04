@@ -68,6 +68,10 @@ export interface MindMapSettings {
   openView: "fit" | "center";
   /** 同一文件的脑图和 Markdown 同时显示时，选中和光标互相跟随（默认关） */
   syncSplit: boolean;
+  /** 分屏联动定位到折叠着的节点时，把它展开（会改文件里的 %%fold%%，默认关） */
+  followExpand: boolean;
+  /** Markdown 跟着脑图折叠：编辑器和阅读视图里对应的节点按脑图的折叠状态折起来（默认关） */
+  foldFollow: boolean;
   /** 自定义标记（设置里原样存用户填的文字，用时再解析） */
   customMarkers: string;
   customMarkersExclusive: boolean;
@@ -93,6 +97,9 @@ export interface SavedViewport {
   tx: number;
   ty: number;
   k: number;
+  /** 记下时画布的宽高（旧数据没有） */
+  cw?: number;
+  ch?: number;
   /** 选中节点的路径 */
   sel: string | null;
   /** 最后一次记录的时间，超出 50 个时淘汰最旧的 */
@@ -127,6 +134,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   dragToFloat: false,
   openView: "fit",
   syncSplit: false,
+  followExpand: false,
+  foldFollow: false,
   customMarkers: "",
   customMarkersExclusive: false,
   rememberView: true,
@@ -591,6 +600,25 @@ export class MindMapSettingTab extends PluginSettingTab {
         tg.setValue(this.plugin.settings.syncSplit).onChange(async (v) => {
           this.plugin.settings.syncSplit = v;
           await this.plugin.saveSettings();
+        }),
+      );
+    new Setting(containerEl)
+      .setName(t("settings.followExpand.name"))
+      .setDesc(t("settings.followExpand.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.followExpand).onChange(async (v) => {
+          this.plugin.settings.followExpand = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+    new Setting(containerEl)
+      .setName(t("settings.foldFollow.name"))
+      .setDesc(t("settings.foldFollow.desc"))
+      .addToggle((tg) =>
+        tg.setValue(this.plugin.settings.foldFollow).onChange(async (v) => {
+          this.plugin.settings.foldFollow = v;
+          await this.plugin.saveSettings();
+          if (v) this.plugin.syncFolds();
         }),
       );
 
