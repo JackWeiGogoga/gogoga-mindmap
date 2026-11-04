@@ -51,6 +51,7 @@ import {
   STRUCTURES,
 } from "./layout";
 import { applyInlineFormat, type InlineFormat } from "./format";
+import { InlineEditor } from "./inline-editor";
 import {
   fromEditableText,
   IMAGE_MAX_WIDTH,
@@ -499,7 +500,6 @@ export class MindMapCanvas {
   private edgeButton: HTMLButtonElement | null = null;
   /** 拖节点 / 拖宽度时贴近画布边缘自动平移；tick 在每帧平移后重算拖拽状态 */
   private autoScroll: { raf: number; vx: number; vy: number; tick: () => void } | null = null;
-  private compositionSel: { start: number; end: number; text: string } | null = null;
   private linkSuggest: { el: HTMLElement; items: LinkTarget[]; index: number; open: number } | null = null;
   private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
@@ -665,8 +665,8 @@ export class MindMapCanvas {
   private disposers: (() => void)[] = [];
   private opts: CanvasOptions;
   private formatBar: HTMLElement | null = null;
-  /** 编辑节点期间才挂的 selectionchange 监听（格式栏跟着选区走），提交编辑时摘掉 */
-  private stopSelectionWatch: (() => void) | null = null;
+  /** 正在编辑的节点文字的编辑框（CodeMirror），和 editing 同生同灭 */
+  private nodeEditor: InlineEditor | null = null;
 
   constructor(container: HTMLElement, opts: CanvasOptions) {
     this.opts = { ...opts };
@@ -1100,9 +1100,8 @@ export class MindMapCanvas {
 
   syncPending(): boolean {
     let changed = false;
-    if (this.editing) {
-      const label = this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
-      const text = fromEditableText(label?.textContent ?? "");
+    if (this.editing && this.nodeEditor) {
+      const text = fromEditableText(this.nodeEditor.text);
       if (text && text !== this.editing.text) {
         this.editing.text = text;
         changed = true;
@@ -1125,7 +1124,7 @@ export class MindMapCanvas {
 
   destroy(): void {
     liveCanvases.delete(this);
-    this.stopSelectionWatch?.();
+    this.nodeEditor?.destroy();
     this.ro?.disconnect();
     this.noteRo?.disconnect();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
@@ -1815,44 +1814,20 @@ export class MindMapCanvas {
     this.editingRel = rel;
     label.classList.remove("is-empty");
     label.classList.add("is-editing");
-    label.textContent = before;
     delete label.dataset.raw;
-    label.setAttribute("contenteditable", "plaintext-only");
-    if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
-    label.focus();
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(label);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    let done = false;
-    const finish = (commit: boolean) => {
-      if (done) return;
-      done = true;
-      label.removeEventListener("keydown", onKey);
-      label.removeEventListener("blur", onBlur);
-      label.removeAttribute("contenteditable");
-      label.classList.remove("is-editing");
-      this.editingRel = null;
-      rel.label = commit ? markerText(label.textContent ?? "") : before;
-      this.drawRels();
-      if (rel.label !== before) this.notify();
-      this.el.focus({ preventScroll: true });
-    };
-    const onKey = (ev: KeyboardEvent) => {
-      ev.stopPropagation();
-      if (ev.isComposing) return;
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        finish(true);
-      } else if (ev.key === "Escape") {
-        ev.preventDefault();
-        finish(false);
-      }
-    };
-    const onBlur = () => finish(true);
-    label.addEventListener("keydown", onKey);
-    label.addEventListener("blur", onBlur);
+    this.editInPlace(label, {
+      text: before,
+      selectAll: true,
+      multiline: false,
+      done: (commit, text) => {
+        label.classList.remove("is-editing");
+        this.editingRel = null;
+        rel.label = commit ? markerText(text) : before;
+        this.drawRels();
+        if (rel.label !== before) this.notify();
+        this.el.focus({ preventScroll: true });
+      },
+    });
   }
 
   /** 反过来：线挪到原来的终点上，指回原来的起点 */
@@ -2773,57 +2748,28 @@ export class MindMapCanvas {
     this.ensureVisible(node);
     delete box.dataset.raw;
     box.classList.add("is-editing");
-    el.textContent = before;
-    el.dataset.placeholder = t("canvas.calloutPlaceholder");
-    el.setAttribute("contenteditable", "plaintext-only");
-    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
-    el.focus();
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(el);
-    // 改已有的：光标放末尾，接着写
-    range.collapse(false);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-
-    let done = false;
-    const finish = (commit: boolean) => {
-      if (done) return;
-      done = true;
-      // 先读文字再撤编辑样式：撤掉 pre-wrap 后 innerText 会把换行压成空格。
-      // 写回文件时引号、%% 会被换掉，这里先换好，画布上看到的和文件里一致
-      const text = commit ? calloutFromMarker(calloutToMarker(el.innerText ?? "")) : before;
-      el.removeEventListener("keydown", onKey);
-      el.removeEventListener("blur", onBlur);
-      el.removeEventListener("input", onInput);
-      el.removeAttribute("contenteditable");
-      box.classList.remove("is-editing");
-      this.editingCallout = null;
-      node.callout = text || undefined;
-      if (!node.callout) node.calloutColor = undefined;
-      // 隐藏标注时编辑完留着浮出的那条，方便看结果；点别处再收起
-      if (this.calloutsHidden && node.callout) this.peekCallout = node;
-      this.render();
-      if ((node.callout ?? "") !== before || (isNew && node.callout)) this.notify();
-      this.el.focus({ preventScroll: true });
-    };
-    const onKey = (ev: KeyboardEvent) => {
-      ev.stopPropagation();
-      if (ev.isComposing || ev.keyCode === 229) return;
-      if (ev.key === "Enter" && !ev.shiftKey) {
-        ev.preventDefault();
-        finish(true);
-      } else if (ev.key === "Escape") {
-        ev.preventDefault();
-        finish(false);
-      }
-    };
-    // 文字变了气泡尺寸跟着变，周围的节点要重新让位
-    const onInput = () => this.reflow();
-    const onBlur = () => finish(true);
-    el.addEventListener("keydown", onKey);
-    el.addEventListener("blur", onBlur);
-    el.addEventListener("input", onInput);
+    this.editInPlace(el, {
+      text: before,
+      // 改已有的：光标放末尾，接着写
+      selectAll: false,
+      multiline: true,
+      placeholder: t("canvas.calloutPlaceholder"),
+      // 文字变了气泡尺寸跟着变，周围的节点要重新让位
+      onChange: () => this.reflow(),
+      done: (commit, raw) => {
+        // 写回文件时引号、%% 会被换掉，这里先换好，画布上看到的和文件里一致
+        const text = commit ? calloutFromMarker(calloutToMarker(raw)) : before;
+        box.classList.remove("is-editing");
+        this.editingCallout = null;
+        node.callout = text || undefined;
+        if (!node.callout) node.calloutColor = undefined;
+        // 隐藏标注时编辑完留着浮出的那条，方便看结果；点别处再收起
+        if (this.calloutsHidden && node.callout) this.peekCallout = node;
+        this.render();
+        if ((node.callout ?? "") !== before || (isNew && node.callout)) this.notify();
+        this.el.focus({ preventScroll: true });
+      },
+    });
   }
 
   /** 大括号：right / tree 尖朝右，left 尖朝左，down 横着、尖朝下 */
@@ -2943,55 +2889,28 @@ export class MindMapCanvas {
     if (!label || !el) return;
     this.editingSummary = start;
     label.classList.remove("is-empty");
-    // 编辑时显示 Markdown 原文，改完再渲染
-    el.textContent = before || t("canvas.summaryDefault");
     delete label.dataset.raw;
     label.classList.add("is-editing");
-    el.setAttribute("contenteditable", "plaintext-only");
-    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
-    el.focus();
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(el);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-
-    let done = false;
-    const finish = (commit: boolean) => {
-      if (done) return;
-      done = true;
-      el.removeEventListener("keydown", onKey);
-      el.removeEventListener("blur", onBlur);
-      el.removeEventListener("input", onInput);
-      el.removeAttribute("contenteditable");
-      label.classList.remove("is-editing");
-      this.editingSummary = null;
-      if (!start.summary) return;
-      const text = commit ? markerText(el.textContent ?? "") : before;
-      // 概要就是为了那段文字：清空了（或新加的按了 Esc）就整个去掉
-      if (!text && (commit || isNew)) start.summary = undefined;
-      else start.summary.text = text;
-      this.render();
-      if (isNew || text !== before) this.notify();
-      this.el.focus({ preventScroll: true });
-    };
-    const onKey = (ev: KeyboardEvent) => {
-      ev.stopPropagation();
-      if (ev.isComposing || ev.keyCode === 229) return;
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        finish(true);
-      } else if (ev.key === "Escape") {
-        ev.preventDefault();
-        finish(false);
-      }
-    };
-    // 文字变长变短要重新排位置（括号不动，文字跟着尖走）
-    const onInput = () => this.reflow();
-    const onBlur = () => finish(true);
-    el.addEventListener("keydown", onKey);
-    el.addEventListener("blur", onBlur);
-    el.addEventListener("input", onInput);
+    this.editInPlace(el, {
+      // 新加的先给个默认字样并全选，打字直接替换
+      text: before || t("canvas.summaryDefault"),
+      selectAll: true,
+      multiline: false,
+      // 文字变长变短要重新排位置（括号不动，文字跟着尖走）
+      onChange: () => this.reflow(),
+      done: (commit, raw) => {
+        label.classList.remove("is-editing");
+        this.editingSummary = null;
+        if (!start.summary) return;
+        const text = commit ? markerText(raw) : before;
+        // 概要就是为了那段文字：清空了（或新加的按了 Esc）就整个去掉
+        if (!text && (commit || isNew)) start.summary = undefined;
+        else start.summary.text = text;
+        this.render();
+        if (isNew || text !== before) this.notify();
+        this.el.focus({ preventScroll: true });
+      },
+    });
   }
 
   /** 拖概要文字框外侧的竖条改宽度；朝外拖变宽。组织结构图里文字居中，两边一起长，所以按两倍算 */
@@ -3034,47 +2953,64 @@ export class MindMapCanvas {
     if (!el) return;
     this.editingBox = start;
     el.classList.add("is-editing");
-    el.setAttribute("contenteditable", "plaintext-only");
-    if (!el.isContentEditable) el.setAttribute("contenteditable", "true");
-    el.focus();
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(el);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
+    this.editInPlace(el, {
+      text: start.box.title,
+      selectAll: true,
+      multiline: false,
+      done: (commit, raw) => {
+        el.classList.remove("is-editing");
+        this.editingBox = null;
+        if (!start.box) return;
+        const text = commit ? raw.replace(/["%\r\n]/g, "").trim() : before;
+        const changed = text !== before;
+        start.box.title = text;
+        el.textContent = text;
+        this.render();
+        if (changed) this.notify();
+        this.el.focus({ preventScroll: true });
+      },
+    });
+  }
 
-    let done = false;
+  /**
+   * 原地编辑一段文字（标注、概要、关联线文字、外框标题）：Enter 提交（能换行的用 Shift+Enter 换行），
+   * Esc 取消，失焦提交。按键不往画布上冒，免得被当成节点操作
+   */
+  private editInPlace(
+    host: HTMLElement,
+    opts: { text: string; selectAll: boolean; multiline: boolean; placeholder?: string; onChange?: () => void; done: (commit: boolean, text: string) => void },
+  ): void {
+    let finished = false;
     const finish = (commit: boolean) => {
-      if (done) return;
-      done = true;
-      el.removeEventListener("keydown", onKey);
-      el.removeEventListener("blur", onBlur);
-      el.removeAttribute("contenteditable");
-      el.classList.remove("is-editing");
-      this.editingBox = null;
-      if (!start.box) return;
-      const text = commit ? (el.textContent ?? "").replace(/["%\r\n]/g, "").trim() : before;
-      const changed = text !== before;
-      start.box.title = text;
-      el.textContent = text;
-      this.render();
-      if (changed) this.notify();
-      this.el.focus({ preventScroll: true });
+      if (finished) return;
+      finished = true;
+      const text = editor.text;
+      editor.destroy();
+      opts.done(commit, text);
     };
-    const onKey = (ev: KeyboardEvent) => {
-      ev.stopPropagation();
-      if (ev.isComposing || ev.keyCode === 229) return;
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        finish(true);
-      } else if (ev.key === "Escape") {
-        ev.preventDefault();
-        finish(false);
-      }
-    };
-    const onBlur = () => finish(true);
-    el.addEventListener("keydown", onKey);
-    el.addEventListener("blur", onBlur);
+    const editor = new InlineEditor(host, {
+      text: opts.text,
+      selectAll: opts.selectAll,
+      multiline: opts.multiline,
+      placeholder: opts.placeholder,
+      onKey: (ev) => {
+        ev.stopPropagation();
+        if (ev.isComposing || ev.keyCode === 229) return false;
+        if (ev.key === "Enter" && !(opts.multiline && ev.shiftKey)) {
+          ev.preventDefault();
+          finish(true);
+          return true;
+        }
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          finish(false);
+          return true;
+        }
+        return false;
+      },
+      onChange: opts.onChange,
+      onBlur: () => finish(true),
+    });
   }
 
   private settleTimer: number | null = null;
@@ -3996,15 +3932,7 @@ export class MindMapCanvas {
     });
 
     const onPaste = (ev: ClipboardEvent) => {
-      // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
-      if (this.opts.editable && this.editing && (ev.target as HTMLElement).closest?.(".mm-label")) {
-        const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
-        if (!imgs.length) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        void this.addImagesToNote(this.editing, imgs);
-        return;
-      }
+      // 编辑中的粘贴归编辑框（图片在 startEdit 的 onPaste 里处理）
       if (!this.opts.editable || this.editing) return;
       const t = ev.target as HTMLElement;
       if (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable) return;
@@ -4024,58 +3952,6 @@ export class MindMapCanvas {
       if (el.contains(ev.target as Node) || el.ownerDocument.activeElement !== el) return;
       onPaste(ev);
     });
-
-    this.on(el, "input", (ev) => {
-      if (this.editing && (ev.target as HTMLElement).classList.contains("mm-label")) {
-        // 输入法组字中不要改文字：Windows 输入法打「【」也走组字，中途把【【换成 [[ 的话，
-        // 组字结束时输入法会再补一个【，就成了 [[【。等 compositionend 再处理
-        if (!(ev as InputEvent).isComposing) this.updateLinkSuggest();
-        this.reflow(this.editing);
-      }
-    });
-    // 选中文字再打【或 [：包成【文字】/[文字]，再打一次变成 [[文字]] 链接（同 Easy Typing 的习惯）
-    this.on(el, "beforeinput", (ev) => {
-      const ie = ev;
-      if (!this.editing || ie.isComposing || ie.inputType !== "insertText" || (ie.data !== "【" && ie.data !== "[")) return;
-      const label = this.editingLabel();
-      const range = label && this.selectionRange(label);
-      if (!label || !range || range.start === range.end) return;
-      ev.preventDefault();
-      this.wrapSelection(label, range.start, range.end, ie.data);
-    });
-    this.on(el, "compositionstart", () => {
-      const label = this.editingLabel();
-      const range = label && this.selectionRange(label);
-      this.compositionSel = label && range && range.start !== range.end ? { ...range, text: (label.textContent ?? "").slice(range.start, range.end) } : null;
-    });
-    this.on(el, "compositionend", (ev) => {
-      const label = this.editingLabel();
-      const saved = this.compositionSel;
-      this.compositionSel = null;
-      if (!label || !this.editing) return;
-      const data = ev.data;
-      if (saved && (data === "【" || data === "[")) {
-        // 组字开始时选中的文字已经被输入法替换成了「【」，按原来的选区复原再包起来
-        const cur = label.textContent ?? "";
-        if (cur.slice(saved.start, saved.start + data.length) === data) {
-          label.textContent = cur.slice(0, saved.start) + saved.text + cur.slice(saved.start + data.length);
-          this.wrapSelection(label, saved.start, saved.start + saved.text.length, data);
-          return;
-        }
-      }
-      this.updateLinkSuggest();
-      this.reflow(this.editing);
-    });
-
-    this.on(
-      el,
-      "blur",
-      (ev) => {
-        const t = ev.target as HTMLElement;
-        if (this.editing && t.classList?.contains("mm-label")) this.commitEdit();
-      },
-      { capture: true },
-    );
   }
 
   private onKeyDown(ev: KeyboardEvent): void {
@@ -5352,24 +5228,35 @@ export class MindMapCanvas {
     this.editing = node;
     this.editingIsNew = isNew;
     this.positionNodebar();
-    label.textContent = toEditableText(node.text);
-    if (this.opts.formatBar?.() && !this.stopSelectionWatch) {
-      const doc = label.ownerDocument;
-      const onChange = () => this.updateFormatBar();
-      doc.addEventListener("selectionchange", onChange);
-      this.stopSelectionWatch = () => doc.removeEventListener("selectionchange", onChange);
-    }
-    label.setAttribute("contenteditable", "plaintext-only");
-    if (!label.isContentEditable) label.setAttribute("contenteditable", "true");
     el.classList.add("is-editing");
-    label.focus({ preventScroll: true });
-    // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(label);
-    if (this.opts.caretAtEnd?.()) range.collapse(false);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
+    this.nodeEditor = new InlineEditor(label, {
+      text: toEditableText(node.text),
+      // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
+      selectAll: !this.opts.caretAtEnd?.(),
+      multiline: true,
+      // 回车提交、Esc、Tab、链接补全的上下键、⌘B 这些走画布的按键处理；画布没处理的（打字、方向键、⌘Z）归编辑框
+      onKey: (ev) => {
+        this.onKeyDown(ev);
+        return ev.defaultPrevented;
+      },
+      onInput: (from, to, text) => this.wrapOnInput(from, to, text),
+      // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
+      onPaste: (ev) => {
+        const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!imgs.length) return false;
+        void this.addImagesToNote(node, imgs);
+        return true;
+      },
+      onChange: () => {
+        if (this.editing !== node) return;
+        this.updateLinkSuggest();
+        this.reflow(node);
+      },
+      onSelect: () => this.updateFormatBar(),
+      onBlur: () => {
+        if (this.editing === node) this.commitEdit();
+      },
+    });
     this.reflow();
   }
 
@@ -5380,11 +5267,10 @@ export class MindMapCanvas {
     const isNew = this.editingIsNew;
     this.editing = null;
     this.editingIsNew = false;
-    this.stopSelectionWatch?.();
-    this.stopSelectionWatch = null;
+    const raw = fromEditableText(this.nodeEditor?.text ?? "");
+    this.nodeEditor?.destroy();
+    this.nodeEditor = null;
     this.updateFormatBar();
-    const label = this.els.get(node.id)?.querySelector<HTMLElement>(".mm-label");
-    const raw = fromEditableText(label?.textContent ?? "");
     const text = cancel ? node.text : raw;
     // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
     if (text === "" && isNew && !node.note) {
@@ -5397,7 +5283,7 @@ export class MindMapCanvas {
     }
     const changed = !cancel && (text !== node.text || isNew);
     node.text = text;
-    // startEdit 把 label 换成了 contenteditable 的原文。文字没改的话签名跟着没变，
+    // startEdit 把 label 换成了编辑框。文字没改的话签名跟着没变，
     // rebuild 会认为这个节点不用动，于是原文就留在那儿了 —— 纯文字节点看不出来，
     // 图片、链接、iframe 这种有渲染形态的就露馅。所以提交时强制让这个节点失效。
     const el = this.els.get(node.id);
@@ -5443,44 +5329,19 @@ export class MindMapCanvas {
 
   // ---------- 编辑时的 [[ 链接补全 ----------
 
-  private editingLabel(): HTMLElement | null {
-    return this.editing ? (this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label") ?? null) : null;
-  }
-
-  /** 光标在 label 纯文本里的位置 */
-  private caretOffset(label: HTMLElement): number | null {
-    const sel = this.el.win.getSelection();
-    if (!sel?.rangeCount || !sel.anchorNode || !label.contains(sel.anchorNode)) return null;
-    const r = this.el.doc.createRange();
-    r.selectNodeContents(label);
-    r.setEnd(sel.anchorNode, sel.anchorOffset);
-    return r.toString().length;
-  }
-
-  /** 选区在 label 纯文本里的起止 */
-  private selectionRange(label: HTMLElement): { start: number; end: number } | null {
-    const sel = this.el.win.getSelection();
-    if (!sel?.rangeCount) return null;
-    const r = sel.getRangeAt(0);
-    if (!label.contains(r.startContainer) || !label.contains(r.endContainer)) return null;
-    const pre = this.el.doc.createRange();
-    pre.selectNodeContents(label);
-    pre.setEnd(r.startContainer, r.startOffset);
-    const start = pre.toString().length;
-    return { start, end: start + r.toString().length };
-  }
-
   /**
-   * 把 [start, end) 包起来并保持选中：【→【文字】，[→[文字]；
-   * 已经被【】或 [] 包着时再打一次，就升级成 [[文字]] 链接
+   * 选中文字再打【或 [：包成【文字】/[文字]，已经被【】或 [] 包着时再打一次升级成 [[文字]] 链接（同 Easy Typing 的习惯）。
+   * 输入法打的【也走这里（CodeMirror 把组字结果交给 inputHandler）
    */
-  private wrapSelection(label: HTMLElement, start: number, end: number, ch: string): void {
-    const text = label.textContent ?? "";
-    let before = text.slice(0, start);
-    let after = text.slice(end);
-    const inner = text.slice(start, end);
-    let open = ch === "【" ? "【" : "[";
-    let close = ch === "【" ? "】" : "]";
+  private wrapOnInput(from: number, to: number, typed: string): boolean {
+    const ed = this.nodeEditor;
+    if (!ed || from === to || (typed !== "【" && typed !== "[")) return false;
+    const text = ed.text;
+    let before = text.slice(0, from);
+    let after = text.slice(to);
+    const inner = text.slice(from, to);
+    let open = typed === "【" ? "【" : "[";
+    let close = typed === "【" ? "】" : "]";
     const wrapped = (o: string, c: string) => before.endsWith(o) && after.startsWith(c);
     if (wrapped("【", "】") || (wrapped("[", "]") && !wrapped("[[", "]]"))) {
       before = before.slice(0, -1);
@@ -5488,23 +5349,10 @@ export class MindMapCanvas {
       open = "[[";
       close = "]]";
     }
-    label.textContent = before + open + inner + close + after;
-    const s = before.length + open.length;
-    const node = label.firstChild ?? label;
-    const sel = this.el.win.getSelection();
-    const r = this.el.doc.createRange();
-    r.setStart(node, s);
-    r.setEnd(node, s + inner.length);
-    sel?.removeAllRanges();
-    sel?.addRange(r);
+    const start = before.length + open.length;
+    ed.setText(before + open + inner + close + after, start, start + inner.length);
     this.closeLinkSuggest();
-    if (this.editing) this.reflow(this.editing);
-  }
-
-  private setCaret(label: HTMLElement, offset: number): void {
-    const node = label.firstChild ?? label;
-    const sel = this.el.win.getSelection();
-    sel?.collapse(node, Math.min(offset, node.textContent?.length ?? 0));
+    return true;
   }
 
   /**
@@ -5512,20 +5360,18 @@ export class MindMapCanvas {
    * 中文输入法下打出来的「【【」先换成 [[（别的笔记插件也这么做，省得切输入法）。
    */
   private updateLinkSuggest(): void {
-    const label = this.editingLabel();
+    const ed = this.nodeEditor;
     const host = this.opts.host;
-    if (!label || !host?.listLinkTargets) return this.closeLinkSuggest();
-    const caret = this.caretOffset(label);
-    if (caret === null) return this.closeLinkSuggest();
-    let text = label.textContent ?? "";
+    if (!ed || ed.composing || !host?.listLinkTargets) return this.closeLinkSuggest();
+    const { from, to } = ed.selection;
+    if (from !== to) return this.closeLinkSuggest();
+    const caret = to;
+    let text = ed.text;
     // 光标前最后一个「【【」（后面没有更晚的 [[）换成 [[；紧挨光标的「】】」换成 ]]。长度不变，光标不用挪
     const cn = text.slice(0, caret).lastIndexOf("【【");
     if (cn >= 0 && text.slice(0, caret).lastIndexOf("[[") < cn) text = text.slice(0, cn) + "[[" + text.slice(cn + 2);
     if (text.slice(0, caret).endsWith("】】")) text = text.slice(0, caret - 2) + "]]" + text.slice(caret);
-    if (text !== label.textContent) {
-      label.textContent = text;
-      this.setCaret(label, caret);
-    }
+    if (text !== ed.text) ed.setText(text, caret);
     const before = text.slice(0, caret);
     const open = before.lastIndexOf("[[");
     const query = open < 0 ? "" : before.slice(open + 2);
@@ -5564,10 +5410,8 @@ export class MindMapCanvas {
     }
     this.paintLinkSuggest();
     // 跟着光标走
-    const sel = this.el.win.getSelection();
     const host_ = this.el.getBoundingClientRect();
-    let rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-    if (!rect || (!rect.width && !rect.height)) rect = label.getBoundingClientRect();
+    const rect = ed.coordsAt(caret) ?? ed.host.getBoundingClientRect();
     const el = this.linkSuggest.el;
     el.style.left = `${Math.max(4, Math.min(rect.left - host_.left, host_.width - el.offsetWidth - 4))}px`;
     const below = rect.bottom - host_.top + 6;
@@ -5604,18 +5448,15 @@ export class MindMapCanvas {
 
   private chooseLinkSuggest(index: number): void {
     const s = this.linkSuggest;
-    const label = this.editingLabel();
+    const ed = this.nodeEditor;
     const target = s?.items[index];
-    if (!s || !label || !target) return;
-    const caret = this.caretOffset(label) ?? (label.textContent ?? "").length;
-    const text = label.textContent ?? "";
+    if (!s || !ed || !target) return;
+    const caret = ed.selection.to;
     // 光标后面已经有 ]]（比如自动补的）就一起吞掉，不留重复的括号
-    const end = text.slice(caret).startsWith("]]") ? caret + 2 : caret;
+    const end = ed.text.slice(caret).startsWith("]]") ? caret + 2 : caret;
     const link = `[[${target.linktext}]]`;
-    label.textContent = text.slice(0, s.open) + link + text.slice(end);
-    this.setCaret(label, s.open + link.length);
+    ed.replace(s.open, end, link, s.open + link.length);
     this.closeLinkSuggest();
-    if (this.editing) this.reflow(this.editing);
   }
 
   private closeLinkSuggest(): void {
@@ -6233,78 +6074,27 @@ export class MindMapCanvas {
   }
 
   private formatEditing(fmt: InlineFormat): void {
-    const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
-    if (!label) return;
-    const text = label.textContent ?? "";
-    const [s, e] = this.labelSelection(label);
-    const r = applyInlineFormat(text, s, e, fmt);
-    if (r.text === text) return;
-    // 整段替换走 insertText：编辑框自己的 ⌘Z 能撤回这一步
-    const sel = this.el.win.getSelection();
-    const all = this.el.doc.createRange();
-    all.selectNodeContents(label);
-    sel?.removeAllRanges();
-    sel?.addRange(all);
-    const ok = this.el.doc.execCommand("insertText", false, r.text);
-    if (!ok || label.textContent !== r.text) label.textContent = r.text;
-    this.setLabelSelection(label, r.start, r.end);
-    this.reflow(this.editing ?? undefined);
-    this.updateFormatBar();
-  }
-
-  /** 编辑框里选区的起止（按 textContent 计的字符位置）；选区不在框里就当没选 */
-  private labelSelection(label: HTMLElement): [number, number] {
-    const sel = this.el.win.getSelection();
-    if (!sel?.rangeCount) return [0, 0];
-    const r = sel.getRangeAt(0);
-    if (!label.contains(r.startContainer) || !label.contains(r.endContainer)) return [0, 0];
-    const pre = this.el.doc.createRange();
-    pre.selectNodeContents(label);
-    pre.setEnd(r.startContainer, r.startOffset);
-    const s = pre.toString().length;
-    return [s, s + r.toString().length];
-  }
-
-  private setLabelSelection(label: HTMLElement, start: number, end: number): void {
-    const walker = this.el.doc.createTreeWalker(label, NodeFilter.SHOW_TEXT);
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(label);
-    range.collapse(false);
-    let pos = 0;
-    let startSet = false;
-    for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
-      const len = n.data.length;
-      if (!startSet && start <= pos + len) {
-        range.setStart(n, start - pos);
-        startSet = true;
-      }
-      if (startSet && end <= pos + len) {
-        range.setEnd(n, end - pos);
-        break;
-      }
-      pos += len;
-    }
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
+    const ed = this.nodeEditor;
+    if (!ed) return;
+    const { from, to } = ed.selection;
+    const r = applyInlineFormat(ed.text, from, to, fmt);
+    if (r.text !== ed.text) ed.setText(r.text, r.start, r.end);
   }
 
   /** 编辑中选中一段文字时浮在它上面的格式栏（设置里打开才有） */
   private updateFormatBar(): void {
-    const label = this.editing && this.els.get(this.editing.id)?.querySelector<HTMLElement>(".mm-label");
-    const sel = this.el.win.getSelection();
-    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    if (!label || !this.opts.formatBar?.() || !range || range.collapsed || !label.contains(range.commonAncestorContainer)) {
+    const ed = this.nodeEditor;
+    const rect = ed && this.opts.formatBar?.() ? ed.selectionRect() : null;
+    if (!ed || !rect) {
       this.formatBar?.remove();
       this.formatBar = null;
       return;
     }
     if (!this.formatBar) this.formatBar = this.buildFormatBar();
     const bar = this.formatBar;
-    const rect = range.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
     // 竖直方向避开整个节点（选区在第一行时，紧贴选区放会压住节点边框）
-    const nodeRect = (label.closest(".gg-mm-node") ?? label).getBoundingClientRect();
+    const nodeRect = (ed.host.closest(".gg-mm-node") ?? ed.host).getBoundingClientRect();
     const w = bar.offsetWidth;
     const h = bar.offsetHeight;
     const left = Math.max(4, Math.min(host.width - w - 4, rect.left + rect.width / 2 - host.left - w / 2));

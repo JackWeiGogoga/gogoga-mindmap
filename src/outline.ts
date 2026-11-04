@@ -6,6 +6,7 @@
 
 import type { MindMapCanvas } from "./canvas";
 import { t } from "./i18n";
+import { InlineEditor } from "./inline-editor";
 import { plainText } from "./inline";
 import { MindNode, visibleChildren } from "./model";
 
@@ -13,7 +14,7 @@ export class OutlinePanel {
   readonly el: HTMLElement;
   private list: HTMLElement;
   private rows = new Map<string, HTMLElement>();
-  private editing: { node: MindNode; el: HTMLElement; isNew: boolean } | null = null;
+  private editing: { node: MindNode; editor: InlineEditor; isNew: boolean } | null = null;
   private disposers: (() => void)[] = [];
 
   constructor(container: HTMLElement, private canvas: MindMapCanvas, onClose: () => void) {
@@ -42,6 +43,8 @@ export class OutlinePanel {
   }
 
   destroy(): void {
+    this.editing?.editor.destroy();
+    this.editing = null;
     for (const d of this.disposers) d();
     this.el.replaceChildren();
     this.el.classList.remove("mm-outline");
@@ -211,30 +214,29 @@ export class OutlinePanel {
     const text = row?.querySelector<HTMLElement>(".mm-outline-text");
     if (!row || !text) return;
     this.canvas.select(node);
-    text.textContent = node.text;
-    text.setAttribute("contenteditable", "plaintext-only");
-    if (!text.isContentEditable) text.setAttribute("contenteditable", "true");
     row.classList.add("is-editing");
-    this.editing = { node, el: text, isNew };
-    text.focus();
-    const range = this.el.doc.createRange();
-    range.selectNodeContents(text);
-    const sel = this.el.win.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    const onBlur = () => {
-      text.removeEventListener("blur", onBlur);
-      if (this.editing?.el === text) this.commitRename();
-    };
-    text.addEventListener("blur", onBlur);
+    const editor: InlineEditor = new InlineEditor(text, {
+      text: node.text,
+      selectAll: true,
+      multiline: false,
+      // Enter、Esc、Tab 走面板的按键处理（编辑中它会拦下事件，不再往面板上冒）；别的键归编辑框
+      onKey: (ev) => {
+        this.onKeyDown(ev);
+        return ev.defaultPrevented;
+      },
+      onBlur: () => {
+        if (this.editing?.editor === editor) this.commitRename();
+      },
+    });
+    this.editing = { node, editor, isNew };
   }
 
   commitRename(cancel = false): void {
     const e = this.editing;
     if (!e) return;
     this.editing = null;
-    const raw = (e.el.textContent ?? "").replace(/\s*\n\s*/g, " ").trim();
-    e.el.removeAttribute("contenteditable");
+    const raw = e.editor.text.replace(/\s*\n\s*/g, " ").trim();
+    e.editor.destroy();
     if (cancel ? e.isNew : raw === "" && e.isNew) {
       this.canvas.deleteNode(e.node);
       this.el.focus({ preventScroll: true });

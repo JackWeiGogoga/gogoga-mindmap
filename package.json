@@ -15,6 +15,9 @@
     "lint": "eslint ."
   },
   "devDependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
     "@eslint/js": "^9.39.5",
     "@eslint/json": "0.14.0",
     "@types/markdown-it": "14.1.2",

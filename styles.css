@@ -429,6 +429,22 @@
   white-space: pre-wrap;
   min-width: 2em;
 }
+/* ---------- 行内编辑框（CodeMirror，见 inline-editor.ts）：长得和原来的文字一样，没有边框和内边距 ---------- */
+.gg-mm-root .mm-has-editor,
+.mm-outline .mm-has-editor { display: inline-block; min-width: 2em; max-width: 100%; vertical-align: top; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-editor { background: transparent; color: inherit; font: inherit; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-editor.cm-focused { outline: none; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-scroller { overflow: visible; font-family: inherit; line-height: inherit; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-content { padding: 0; font-family: inherit; caret-color: currentColor; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-line { padding: 0; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-placeholder { color: var(--text-faint, #999); }
+/* 实时预览：和节点渲染出来的样子一致；光标进到某段时露出的标记符淡一些 */
+.mm-has-editor .mm-ed-strong { font-weight: 700; }
+.mm-has-editor .mm-ed-em { font-style: italic; }
+.mm-has-editor .mm-ed-del { text-decoration: line-through; }
+.mm-has-editor .mm-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
+.mm-has-editor .mm-ed-mark { background: rgba(255, 210, 0, 0.45); border-radius: 2px; }
+.mm-has-editor .mm-ed-syntax { opacity: 0.45; }
 .mm-label strong { font-weight: 700; }
 .mm-label code {
   font-family: var(--font-monospace, ui-monospace, Menlo, monospace);
@@ -1892,10 +1908,6 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .mm-callout .mm-link { color: var(--link-color, var(--mm-selection)); }
 .mm-callout.is-editing { cursor: text; user-select: text; min-width: 60px; }
 .mm-callout.is-editing .mm-callout-text { white-space: pre-wrap; outline: none; }
-.mm-callout.is-editing .mm-callout-text:empty::before {
-  content: attr(data-placeholder);
-  opacity: 0.45;
-}
 /* 隐藏标注时临时浮出的一条：盖在节点上面，带阴影区分 */
 .mm-callout.is-peek {
   z-index: 5;

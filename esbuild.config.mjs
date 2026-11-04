@@ -11,7 +11,9 @@ const outfile = harness ? "dev/harness.js" : "dist/main.js";
 const context = await esbuild.context({
   entryPoints: [entry],
   bundle: true,
-  external: ["obsidian", "electron", ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
+  // CodeMirror 用 Obsidian 自带的那份（插件运行时由 Obsidian 提供，版本和它的编辑器一致）；
+  // 调试页不在 Obsidian 里，得打包进去
+  external: ["obsidian", "electron", ...(harness ? [] : ["@codemirror/*", "@lezer/*"]), ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
   format: harness ? "iife" : "cjs",
   target: "es2020",
   platform: "browser",
