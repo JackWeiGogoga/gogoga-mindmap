@@ -4,8 +4,10 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-04
+
 ### 改进
-- 编辑节点文字时直接显示格式效果，和 Obsidian 的实时预览一样：粗体、斜体、高亮、删除线、行内代码、文字颜色和荧光笔都按渲染后的样子显示，标记藏起来；光标停到某一段上才露出这一段的原文。编辑框换成了 Obsidian 自己用的 CodeMirror，输入法、撤销、光标移动和 Obsidian 的编辑器一致；标注、概要、关联线文字、外框标题和大纲面板改名也用同一个编辑框。
+- 编辑节点文字时直接显示格式效果，和 Obsidian 的实时预览一样：粗体、斜体、高亮、删除线、行内代码、文字颜色和荧光笔都按渲染后的样子显示，标记藏起来；光标停到粗体、高亮这类 Markdown 格式上时露出 `**`、`==`，颜色标签始终藏着，点进彩色的字、拖选时排版不会跳。编辑框换成了 Obsidian 自己用的 CodeMirror，输入法、撤销、光标移动和 Obsidian 的编辑器一致；标注、概要、关联线文字、外框标题和大纲面板改名也用同一个编辑框。
 
 ### 修复
 - 标题紧挨着写（中间不空行）的笔记，在脑图里新增节点后，Markdown 里每个新节点前面都会多一个空行。现在新增的标题跟着原文的写法：原文标题之间大多不空行，新增的也不空；中心主题后面、备注和段落后面照样空一行。插件新建的脑图标题之间本来就空一行，不受影响。
@@ -490,7 +492,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...HEAD
+[0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0
 [0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0

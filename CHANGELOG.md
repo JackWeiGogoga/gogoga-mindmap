@@ -4,8 +4,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-04
+
 ### Improved
-- Editing a node's text now shows formatting as it will look, like Obsidian's Live Preview: bold, italic, highlights, strikethrough, inline code, text colors and highlighter colors render in place with their markers hidden, and a piece's source shows when the cursor is on it. The editor is now CodeMirror, the same one Obsidian uses, so input methods, undo and cursor movement behave as in Obsidian's editor; callouts, summaries, relationship labels, boundary titles and renaming in the outline panel use the same editor.
+- Editing a node's text now shows formatting as it will look, like Obsidian's Live Preview: bold, italic, highlights, strikethrough, inline code, text colors and highlighter colors render in place with their markers hidden; Markdown markers like `**` and `==` show when the cursor is on them, while color tags always stay hidden so clicking into or selecting colored text doesn't reflow the node. The editor is now CodeMirror, the same one Obsidian uses, so input methods, undo and cursor movement behave as in Obsidian's editor; callouts, summaries, relationship labels, boundary titles and renaming in the outline panel use the same editor.
 
 ### Fixed
 - In notes whose headings sit on consecutive lines (no blank line between them), every node added from the map got a blank line in front of it in Markdown. New headings now follow the note's own style: if most headings sit right after the previous node, new ones do too; a blank line is still kept after the central topic and after notes and paragraphs. Maps created by the plugin, which put a blank line between headings, are unaffected.
@@ -490,7 +492,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...HEAD
+[0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0
 [0.37.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.36.0...0.37.0
 [0.36.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.35.0...0.36.0
 [0.35.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.34.0...0.35.0
