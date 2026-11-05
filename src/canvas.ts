@@ -117,6 +117,8 @@ export interface CanvasHost {
   /** 当前文件名（不含扩展名），复制节点链接用 */
   fileBasename?: () => string;
   notice?: (message: string) => void;
+  /** 编辑时粘贴网页地址，抓它的标题（设置里关着就返回 null，照常粘地址） */
+  linkTitle?: (url: string) => Promise<string | null> | null;
   /** 用宿主的样式显示提示（Obsidian 的 setTooltip）；没有就退回原生 title */
   setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement) => void;
 }
@@ -3035,6 +3037,7 @@ export class MindMapCanvas {
       selectAll: opts.selectAll,
       multiline: opts.multiline,
       placeholder: opts.placeholder,
+      linkTitle: this.linkTitle,
       onKey: (ev) => {
         ev.stopPropagation();
         if (ev.isComposing || ev.keyCode === 229) return false;
@@ -5312,6 +5315,7 @@ export class MindMapCanvas {
         return ev.defaultPrevented;
       },
       onInput: (from, to, text) => this.wrapOnInput(from, to, text),
+      linkTitle: this.linkTitle,
       // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
       onPaste: (ev) => {
         const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
@@ -5331,6 +5335,9 @@ export class MindMapCanvas {
     });
     this.reflow();
   }
+
+  /** 交给行内编辑框：粘贴网页地址时抓标题 */
+  readonly linkTitle = (url: string): Promise<string | null> | null => this.opts.host?.linkTitle?.(url) ?? null;
 
   commitEdit(cancel = false, refocus = true): void {
     const node = this.editing;
@@ -5849,20 +5856,28 @@ export class MindMapCanvas {
   }
 
   /** 把文本解析成节点挂到当前节点下（无选中则挂到根） */
-  pasteText(text: string): void {
-    if (!this.opts.editable || !this.doc) return;
+  /**
+   * 剪贴板文字粘成选中节点的子节点。select：选中粘进来的节点（平常的粘贴）；
+   * 不选（PDF 自动摘录）时选中留在原节点上，接着摘的还加到它下面，只把新节点挪进视野。粘进了东西返回 true
+   */
+  pasteText(text: string, select = true): boolean {
+    if (!this.opts.editable || !this.doc) return false;
     if (lastCopy && lastCopy.plain !== lastCopy.full && text.replace(/\r/g, "") === lastCopy.plain) text = lastCopy.full;
     const nodes = parseClipboard(text);
-    if (!nodes.length) return;
+    if (!nodes.length) return false;
     if (this.editing) this.commitEdit();
     this.remapPastedAnchors(nodes);
     const target = this.primary ?? this.doc.root;
     if (target.folded) target.folded = false;
     for (const n of nodes) attachSubtree(n, target, this.doc.style);
-    this.select(null);
-    nodes.forEach((n, i) => this.select(n, i === 0 ? "replace" : "add"));
+    if (select) {
+      this.select(null);
+      nodes.forEach((n, i) => this.select(n, i === 0 ? "replace" : "add"));
+    }
     this.render();
+    if (!select) this.ensureVisible(nodes[nodes.length - 1]);
     this.notify();
+    return true;
   }
 
   // ---------- 节点 ⇄ 笔记 ----------

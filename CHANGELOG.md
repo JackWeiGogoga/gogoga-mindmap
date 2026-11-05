@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-05
+
+### Added
+- Select text while editing a node and paste a web address to get a `[text](address)` link, as in the Obsidian editor. Local file and folder paths (`/Users/…`, `C:\…`) work the same way and become `file://` links that open in the default app. With nothing selected, pasting works as before. Turn on **Fetch page titles for pasted links** (off by default) to have a pasted address with nothing selected become `[page title](address)`. Renaming in the outline panel works the same way.
+- PDF auto-excerpt: run **Toggle PDF auto-excerpt into this mind map** in a map, and every link PDF++ copies (selected text, a rectangle, an annotation) is added under the selected node straight away, with no ⌘V. The selection stays on that node, so excerpts in a row land under it; click another node to send the next ones there. Turn on Auto-copy in PDF++ to add a selection as soon as you make it. While it's on, a highlighted button in the view header stops it. Needs PDF++.
+
 ## [0.41.0] - 2026-11-05
 
 ### Added
@@ -525,7 +531,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...HEAD
+[0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0
 [0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0

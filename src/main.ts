@@ -18,6 +18,7 @@ import {
   setTooltip,
   Plugin,
   renderMath,
+  requestUrl,
   Scope,
   TAbstractFile,
   TFile,
@@ -30,6 +31,8 @@ const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "
 import { locateBlock, replaceBlock } from "./codeblock";
 import { preserveFormat } from "./merge";
 import { parseColorList } from "./format";
+import { htmlCharset, titleFromHtml } from "./paste-link";
+import { PdfExcerpt } from "./pdf-excerpt";
 import { Key, setLocale, t } from "./i18n";
 import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
@@ -106,6 +109,8 @@ function previewLineAt(view: MarkdownView, target: HTMLElement): number | null {
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
+  /** PDF 自动摘录：同一时间只有一张脑图接 PDF++ 复制的内容 */
+  readonly pdfExcerpt = new PdfExcerpt(this.app);
   /** 锁定、备注展开、隐藏标注：插件目录下的 state.json，和设置分开 */
   fileState!: FileStateStore;
   /** 视口：只存本机 */
@@ -127,6 +132,7 @@ export default class MindMapPlugin extends Plugin {
     setLocale(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
+    this.register(() => this.pdfExcerpt.stop());
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();
@@ -986,6 +992,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
+    exportCommand("toggle-pdf-excerpt", t("command.togglePdfExcerpt"), async (v) => this.pdfExcerpt.toggle(v));
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
     exportCommand("toggle-notes", t("command.toggleNotes"), async (v) => v.toggleNotes());
     exportCommand("toggle-hidden", t("command.toggleHidden"), async () => this.toggleShowHidden());
@@ -1385,6 +1392,32 @@ export default class MindMapPlugin extends Plugin {
     return true;
   }
 
+  /** 抓网页标题；10 秒没回来、出错、不是网页都当没有 */
+  private async fetchPageTitle(url: string): Promise<string | null> {
+    const fetch = (async () => {
+      const res = await requestUrl({ url, method: "GET", throw: false });
+      if (res.status >= 400) return null;
+      const type = res.headers["content-type"] ?? res.headers["Content-Type"];
+      if (type && !/html/i.test(type)) return null;
+      const bytes = res.arrayBuffer;
+      // 先按 latin1 看一眼开头找 <meta charset>，再用声明的编码解（GBK 的中文网页不少）
+      const head = new TextDecoder("latin1").decode(bytes.slice(0, 4096));
+      let html: string;
+      try {
+        html = new TextDecoder(htmlCharset(type, head)).decode(bytes);
+      } catch {
+        html = new TextDecoder().decode(bytes);
+      }
+      return titleFromHtml(html);
+    })();
+    const timeout = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 10000));
+    try {
+      return await Promise.race([fetch, timeout]);
+    } catch {
+      return null;
+    }
+  }
+
   canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
     return {
       claimKeys: (el, onKey) => {
@@ -1545,6 +1578,7 @@ export default class MindMapPlugin extends Plugin {
         return f instanceof TFile ? f.basename : p.replace(/\.md$/, "").split("/").pop() ?? p;
       },
       notice: (m) => new Notice(m),
+      linkTitle: (url) => (this.settings.pasteLinkTitle ? this.fetchPageTitle(url) : null),
       // 工具栏按钮只有图标：提示别让人等（Obsidian 默认要停一会儿才出）
       setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
       openLink: (href, internal, ev) => {

@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-05
+
+### 新增
+- 编辑节点时选中文字再粘贴网址，生成 `[文字](网址)` 链接，和 Obsidian 编辑器里一样；本地文件、文件夹的路径（`/Users/…`、`C:\…`）也一样，转成 `file://` 链接，点击用系统默认的程序打开。没选中文字时照旧直接粘贴。设置「粘贴网址时抓取网页标题」（默认关）打开后，没选中文字粘贴网址会自动抓网页标题，粘成 `[标题](网址)`。大纲面板改名时也能这样粘。
+- PDF 自动摘录：在脑图里运行命令「PDF 自动摘录到这张脑图（开/关）」后，PDF++ 每复制一次链接（选中文字、框选区域、标注），就直接加到这张脑图选中节点的下面，不用再回脑图按 ⌘V。选中留在原来的节点上，连着摘的都加在它下面；在脑图里点别的节点就换个地方加。在 PDF++ 设置里打开 Auto-copy，选中文字就加进来。开着时标题栏有个高亮的按钮，点它停止；需要装 PDF++。
+
 ## [0.41.0] - 2026-11-05
 
 ### 新增
@@ -525,7 +531,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...HEAD
+[0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0
 [0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0

@@ -10,6 +10,7 @@ import { Decoration, type DecorationSet, EditorView, keymap, placeholder, ViewPl
 import { defaultKeymap, history, historyKeymap, insertNewline } from "@codemirror/commands";
 import { dropEmptyColors } from "./format";
 import { formatSpans, revealed, type FormatSpan } from "./live-preview";
+import { isWebUrl, linkDestination, pastedLink } from "./paste-link";
 
 export interface InlineEditorOptions {
   text: string;
@@ -22,6 +23,11 @@ export interface InlineEditorOptions {
   onKey?: (ev: KeyboardEvent) => boolean;
   /** 粘贴先交给宿主：返回 true 表示处理过了（比如图片存成附件），编辑框不再插入任何东西 */
   onPaste?: (ev: ClipboardEvent) => boolean;
+  /**
+   * 没选中文字时粘贴网页地址：给了就去抓标题，抓到后把刚粘进去的地址换成 [标题](网址)。
+   * 返回 null 表示不抓（设置里关着）
+   */
+  linkTitle?: (url: string) => Promise<string | null> | null;
   /** 一次输入落到文字之前：返回 true 表示宿主自己处理了（比如选中文字打【包成链接） */
   onInput?: (from: number, to: number, text: string) => boolean;
   /** 文字变了（输入法组字结束时也会来一次）。在这次更新结束后才调用，回调里可以接着改文字 */
@@ -87,12 +93,14 @@ const livePreview = ViewPlugin.fromClass(
 export class InlineEditor {
   readonly view: EditorView;
   private destroyed = false;
+  private readonly linkTitle: InlineEditorOptions["linkTitle"];
 
   constructor(
     readonly host: HTMLElement,
     opts: InlineEditorOptions,
   ) {
     const { text } = opts;
+    this.linkTitle = opts.linkTitle;
     // CodeMirror 不许在一次更新还没结束时再发起修改，回调统一推到这次更新之后
     const later = (fn?: () => void) => fn && queueMicrotask(() => !this.destroyed && fn());
     host.replaceChildren();
@@ -110,9 +118,11 @@ export class InlineEditor {
             EditorView.domEventHandlers({
               keydown: (ev) => !!opts.onKey?.(ev),
               paste: (ev) => {
-                if (!opts.onPaste?.(ev)) return false;
-                ev.preventDefault();
-                return true;
+                if (opts.onPaste?.(ev) || this.pasteLink(ev)) {
+                  ev.preventDefault();
+                  return true;
+                }
+                return false;
               },
             }),
           ),
@@ -151,6 +161,42 @@ export class InlineEditor {
 
   get text(): string {
     return this.view.state.doc.toString();
+  }
+
+  /** 粘贴网址或本地路径：选中了文字就包成链接；没选中、能抓标题的先照常粘上，标题到了再换。处理了返回 true */
+  private pasteLink(ev: ClipboardEvent): boolean {
+    const clip = ev.clipboardData?.getData("text/plain") ?? "";
+    const view = this.view;
+    const { from, to } = view.state.selection.main;
+    if (from !== to) {
+      const link = pastedLink(view.state.sliceDoc(from, to), clip);
+      if (!link) return false;
+      view.dispatch({ changes: { from, to, insert: link }, selection: { anchor: from + link.length }, userEvent: "input.paste" });
+      return true;
+    }
+    if (!isWebUrl(clip)) return false;
+    const url = clip.trim();
+    const pending = this.linkTitle?.(url);
+    if (!pending) return false;
+    view.dispatch({ changes: { from, insert: url }, selection: { anchor: from + url.length }, userEvent: "input.paste" });
+    void pending.then((title) => {
+      if (!title || this.destroyed) return;
+      // 等标题的这一会儿可能又打了字：地址还在原处就换原处，否则找文字里唯一的那一处
+      const doc = this.view.state.doc.toString();
+      const at = doc.slice(from, from + url.length) === url ? from : doc.indexOf(url);
+      if (at < 0 || (at !== from && doc.indexOf(url, at + 1) >= 0)) return;
+      const link = `[${title}](${linkDestination(url) ?? url})`;
+      const sel = this.view.state.selection.main;
+      const end = at + url.length;
+      // 光标在地址后面的跟着挪，换完还在原来那个字后面
+      const shift = (p: number) => (p >= end ? p + link.length - url.length : p);
+      this.view.dispatch({
+        changes: { from: at, to: end, insert: link },
+        selection: { anchor: shift(sel.anchor), head: shift(sel.head) },
+        userEvent: "input.paste",
+      });
+    });
+    return true;
   }
 
   /** 拿去保存的文字：颜色标签编辑时藏着，把彩色字整个删掉会留下看不见的空标签，这里去掉 */

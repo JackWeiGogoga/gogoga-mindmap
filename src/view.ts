@@ -13,6 +13,7 @@ import { pathOf, walk, type MindDoc } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import type MindMapPlugin from "./main";
+import type { ExcerptTarget } from "./pdf-excerpt";
 import { indentString, ToolbarPosition } from "./settings";
 
 export const VIEW_TYPE_MINDMAP = "mindmap";
@@ -26,7 +27,7 @@ function foldedSignature(doc: MindDoc): string {
   return out.join("\n");
 }
 
-export class MindMapView extends TextFileView {
+export class MindMapView extends TextFileView implements ExcerptTarget {
   /** 页面预览（hover-link）需要宿主提供这个字段 */
   hoverPopover: HoverPopover | null = null;
   private canvas: MindMapCanvas | null = null;
@@ -185,6 +186,27 @@ export class MindMapView extends TextFileView {
 
   toggleRecite(): void {
     this.canvas?.setRecite(!this.canvas.isRecite());
+  }
+
+  // ---------- PDF 自动摘录（见 pdf-excerpt.ts） ----------
+
+  private excerptAction: HTMLElement | null = null;
+
+  pasteExcerpt(text: string): boolean {
+    return this.canvas?.pasteText(text, false) ?? false;
+  }
+
+  isAlive(): boolean {
+    return !!this.canvas && this.containerEl.isConnected;
+  }
+
+  /** 摘录开着时标题栏多一个高亮的按钮，点它关掉 */
+  setExcerpting(on: boolean): void {
+    this.excerptAction?.remove();
+    this.excerptAction = null;
+    if (!on) return;
+    this.excerptAction = this.addAction("file-input", t("action.stopExcerpt"), () => this.plugin.pdfExcerpt.toggle(this));
+    this.excerptAction.addClass("is-active", "mm-excerpt-action");
   }
 
   fitSelectedBranch(): void {
@@ -359,6 +381,7 @@ export class MindMapView extends TextFileView {
     // FileView.onClose 会 loadFile(null) → onUnloadFile → TextFileView.save(true)，
     // 这是视图被替换（切 Markdown 视图、同一标签页打开别的笔记）时最后一次写盘的机会，不能漏掉 super
     this.canvas?.flush();
+    if (this.plugin.pdfExcerpt.isOn(this)) this.plugin.pdfExcerpt.stop();
     await super.onClose();
     this.outline?.destroy();
     this.outline = null;
