@@ -88,6 +88,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 
 - Click to select, double-click to edit. A selected node shows a floating toolbar above it: 9 colors, edit note, and delete. Choose which colors it offers in the "Node colors" setting: built-in names (which follow the theme and dark mode) or hex values like `#ff8800` (which stay fixed), separated by commas. If it gets in the way of clicking nearby nodes, turn off "Floating toolbar on selected nodes" in settings; the same actions are in the context menu.
 - **Drag a node** onto another node, or into the empty space just behind it, to make it a child of that node, or into a gap in a column of children to insert it at that position. In the left-and-right layout you can also drag it to the other side. Near the edge of the canvas the view scrolls along.
+- **Center the selected node** setting (off by default): clicking a node, moving with the arrow keys, or adding a node with Tab / Enter glides the selection to the middle of the canvas; multi-select, box-select and dragging leave the view alone.
 - Shift-click to add to the selection, ⌘-click to toggle, **Shift-drag on empty space to box-select**, ⌘A to select all. With multiple nodes selected, color, delete, dragging and Alt+arrow reordering / promoting / demoting apply to the whole group (drag any one of them and the rest come along).
   Coming from XMind? Set Settings → Left-drag on empty space to "Select": a plain left-drag draws the selection box, right- or middle-drag pans, and a right-click on empty space still opens the menu.
 - Click ≡ on a node to view its note, or use the note button in the toolbar to edit it. Notes support Markdown and stay directly under the node when written back. While editing a note you can paste or drop images: they are saved as attachments and inserted at the cursor. Pasting an image while editing a node's text adds it to that node's note. Drag the bottom-right corner of the note popover to resize it (the size is remembered); clicking **Edit** keeps the popover where it is and at the same size. Click an image in a note to view it full-screen (Esc or click anywhere to close). `[[Links]]` in a note open when clicked (⌘/Ctrl-click for a new tab) and show a page preview on hover. To remove a note, right-click the node → **Delete note**. Turn on "Preview notes while editing" (off by default) to see the rendered note next to the text box as you type (below it when the window is narrow).
@@ -193,7 +194,7 @@ A paragraph here becomes the central topic's note.
 | = / - | Expand / collapse the branch by one level |
 | ⌘⇧0 | Zoom to the selected branch |
 
-| Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch; the view follows when the selection leaves the screen) |
+| Arrow keys | Move between nodes (up and down go through siblings first, then to the same level in the neighboring branch; the view follows when the selection leaves the screen; turn on **Center the selected node** to always glide the selection to the middle) |
 | ⌘Z / ⌘⇧Z | Undo / redo |
 | Scroll wheel / drag empty space | Pan; Shift + wheel pans sideways (set the wheel to zoom in settings → Mouse wheel; Shift + wheel then pans) |
 | ⌘+scroll wheel / pinch / ⌘= ⌘- | Zoom; ⌘0 to fit the canvas |

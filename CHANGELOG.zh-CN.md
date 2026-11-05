@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-05
+
+### 新增
+- 设置「选中节点时自动居中」（「编辑与操作」页，默认关）：点选节点、用方向键切换、按 Tab / Enter 新建节点时，把选中的节点用大约 0.2 秒平滑移到画布中间。单击后等过了双击的间隔才挪，双击编辑不受影响；按住 Shift/⌘ 多选、框选、拖动节点时不动；挪的途中自己拖动画布或缩放，就停在你拖到的位置。
+
 ## [0.42.0] - 2026-11-05
 
 ### 新增
@@ -531,7 +536,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...HEAD
+[0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0

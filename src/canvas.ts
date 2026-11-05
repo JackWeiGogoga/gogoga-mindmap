@@ -215,6 +215,8 @@ export interface CanvasOptions {
   nodeColors?: () => string[];
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
+  /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
+  centerOnSelect?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
@@ -1146,6 +1148,8 @@ export class MindMapCanvas {
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
     if (this.reflowTimer !== null) window.clearTimeout(this.reflowTimer);
     if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
+    this.cancelTapCenter();
+    this.stopPanAnim();
     if (this.touchPress) window.clearTimeout(this.touchPress.timer);
     for (const d of this.disposers) d();
     this.el.replaceChildren();
@@ -3667,6 +3671,7 @@ export class MindMapCanvas {
       this.downOnShield = !!target.closest(".mm-frame-shield");
       this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
       const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
+      this.cancelTapCenter();
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
@@ -3794,6 +3799,8 @@ export class MindMapCanvas {
           else this.editOnDoubleTap(tapped);
         } else {
           this.lastTap = { node: tapped, time: now };
+          // 单击选中后居中：等过了双击的间隔再挪，免得第二下点空；按着 Shift/⌘ 多选时不挪
+          if (!ev.shiftKey && !ev.metaKey && !ev.ctrlKey && this.opts.centerOnSelect?.()) this.scheduleTapCenter(tapped);
         }
       } else if (ev.type === "pointerup") {
         this.lastTap = null;
@@ -4271,7 +4278,7 @@ export class MindMapCanvas {
       case "ArrowDown":
         ev.preventDefault();
         this.navigate(sel, ev.key);
-        this.ensureVisible(this.primary);
+        this.followSelection(this.primary);
         return;
       case " ":
       case "F2":
@@ -5152,8 +5159,9 @@ export class MindMapCanvas {
     const node = addChild(sel, this.doc.style, "");
     this.select(node);
     this.render();
-    this.ensureVisible(node);
+    // 先进编辑再居中：编辑框会把节点撑宽，按撑宽后的大小算中心
     this.startEdit(node, true);
+    this.followSelection(node);
   }
 
   private addSiblingToSelected(before: boolean): void {
@@ -5168,8 +5176,9 @@ export class MindMapCanvas {
     if (sel.side) node.side = sel.side;
     this.select(node);
     this.render();
-    this.ensureVisible(node);
+    // 先进编辑再居中：编辑框会把节点撑宽，按撑宽后的大小算中心
     this.startEdit(node, true);
+    this.followSelection(node);
   }
 
   private deleteSelected(): void {
@@ -5260,8 +5269,8 @@ export class MindMapCanvas {
     this.setPrimary(made[0]);
     this.render();
     this.notify();
-    this.ensureVisible(made[0]);
     if (made.length === 1) this.startEdit(made[0]);
+    this.followSelection(made[0]);
   }
 
   /** 只删选中的节点本身，它的子节点按原顺序接到父节点下、它原来的位置 */
@@ -5776,12 +5785,68 @@ export class MindMapCanvas {
     this.positionNodebar();
   }
 
-  centerOn(node: MindNode): void {
+  /** smooth：约 0.2 秒平滑移过去（中途用户自己平移、缩放了就停下，不和他抢） */
+  centerOn(node: MindNode, smooth = false): void {
     const p = this.layout?.placed.get(node.id);
     if (!p) return;
-    this.tx = this.el.clientWidth / 2 - (p.x + p.w / 2) * this.k;
-    this.ty = this.el.clientHeight / 2 - (p.y + p.h / 2) * this.k;
-    this.applyTransform();
+    const tx = this.el.clientWidth / 2 - (p.x + p.w / 2) * this.k;
+    const ty = this.el.clientHeight / 2 - (p.y + p.h / 2) * this.k;
+    this.stopPanAnim();
+    if (!smooth || (Math.abs(tx - this.tx) < 1 && Math.abs(ty - this.ty) < 1)) {
+      this.tx = tx;
+      this.ty = ty;
+      this.applyTransform();
+      return;
+    }
+    const win = this.el.win;
+    const sx = this.tx;
+    const sy = this.ty;
+    const k = this.k;
+    // 上一帧设到的位置：和现在对不上，说明别处动过视口（拖动画布、滚轮、缩放），就停下
+    let last = { tx: sx, ty: sy };
+    const start = performance.now();
+    const step = (now: number) => {
+      if (this.tx !== last.tx || this.ty !== last.ty || this.k !== k) {
+        this.panAnim = null;
+        return;
+      }
+      const t = Math.min(1, (now - start) / 200);
+      const e = 1 - Math.pow(1 - t, 3);
+      this.tx = sx + (tx - sx) * e;
+      this.ty = sy + (ty - sy) * e;
+      last = { tx: this.tx, ty: this.ty };
+      this.applyTransform();
+      this.panAnim = t < 1 ? win.requestAnimationFrame(step) : null;
+    };
+    this.panAnim = win.requestAnimationFrame(step);
+  }
+
+  private panAnim: number | null = null;
+  private tapCenter: number | null = null;
+
+  private stopPanAnim(): void {
+    if (this.panAnim !== null) this.el.win.cancelAnimationFrame(this.panAnim);
+    this.panAnim = null;
+  }
+
+  /** 选中变了以后把它带进视野：设置开了「选中节点时自动居中」就平滑移到中间，否则出了视野才挪最小距离 */
+  private followSelection(node: MindNode | null): void {
+    if (node && this.opts.centerOnSelect?.()) this.centerOn(node, true);
+    else this.ensureVisible(node);
+  }
+
+  /** 单击选中后的居中等双击间隔过了再做；期间又按下了（双击、拖动）就取消 */
+  private scheduleTapCenter(node: MindNode): void {
+    this.cancelTapCenter();
+    this.tapCenter = this.el.win.setTimeout(() => {
+      this.tapCenter = null;
+      if (this.primary === node && this.selected.size === 1 && !this.editing) this.centerOn(node, true);
+    }, 350);
+  }
+
+  private cancelTapCenter(): void {
+    if (this.tapCenter !== null) this.el.win.clearTimeout(this.tapCenter);
+    this.tapCenter = null;
   }
 
   // ---------- 剪贴板 ----------

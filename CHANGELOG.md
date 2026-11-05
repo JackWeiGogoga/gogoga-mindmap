@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-05
+
+### Added
+- **Center the selected node** setting (on the Editing and interaction page, off by default): clicking a node, moving with the arrow keys, or adding a node with Tab / Enter glides the selection to the middle of the canvas in about 0.2 s. After a click it waits out the double-click interval, so double-click to edit still works; Shift/⌘ multi-select, box-select and dragging leave the view alone, and panning or zooming mid-glide stops it where you put it.
+
 ## [0.42.0] - 2026-11-05
 
 ### Added
@@ -531,7 +536,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...HEAD
+[0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0

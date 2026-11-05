@@ -123,6 +123,7 @@ class MindMapEmbed extends Component {
         wheelZoom: () => settings.wheelAction === "zoom",
         notePreview: () => settings.notePreview,
         formatBar: () => settings.formatBar,
+        centerOnSelect: () => settings.centerOnSelect,
         copyPlain: () => settings.copyPlain,
         showNodebar: () => settings.showNodebar,
         nodeColors: () => parseNodeColors(settings.nodeColors),

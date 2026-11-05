@@ -304,6 +304,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       notePreview: () => this.plugin.settings.notePreview,
       formatBar: () => this.plugin.settings.formatBar,
+      centerOnSelect: () => this.plugin.settings.centerOnSelect,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),

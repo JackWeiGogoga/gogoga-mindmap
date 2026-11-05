@@ -1169,6 +1169,7 @@ export default class MindMapPlugin extends Plugin {
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
+        centerOnSelect: () => this.settings.centerOnSelect,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
