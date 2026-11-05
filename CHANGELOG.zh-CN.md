@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-05
+
+### 新增
+- 支持 Obsidian 1.15 的彩色高亮 `==🔴文字==`：节点里按 Obsidian 主题的颜色显示，不再露出 emoji、一律显示成黄色；编辑节点时 emoji 和 `==` 一样藏着。「常用荧光笔颜色」里可以填 🔴🟠🟡🟢🔵🟣，格式栏和「荧光笔颜色」命令就写成这种高亮；「清除文字颜色和荧光笔」把它变回普通高亮。
+
+### 改进
+- 背诵模式遮住高亮时保留原来的颜色（普通高亮是黄色，荧光笔和彩色高亮各是各的颜色），不再一律遮成灰色，更醒目，也看得出是哪一类内容。
+
 ## [0.40.0] - 2026-11-05
 
 ### 新增
@@ -517,7 +525,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...HEAD
+[0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0
 [0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0
 [0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0

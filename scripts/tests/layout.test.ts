@@ -70,6 +70,7 @@ test("多行节点文本用 <br> 存储，编辑时还原成换行", () => {
   assert.equal(fromEditableText("第一行\n  第二行  \n\n第三行"), "第一行<br>第二行<br>第三行");
   assert.equal(toEditableText("a<br>b<br/>c"), "a\nb\nc");
   assert.equal(plainText("a<br>**b**"), "a b");
+  assert.equal(plainText("==🔴红== ==普通=="), "红 普通");
 });
 
 test("组织结构图：子节点水平排在父节点下方并居中，无重叠", () => {

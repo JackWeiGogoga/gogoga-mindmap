@@ -58,3 +58,14 @@ test("HTML 颜色标签和 <mark>：始终藏着，光标在里面也不露", ()
   }
   assert.equal(formatSpans("a ==亮== b")[0].html, undefined);
 });
+
+test("Obsidian 彩色高亮：emoji 算在开头的标记符里，带上颜色", () => {
+  const text = "a ==🔴红**粗**== b";
+  const spans = formatSpans(text);
+  assert.equal(spans[0].kind, "mark");
+  assert.equal(spans[0].highlight, "red");
+  assert.equal(text.slice(spans[0].from, spans[0].innerFrom), "==🔴");
+  assert.equal(text.slice(spans[0].innerFrom, spans[0].innerTo), "红**粗**");
+  assert.equal(spans[1].kind, "strong");
+  assert.equal(formatSpans("==普通==")[0].highlight, undefined);
+});

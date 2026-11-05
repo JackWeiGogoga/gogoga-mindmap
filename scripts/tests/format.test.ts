@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyInlineFormat, parseColorList, type InlineFormat } from "../../src/format";
+import { applyInlineFormat, highlightColor, highlightOf, parseColorList, type InlineFormat } from "../../src/format";
 
 /** 用 [ ] 标出选区，返回格式化后的文字，新选区同样用 [ ] 标出 */
 function run(marked: string, fmt: InlineFormat): string {
@@ -87,4 +87,35 @@ test("选区两头带上了看不见的标签：剥掉再格式化，标签不�
 test("选区只框住另一种颜色标签的一半：扩到整对，结构保持完整", () => {
   const out = run('[甲<span style="color:#e03e3e">乙]丙</span>', { kind: "bg", color: "#ffd43b" });
   assert.equal(out, '<mark style="background:#ffd43b">[甲<span style="color:#e03e3e">乙丙</span>]</mark>');
+});
+
+test("Obsidian 彩色高亮：包上、同色取消、换色只换 emoji、和普通高亮互换", () => {
+  const R = { kind: "highlight", color: "red" } as const;
+  const G = { kind: "highlight", color: "green" } as const;
+  assert.equal(run("一段[文字]内容", R), "一段==🔴[文字]==内容");
+  assert.equal(run("一段==🔴[文字]==内容", R), "一段[文字]内容");
+  assert.equal(run("一段==🔴[文字]==内容", G), "一段==🟢[文字]==内容");
+  assert.equal(run("一段==[文字]==内容", R), "一段==🔴[文字]==内容");
+  assert.equal(run("一段==🔴[文字]==内容", { kind: "highlight" }), "一段==[文字]==内容");
+  // 方块 emoji 也认，同色算同一种
+  assert.equal(run("一段==🟥[文字]==内容", R), "一段[文字]内容");
+  // 连标记一起选中
+  assert.equal(run("一段[==🔴文字==]内容", R), "一段[文字]内容");
+  assert.equal(run("一段[==🔴文字==]内容", G), "一段==🟢[文字]==内容");
+  // 跨行逐行包
+  assert.equal(run("[甲\n乙]", R), "==🔴[甲==\n==🔴乙]==");
+});
+
+test("清除颜色：彩色高亮去掉颜色、留下普通高亮，选区外的不动", () => {
+  assert.equal(run("[==🔴甲== 乙] ==🟢丙==", { kind: "clear" }), "[==甲== 乙] ==🟢丙==");
+  assert.equal(run("==🔴[甲]==", { kind: "clear" }), "==[甲]==");
+});
+
+test("荧光笔颜色表：可以填 🔴 这些，文字颜色表不认", () => {
+  assert.deepEqual(parseColorList("#ffd43b99, 🔴 🟢", true), ["#ffd43b99", "🔴", "🟢"]);
+  assert.deepEqual(parseColorList("#ffd43b99, 🔴", false), ["#ffd43b99"]);
+  assert.equal(highlightOf("🟦"), "blue");
+  assert.equal(highlightOf("#ffd43b"), null);
+  assert.deepEqual(highlightColor("🟣字"), { color: "purple", length: 2 });
+  assert.equal(highlightColor("字"), null);
 });

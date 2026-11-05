@@ -4,7 +4,7 @@
  * 输出全部用 DOM API 构造，不拼 HTML。
  */
 
-import { BG_OPEN_SRC, COLOR_OPEN_SRC } from "./format";
+import { BG_OPEN_SRC, COLOR_OPEN_SRC, highlightColor } from "./format";
 import { t } from "./i18n";
 
 export interface InlineOptions {
@@ -246,8 +246,13 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
       el.appendChild(wrap("code", m[12]));
     } else if (m[13] !== undefined) {
       el.appendChild(nest("del", m[13], opts));
-    } else if (m[14] !== undefined || m[25] !== undefined) {
-      el.appendChild(nest("mark", m[14] ?? m[25], opts));
+    } else if (m[14] !== undefined) {
+      const hc = highlightColor(m[14]);
+      const e = nest("mark", hc ? m[14].slice(hc.length) : m[14], opts);
+      if (hc) e.dataset.highlight = hc.color;
+      el.appendChild(e);
+    } else if (m[25] !== undefined) {
+      el.appendChild(nest("mark", m[25], opts));
     } else if (m[15] !== undefined || m[16] !== undefined) {
       el.appendChild(nest("em", m[15] ?? m[16], opts));
     } else if (m[17] !== undefined) {
@@ -545,6 +550,8 @@ export function plainText(text: string): string {
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_: string, a: string, b?: string) => b ?? a)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_: string, a?: string, b?: string, c?: string, d?: string, e?: string) => a ?? b ?? c ?? d ?? e ?? "")
+    .replace(/\*\*(.+?)\*\*|__(.+?)__|`([^`]+)`|~~(.+?)~~|==(.+?)==/g, (_: string, a?: string, b?: string, c?: string, d?: string, e?: string) =>
+      a ?? b ?? c ?? d ?? (e !== undefined ? e.slice(highlightColor(e)?.length ?? 0) : ""),
+    )
     .replace(/\\([!-/:-@[-`{-~])/g, "$1");
 }

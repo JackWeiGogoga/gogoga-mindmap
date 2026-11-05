@@ -1166,7 +1166,7 @@ export default class MindMapPlugin extends Plugin {
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
-        highlightColors: () => parseColorList(this.settings.highlightColors),
+        highlightColors: () => parseColorList(this.settings.highlightColors, true),
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,

@@ -9,7 +9,8 @@
 export type InlineFormat =
   | { kind: "bold" }
   | { kind: "italic" }
-  | { kind: "highlight" }
+  /** color：Obsidian 的彩色高亮 ==🔴文字==；不给就是普通的 ==高亮== */
+  | { kind: "highlight"; color?: HighlightColor }
   | { kind: "color"; color: string }
   | { kind: "bg"; color: string }
   | { kind: "clear" };
@@ -20,6 +21,33 @@ export interface FormatResult {
   start: number;
   end: number;
 }
+
+/**
+ * Obsidian 1.15 起的彩色高亮：开头的 `==` 后面紧跟一个颜色 emoji，比如 `==🔴文字==`，圆点和方块都认。
+ * 渲染时 emoji 不显示，底色用 Obsidian 主题里那个颜色的高亮色
+ */
+export const HIGHLIGHT_COLORS = { red: "🔴", orange: "🟠", yellow: "🟡", green: "🟢", blue: "🔵", purple: "🟣" } as const;
+export type HighlightColor = keyof typeof HIGHLIGHT_COLORS;
+const HIGHLIGHT_EMOJI: Record<string, HighlightColor> = {
+  "🔴": "red", "🟥": "red", "🟠": "orange", "🟧": "orange", "🟡": "yellow", "🟨": "yellow",
+  "🟢": "green", "🟩": "green", "🔵": "blue", "🟦": "blue", "🟣": "purple", "🟪": "purple",
+};
+
+/** ==高亮== 里面的文字开头是不是颜色 emoji：是的话给出颜色和 emoji 占的长度 */
+export function highlightColor(inner: string): { color: HighlightColor; length: number } | null {
+  const cp = inner.codePointAt(0);
+  if (cp === undefined) return null;
+  const ch = String.fromCodePoint(cp);
+  const color = HIGHLIGHT_EMOJI[ch];
+  return color ? { color, length: ch.length } : null;
+}
+
+const EMOJI_ALT = Object.keys(HIGHLIGHT_EMOJI).join("|");
+/** 文字里紧挨着 s 前面的高亮开头（== 或 ==🔴） */
+const HIGHLIGHT_OPEN_BEFORE = new RegExp(`==(?:${EMOJI_ALT})?$`, "u");
+/** 选区连标记一起选中的整段高亮 */
+const WHOLE_HIGHLIGHT = new RegExp(`^==(${EMOJI_ALT})?([\\s\\S]+)==$`, "u");
+const COLORED_HIGHLIGHT = new RegExp(`==(${EMOJI_ALT})(.+?)==`, "gu");
 
 const COLOR = String.raw`#[0-9a-fA-F]{3,8}|[a-zA-Z]+|rgba?\([\d\s.,%]+\)`;
 export const COLOR_OPEN_SRC = String.raw`<span style="color:\s*(${COLOR})\s*;?\s*">`;
@@ -32,13 +60,19 @@ const TAG_RE: Record<ColorKind, RegExp> = {
 };
 
 /** 设置里填的颜色列表：逗号或空格隔开，只认合法的颜色写法 */
-export function parseColorList(input: string): string[] {
+export function parseColorList(input: string, highlights = false): string[] {
   const one = new RegExp(`^(?:${COLOR})$`);
   return input
     // rgba(…) 里的逗号不算分隔
     .split(/[,，\s]+(?![^(]*\))/)
     .map((s) => s.trim())
-    .filter((s) => one.test(s));
+    // 荧光笔颜色里还可以填 🔴🟢 这些：写成 Obsidian 自己的彩色高亮
+    .filter((s) => one.test(s) || (highlights && s in HIGHLIGHT_EMOJI));
+}
+
+/** 荧光笔颜色表里的一项是不是 Obsidian 的彩色高亮（🔴 之类），是的话给出颜色名 */
+export function highlightOf(entry: string): HighlightColor | null {
+  return HIGHLIGHT_EMOJI[entry] ?? null;
 }
 
 export function openTag(kind: ColorKind, color: string): string {
@@ -100,34 +134,69 @@ function starsAfter(text: string, e: number): number {
   return n;
 }
 
-function toggleMark(text: string, s: number, e: number, kind: "bold" | "italic" | "highlight"): FormatResult {
-  const m = kind === "bold" ? "**" : kind === "italic" ? "*" : "==";
+/**
+ * 高亮开关：选区正好是一段高亮里面的文字（或连 == 一起选中）时，同色就取消、换色就只换颜色；
+ * 不然整段包起来。颜色写成 Obsidian 的 ==🔴文字==，emoji 紧跟在开头的 == 后面
+ */
+function toggleHighlight(text: string, s: number, e: number, color?: HighlightColor): FormatResult {
+  const emoji = color ? HIGHLIGHT_COLORS[color] : "";
+  const open = HIGHLIGHT_OPEN_BEFORE.exec(text.slice(0, s));
+  if (open && text.slice(e, e + 2) === "==") {
+    const was = highlightColor(open[0].slice(2))?.color;
+    const from = s - open[0].length;
+    if (was === color) return { text: text.slice(0, from) + text.slice(s, e) + text.slice(e + 2), start: from, end: from + (e - s) };
+    const opener = `==${emoji}`;
+    return { text: text.slice(0, from) + opener + text.slice(s), start: from + opener.length, end: from + opener.length + (e - s) };
+  }
+  const whole = WHOLE_HIGHLIGHT.exec(text.slice(s, e));
+  if (whole) {
+    const was = whole[1] ? HIGHLIGHT_EMOJI[whole[1]] : undefined;
+    const inner = whole[2];
+    const next = was === color ? inner : `==${emoji}${inner}==`;
+    const lead = was === color ? 0 : 2 + emoji.length;
+    return { text: text.slice(0, s) + next + text.slice(e), start: s + lead, end: s + lead + inner.length };
+  }
+  const sel = text.slice(s, e);
+  const wrapped = wrapLines(sel, `==${emoji}`, "==");
+  return { text: text.slice(0, s) + wrapped + text.slice(e), start: s + 2 + emoji.length, end: s + wrapped.length - 2 };
+}
+
+/** 清除颜色时，碰到选区的彩色高亮去掉颜色、留下普通高亮 */
+function clearHighlightColors(text: string, start: number, end: number): FormatResult {
+  let out = "";
+  let last = 0;
+  let [s, e] = [start, end];
+  for (const m of text.matchAll(COLORED_HIGHLIGHT)) {
+    const from = m.index ?? 0;
+    const to = from + m[0].length;
+    if (to <= start || from >= end) continue;
+    const at = from + 2;
+    const len = m[1].length;
+    out += text.slice(last, at);
+    last = at + len;
+    if (at < start) s -= Math.min(len, start - at);
+    if (at < end) e -= Math.min(len, end - at);
+  }
+  return { text: out + text.slice(last), start: s, end: e };
+}
+
+function toggleMark(text: string, s: number, e: number, kind: "bold" | "italic"): FormatResult {
+  const m = kind === "bold" ? "**" : "*";
   const len = m.length;
   // * 和 ** 共用一个字符：数一数前后有几个星号，奇数才有斜体，两个以上才有粗体
   const has = (before: number, after: number) => {
-    if (kind === "highlight") return before >= 1 && after >= 1;
     const n = Math.min(before, after);
     return kind === "bold" ? n >= 2 : n % 2 === 1;
   };
-  if (kind === "highlight") {
-    if (text.slice(s - len, s) === m && text.slice(e, e + len) === m) {
-      return { text: text.slice(0, s - len) + text.slice(s, e) + text.slice(e + len), start: s - len, end: e - len };
-    }
-    const sel = text.slice(s, e);
-    if (sel.length > len * 2 && sel.startsWith(m) && sel.endsWith(m)) {
-      return { text: text.slice(0, s) + sel.slice(len, -len) + text.slice(e), start: s, end: e - len * 2 };
-    }
-  } else {
-    if (has(starsBefore(text, s), starsAfter(text, e))) {
-      return { text: text.slice(0, s - len) + text.slice(s, e) + text.slice(e + len), start: s - len, end: e - len };
-    }
-    // 选区把星号也框进去了
-    const sel = text.slice(s, e);
-    const lead = /^\*+/.exec(sel)?.[0].length ?? 0;
-    const tail = /\*+$/.exec(sel)?.[0].length ?? 0;
-    if (sel.length > lead + tail && has(lead, tail)) {
-      return { text: text.slice(0, s) + sel.slice(len, -len) + text.slice(e), start: s, end: e - len * 2 };
-    }
+  if (has(starsBefore(text, s), starsAfter(text, e))) {
+    return { text: text.slice(0, s - len) + text.slice(s, e) + text.slice(e + len), start: s - len, end: e - len };
+  }
+  // 选区把星号也框进去了
+  const sel0 = text.slice(s, e);
+  const lead = /^\*+/.exec(sel0)?.[0].length ?? 0;
+  const tail = /\*+$/.exec(sel0)?.[0].length ?? 0;
+  if (sel0.length > lead + tail && has(lead, tail)) {
+    return { text: text.slice(0, s) + sel0.slice(len, -len) + text.slice(e), start: s, end: e - len * 2 };
   }
   const sel = text.slice(s, e);
   const wrapped = wrapLines(sel, m, m);
@@ -246,14 +315,16 @@ export function applyInlineFormat(text: string, start: number, end: number, fmt:
   switch (fmt.kind) {
     case "bold":
     case "italic":
-    case "highlight":
       return toggleMark(text, s, e, fmt.kind);
+    case "highlight":
+      return toggleHighlight(text, s, e, fmt.color);
     case "color":
     case "bg":
       return applyColor(text, s, e, fmt.kind, fmt.color);
     case "clear": {
       const a = applyColor(text, s, e, "color", null);
-      return applyColor(a.text, a.start, a.end, "bg", null);
+      const b = applyColor(a.text, a.start, a.end, "bg", null);
+      return clearHighlightColors(b.text, b.start, b.end);
     }
   }
 }

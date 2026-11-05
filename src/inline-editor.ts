@@ -45,6 +45,7 @@ const KIND_MARKS = {
 /** 颜色值来自 COLOR_OPEN_SRC 的匹配（十六进制、颜色名、rgba(数字)），放进 style 是安全的 */
 function contentMark(span: FormatSpan): Decoration {
   if (span.kind === "color") return Decoration.mark({ attributes: { style: `color: ${span.color}` } });
+  if (span.highlight) return Decoration.mark({ class: "mm-ed-mark", attributes: { "data-highlight": span.highlight } });
   if (span.kind === "bg") return Decoration.mark({ class: "mm-ed-mark", attributes: { style: `background: ${span.color}` } });
   return KIND_MARKS[span.kind];
 }

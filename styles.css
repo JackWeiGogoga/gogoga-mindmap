@@ -458,6 +458,13 @@
   color: inherit;
   border-radius: 2px;
 }
+/* Obsidian 1.15 的彩色高亮 ==🔴文字==：用主题里的高亮色，老版本 Obsidian 没有这些变量时按主题色调淡 */
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 /* 编辑时选中文字浮出的格式栏 */
 .mm-format-bar {
   position: absolute;
@@ -1821,17 +1828,14 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 /* ---------- 背诵模式（只改显示，不写文件） ---------- */
 /* 复习时用不上编辑工具栏，点题目也不让它盖住选项 */
 .gg-mm-root.is-recite .mm-nodebar { visibility: hidden; }
-/* ==高亮== 遮成一道横线，点一下揭开 */
+/* ==高亮== 遮住文字、保留原来的高亮颜色（彩色高亮、荧光笔各是各的颜色），底下一道横线，点一下揭开 */
 .gg-mm-root.is-recite .mm-label mark:not(.is-revealed) {
   color: transparent;
-  background: rgba(127, 127, 127, 0.12);
   box-shadow: inset 0 -1.5px 0 var(--mm-selection);
   cursor: pointer;
 }
 .gg-mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
 .gg-mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
-/* 荧光笔的底色写在行内样式里，遮挡时要压过它 */
-.gg-mm-root.is-recite .mm-label mark.mm-bg:not(.is-revealed) { background: rgba(127, 127, 127, 0.12) !important; }
 /* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
 .gg-mm-root.is-recite .mm-task { cursor: default; }
 .gg-mm-root.is-recite .gg-mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }

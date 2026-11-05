@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-05
+
+### Added
+- Obsidian 1.15's colored highlights, `==🔴text==`, now show in nodes in the theme's highlight colors instead of plain yellow with the emoji visible; while editing, the emoji is hidden like `==`. Add 🔴🟠🟡🟢🔵🟣 to "Highlighter colors" to write them from the format bar and the "Highlighter color" commands; "Clear text and highlighter colors" turns them back into plain highlights.
+
+### Improved
+- Recite mode keeps a highlight's own color when covering it (yellow for plain highlights, their own color for highlighter and colored highlights) instead of turning every blank gray, so blanks stand out and you can still tell them apart.
+
 ## [0.40.0] - 2026-11-05
 
 ### Added
@@ -517,7 +525,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...HEAD
+[0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
 [0.40.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.39.0...0.40.0
 [0.39.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.38.0...0.39.0
 [0.38.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.37.0...0.38.0

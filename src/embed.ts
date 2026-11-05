@@ -127,7 +127,7 @@ class MindMapEmbed extends Component {
         showNodebar: () => settings.showNodebar,
         nodeColors: () => parseNodeColors(settings.nodeColors),
         textColors: () => parseColorList(settings.textColors),
-        highlightColors: () => parseColorList(settings.highlightColors),
+        highlightColors: () => parseColorList(settings.highlightColors, true),
         marqueeDrag: () => settings.leftDrag === "select",
         caretAtEnd: () => settings.editCaret === "end",
         dragToFloat: () => settings.dragToFloat,

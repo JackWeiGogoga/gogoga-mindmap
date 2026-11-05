@@ -50,7 +50,7 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { applyInlineFormat, type InlineFormat } from "./format";
+import { applyInlineFormat, highlightOf, type InlineFormat } from "./format";
 import { InlineEditor } from "./inline-editor";
 import {
   fromEditableText,
@@ -305,6 +305,12 @@ const NAME_COLLATOR = new Intl.Collator("zh-Hans-u-co-pinyin", { numeric: true, 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3;
 const FIT_PADDING = 48;
+
+/** 格式栏、命令里的一个颜色：荧光笔颜色表里的 🔴 之类写成 Obsidian 的 ==🔴文字==，其余照旧写颜色标签 */
+function highlightFormat(kind: "color" | "bg", color: string): InlineFormat {
+  const hl = kind === "bg" ? highlightOf(color) : null;
+  return hl ? { kind: "highlight", color: hl } : { kind, color };
+}
 const DRAG_THRESHOLD = 4;
 
 /** 设置里的「节点间距」：所有画布的间距按这个倍数放大缩小（1 = 主题原样） */
@@ -6169,7 +6175,7 @@ export class MindMapCanvas {
   /** 用设置里第 index 个常用颜色上色；没有这一个就不动 */
   formatColor(kind: "color" | "bg", index: number): void {
     const color = (kind === "color" ? this.opts.textColors?.() : this.opts.highlightColors?.())?.[index];
-    if (color) this.formatText({ kind, color });
+    if (color) this.formatText(highlightFormat(kind, color));
   }
 
   private formatEditing(fmt: InlineFormat): void {
@@ -6242,9 +6248,12 @@ export class MindMapCanvas {
     const bgs = this.opts.highlightColors?.() ?? [];
     if (bgs.length) sep();
     for (const c of bgs)
-      btn("is-bg", t("format.highlightColor", { color: c }), { kind: "bg", color: c }, (b) => {
+      btn("is-bg", t("format.highlightColor", { color: c }), highlightFormat("bg", c), (b) => {
         b.textContent = "A";
-        b.style.background = c;
+        // Obsidian 的彩色高亮用主题里的颜色，样式表按 data-highlight 上色
+        const hl = highlightOf(c);
+        if (hl) b.dataset.highlight = hl;
+        else b.style.background = c;
       });
     sep();
     btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(icon("eraser")));
