@@ -15,8 +15,11 @@ export interface XmindTopic {
   folded?: boolean;
   /** 外框：XMind 的 boundary 挂在父主题上、按子主题下标框一段；这里换算成挂在起始子主题上 */
   box?: { span: number; title: string };
-  /** 概要：同外框，按子主题下标括一段，文字取自 XMind 的概要主题 */
-  summary?: { span: number; text: string };
+  /**
+   * 概要：同外框，按子主题下标括一段，文字取自 XMind 的概要主题。
+   * 概要主题下面还挂着子主题时整个带过来（topic），转成概要主题（%%summary-topic%%）
+   */
+  summary?: { span: number; text: string; topic?: XmindTopic };
   /** 自由主题（XMind 的 detached，只认中心主题下的）：相对中心主题的位置 */
   float?: { x: number; y: number };
   /** 标注（XMind 的 callout 主题）；一个主题有好几条时按行合并 */
@@ -85,20 +88,25 @@ function applyBoundary(topic: XmindTopic, range: string | undefined, title: stri
 
 /**
  * XMind 的概要：父主题上记 range "(0,2)" 和概要主题的 id，概要主题本身放在 children.summary 里。
- * 概要主题下面还挂着子主题的，那些子主题这边还显示不了，算进「丢掉的内容」
+ * 概要主题下面还挂着子主题的，sub 是整个概要主题，转成概要主题；没有子主题的只取文字（普通概要）
  */
-function applySummary(topic: XmindTopic, range: string | undefined, text: string): void {
+function applySummary(topic: XmindTopic, range: string | undefined, text: string, sub?: XmindTopic): void {
   const m = /^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(range ?? "");
   if (!m) return;
   const a = Number(m[1]);
   const b = Math.min(Number(m[2]), topic.children.length - 1);
   const start = topic.children[a];
-  if (start && b >= a && !start.summary) start.summary = { span: b - a + 1, text: cleanTitle(text).replace(/["%]/g, "") };
+  if (!start || b < a || start.summary) return;
+  start.summary = { span: b - a + 1, text: cleanTitle(text).replace(/["%]/g, "") };
+  if (sub?.children.length) start.summary.topic = sub;
 }
 
 function collectIds(t: XmindTopic, out: Set<string>): void {
   if (t.id) out.add(t.id);
-  for (const c of t.children) collectIds(c, out);
+  for (const c of t.children) {
+    collectIds(c, out);
+    if (c.summary?.topic) collectIds(c.summary.topic, out);
+  }
 }
 
 // ---------- zip ----------
@@ -210,8 +218,7 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false)
   for (const b of t.boundaries ?? []) applyBoundary(topic, b.range, b.title ?? "");
   for (const s of t.summaries ?? []) {
     const st = t.children?.summary?.find((x) => x.id === s.topicId);
-    applySummary(topic, s.range, st?.title ?? "");
-    if (st?.children?.attached?.length) lost.summaries += 1;
+    applySummary(topic, s.range, st?.title ?? "", st?.children?.attached?.length ? fromJsonTopic(st, lost) : undefined);
   }
   return topic;
 }
@@ -376,8 +383,8 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): Xmin
   for (const s of childrenByName(el, "summaries")) {
     for (const sm of childrenByName(s, "summary")) {
       const st = summaryTopics.find((x) => x.attrs["id"] === sm.attrs["topic-ref"]);
-      applySummary(topic, sm.attrs["range"], st ? (childrenByName(st, "title")[0]?.text ?? "") : "");
-      if (st && childrenByName(st, "children").some((ch) => childrenByName(ch, "topics").some((ts) => childrenByName(ts, "topic").length))) lost.summaries += 1;
+      const hasKids = !!st && childrenByName(st, "children").some((ch) => childrenByName(ch, "topics").some((ts) => childrenByName(ts, "topic").length));
+      applySummary(topic, sm.attrs["range"], st ? (childrenByName(st, "title")[0]?.text ?? "") : "", st && hasKids ? fromXmlTopic(st, lost, false) : undefined);
     }
   }
   return topic;
@@ -501,7 +508,8 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       color: t.color,
       folded: !!t.folded,
       box: t.box && { ...t.box },
-      summary: t.summary && { ...t.summary },
+      // 概要主题和括住的兄弟同一层：父节点、层级都跟起始节点一样
+      summary: t.summary && (t.summary.topic ? { span: t.summary.span, text: "", topic: build(t.summary.topic, parent, depth) } : { span: t.summary.span, text: t.summary.text }),
       float: parent && !parent.parent && t.float ? { ...t.float } : undefined,
       callout: t.callout,
       kind: asHeading ? "heading" : "list",

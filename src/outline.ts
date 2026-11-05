@@ -8,7 +8,7 @@ import type { MindMapCanvas } from "./canvas";
 import { t } from "./i18n";
 import { InlineEditor } from "./inline-editor";
 import { plainText } from "./inline";
-import { MindNode, visibleChildren } from "./model";
+import { isSummaryTopic, MindNode, visibleChildren, withTopics } from "./model";
 
 export class OutlinePanel {
   readonly el: HTMLElement;
@@ -65,6 +65,8 @@ export class OutlinePanel {
       row.dataset.id = node.id;
       row.style.setProperty("--depth", String(node.depth));
       if (node === primary) row.classList.add("is-selected");
+      // 概要主题按 Markdown 里的位置列在它括住的兄弟后面，标一下是概要
+      if (isSummaryTopic(node)) row.classList.add("is-summary-topic");
 
       const chevron = createSpan();
       chevron.className = "mm-outline-chevron" + (node.children.length ? "" : " is-leaf") + (node.folded ? " is-folded" : "");
@@ -107,7 +109,7 @@ export class OutlinePanel {
       });
       this.list.append(row);
       this.rows.set(node.id, row);
-      for (const c of visibleChildren(node)) visit(c);
+      for (const c of withTopics(visibleChildren(node))) visit(c);
     };
     visit(doc.root);
     this.list.scrollTop = scroll;
@@ -128,7 +130,7 @@ export class OutlinePanel {
     const out: MindNode[] = [];
     const visit = (n: MindNode) => {
       out.push(n);
-      for (const c of visibleChildren(n)) visit(c);
+      for (const c of withTopics(visibleChildren(n))) visit(c);
     };
     visit(doc.root);
     return out;

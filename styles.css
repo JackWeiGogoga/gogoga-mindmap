@@ -1335,6 +1335,8 @@
 }
 .mm-outline-row:hover { background: var(--background-modifier-hover, #ececee); }
 .mm-outline-row.is-selected { background: color-mix(in srgb, var(--interactive-accent, #155dff) 14%, transparent); color: var(--text-normal, #1f1f1f); }
+/* 概要主题：文字前面加一个大括号，看得出它是前面几项的概要 */
+.mm-outline-row.is-summary-topic .mm-outline-text::before { content: "} "; color: var(--text-faint, #999); }
 .mm-outline-chevron { flex: none; width: 14px; color: var(--text-faint, #999); font-size: 11px; text-align: center; cursor: pointer; transition: transform 0.12s ease; }
 .mm-outline-chevron.is-folded { transform: rotate(-90deg); }
 .mm-outline-chevron:hover { color: var(--text-normal, #1f1f1f); }

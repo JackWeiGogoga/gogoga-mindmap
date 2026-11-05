@@ -153,7 +153,7 @@ test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数
           detached: [{ id: "f", title: "自由", position: { x: 320.4, y: -150 } }],
           summary: [
             { id: "s1", title: "前两个" },
-            // 概要主题下面还挂着子主题：子主题显示不了，算丢掉一项
+            // 概要主题下面还挂着子主题：整个转成概要主题，不再算丢掉
             { id: "s2", title: "最后", children: { attached: [{ id: "s2a", title: "x" }] } },
           ],
         },
@@ -162,7 +162,7 @@ test("外框转成 %%box%%、概要转成 %%summary%%，不支持的内容计数
   ]);
   const [sheet] = await parseXmind(makeZip({ "content.json": json }));
   // 中心主题下的自由主题能转过来，不再算丢失
-  assert.deepEqual(sheet.lost, { detached: 0, relationships: 2, summaries: 1, comments: 0, images: 0 });
+  assert.deepEqual(sheet.lost, { detached: 0, relationships: 2, summaries: 0, comments: 0, images: 0 });
   assert.equal(
     xmindSheetToMarkdown(sheet, { maxHeadingLevel: 2 }),
     `---
@@ -178,7 +178,10 @@ mindmap: true
 %%box=2 "后两个"%%
 
 ## C
-%%summary "最后"%%
+
+## 最后
+%%summary-topic=1%%
+- x
 
 ## 自由
 %%float x=320 y=-150%%

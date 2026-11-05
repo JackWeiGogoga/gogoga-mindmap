@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-05
+
+### Added
+- Summary topics: a summary can now have its own subtopics, like XMind's summary topic. Click the summary text and press Tab, or right-click the summary → **Add subtopic**: the summary text becomes a node with a subtopic under it, and from then on it edits, takes children, folds and accepts dropped nodes like any node. When it's taller than the nodes it covers, the siblings above and below make room instead of overlapping; all four structures are supported, and on the left side of a mind map it grows leftward. In Markdown it's the item right after the last node it covers, `- Notes %%summary-topic=2%%`, with its subtopics under it as usual; the outline panel lists it in that spot too. A summary topic follows the range it covers and can't be dragged or moved on its own; deleting the first covered node hands the summary to the next one, and deleting them all leaves it behind as an ordinary node with its subtree. Plain one-line summaries are stored exactly as before, and existing notes don't change at all.
+- Opening or converting .xmind files now brings over topics hanging off a summary (as summary topics) instead of counting them as left out.
+
 ## [0.43.0] - 2026-11-05
 
 ### Added
@@ -536,7 +542,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...HEAD
+[0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
 [0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0

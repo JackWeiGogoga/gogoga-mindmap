@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { allChildren, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { attachSummaryTopics, fileChildren, fixTopics, isSummaryTopic, withTopics, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -73,6 +73,8 @@ interface Marker {
   hidden?: boolean;
   anchor?: string;
   rels?: Relation[];
+  /** %%summary-topic=N%%：这一项是前面 N 个兄弟的概要主题 */
+  summaryTopic?: number;
 }
 
 /** 关联线两头的标识：字母、数字、- 和 _ */
@@ -146,6 +148,8 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
     } else if (/^cc=/.test(lower) && ((COLOR_NAMES as readonly string[]).includes(lower.slice(3)) || HEX_RE.test(lower.slice(3)))) {
       const c = lower.slice(3);
       marker.calloutColor = c.startsWith("#") || (COLOR_NAMES as readonly string[]).includes(c) ? c : `#${c}`;
+    } else if (/^summary-topic=\d{1,3}$/.test(lower)) {
+      marker.summaryTopic = Math.max(1, Number(lower.slice(14)));
     } else if (/^sw=\d{1,6}$/.test(lower)) {
       sw = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(3))));
     } else if (/^w=\d{1,6}$/.test(lower)) {
@@ -184,7 +188,11 @@ function mergeMarker(a: Marker, b: Marker): Marker {
 /** 外框 / 概要写回的跨度：范围里夹着隐藏的兄弟、在脑图里又没改过时，照文件原来写的 */
 const spanOf = (g: { span: number; raw?: HiddenSpan }) => (g.raw && g.raw.visible === g.span ? g.raw.span : g.span);
 
-export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "anchor" | "rels">): string {
+/** noTopic：概要主题单独复制出去时不带 summary-topic（粘到别处就是普通节点） */
+export function formatMarker(
+  node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "anchor" | "rels" | "topicOf" | "topicSpan">,
+  noTopic = false,
+): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
@@ -196,7 +204,10 @@ export function formatMarker(node: Pick<MindNode, "color" | "folded" | "box" | "
     const span = spanOf(node.box);
     parts.push(`box${span > 1 ? `=${span}` : ""}${title ? ` "${title}"` : ""}`);
   }
-  if (node.summary) {
+  // 概要主题的起始节点上不写 summary：概要写在概要主题那一项上
+  const topicSpan = noTopic ? undefined : node.topicOf?.summary?.topic === node ? spanOf(node.topicOf.summary) : node.topicSpan;
+  if (topicSpan !== undefined) parts.push(`summary-topic=${topicSpan}`);
+  if (node.summary && !node.summary.topic) {
     const text = markerText(node.summary.text);
     const span = spanOf(node.summary);
     parts.push(`summary${span > 1 ? `=${span}` : ""}${text ? ` "${text}"` : ""}`);
@@ -346,13 +357,14 @@ export function normalizeNote(plain: string, inList = true, listsOk = false): st
 export function subtreeToList(node: MindNode, indent = "\t", plain = false): string {
   const lines: string[] = [];
   const walk = (n: MindNode, depth: number) => {
-    lines.push(`${indent.repeat(depth)}- ${n.text}${plain ? "" : formatMarker(n)}`.trimEnd());
+    // 单独复制概要主题：粘到别处就是普通节点，不带 summary-topic
+    lines.push(`${indent.repeat(depth)}- ${n.text}${plain ? "" : formatMarker(n, depth === 0 && isSummaryTopic(n))}`.trimEnd());
     if (n.note) {
       const note = normalizeNote(n.note);
       for (const l of note.split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
       if (isEscapedNote(note)) lines.push("");
     }
-    for (const c of n.children) walk(c, depth + 1);
+    for (const c of withTopics(n.children)) walk(c, depth + 1);
   };
   walk(node, 0);
   return lines.join("\n") + "\n";
@@ -632,7 +644,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -654,7 +666,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);
@@ -733,6 +745,9 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   }
   // 隐藏的节点摘出去（中心主题不算）；它们的行号也去掉，那几行算前面的节点。
   // 放在算根节点级别之后：最高一级的标题全隐藏了，写回的级别也不能变
+  // 带 %%summary-topic%% 的节点挂成概要主题；要在摘隐藏节点之前，跨度按文件里的兄弟算
+  attachSummaryTopics(root);
+  fixTopics(root);
   if (!opts.showHidden) stripHidden(root, (n) => opts.lines?.delete(n));
 
   const style: DocStyle = {
@@ -764,8 +779,9 @@ function mostCommon(items: string[]): string | null {
 }
 
 export function serializeMarkdown(doc: MindDoc): string {
-  normalizeKinds(doc);
   normalizeBoxes(doc.root);
+  fixTopics(doc.root);
+  normalizeKinds(doc);
   const out: string[] = [];
   const ensureBlank = () => {
     if (out.length && out[out.length - 1] !== "") out.push("");
@@ -800,7 +816,7 @@ export function serializeMarkdown(doc: MindDoc): string {
       ensureBlank();
       pushBlock(normalizeNote(node.note, false, style.headingsOnly));
     }
-    const kids = allChildren(node);
+    const kids = fileChildren(node);
     const headingKids = kids.filter((c) => c.kind === "heading" && level < 6);
     // 列表子节点先于标题子节点写出（标题会吞掉后面所有列表，顺序只能如此）
     const listKids = kids.filter((c) => !headingKids.includes(c));
@@ -835,7 +851,7 @@ export function serializeMarkdown(doc: MindDoc): string {
       // 包成标注块的备注后面空一行：实时预览会把缩进的标注块后面紧跟的列表项（子节点、兄弟）也算进标注块
       if (isEscapedNote(note)) out.push("");
     }
-    for (const c of allChildren(node)) emitList(c, depth + 1);
+    for (const c of fileChildren(node)) emitList(c, depth + 1);
     if (node.tail) emitBlock(node.tail, depth + 1);
   };
 
@@ -848,7 +864,7 @@ export function serializeMarkdown(doc: MindDoc): string {
       pushBlock(normalizeNote(root.note, false, style.headingsOnly));
     }
     const level = Math.max(1, root.level + 1);
-    const rootKids = allChildren(root);
+    const rootKids = fileChildren(root);
     const headingKids = rootKids.filter((c) => c.kind === "heading");
     const listKids = rootKids.filter((c) => c.kind !== "heading");
     if (listKids.length) {
@@ -873,11 +889,11 @@ export function normalizeKinds(doc: MindDoc): void {
       if (!parentIsHeading || parentLevel >= 6) node.kind = "list";
       else node.level = parentLevel + 1;
     }
-    for (const c of allChildren(node)) fix(c, node.level, node.kind === "heading");
+    for (const c of fileChildren(node)) fix(c, node.level, node.kind === "heading");
   };
   const rootLevel = doc.rootFromHeading ? 1 : doc.root.level;
   doc.root.level = rootLevel;
-  for (const c of allChildren(doc.root)) fix(c, rootLevel, true);
+  for (const c of fileChildren(doc.root)) fix(c, rootLevel, true);
 }
 
 /** 把某个节点的整层兄弟统一改成标题或列表；返回是否可行 */

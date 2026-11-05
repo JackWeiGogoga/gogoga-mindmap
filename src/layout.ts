@@ -106,8 +106,10 @@ export interface PlacedSummary {
   side: Side;
   /** 括号所占的矩形；right / tree 朝右开口在左，left 镜像，down 横着画在下方 */
   brace: Bounds;
-  /** 文字的位置；同一个概要在思维导图里被左右拆开时只有第一段有文字 */
+  /** 文字的位置；同一个概要在思维导图里被左右拆开时只有第一段有文字。概要主题没有文字框（为 null） */
   label: Bounds | null;
+  /** 概要主题：它连同子树已经排进 placed 里，跟在括号尖后面 */
+  topic?: MindNode;
 }
 
 /**
@@ -254,13 +256,19 @@ export function layoutTree(
     return g.get(n.id);
   };
   const boxTop = (start: MindNode) => BOX_PAD + (start.box?.title ? BOX_TITLE_H : 0);
-  /** list 按排布顺序；before[i]/after[i] 是第 i 个节点前后要让出的外框留白 */
+  /**
+   * list 按排布顺序；before[i]/after[i] 是第 i 个节点前后要让出的外框留白，
+   * 再加上概要主题比被括住的那一段高时，在这一段前后各让出的一半（见 topicPads）
+   */
   function boxPads(list: MindNode[]): { before: number[]; after: number[] } {
     const gs = list.map(groupOf);
-    return {
-      before: gs.map((g, i) => (g && g !== gs[i - 1] ? boxTop(g) : 0)),
-      after: gs.map((g, i) => (g && g !== gs[i + 1] ? BOX_PAD : 0)),
-    };
+    const before = gs.map((g, i) => (g && g !== gs[i - 1] ? boxTop(g) : 0));
+    const after = gs.map((g, i) => (g && g !== gs[i + 1] ? BOX_PAD : 0));
+    for (const r of topicRuns(list, before, after, false)) {
+      before[r.first] += r.extra / 2;
+      after[r.last] += r.extra / 2;
+    }
+    return { before, after };
   }
   const padTotal = (list: MindNode[]) => {
     const { before, after } = boxPads(list);
@@ -269,8 +277,17 @@ export function layoutTree(
   /** 横向排布：每段外框左右各 BOX_PAD */
   const sidePads = (list: MindNode[]) => {
     const gs = list.map(groupOf);
-    return gs.reduce((sum, g, i) => sum + (g && g !== gs[i - 1] ? 2 * BOX_PAD : 0), 0);
+    const box = gs.reduce((sum, g, i) => sum + (g && g !== gs[i - 1] ? 2 * BOX_PAD : 0), 0);
+    return box + downTopicRuns(list).reduce((sum, r) => sum + r.extra, 0);
   };
+  /** 组织结构图里概要主题比被括住的一段宽时长出来的部分（外框留白按左右各 BOX_PAD 算） */
+  function downTopicRuns(list: MindNode[]): TopicRun[] {
+    if (!list.some((c) => summaryOf(c)?.summary?.topic)) return [];
+    const gs = list.map(groupOf);
+    const before = gs.map((g, i) => (g && g !== gs[i - 1] ? BOX_PAD : 0));
+    const after = gs.map((g, i) => (g && g !== gs[i + 1] ? BOX_PAD : 0));
+    return topicRuns(list, before, after, true);
+  }
   /** 父节点 id → 它子节点里的外框 / 概要（按排布顺序，一段连续的同组兄弟为一个） */
   type Run = { start: MindNode; members: MindNode[]; side: Side };
   const runs = new Map<string, Run[]>();
@@ -286,6 +303,50 @@ export function layoutTree(
     }
     return g.get(n.id);
   };
+  // ---- 概要主题：单独排成一棵小树（坐标相对它自己），被括住的那一段在堆叠方向上给它让出位置 ----
+  const topicCache = new Map<string, LayoutResult>();
+  /** down：组织结构图里概要在下方，小树也朝下排；其余朝右排（左边的放置时镜像） */
+  function topicLayout(start: MindNode, down: boolean): LayoutResult | null {
+    const topic = start.summary?.topic;
+    if (!topic) return null;
+    const key = `${start.id}/${down ? "d" : "h"}`;
+    let r = topicCache.get(key);
+    if (!r) {
+      const structure: Structure = down ? "org-down" : "logic-right";
+      r = layoutTree(topic, measure, { ...opts, structure, gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+      topicCache.set(key, r);
+    }
+    return r;
+  }
+  /** 一排兄弟里带概要主题的概要：从第 first 到第 last 个，概要主题比这一段长出 extra（堆叠方向） */
+  type TopicRun = { start: MindNode; first: number; last: number; extra: number };
+  /**
+   * 概要主题比被括住的一段（成员连同外框留白和中间的间距）长时，长出来的部分。
+   * down：组织结构图横着排，比宽度；否则比高度。没有概要主题时返回空，排布和以前完全一样
+   */
+  function topicRuns(list: MindNode[], before: number[], after: number[], down: boolean): TopicRun[] {
+    if (!list.some((c) => summaryOf(c)?.summary?.topic)) return [];
+    const out: TopicRun[] = [];
+    const tree = opts.structure === "tree-right";
+    for (let i = 0; i < list.length; ) {
+      const g = summaryOf(list[i]);
+      const sub = g ? topicLayout(g, down) : null;
+      let j = i;
+      while (j + 1 < list.length && g && summaryOf(list[j + 1]) === g) j++;
+      if (g && sub) {
+        const parent = list[i].parent!;
+        const gap = down ? hGapFor(parent) : tree ? opts.gapSibling : gapFor(parent);
+        let block = 0;
+        for (let k = i; k <= j; k++) block += (down ? extentW(list[k]) : tree ? treeExtent(list[k]) : extentH(list[k])) + before[k] + after[k] + (k > i ? gap : 0);
+        const need = down ? sub.bounds.w : sub.bounds.h;
+        out.push({ start: g, first: i, last: j, extra: Math.max(0, need - block) });
+      }
+      i = j + 1;
+    }
+    return out;
+  }
+  /** 概要主题的中心放在堆叠方向上的哪里：被括住那一段（含让出的位置）的正中 */
+  const topicCenter = new Map<string, number>();
   function collect(into: Map<string, Run[]>, of: (n: MindNode) => MindNode | undefined, parent: MindNode, list: MindNode[], side: Side): void {
     let cur: Run | null = null;
     for (const c of list) {
@@ -376,7 +437,11 @@ export function layoutTree(
     let y = cy - extentOfList(list, gapV) / 2;
     const { before, after } = boxPads(list);
     recordRuns(parent, list, side);
+    const tr = topicRuns(list, before.map(() => 0), after.map(() => 0), false);
+    let runTop = 0;
     list.forEach((c, i) => {
+      const run = tr.find((r) => r.first === i);
+      if (run) runTop = y;
       y += before[i];
       const s = sizeOf(c);
       const v = halves(c);
@@ -398,7 +463,10 @@ export function layoutTree(
         addNote(c, { x: nx, y: bottom + NOTE_GAP, w: no.w, h: no.h }, v.noteFar);
       }
       placeColumn(c, visibleChildren(c), side, ccy);
-      y += e + after[i] + gapV;
+      y += e + after[i];
+      const end = tr.find((r) => r.last === i);
+      if (end) topicCenter.set(end.start.id, (runTop + y) / 2);
+      y += gapV;
     });
   }
 
@@ -445,7 +513,14 @@ export function layoutTree(
     // 横向排布时标题在框顶，不占横向空间，左右只留 BOX_PAD
     const gs = list.map(groupOf);
     recordRuns(parent, list, "down");
+    const tr = downTopicRuns(list);
+    let runLeft = 0;
     list.forEach((c, i) => {
+      const run = tr.find((r) => r.first === i);
+      if (run) {
+        runLeft = x;
+        x += run.extra / 2;
+      }
       if (gs[i] && gs[i] !== gs[i - 1]) x += BOX_PAD;
       const s = sizeOf(c);
       const v = wHalves(c);
@@ -457,7 +532,13 @@ export function layoutTree(
       const no = noteOf(c);
       if (no) addNote(c, { x: ccx - no.w / 2, y: y + s.h + noteLift(c) + NOTE_GAP, w: no.w, h: no.h });
       layoutDown(c, visibleChildren(c));
-      x += e + gapX + (gs[i] && gs[i] !== gs[i + 1] ? BOX_PAD : 0);
+      x += e + (gs[i] && gs[i] !== gs[i + 1] ? BOX_PAD : 0);
+      const end = tr.find((r) => r.last === i);
+      if (end) {
+        x += end.extra / 2;
+        topicCenter.set(end.start.id, (runLeft + x) / 2);
+      }
+      x += gapX;
     });
   }
 
@@ -478,7 +559,10 @@ export function layoutTree(
     const x = p.x + TREE_INDENT;
     const { before, after } = boxPads(list);
     recordRuns(parent, list, "tree");
+    const tr = topicRuns(list, before.map(() => 0), after.map(() => 0), false);
+    let runTop = 0;
     list.forEach((c, i) => {
+      if (tr.some((r) => r.first === i)) runTop = y;
       y += before[i];
       const s = sizeOf(c);
       // 标注占这个节点前面的一段，节点往下让
@@ -489,7 +573,10 @@ export function layoutTree(
       const no = noteOf(c);
       if (no) addNote(c, { x, y: top + s.h + NOTE_GAP, w: no.w, h: no.h });
       layoutTreeRight(c, visibleChildren(c));
-      y += treeExtent(c) + after[i] + opts.gapSibling;
+      y += treeExtent(c) + after[i];
+      const end = tr.find((r) => r.last === i);
+      if (end) topicCenter.set(end.start.id, (runTop + y) / 2);
+      y += opts.gapSibling;
     });
   }
 
@@ -537,6 +624,14 @@ export function layoutTree(
       if (!inner) continue;
       const first = !labelled.has(run.start.id);
       labelled.add(run.start.id);
+      const sub = first ? topicLayout(run.start, run.side === "down") : null;
+      if (sub) {
+        const s = placeSummary(run, inner, null);
+        s.topic = run.start.summary!.topic;
+        summaries.push(s);
+        b = union(union(b, s.brace), placeTopic(run, s.brace, inner, sub));
+        continue;
+      }
       const ls = first ? (measureSummary?.(run.start) ?? { w: 0, h: 0 }) : null;
       const s = placeSummary(run, inner, ls);
       summaries.push(s);
@@ -548,6 +643,42 @@ export function layoutTree(
   const boxBounds = new Map<string, Bounds>();
   const summaries: PlacedSummary[] = [];
   const labelled = new Set<string>();
+  /**
+   * 把概要主题那棵小树挪到括号尖后面：右边（树形图同）左对齐、左边镜像、组织结构图放在括号下方；
+   * 堆叠方向上以让出来的那一段为中心。返回它占的范围
+   */
+  function placeTopic(run: Run, brace: Bounds, inner: Bounds, sub: LayoutResult): Bounds {
+    const sb = sub.bounds;
+    const side = run.side;
+    const mirror = side === "left";
+    let dx: number;
+    let dy: number;
+    if (side === "down") {
+      const cx = topicCenter.get(run.start.id) ?? inner.x + inner.w / 2;
+      dx = cx - (sb.x + sb.w / 2);
+      dy = brace.y + brace.h + SUMMARY_LABEL_GAP - sb.y;
+    } else {
+      const cy = topicCenter.get(run.start.id) ?? inner.y + inner.h / 2;
+      dy = cy - (sb.y + sb.h / 2);
+      // 镜像后小树的右边缘是 -sb.x，要贴到括号尖左边
+      dx = mirror ? brace.x - SUMMARY_LABEL_GAP + sb.x : brace.x + brace.w + SUMMARY_LABEL_GAP - sb.x;
+    }
+    const mx = (x: number, w: number) => (mirror ? -(x + w) : x) + dx;
+    const flip = (s: Side): Side => (mirror && s === "right" ? "left" : s);
+    for (const p of sub.placed.values()) placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side) });
+    for (const x of sub.boxes) boxes.push({ ...x, x: mx(x.x, x.w), y: x.y + dy, side: flip(x.side) });
+    for (const c of sub.callouts) callouts.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });
+    for (const n of sub.notes) notes.push({ ...n, x: mx(n.x, n.w), y: n.y + dy });
+    for (const x of sub.summaries) {
+      summaries.push({
+        ...x,
+        side: flip(x.side),
+        brace: { ...x.brace, x: mx(x.brace.x, x.brace.w), y: x.brace.y + dy },
+        label: x.label && { ...x.label, x: mx(x.label.x, x.label.w), y: x.label.y + dy },
+      });
+    }
+    return { x: mx(sb.x, sb.w), y: sb.y + dy, w: sb.w, h: sb.h };
+  }
   function placeSummary(run: Run, inner: Bounds, ls: Size | null): PlacedSummary {
     const base = { start: run.start, members: run.members, side: run.side };
     if (run.side === "down") {

@@ -7,6 +7,7 @@ import {
   addChild,
   addSibling,
   attachSubtree,
+  createNode,
   findByPath,
   isAncestor,
   MindDoc,
@@ -27,8 +28,12 @@ import {
   summaryGroups,
   visibleChildren,
   Relation,
-  walk,
   walkAll,
+  walkMap,
+  isSummaryTopic,
+  topicsOf,
+  visibleTopics,
+  fixTopics,
   hideNode,
   countHidden,
 } from "./model";
@@ -474,14 +479,14 @@ export function findSubpathNode(root: MindNode, subpath: string): MindNode | nul
   let target: MindNode | null = null;
   if (sub.startsWith("^")) {
     const id = sub.slice(1);
-    walk(root, (n) => {
+    walkMap(root, (n) => {
       if (!target && n.blockId === id) target = n;
     });
     return target;
   }
   const parts = sub.split("#").map(norm).filter(Boolean);
   const last = parts[parts.length - 1];
-  walk(root, (n) => {
+  walkMap(root, (n) => {
     if (target || norm(n.text) !== last) return;
     // 写了上级标题的，上级也要对得上
     let p = n.parent;
@@ -1306,9 +1311,16 @@ export class MindMapCanvas {
    */
   private rebuild(): void {
     const doc = this.doc!;
+    // 概要主题跟着起始节点（编辑挪动之后对上 parent、深度、写法）
+    fixTopics(doc.root);
     const theme = resolveTheme(this.opts.theme);
     const branchOf = new Map<string, number>();
-    doc.root.children.forEach((c, i) => walk(c, (n) => branchOf.set(n.id, i % BRANCH_COLOR_COUNT)));
+    doc.root.children.forEach((c, i) => walkMap(c, (n) => branchOf.set(n.id, i % BRANCH_COLOR_COUNT)));
+    // 主主题这一层的概要主题：跟着它括住的第一个主主题配色
+    for (const t of topicsOf(doc.root)) {
+      const b = t.topicOf && branchOf.get(t.topicOf.id);
+      if (b !== undefined) walkMap(t, (n) => branchOf.set(n.id, b));
+    }
     const base = this.focusRoot ?? doc.root;
     const prev = this.els;
     const next = new Map<string, HTMLElement>();
@@ -1333,6 +1345,7 @@ export class MindMapCanvas {
       if (reused && this.elSigs.get(reused) === sig) {
         next.set(node.id, reused);
         for (const c of visibleChildren(node)) visit(c);
+        for (const t of visibleTopics(node)) visit(t);
         return;
       }
       const el = reused ?? createDiv();
@@ -1478,6 +1491,7 @@ export class MindMapCanvas {
       if (!reused) this.nodesEl.append(el);
       next.set(node.id, el);
       for (const c of visibleChildren(node)) visit(c);
+      for (const t of visibleTopics(node)) visit(t);
     };
     visit(base);
     for (const [id, el] of prev) {
@@ -1513,7 +1527,7 @@ export class MindMapCanvas {
     const tiers = alignedTiers(this.opts.theme);
     if (!tiers) return;
     const byDepth = new Map<number, { el: HTMLElement; id: string }[]>();
-    walk(base, (n) => {
+    walkMap(base, (n) => {
       const el = this.els.get(n.id);
       if (!el || el.classList.contains("has-width") || el.classList.contains("has-image")) return;
       const rel = n.depth - base.depth;
@@ -1605,8 +1619,8 @@ export class MindMapCanvas {
     for (const child of this.layout.placed.values()) {
       const parentNode = child.node.parent;
       if (!parentNode) continue;
-      // 自由主题不和中心主题连线
-      if (this.layout.floating?.has(child.node)) continue;
+      // 自由主题不和中心主题连线；概要主题由括号连着，也不和父节点连线
+      if (this.layout.floating?.has(child.node) || isSummaryTopic(child.node)) continue;
       const parent = this.layout.placed.get(parentNode.id);
       if (!parent) continue;
       const g = edgeGeometry(parent, child);
@@ -1669,11 +1683,11 @@ export class MindMapCanvas {
   private drawRels(): void {
     const layout = this.layout!;
     const anchors = new Map<string, MindNode>();
-    walk(this.doc!.root, (n) => {
+    walkMap(this.doc!.root, (n) => {
       if (n.anchor && !anchors.has(n.anchor)) anchors.set(n.anchor, n);
     });
     const seen = new Set<string>();
-    walk(this.doc!.root, (src) => {
+    walkMap(this.doc!.root, (src) => {
       src.rels?.forEach((rel, i) => {
         const dst = anchors.get(rel.to);
         const a = layout.placed.get(src.id);
@@ -1827,7 +1841,7 @@ export class MindMapCanvas {
 
   private relSource(rel: Relation): MindNode | null {
     let found: MindNode | null = null;
-    if (this.doc) walk(this.doc.root, (n) => {
+    if (this.doc) walkMap(this.doc.root, (n) => {
       if (!found && n.rels?.includes(rel)) found = n;
     });
     return found;
@@ -1835,7 +1849,7 @@ export class MindMapCanvas {
 
   private relTarget(rel: Relation): MindNode | null {
     let found: MindNode | null = null;
-    if (this.doc) walk(this.doc.root, (n) => {
+    if (this.doc) walkMap(this.doc.root, (n) => {
       if (!found && n.anchor === rel.to) found = n;
     });
     return found;
@@ -2321,7 +2335,7 @@ export class MindMapCanvas {
     this.el.classList.add(dragCls);
     const branchBounds = (node: MindNode): Bounds | null => {
       let b: Bounds | null = null;
-      walk(node, (m) => {
+      walkMap(node, (m) => {
         const p = this.layout?.placed.get(m.id);
         if (!p) return;
         if (!b) b = { x: p.x, y: p.y, w: p.w, h: p.h };
@@ -2378,7 +2392,7 @@ export class MindMapCanvas {
     if (!this.opts.editable) return;
     const byParent = new Map<MindNode, number[]>();
     for (const n of this.selected) {
-      if (!n.parent || this.boxOf(n) || this.isFloating(n)) continue;
+      if (!n.parent || this.boxOf(n) || this.isFloating(n) || isSummaryTopic(n)) continue;
       const arr = byParent.get(n.parent) ?? [];
       arr.push(n.parent.children.indexOf(n));
       byParent.set(n.parent, arr);
@@ -2442,7 +2456,8 @@ export class MindMapCanvas {
     const need = new Set<string>();
     const visit = (n: MindNode) => {
       for (const c of visibleChildren(n)) {
-        if (c.summary) {
+        // 概要主题本身就是节点，不另建文字框
+        if (c.summary && !c.summary.topic) {
           need.add(c.id);
           let el = this.summaryLabels.get(c.id);
           if (!el) {
@@ -2465,6 +2480,7 @@ export class MindMapCanvas {
         }
         visit(c);
       }
+      for (const t of visibleTopics(n)) visit(t);
     };
     visit(base);
     for (const [id, el] of this.summaryLabels) {
@@ -2554,6 +2570,7 @@ export class MindMapCanvas {
         el.classList.toggle("is-peek", this.calloutsHidden);
       }
       for (const c of visibleChildren(n)) visit(c);
+      for (const t of visibleTopics(n)) visit(t);
     };
     visit(base);
     for (const [id, el] of this.calloutEls) {
@@ -2730,7 +2747,8 @@ export class MindMapCanvas {
   /** 右键「在脑图中隐藏」：打上 %%hide%%；没开「显示隐藏的节点」时直接从图里摘掉 */
   hideSelected(): void {
     if (!this.opts.editable || !this.doc) return;
-    const targets = [...this.selected].filter((n) => n.parent && !n.hidden);
+    // 概要主题藏起来就挂不回概要上了（解析时隐藏的不挂），不提供
+    const targets = [...this.selected].filter((n) => n.parent && !n.hidden && !isSummaryTopic(n));
     if (!targets.length) return;
     const show = !!this.opts.showHidden?.();
     const next = targets[0].parent!;
@@ -2759,7 +2777,7 @@ export class MindMapCanvas {
     const b = this.calloutButton;
     if (!b || !this.doc) return;
     let any = false;
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       if (n.callout) any = true;
     });
     b.classList.toggle("is-hidden", !any);
@@ -2870,11 +2888,64 @@ export class MindMapCanvas {
   }
 
   private summaryMenuEntries(start: MindNode): MenuEntry[] {
+    const topic = start.summary?.topic;
+    if (topic) {
+      // 只剩一行字（没有子节点、备注、标注、关联线）时才能转回普通概要，转回去不丢东西
+      const plain = !topic.children.length && !topic.note && topic.callout === undefined && !topic.rels?.length && !topic.anchor;
+      return [
+        { title: t("menu.editSummary"), icon: "type", run: () => this.editTopic(topic) },
+        { title: t("menu.addSummaryTopic"), icon: "corner-down-right", run: () => this.addTopicChild(start) },
+        ...this.rangeMenuEntries(start, "summary"),
+        { title: t("menu.summaryToText"), icon: "text", disabled: !plain, run: () => this.topicToText(start) },
+        { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
+      ];
+    }
     return [
       { title: t("menu.editSummary"), icon: "type", run: () => this.editSummary(start) },
+      { title: t("menu.addSummaryTopic"), icon: "corner-down-right", run: () => this.addTopicChild(start) },
       ...this.rangeMenuEntries(start, "summary"),
       { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
     ];
+  }
+
+  private editTopic(topic: MindNode): void {
+    this.select(topic);
+    this.startEdit(topic);
+  }
+
+  /**
+   * 给概要加子主题（XMind 的概要主题）：普通概要先把文字变成一个节点（概要主题），再在它下面加一个子节点进入编辑。
+   * 写回时概要主题是被括住的最后一个兄弟后面的一项，见 Summary.topic
+   */
+  addTopicChild(start: MindNode): void {
+    if (!this.opts.editable || !this.doc || !start.summary) return;
+    if (this.editing) this.commitEdit();
+    let topic = start.summary.topic;
+    if (!topic) {
+      topic = createNode({ parent: start.parent, text: start.summary.text || t("canvas.summaryDefault") });
+      start.summary = { span: start.summary.span, raw: start.summary.raw, text: "", topic };
+      fixTopics(this.doc.root);
+    }
+    if (topic.folded) topic.folded = false;
+    const child = addChild(topic, this.doc.style, "");
+    this.activateGroup(null);
+    this.select(child);
+    this.render();
+    this.startEdit(child, true);
+    this.followSelection(child);
+  }
+
+  /** 概要主题只剩一行字时转回普通概要（文字写进标记） */
+  topicToText(start: MindNode): void {
+    const g = start.summary;
+    const topic = g?.topic;
+    if (!this.opts.editable || !g || !topic || topic.children.length) return;
+    start.summary = { span: g.span, raw: g.raw, text: markerText(topic.text), width: topic.width };
+    topic.topicOf = undefined;
+    topic.parent = null;
+    this.select(null);
+    this.render();
+    this.notify();
   }
 
   /** 给选中的节点加概要：同一父节点下相邻的合成一个；已在概要里的跳过。加完直接进入编辑文字 */
@@ -2882,7 +2953,7 @@ export class MindMapCanvas {
     if (!this.opts.editable) return;
     const byParent = new Map<MindNode, number[]>();
     for (const n of this.selected) {
-      if (!n.parent || this.summaryOf(n) || this.isFloating(n)) continue;
+      if (!n.parent || this.summaryOf(n) || this.isFloating(n) || isSummaryTopic(n)) continue;
       const arr = byParent.get(n.parent) ?? [];
       arr.push(n.parent.children.indexOf(n));
       byParent.set(n.parent, arr);
@@ -2923,7 +2994,15 @@ export class MindMapCanvas {
 
   removeSummary(start: MindNode): void {
     if (!this.opts.editable || !start.summary) return;
+    const topic = start.summary.topic;
     start.summary = undefined;
+    if (topic) {
+      // 连同概要主题的子树一起去掉：选中在里面的取消，连到里面的关联线也去掉
+      for (const n of [...this.selected]) if (n === topic || isAncestor(topic, n)) this.selected.delete(n);
+      topic.topicOf = undefined;
+      topic.parent = null;
+      this.pruneRels();
+    }
     this.render();
     this.notify();
   }
@@ -3318,7 +3397,7 @@ export class MindMapCanvas {
   /** 按当前的树给题目和选项挂上 class；只在背诵模式下有样式，关掉后留着也不影响 */
   private applyRecite(): void {
     if (!this.doc) return;
-    walk(this.doc.root, (q) => {
+    walkMap(this.doc.root, (q) => {
       const qEl = this.els.get(q.id);
       const options = q.children.map((c) => ({ c, state: taskState(c.text) })).filter((o) => o.state);
       if (qEl) {
@@ -3711,7 +3790,8 @@ export class MindMapCanvas {
           }, 400);
           this.touchPress = { node, timer, ev };
           this.pan = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false, onNode: true };
-        } else if (ev.button === 0) {
+        } else if (ev.button === 0 && !isSummaryTopic(node)) {
+          // 概要主题跟着括住的范围走，不能拖去排序（往它下面拖别的节点照常）
           this.pendingDrag = { node, x: ev.clientX, y: ev.clientY };
         }
         return;
@@ -4263,6 +4343,12 @@ export class MindMapCanvas {
       }
     }
     const sel = this.primary;
+    // 点选了概要文字（没有选中节点）时按 Tab：给概要加子主题
+    if (!sel && ev.key === "Tab" && !ev.shiftKey && this.opts.editable && this.activeGroup?.summary && this.summaryLabels.get(this.activeGroup.id)?.classList.contains("is-active")) {
+      ev.preventDefault();
+      this.addTopicChild(this.activeGroup);
+      return;
+    }
     if (!sel) return;
     if (ev.altKey && this.opts.editable && ev.key.startsWith("Arrow")) {
       // Alt+↑↓ 在兄弟间排序，Alt+←→ 升降级
@@ -4320,7 +4406,7 @@ export class MindMapCanvas {
     const id = el.dataset.id;
     if (!id || !this.doc) return null;
     let found: MindNode | null = null;
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       if (n.id === id) found = n;
     });
     return found;
@@ -4353,7 +4439,7 @@ export class MindMapCanvas {
   private selectAll(): void {
     if (!this.doc) return;
     this.selected.clear();
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       if (n.depth > 0 && this.els.has(n.id)) this.selected.add(n);
     });
     this.primary = this.primary && this.selected.has(this.primary) ? this.primary : [...this.selected][0] ?? null;
@@ -4382,15 +4468,26 @@ export class MindMapCanvas {
     const p = this.layout.placed.get(node.id);
     if (!p) return;
     const structure = this.opts.structure;
+    // 概要主题往回走到它括住的第一个兄弟；被括住的节点没有子节点时，往子节点方向走就到概要主题
+    const back = (n: MindNode) => {
+      if (isSummaryTopic(n)) this.select(n.topicOf!);
+      else if (n.parent && !this.isFloating(n)) this.select(n.parent);
+    };
+    const forward = (kids: MindNode[]) => {
+      if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
+      else {
+        const topic = this.summaryOf(node)?.summary?.topic;
+        if (topic && this.layout?.placed.has(topic.id)) this.select(topic);
+      }
+    };
     if (structure === "org-down") {
       // 向下结构：上下是父子，左右在兄弟间找最近的
       if (key === "ArrowDown") {
-        const kids = visibleChildren(node);
-        if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
+        forward(visibleChildren(node));
         return;
       }
       if (key === "ArrowUp") {
-        if (node.parent && !this.isFloating(node)) this.select(node.parent);
+        back(node);
         return;
       }
       this.selectNearest(p, key === "ArrowLeft" ? "left" : "right");
@@ -4400,10 +4497,11 @@ export class MindMapCanvas {
       if (key === "ArrowRight") {
         const kids = visibleChildren(node);
         if (kids.length) this.select(kids[0]);
+        else forward(kids);
         return;
       }
       if (key === "ArrowLeft") {
-        if (node.parent && !this.isFloating(node)) this.select(node.parent);
+        back(node);
         return;
       }
       this.selectNearest(p, key === "ArrowUp" ? "up" : "down");
@@ -4416,13 +4514,9 @@ export class MindMapCanvas {
         if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
         return;
       }
-      if (towardChildren) {
-        const kids = visibleChildren(node);
-        if (kids.length) this.select(kids[Math.floor((kids.length - 1) / 2)]);
-      } else if (node.parent && !this.isFloating(node)) {
-        // 自由主题没有连到中心主题，往回走不到中心主题
-        this.select(node.parent);
-      }
+      // 自由主题没有连到中心主题，往回走不到中心主题
+      if (towardChildren) forward(visibleChildren(node));
+      else back(node);
       return;
     }
     this.selectVertical(node, p, key === "ArrowUp" ? -1 : 1);
@@ -4441,7 +4535,8 @@ export class MindMapCanvas {
   private selectVertical(node: MindNode, p: Placed, dir: -1 | 1): void {
     if (!this.layout || !node.parent) return;
     const placed = this.layout.placed;
-    const sibs = visibleChildren(node.parent)
+    // 概要主题没有兄弟，直接找上下最近的
+    const sibs = (isSummaryTopic(node) ? [] : visibleChildren(node.parent))
       .map((c) => placed.get(c.id))
       .filter((q): q is Placed => !!q && q.side === p.side && this.isFloating(q.node) === this.isFloating(node))
       .sort((a, b) => a.y - b.y);
@@ -4548,10 +4643,11 @@ export class MindMapCanvas {
     const el = this.els.get(node.id);
     if (!el || !this.doc) return;
     // 按住的是多选里的一个：整组一起拖（父子都选中时只拖外层的，子节点跟着走）
-    const movers = this.selected.has(node) && this.selected.size > 1 ? this.topLevelSelection() : [node];
+    const movers = (this.selected.has(node) && this.selected.size > 1 ? this.topLevelSelection() : [node]).filter((m) => !isSummaryTopic(m));
+    if (!movers.length || isSummaryTopic(node)) return;
     if (!movers.includes(node)) movers.splice(0, movers.length, node);
     const subtree = new Set<MindNode>();
-    for (const m of movers) walk(m, (n) => subtree.add(n));
+    for (const m of movers) walkMap(m, (n) => subtree.add(n));
     const ghost = el.cloneNode(true) as HTMLElement;
     ghost.classList.add("mm-ghost");
     ghost.classList.remove("is-selected");
@@ -4902,7 +4998,7 @@ export class MindMapCanvas {
     if (!pf) return;
     let top = pf.y;
     let bottom = pf.y + pf.h;
-    walk(f, (n) => {
+    walkMap(f, (n) => {
       const p = this.layout!.placed.get(n.id);
       if (!p) return;
       top = Math.min(top, p.y);
@@ -4944,7 +5040,7 @@ export class MindMapCanvas {
 
   /** 节点原地变成自由主题（右键「转为自由主题」） */
   convertToFloat(node: MindNode): void {
-    if (!this.canFloat() || !node.parent || this.isFloating(node)) return;
+    if (!this.canFloat() || !node.parent || this.isFloating(node) || isSummaryTopic(node)) return;
     const c = this.centerOf(node);
     if (c) this.floatMany([node], node, c);
   }
@@ -4966,8 +5062,9 @@ export class MindMapCanvas {
    * 降级挂到组里第一个前面那个没被选中的兄弟下；升级放到父节点之后
    */
   private moveSelection(op: "up" | "down" | "indent" | "outdent"): void {
-    const movers = this.topLevelSelection();
-    const primary = this.primary;
+    // 概要主题不在兄弟里，不能上下挪、升降级
+    const movers = this.topLevelSelection().filter((m) => !isSummaryTopic(m));
+    const primary = this.primary && !isSummaryTopic(this.primary) ? this.primary : null;
     if (movers.length <= 1 || !this.doc) {
       const n = primary;
       if (!n) return;
@@ -5046,7 +5143,7 @@ export class MindMapCanvas {
     this.emitNoteCards();
     if (this.doc?.style.headingsOnly && !this.warnedDeep) {
       let deep = false;
-      walk(this.doc.root, (n) => {
+      walkMap(this.doc.root, (n) => {
         if (n !== this.doc!.root && n.kind === "list") deep = true;
       });
       if (deep) {
@@ -5186,11 +5283,13 @@ export class MindMapCanvas {
     if (!victims.length) return;
     const primary = this.primary && victims.includes(this.primary) ? this.primary : victims[0];
     const parent = primary.parent!;
+    // 删的是概要主题：之后选中它括住的第一个兄弟
+    const fallback = isSummaryTopic(primary) ? primary.topicOf! : null;
     const idx = parent.children.indexOf(primary);
     for (const v of victims) removeNode(v);
     // 删掉的节点上连出去、连进来的关联线一起去掉
     this.pruneRels();
-    const next = parent.children[Math.min(idx, parent.children.length - 1)] ?? parent;
+    const next = (fallback?.parent ? fallback : null) ?? parent.children[Math.min(Math.max(0, idx), parent.children.length - 1)] ?? parent;
     this.select(next);
     this.render();
     this.notify();
@@ -5262,7 +5361,8 @@ export class MindMapCanvas {
   private insertParentForSelected(): void {
     if (!this.doc || !this.opts.editable) return;
     if (this.editing) this.commitEdit();
-    const made = insertParents([...this.selected], this.doc.style);
+    // 概要主题不在兄弟里，给它插父节点没有意义
+    const made = insertParents([...this.selected].filter((n) => !isSummaryTopic(n)), this.doc.style);
     if (!made.length) return;
     this.select(made[0]);
     for (const n of made.slice(1)) this.select(n, "add");
@@ -5276,7 +5376,7 @@ export class MindMapCanvas {
   /** 只删选中的节点本身，它的子节点按原顺序接到父节点下、它原来的位置 */
   private deleteOnlySelected(): void {
     if (!this.doc) return;
-    const victims = [...this.selected].filter((n) => n.parent);
+    const victims = [...this.selected].filter((n) => n.parent && !isSummaryTopic(n));
     if (!victims.length) return;
     const primary = this.primary && victims.includes(this.primary) ? this.primary : victims[0];
     let next: MindNode | null = null;
@@ -5565,7 +5665,7 @@ export class MindMapCanvas {
     if (this.editing) this.commitEdit();
     const top = this.focusRoot ?? this.doc.root;
     const base = from && from !== top && isAncestor(top, from) ? from : top;
-    walk(base, (n) => {
+    walkMap(base, (n) => {
       if (n.children.length) n.folded = level !== null && n.depth - base.depth >= level;
     });
     this.render();
@@ -5611,7 +5711,7 @@ export class MindMapCanvas {
         b = { x, y, w: Math.max(b.x + b.w, r.x + r.w) - x, h: Math.max(b.y + b.h, r.y + r.h) - y };
       }
     };
-    walk(node, (n) => {
+    walkMap(node, (n) => {
       const p = this.layout!.placed.get(n.id);
       if (p) add(p);
     });
@@ -5714,7 +5814,7 @@ export class MindMapCanvas {
     const q = query.trim().toLowerCase();
     const list: MindNode[] = [];
     if (q) {
-      walk(this.doc.root, (n) => {
+      walkMap(this.doc.root, (n) => {
         if (plainText(n.text).toLowerCase().includes(q) || unescapeNote(n.note).toLowerCase().includes(q) || (n.callout ?? "").toLowerCase().includes(q)) list.push(n);
       });
     }
@@ -6067,15 +6167,17 @@ export class MindMapCanvas {
     const link = wikilinkOf(node.text);
     const sep: MenuEntry = { separator: true };
     const entries: MenuEntry[] = [];
+    // 概要主题不在兄弟里：没有兄弟、前后、父节点这些操作，范围和移除在「概要 ▸」里
+    const topic = isSummaryTopic(node);
     if (editable) {
       entries.push(
         { title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
         { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
-        { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent, run: () => this.addSiblingToSelected(false) },
+        { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent || topic, run: () => this.addSiblingToSelected(false) },
         {
           title: t("menu.insertGroup"),
           icon: "between-horizontal-start",
-          disabled: !node.parent,
+          disabled: !node.parent || topic,
           submenu: [
             { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", run: () => this.addSiblingToSelected(true) },
             { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", run: () => this.insertParentForSelected() },
@@ -6134,8 +6236,8 @@ export class MindMapCanvas {
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
       if (box) entries.push({ title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
-      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent || this.isFloating(node), run: () => this.addBoxToSelected() });
-      const summary = this.summaryOf(node);
+      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent || this.isFloating(node) || topic, run: () => this.addBoxToSelected() });
+      const summary = topic ? node.topicOf! : this.summaryOf(node);
       if (summary) entries.push({ title: t("menu.summaryGroup"), icon: "brackets", submenu: this.summaryMenuEntries(summary) });
       else entries.push({ title: t("menu.addSummary"), icon: "brackets", disabled: !node.parent || this.isFloating(node), run: () => this.addSummaryToSelected() });
       entries.push(sep);
@@ -6157,11 +6259,11 @@ export class MindMapCanvas {
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
       more.push(
-        { title: t("menu.toHeading"), icon: "heading", disabled: !parent || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
-        { title: t("menu.toList"), icon: "list", disabled: !parent || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
+        { title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
+        { title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
       );
       more.push({ title: t("menu.splitByPunctuation"), icon: "split", disabled: !this.splittable(node).length, run: () => this.splitIntoChildren(node) });
-      if (node.parent) {
+      if (node.parent && !topic) {
         more.push(
           node.hidden
             ? { title: t("menu.unhideNode"), icon: "eye", run: () => this.unhideSelected() }
@@ -6169,7 +6271,7 @@ export class MindMapCanvas {
         );
       }
       if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
-      else if (node.parent && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
+      else if (node.parent && !topic && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       more.push(sep);
     }
     more.push({ title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
@@ -6177,7 +6279,7 @@ export class MindMapCanvas {
     entries.push({ title: t("menu.more"), icon: "more-horizontal", submenu: more });
     if (editable && node.parent) {
       entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
-      if (node.children.length) entries.push({ title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });
+      if (node.children.length && !topic) entries.push({ title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });
     }
     return entries;
   }
@@ -6200,7 +6302,7 @@ export class MindMapCanvas {
   }
 
   private convertLevel(node: MindNode, kind: "heading" | "list"): void {
-    if (!this.doc || !this.opts.editable) return;
+    if (!this.doc || !this.opts.editable || isSummaryTopic(node)) return;
     if (!convertLevelKind(node, kind, this.doc.style)) {
       this.opts.host?.notice?.(t("notice.cannotHeading"));
       return;
@@ -6881,6 +6983,7 @@ export class MindMapCanvas {
         }
       }
       for (const c of visibleChildren(n)) visit(c);
+      for (const t of visibleTopics(n)) visit(t);
     };
     visit(base);
     for (const [id, el] of this.noteEls) {
@@ -7117,7 +7220,7 @@ export class MindMapCanvas {
   private resolveNoteCards(): void {
     this.cardState.clear();
     if (!this.doc || !Object.keys(this.cardKeys).length) return;
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       const c = this.cardKeys[noteKey(n)];
       if (c) this.cardState.set(n.id, { ...c });
     });
@@ -7127,7 +7230,7 @@ export class MindMapCanvas {
   private emitNoteCards(): void {
     if (!this.doc) return;
     const out: NoteCards = {};
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       const c = this.cardState.get(n.id);
       if (c && n.note) out[noteKey(n)] = c;
     });
@@ -7173,7 +7276,7 @@ export class MindMapCanvas {
     const b = this.notesButton;
     if (!b || !this.doc) return;
     let any = false;
-    walk(this.doc.root, (n) => {
+    walkMap(this.doc.root, (n) => {
       if (n.note) any = true;
     });
     b.classList.toggle("is-hidden", !any);

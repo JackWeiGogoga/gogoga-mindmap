@@ -48,6 +48,7 @@ One `%%…%%` comment per node holds all its markers, separated by spaces, for e
 | `fold` | Collapsed: children are hidden until clicked |
 | `box` / `box=3` / `box "Title"` | Dashed frame around this node and its whole branch; `=3` also takes in the next two siblings |
 | `summary "Text"` / `summary=2 "Text"` | Curly brace on the outer side of this node and its whole branch, with the summary text after it; `=2` stretches it over the next sibling too. To summarize several siblings, put it on the first one |
+| `summary-topic=2` | A summary that has its own subtopics: put it on an item written **right after** the siblings it sums up; the item becomes the summary (after the brace) and its children hang off it. `=2` is how many preceding siblings it covers. Use the plain `summary "Text"` when it's just a line |
 | `callout "Text"` | Small always-visible bubble next to the node; `<br>` for a line break, add `cc=yellow` to fill it |
 | `hide` | Kept in the note but not shown in the map |
 | `id=r1` and `rel=r1 "Text"` | Relationship: a dashed arrow from the node with `rel=r1` to the node with `id=r1`. Pick any short id (letters, digits, `-`, `_`); one `id=` per node, several `rel=` allowed |

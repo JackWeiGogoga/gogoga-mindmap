@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-05
+
+### 新增
+- 概要主题：概要后面也能挂子主题，和 XMind 的概要主题一样。单击概要文字后按 Tab，或右键概要 →「添加子主题」，概要文字变成一个节点，下面加上子节点，之后和普通节点一样编辑、加子节点、折叠、把别的节点拖进来。它比括住的节点高时，上下的兄弟会让开，不会重叠；四种结构都支持，思维导图左边的朝左展开。在 Markdown 里写成紧跟在被括住的最后一项后面的一项 `- 注意事项 %%summary-topic=2%%`，子主题照常写在它下面，大纲面板也按这个位置列出来。概要主题跟着括住的范围走，不能单独拖动、上下挪；删掉括住的第一个节点时概要交给下一个，全删了它留下来当普通节点，子树不会丢。原来只有一行文字的概要写法不变，已有的笔记一个字都不改。
+- 打开、转换 .xmind 文件时，挂在概要下面的主题也转过来（变成概要主题），不再算作没转过来的内容。
+
 ## [0.43.0] - 2026-11-05
 
 ### 新增
@@ -536,7 +542,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...HEAD
+[0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
 [0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
 [0.41.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.40.0...0.41.0
