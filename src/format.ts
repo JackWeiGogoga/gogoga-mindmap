@@ -9,6 +9,7 @@
 export type InlineFormat =
   | { kind: "bold" }
   | { kind: "italic" }
+  | { kind: "strike" }
   /** color：Obsidian 的彩色高亮 ==🔴文字==；不给就是普通的 ==高亮== */
   | { kind: "highlight"; color?: HighlightColor }
   | { kind: "color"; color: string }
@@ -120,6 +121,19 @@ function wrapLines(sel: string, open: string, close: string): string {
       return `${m[1]}${open}${m[2]}${close}${m[3]}`;
     })
     .join("\n");
+}
+
+/** 删除线开关：选区紧挨着 ~~（或连 ~~ 一起选中）就去掉，不然每行包上 ~~ */
+function toggleStrike(text: string, s: number, e: number): FormatResult {
+  if (text.slice(s - 2, s) === "~~" && text.slice(e, e + 2) === "~~") {
+    return { text: text.slice(0, s - 2) + text.slice(s, e) + text.slice(e + 2), start: s - 2, end: e - 2 };
+  }
+  const sel = text.slice(s, e);
+  if (sel.length > 4 && sel.startsWith("~~") && sel.endsWith("~~")) {
+    return { text: text.slice(0, s) + sel.slice(2, -2) + text.slice(e), start: s, end: e - 4 };
+  }
+  const wrapped = wrapLines(sel, "~~", "~~");
+  return { text: text.slice(0, s) + wrapped + text.slice(e), start: s + 2, end: s + wrapped.length - 2 };
 }
 
 /** 选区前后有几个连续的 * */
@@ -316,6 +330,8 @@ export function applyInlineFormat(text: string, start: number, end: number, fmt:
     case "bold":
     case "italic":
       return toggleMark(text, s, e, fmt.kind);
+    case "strike":
+      return toggleStrike(text, s, e);
     case "highlight":
       return toggleHighlight(text, s, e, fmt.color);
     case "color":

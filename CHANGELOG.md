@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- A strikethrough button (S) in the formatting toolbar while editing a node: select text and click to add `~~`, click again to remove it.
+- **Strike through completed tasks** setting (Editing and interaction page, off by default): nodes whose task box is checked show struck-through, dimmed text; not in recite mode.
+- **Name new nodes Topic 1, Topic 2…** setting (Editing and interaction page, off by default): a new node starts as "Topic 1", "Topic 2"… selected, so typing replaces it; pressing Enter or Esc without typing keeps it, so you can add several nodes in a row.
+
 ## [0.46.0] - 2026-11-07
 
 ### Added

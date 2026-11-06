@@ -40,6 +40,10 @@ export interface MindMapSettings {
   hideSyntax: boolean;
   /** 悬停在节点右边缘就能调宽度（默认关） */
   widthHandleOnHover: boolean;
+  /** 新建的节点自带名字「主题1」，不写字也留着（默认关） */
+  newNodeName: boolean;
+  /** 勾上的任务（[x]）在脑图里显示删除线（默认关） */
+  strikeDoneTasks: boolean;
   /** 编辑时粘贴网页地址，自动抓网页标题粘成 [标题](网址)（默认关） */
   pasteLinkTitle: boolean;
   /** 复制节点时去掉 %%…%% 标记（默认关） */
@@ -174,6 +178,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   centerOnSelect: false,
   hideSyntax: false,
   widthHandleOnHover: false,
+  newNodeName: false,
+  strikeDoneTasks: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
@@ -257,6 +263,8 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "customMarkers":
       case "customMarkersExclusive":
         return p.applyCustomMarkers();
+      case "strikeDoneTasks":
+        return p.applyDisplayScale(false);
       case "foldFollow":
         if (value) p.syncFolds();
         return;
@@ -313,6 +321,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
         toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
         toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
+        toggle("newNodeName", t("settings.newNodeName.name"), t("settings.newNodeName.desc"), ["new node", "新建", "默认名字", "主题1"]),
+        toggle("strikeDoneTasks", t("settings.strikeDoneTasks.name"), t("settings.strikeDoneTasks.desc"), ["task", "任务", "删除线", "strikethrough"]),
         toggle("copyPlain", t("settings.copyPlain.name"), t("settings.copyPlain.desc"), ["clipboard", "剪贴板"]),
         toggle("pasteLinkTitle", t("settings.pasteLinkTitle.name"), t("settings.pasteLinkTitle.desc"), ["link", "url", "链接", "网址"]),
         { name: t("settings.hover.name"), desc: t("settings.hover.desc", { source: t("hover.display") }), aliases: ["page preview", "页面预览"] },

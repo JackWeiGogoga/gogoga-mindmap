@@ -233,6 +233,8 @@ export interface CanvasOptions {
   hideSyntax?: () => boolean;
   /** 鼠标移到任意节点的右边缘就能拖动改宽、双击，不用先选中（默认关：只有选中的节点有手柄） */
   widthHandleOnHover?: () => boolean;
+  /** 新建的节点自带名字「主题1」「主题2」…：不写字直接确认也留着（默认关：没写字的新节点不保留） */
+  newNodeName?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
@@ -5495,12 +5497,15 @@ export class MindMapCanvas {
     this.select(node);
     this.editing = node;
     this.editingIsNew = isNew;
+    // 新建节点自带名字（设置打开时）：名字先写进节点，编辑时整个选中，打字就替换；不改直接确认、按 Esc 都留着
+    const named = isNew && !node.text && !!this.opts.newNodeName?.();
+    if (named) node.text = this.defaultNodeName(node);
     this.positionNodebar();
     el.classList.add("is-editing");
     this.nodeEditor = new InlineEditor(label, {
       text: toEditableText(node.text),
       // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
-      selectAll: !this.opts.caretAtEnd?.(),
+      selectAll: named || !this.opts.caretAtEnd?.(),
       multiline: true,
       // 回车提交、Esc、Tab、链接补全的上下键、⌘B 这些走画布的按键处理；画布没处理的（打字、方向键、⌘Z）归编辑框
       onKey: (ev) => {
@@ -5530,6 +5535,19 @@ export class MindMapCanvas {
     this.reflow();
   }
 
+  /** 新节点的默认名字：主题1、主题2……，接着同级里已有的最大编号往下排 */
+  private defaultNodeName(node: MindNode): string {
+    const siblings = node.parent ? node.parent.children : [];
+    const re = new RegExp(`^${t("canvas.newTopicName", { n: "(\\d+)" })}$`);
+    let max = 0;
+    for (const s of siblings) {
+      if (s === node) continue;
+      const m = re.exec(s.text.trim());
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    return t("canvas.newTopicName", { n: max + 1 });
+  }
+
   /** 交给行内编辑框：粘贴网页地址时抓标题 */
   readonly linkTitle = (url: string): Promise<string | null> | null => this.opts.host?.linkTitle?.(url) ?? null;
   readonly hideSyntax = (): boolean => !!this.opts.hideSyntax?.();
@@ -5555,7 +5573,8 @@ export class MindMapCanvas {
       if (refocus) this.el.focus({ preventScroll: true });
       return;
     }
-    const changed = !cancel && (text !== node.text || isNew);
+    // 新节点留下来了（自带名字的按 Esc 也留着）就得存
+    const changed = isNew || (!cancel && text !== node.text);
     node.text = text;
     // startEdit 把 label 换成了编辑框。文字没改的话签名跟着没变，
     // rebuild 会认为这个节点不用动，于是原文就留在那儿了 —— 纯文字节点看不出来，
@@ -6512,6 +6531,7 @@ export class MindMapCanvas {
     };
     btn("is-bold", t("format.bold"), { kind: "bold" }, (b) => (b.textContent = "B"));
     btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
+    btn("is-strike", t("format.strike"), { kind: "strike" }, (b) => (b.textContent = "S"));
     btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(icon("highlighter")));
     const sep = () => bar.append(createSpan({ cls: "mm-format-sep" }));
     const colors = this.opts.textColors?.() ?? [];

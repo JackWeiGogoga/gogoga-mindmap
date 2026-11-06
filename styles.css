@@ -501,6 +501,7 @@
 .gg-mm-root .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
 .gg-mm-root .mm-format-btn.is-bold { font-weight: 700; }
 .gg-mm-root .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
+.gg-mm-root .mm-format-btn.is-strike { text-decoration: line-through; }
 .gg-mm-root .mm-format-btn.is-color { font-weight: 700; }
 .gg-mm-root .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
 .gg-mm-root .mm-format-btn .mm-icon { font-size: 15px; }
@@ -2074,6 +2075,9 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .gg-mm-node .mm-node-table .ggt button.ggt-add-col { top: 6px; bottom: 18px; right: 0; width: 16px; height: auto; }
 .gg-mm-node .mm-node-table .ggt button.ggt-add-row { left: 0; right: 18px; bottom: 0; height: 16px; width: auto; }
 .gg-mm-node .mm-node-table .ggt-table { background: var(--background-primary); }
+
+/* 完成的任务显示删除线（设置打开时；背诵模式里勾选框是答案，不加） */
+body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done) { text-decoration: line-through; color: var(--text-muted); }
 
 /* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */
 /*

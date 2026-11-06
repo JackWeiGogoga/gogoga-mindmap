@@ -119,3 +119,12 @@ test("荧光笔颜色表：可以填 🔴 这些，文字颜色表不认", () =>
   assert.deepEqual(highlightColor("🟣字"), { color: "purple", length: 2 });
   assert.equal(highlightColor("字"), null);
 });
+
+test("删除线：加上、紧挨着 ~~ 时去掉、连 ~~ 选中也去掉、多行每行各包一层", () => {
+  assert.deepEqual(applyInlineFormat("完成任务", 0, 2, { kind: "strike" }), { text: "~~完成~~任务", start: 2, end: 4 });
+  assert.deepEqual(applyInlineFormat("~~完成~~任务", 2, 4, { kind: "strike" }), { text: "完成任务", start: 0, end: 2 });
+  assert.deepEqual(applyInlineFormat("~~完成~~任务", 0, 6, { kind: "strike" }), { text: "完成任务", start: 0, end: 2 });
+  assert.equal(applyInlineFormat("一\n二", 0, 3, { kind: "strike" }).text, "~~一~~\n~~二~~");
+  // 选区为空：整段
+  assert.equal(applyInlineFormat("全部", 1, 1, { kind: "strike" }).text, "~~全部~~");
+});

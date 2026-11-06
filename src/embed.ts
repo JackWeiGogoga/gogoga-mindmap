@@ -126,6 +126,7 @@ class MindMapEmbed extends Component {
         centerOnSelect: () => settings.centerOnSelect,
         hideSyntax: () => settings.hideSyntax,
         widthHandleOnHover: () => settings.widthHandleOnHover,
+        newNodeName: () => settings.newNodeName,
         copyPlain: () => settings.copyPlain,
         showNodebar: () => settings.showNodebar,
         nodeColors: () => parseNodeColors(settings.nodeColors),

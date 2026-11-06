@@ -147,6 +147,7 @@ export default class MindMapPlugin extends Plugin {
       this.applyEmbedToolbar(undefined, false);
       for (const d of this.allDocs()) {
         d.body.style.removeProperty("--mm-font-scale");
+        d.body.classList.remove("mm-strike-done");
         d.body.style.removeProperty("--mm-note-max-h");
         d.body.style.removeProperty("--mm-note-max-w");
       }
@@ -297,6 +298,8 @@ export default class MindMapPlugin extends Plugin {
     const k = this.settings.fontScale / 100;
     if (k === 1) doc.body.style.removeProperty("--mm-font-scale");
     else doc.body.style.setProperty("--mm-font-scale", String(k));
+    // 完成的任务（[x]）显示删除线：样式表按这个类画
+    doc.body.classList.toggle("mm-strike-done", this.settings.strikeDoneTasks);
     const h = this.settings.noteMaxHeight;
     if (h === DEFAULT_SETTINGS.noteMaxHeight) doc.body.style.removeProperty("--mm-note-max-h");
     else doc.body.style.setProperty("--mm-note-max-h", `${h}px`);
@@ -1181,6 +1184,7 @@ export default class MindMapPlugin extends Plugin {
         centerOnSelect: () => this.settings.centerOnSelect,
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,
+        newNodeName: () => this.settings.newNodeName,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
