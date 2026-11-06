@@ -2060,7 +2060,11 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
   max-height: calc(var(--mm-table-max-h, 480px) * var(--mm-font-scale, 1));
   overflow: auto;
   overscroll-behavior: contain;
+  /* 细滚动条，鼠标在节点上才显示 */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
+.gg-mm-node:hover .mm-node-table .ggt-scroll { scrollbar-color: var(--scrollbar-thumb-bg, rgba(0, 0, 0, 0.2)) transparent; }
 /* 最后一列是 minmax(0, 1fr)：横跨所有列的表格不会把网格撑得比节点宽 */
 .gg-mm-node.has-table.has-width { grid-template-columns: repeat(3, max-content) minmax(0, 1fr); }
 .gg-mm-node.has-width .mm-node-table .ggt, .gg-mm-node.has-width .mm-node-table .ggt-scroll { max-width: 100%; }

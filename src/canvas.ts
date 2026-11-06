@@ -3977,11 +3977,22 @@ export class MindMapCanvas {
           if (this.opts.embedded) ev.stopPropagation();
           return;
         }
-        // 展开的备注内容超出时，在卡片里滚动；滚到头了（或按着 ⌘/Ctrl 缩放）再交给画布
-        // 节点里的表格也一样：超出最大宽高时在节点里滚动，滚到头再交给画布
-        const noteBody = (ev.target as HTMLElement).closest<HTMLElement>(".mm-note-card-body, .mm-node-table .ggt-scroll");
-        if (noteBody && !ev.ctrlKey && !ev.metaKey && MindMapCanvas.canScroll(noteBody, ev)) {
+        // 一次滑动（连同触控板松手后的惯性）只归一样东西：开头落在哪就一直是哪，
+        // 从画布开始的平移扫过表格节点不会被截住，在表格里开始的滚到头也不会把画布甩出去
+        const now = performance.now();
+        const zoom = ev.ctrlKey || ev.metaKey;
+        const latched = this.wheelLatch && now - this.wheelLatch.at < 220 ? this.wheelLatch : null;
+        const scroller = zoom ? null : latched ? latched.target : this.wheelTargetAt(ev);
+        this.wheelLatch = zoom ? null : { target: scroller, at: now };
+        if (scroller?.isConnected) {
+          ev.preventDefault();
           if (this.opts.embedded) ev.stopPropagation();
+          const k = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 100 : 1;
+          // Shift + 滚轮：有的系统不把竖着滚换成横向，自己换
+          const dx = ev.shiftKey && !ev.deltaX ? ev.deltaY : ev.deltaX;
+          const dy = ev.shiftKey && !ev.deltaX ? 0 : ev.deltaY;
+          scroller.scrollLeft += dx * k;
+          scroller.scrollTop += dy * k;
           return;
         }
         ev.preventDefault();
@@ -7388,6 +7399,24 @@ export class MindMapCanvas {
     if (!body) return;
     const more = body.scrollHeight > body.clientHeight + 1 && body.scrollTop + body.clientHeight < body.scrollHeight - 1;
     if (el.classList.contains("is-overflow") !== more) el.classList.toggle("is-overflow", more);
+  }
+
+  /** 正在进行的这次滑动归谁：节点表格 / 备注卡片的滚动区，null 是画布 */
+  private wheelLatch: { target: HTMLElement | null; at: number } | null = null;
+
+  /**
+   * 一次滑动开始时落在哪：
+   * - 节点里的表格超出了大小（能滚）：鼠标在这个节点任何地方（标题、边距也算）都滚表格，滚到头就停住，节点不动
+   * - 展开的备注卡片：还能往这个方向滚才归卡片，滚到头了这次滑动交给画布（和原来一样）
+   */
+  private wheelTargetAt(ev: WheelEvent): HTMLElement | null {
+    const target = ev.target as HTMLElement;
+    const tableNode = target.closest<HTMLElement>(".gg-mm-node.has-table");
+    const sc = tableNode?.querySelector<HTMLElement>(".mm-node-table .ggt-scroll");
+    if (sc && (sc.scrollHeight > sc.clientHeight + 1 || sc.scrollWidth > sc.clientWidth + 1)) return sc;
+    const body = target.closest<HTMLElement>(".mm-note-card-body");
+    if (body && MindMapCanvas.canScroll(body, ev)) return body;
+    return null;
   }
 
   /** 滚轮在这个元素里还能不能往这个方向滚 */
