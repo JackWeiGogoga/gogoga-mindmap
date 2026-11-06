@@ -2160,14 +2160,14 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
   caret-color: var(--ggt-sel);
 }
 
-/* 底色：主题的颜色调淡，深浅色都合适 */
-.ggt .ggt-cell[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.07); }
-.ggt .ggt-cell[data-bg="red"] { background: rgba(var(--color-red-rgb), 0.14); }
-.ggt .ggt-cell[data-bg="orange"] { background: rgba(var(--color-orange-rgb), 0.15); }
-.ggt .ggt-cell[data-bg="yellow"] { background: rgba(var(--color-yellow-rgb), 0.18); }
-.ggt .ggt-cell[data-bg="green"] { background: rgba(var(--color-green-rgb), 0.14); }
-.ggt .ggt-cell[data-bg="blue"] { background: rgba(var(--color-blue-rgb), 0.13); }
-.ggt .ggt-cell[data-bg="purple"] { background: rgba(var(--color-purple-rgb), 0.13); }
+/* 底色：主题的颜色调淡，深浅色都合适。颜色放在变量里，真正上色的规则在后面（要压过表头、预设的底色） */
+.ggt .ggt-cell[data-bg="gray"] { --ggt-cell-bg: rgba(var(--mono-rgb-100), 0.07); }
+.ggt .ggt-cell[data-bg="red"] { --ggt-cell-bg: rgba(var(--color-red-rgb), 0.14); }
+.ggt .ggt-cell[data-bg="orange"] { --ggt-cell-bg: rgba(var(--color-orange-rgb), 0.15); }
+.ggt .ggt-cell[data-bg="yellow"] { --ggt-cell-bg: rgba(var(--color-yellow-rgb), 0.18); }
+.ggt .ggt-cell[data-bg="green"] { --ggt-cell-bg: rgba(var(--color-green-rgb), 0.14); }
+.ggt .ggt-cell[data-bg="blue"] { --ggt-cell-bg: rgba(var(--color-blue-rgb), 0.13); }
+.ggt .ggt-cell[data-bg="purple"] { --ggt-cell-bg: rgba(var(--color-purple-rgb), 0.13); }
 
 /* 预设：斑马纹 */
 .ggt[data-preset="zebra"] tbody tr:nth-child(even) .ggt-cell:not([data-bg]) { background: var(--ggt-zebra); }
@@ -2417,13 +2417,6 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .ggt[data-preset="academic"] .ggt-cell { border-left: 0 !important; border-right: 0; border-bottom: 0; background: transparent; }
 .ggt[data-preset="academic"] thead .ggt-cell { border-top: 1.5px solid var(--text-normal); border-bottom: 1px solid var(--text-normal); background: transparent; }
 .ggt[data-preset="academic"] tbody tr:last-child .ggt-cell { border-bottom: 1.5px solid var(--text-normal); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.07); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="red"] { background: rgba(var(--color-red-rgb), 0.14); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="orange"] { background: rgba(var(--color-orange-rgb), 0.15); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="yellow"] { background: rgba(var(--color-yellow-rgb), 0.18); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="green"] { background: rgba(var(--color-green-rgb), 0.14); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="blue"] { background: rgba(var(--color-blue-rgb), 0.13); }
-.ggt[data-preset="academic"] .ggt-cell[data-bg="purple"] { background: rgba(var(--color-purple-rgb), 0.13); }
 
 /* 合计行：加粗，上面一道线 */
 .ggt .ggt-cell.is-total-row { font-weight: var(--font-semibold, 600); border-top: 1.5px solid var(--ggt-line-strong, var(--text-faint)); }
@@ -2449,4 +2442,11 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 
 /* 列表项下面的表格（实时预览）：按缩进层数往右挪，和列表项的文字对齐 */
 .markdown-source-view.mod-cm6 .cm-content > .ggt-lp.is-in-list { padding-inline-start: calc(var(--list-indent, 2.25em) * var(--ggt-depth, 1)); }
+
+/*
+ * 格子自己的底色压过一切默认底色：表头的浅灰、标题列、斑马纹、极简线和三线表的透明表头。
+ * 表头吸顶时底下要不透明：先铺页面底色，再叠一层格子的颜色
+ */
+.ggt .ggt-table .ggt-cell[data-bg] { background-color: var(--ggt-cell-bg); }
+.ggt.is-stuck .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
 /* ==== gogoga-table 同步结束 ==== */
