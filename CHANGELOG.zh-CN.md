@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-07
+
 ### 新增
 - 节点里的表格：右键节点 →「插入 ▸ 插入表格」，表格画在节点框里、标题下面，点格子直接改，和 gogoga Table 插件同一套编辑器：Enter / Tab 跳格、拖列宽、底色、合并单元格、行列手柄、和 Excel / 飞书互相复制粘贴、⌘Z 撤销都能用。不用另外装表格插件。表格存在节点的备注里，是标准 Markdown 表格，节点后面多一个 `%%table%%`；备注里本来就有表格的节点，右键 →「插入 ▸ 表格显示在节点里」就能放进节点，「更多 ▸ 表格放回备注」放回去。没加标记的节点和已有的笔记都不变。大表格不会把节点撑得太大：没拖过宽度的列最宽 240、文字换行，整张表超过设置里的最大宽度、高度（默认 640、480，「备注」设置页）就在节点里滚动，表头留在顶上；鼠标在这种节点上任何位置滑动都只滚表格，滚到头也停住，节点不动。一次滑动（连同触控板的惯性）只归一样东西：从画布开始的平移扫过表格节点不会被截住，展开的备注卡片滚到头时惯性也不会把画布甩出去。
 
@@ -564,7 +566,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...HEAD
+[0.46.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...0.46.0
 [0.45.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...0.45.0
 [0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
 [0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
