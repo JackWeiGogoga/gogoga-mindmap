@@ -2044,10 +2044,14 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
   overflow-wrap: normal;
   cursor: auto;
 }
-/* 表格贴着节点的内边距放，不额外留白；加行加列的按钮悬停时骑在节点边上 */
-.gg-mm-node .mm-node-table .ggt { margin: 0; padding: 6px 0 0; max-width: none; }
-.gg-mm-node .mm-node-table .ggt-add-col { top: 6px; bottom: 0; right: -20px; }
-.gg-mm-node .mm-node-table .ggt-add-row { left: 0; right: 0; bottom: -20px; }
+/*
+ * 加行、加列的按钮放在节点里面：表格右边、下边各留一条 18px 的窄带，两个按钮一样大、都在节点框里。
+ * 节点自己右边、下边的内边距相应收小，表格四周的空白和标题那边差不多
+ */
+.gg-mm-node.has-table { padding-right: 6px; padding-bottom: 6px; }
+.gg-mm-node .mm-node-table .ggt { margin: 0; padding: 6px 18px 18px 0; max-width: none; }
+.gg-mm-node .mm-node-table .ggt button.ggt-add-col { top: 6px; bottom: 18px; right: 0; width: 16px; height: auto; }
+.gg-mm-node .mm-node-table .ggt button.ggt-add-row { left: 0; right: 18px; bottom: 0; height: 16px; width: auto; }
 .gg-mm-node .mm-node-table .ggt-table { background: var(--background-primary); }
 
 /* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */
