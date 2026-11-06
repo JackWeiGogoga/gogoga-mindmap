@@ -333,6 +333,8 @@ export class TableEditor {
       this.root.classList.toggle("can-left", sc.scrollLeft > 1);
       this.root.classList.toggle("can-right", sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1);
       this.stickHeader();
+      // 手柄、左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
+      this.placeHandles();
     };
     const onScroll = () => win.requestAnimationFrame(update);
     this.on(this.scroller, "scroll", onScroll, { passive: true });
@@ -1693,12 +1695,26 @@ export class TableEditor {
   }
 
   /** 行手柄放在悬停（或选中）那一行的左边框上，列手柄放在那一列的上边框上 */
+  /** 滚动区域在屏幕上看得见的那一块（表格横向 / 纵向滚动时，手柄不能跟着跑到外面去） */
+  private visibleBox(): { left: number; top: number; right: number; bottom: number } {
+    const sc = this.scroller;
+    const r = sc.getBoundingClientRect();
+    const k = this.scale();
+    const left = r.left + sc.clientLeft * k;
+    const top = r.top + sc.clientTop * k;
+    return { left, top, right: left + sc.clientWidth * k, bottom: top + sc.clientHeight * k };
+  }
+
   private placeHandles(): void {
+    const vis = this.visibleBox();
     {
       const base = this.root.getBoundingClientRect();
       const tr = this.tableEl.getBoundingClientRect();
       const k = this.scale();
-      this.cornerBtn.setAttribute("style", `left:${(tr.left - base.left) / k}px;top:${(tr.top - base.top) / k}px`);
+      // 表格滚动了：左上角按钮贴在看得见的左上角，不跟着滚出去
+      const x = Math.max(tr.left, vis.left);
+      const y = Math.max(tr.top, vis.top);
+      this.cornerBtn.setAttribute("style", `left:${(x - base.left) / k}px;top:${(y - base.top) / k}px`);
     }
     const p = this.hover ?? this.sel;
     const show = !!p && !this.host.readonly && !this.resize;
@@ -1713,13 +1729,18 @@ export class TableEditor {
     const fr = first.getBoundingClientRect();
     const hr = head.getBoundingClientRect();
     const k = this.scale();
-    this.rowHandle.style.top = `${(fr.top - base.top + fr.height / 2) / k}px`;
-    this.rowHandle.style.left = `${(fr.left - base.left) / k}px`;
+    // 行手柄贴在看得见的左边；这一行上下滚出去了就藏起来。列手柄：这一列左右滚出去了就藏起来
+    const rowMid = fr.top + fr.height / 2;
+    const colMid = hr.left + hr.width / 2;
+    if (rowMid < vis.top || rowMid > vis.bottom) this.rowHandle.classList.remove("is-shown");
+    if (colMid < vis.left || colMid > vis.right) this.colHandle.classList.remove("is-shown");
+    this.rowHandle.style.top = `${(rowMid - base.top) / k}px`;
+    this.rowHandle.style.left = `${(Math.max(fr.left, vis.left) - base.left) / k}px`;
     this.rowHandle.dataset.r = String(p.r);
     this.rowHandle.classList.toggle("is-fixed", p.r === 0);
     this.rowHandle.dataset.c = String(p.c);
-    this.colHandle.style.left = `${(hr.left - base.left + hr.width / 2) / k}px`;
-    this.colHandle.style.top = `${(hr.top - base.top) / k}px`;
+    this.colHandle.style.left = `${(colMid - base.left) / k}px`;
+    this.colHandle.style.top = `${(Math.max(hr.top, vis.top) - base.top) / k}px`;
     this.colHandle.dataset.r = String(p.r);
     this.colHandle.dataset.c = String(p.c);
   }
