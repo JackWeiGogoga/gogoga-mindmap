@@ -6,7 +6,7 @@ import test from "node:test";
 import { PARTS, TABLE_SRC, tableCss } from "../sync-table.mjs";
 
 // 只在两个仓库并排放着时检查（CI 里只有脑图仓库，跳过）
-test("节点表格的代码和 gogoga-table 同步（改了表格插件要跑 node scripts/sync-table.mjs）", { skip: !existsSync(TABLE_SRC) }, () => {
+test("节点表格的代码和 gogoga-table 同步（改了表格插件要跑 node scripts/sync-table.mjs）", { skip: !existsSync(path.join(TABLE_SRC as string, "src", "core")) }, () => {
   for (const part of PARTS as string[]) {
     const from = path.join(TABLE_SRC as string, "src", part);
     for (const f of readdirSync(from).filter((x) => x.endsWith(".ts"))) {
