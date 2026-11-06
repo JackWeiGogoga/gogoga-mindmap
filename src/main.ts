@@ -303,6 +303,12 @@ export default class MindMapPlugin extends Plugin {
     const w = this.settings.noteMaxWidth;
     if (w === DEFAULT_SETTINGS.noteMaxWidth) doc.body.style.removeProperty("--mm-note-max-w");
     else doc.body.style.setProperty("--mm-note-max-w", `${w}px`);
+    const tw = this.settings.tableMaxWidth;
+    if (tw === DEFAULT_SETTINGS.tableMaxWidth) doc.body.style.removeProperty("--mm-table-max-w");
+    else doc.body.style.setProperty("--mm-table-max-w", `${tw}px`);
+    const th = this.settings.tableMaxHeight;
+    if (th === DEFAULT_SETTINGS.tableMaxHeight) doc.body.style.removeProperty("--mm-table-max-h");
+    else doc.body.style.setProperty("--mm-table-max-h", `${th}px`);
   }
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */

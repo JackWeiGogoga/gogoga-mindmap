@@ -51,6 +51,9 @@ export interface MindMapSettings {
   noteMaxHeight: number;
   /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
   noteMaxWidth: number;
+  /** 节点里表格的最大宽度、高度（像素，随节点字号缩放）：超出的在节点里滚动 */
+  tableMaxWidth: number;
+  tableMaxHeight: number;
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 脑图视图是否显示大纲面板 */
@@ -175,6 +178,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
   noteMaxWidth: 320,
+  tableMaxWidth: 640,
+  tableMaxHeight: 480,
   customThemes: [],
   listIcon: MINDMAP_LIST_ICON,
 };
@@ -333,6 +338,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("notesExpanded", t("settings.notesExpanded.name"), t("settings.notesExpanded.desc")),
         this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
+        this.sizeSetting("tableMaxWidth", t("settings.tableMaxWidth.name"), t("settings.tableMaxWidth.desc"), 320, 1600, t("settings.resetTableWidth")),
+        this.sizeSetting("tableMaxHeight", t("settings.tableMaxHeight.name"), t("settings.tableMaxHeight.desc"), 160, 1200, t("settings.resetTableHeight")),
         toggle("notePreview", t("settings.notePreview.name"), t("settings.notePreview.desc")),
       ]),
       page(t("settings.group.markdown"), t("settings.page.markdown"), [
@@ -383,12 +390,12 @@ export class MindMapSettingTab extends PluginSettingTab {
     return this.sliderWithReset(key, name, desc, min, max, 5, 100, t("settings.reset"), () => this.plugin.applyDisplayScale());
   }
 
-  private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
+  private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
     return this.sliderWithReset(key, name, desc, min, max, 20, DEFAULT_SETTINGS[key], resetTip, () => this.plugin.applyDisplayScale());
   }
 
   private sliderWithReset(
-    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth",
+    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight",
     name: string,
     desc: string,
     min: number,

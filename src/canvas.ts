@@ -3978,7 +3978,8 @@ export class MindMapCanvas {
           return;
         }
         // 展开的备注内容超出时，在卡片里滚动；滚到头了（或按着 ⌘/Ctrl 缩放）再交给画布
-        const noteBody = (ev.target as HTMLElement).closest<HTMLElement>(".mm-note-card-body");
+        // 节点里的表格也一样：超出最大宽高时在节点里滚动，滚到头再交给画布
+        const noteBody = (ev.target as HTMLElement).closest<HTMLElement>(".mm-note-card-body, .mm-node-table .ggt-scroll");
         if (noteBody && !ev.ctrlKey && !ev.metaKey && MindMapCanvas.canScroll(noteBody, ev)) {
           if (this.opts.embedded) ev.stopPropagation();
           return;

@@ -435,6 +435,8 @@ export class TableEditor {
         const fg = fgOf(tb, r, c);
         if (fg) cell.dataset.fg = fg;
         if (tb.meta.headerCol && c === 0 && r > 0) cell.classList.add("is-head-col");
+        // 没拖过宽度的列：宿主可以给它设个最宽（脑图节点里最宽 240，超出换行）
+        if (!m && !widthOf(tb, c)) cell.classList.add("is-auto-width");
         const content = cell.appendChild(doc.createElement("div"));
         content.className = "ggt-content";
         if (r === rows - 1 && r > 0 && hasTotal(tb)) cell.classList.add("is-total-row");
