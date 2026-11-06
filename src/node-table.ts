@@ -5,8 +5,8 @@
  * 一个备注里有好几张表时只管第一张，其余的留在备注里。
  */
 
-import { findTables } from "./table/core/find";
-import { emptyTable, parseTable, serializeBlock, type Table } from "./table/core/table";
+import { blockTable, findTables, writeBlock } from "./table/core/find";
+import { emptyTable, serializeBlock, type Table } from "./table/core/table";
 import { normalizeNote, unescapeNote } from "./markdown";
 
 export interface NoteTable {
@@ -17,6 +17,7 @@ export interface NoteTable {
   start: number;
   stop: number;
   tail: string[];
+  indent: string;
 }
 
 /** 备注里的第一张表 */
@@ -24,8 +25,8 @@ export function noteTable(note: string): NoteTable | null {
   if (!note || !note.includes("|")) return null;
   const lines = unescapeNote(note).split("\n");
   for (const b of findTables(lines)) {
-    const table = parseTable(lines.slice(b.start, b.end), b.meta);
-    if (table) return { table, lines, start: b.start, stop: b.stop, tail: b.tail };
+    const table = blockTable(lines, b);
+    if (table) return { table, lines, start: b.start, stop: b.stop, tail: b.tail, indent: b.indent };
   }
   return null;
 }
@@ -45,7 +46,7 @@ function tidy(lines: string[]): string {
 export function withTable(note: string, table: Table, inList: boolean): string {
   const nt = noteTable(note);
   if (!nt) return note;
-  const lines = [...nt.lines.slice(0, nt.start), ...serializeBlock(table, nt.tail), ...nt.lines.slice(nt.stop)];
+  const lines = [...nt.lines.slice(0, nt.start), ...writeBlock(table, nt), ...nt.lines.slice(nt.stop)];
   return normalizeNote(lines.join("\n"), inList);
 }
 

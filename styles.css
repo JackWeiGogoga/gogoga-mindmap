@@ -2446,4 +2446,7 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .ggt-content li > p { margin: 0; }
 .ggt-content .list-bullet { margin-inline-start: -0.9em; }
 .ggt-content ul > li.task-list-item, .ggt-content ol > li.task-list-item { margin-inline-start: 0; }
+
+/* 列表项下面的表格（实时预览）：按缩进层数往右挪，和列表项的文字对齐 */
+.markdown-source-view.mod-cm6 .cm-content > .ggt-lp.is-in-list { padding-inline-start: calc(var(--list-indent, 2.25em) * var(--ggt-depth, 1)); }
 /* ==== gogoga-table 同步结束 ==== */
