@@ -5,11 +5,11 @@
  * 输入法组字、撤销、光标跳过藏起来的字符都交给 CodeMirror。
  */
 
-import { EditorSelection, EditorState, Prec, type Range } from "@codemirror/state";
+import { EditorSelection, EditorState, Facet, findClusterBreak, Prec, Transaction, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, keymap, placeholder, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, insertNewline } from "@codemirror/commands";
 import { dropEmptyColors } from "./format";
-import { formatSpans, revealed, type FormatSpan } from "./live-preview";
+import { formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
 import { isWebUrl, linkDestination, pastedLink } from "./paste-link";
 
 export interface InlineEditorOptions {
@@ -36,7 +36,49 @@ export interface InlineEditorOptions {
   onSelect?: () => void;
   /** 焦点离开编辑框（窗口失焦也算，和原来一样就此提交） */
   onBlur?: () => void;
+  /** 光标挨着格式时也不露出 ** == 这些标记（设置里的开关，默认关） */
+  hideSyntax?: boolean;
 }
+
+/** 这个编辑框里格式标记始终藏着 */
+const hideAll = Facet.define<boolean, boolean>({ combine: (v) => v.some(Boolean) });
+
+/** 现在藏着标记的那几段 */
+function hiddenSpans(state: EditorState): FormatSpan[] {
+  const all = state.facet(hideAll);
+  return formatSpans(state.doc.toString()).filter((s) => all || !revealed(s, state.selection.ranges));
+}
+
+/** 删字、打字碰到藏着的标记时只动看得见的字（规则见 guardHiddenMarks） */
+const keepMarksPaired = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged || !(tr.isUserEvent("delete") || tr.isUserEvent("input.type") || tr.isUserEvent("input.paste"))) return tr;
+  const st = tr.startState;
+  if (st.selection.ranges.length > 1) return tr;
+  const hidden = hiddenSpans(st);
+  if (!hidden.length) return tr;
+  const edits: TextEdit[] = [];
+  tr.changes.iterChanges((from, to, _a, _b, ins) => edits.push({ from, to, insert: ins.toString() }));
+  const text = st.doc.toString();
+  const backward = tr.isUserEvent("delete.backward") ? true : tr.isUserEvent("delete.forward") ? false : null;
+  const fixed = guardHiddenMarks(
+    text,
+    hidden,
+    edits,
+    backward,
+    (p) => findClusterBreak(text, p, false),
+    (p) => findClusterBreak(text, p, true),
+  );
+  if (!fixed) return tr;
+  if (!fixed.length) return [];
+  const changes = st.changes(fixed);
+  const first = fixed[0];
+  return {
+    changes,
+    selection: EditorSelection.cursor(changes.mapPos(first.from, -1) + first.insert.length),
+    userEvent: tr.annotation(Transaction.userEvent),
+    scrollIntoView: tr.scrollIntoView,
+  };
+});
 
 const HIDE = Decoration.replace({});
 const SYNTAX = Decoration.mark({ class: "mm-ed-syntax" });
@@ -59,9 +101,10 @@ function contentMark(span: FormatSpan): Decoration {
 function build(state: EditorState): { deco: DecorationSet; atomic: DecorationSet } {
   const deco: Range<Decoration>[] = [];
   const atomic: Range<Decoration>[] = [];
+  const all = state.facet(hideAll);
   for (const span of formatSpans(state.doc.toString())) {
     deco.push(contentMark(span).range(span.innerFrom, span.innerTo));
-    if (revealed(span, state.selection.ranges)) {
+    if (!all && revealed(span, state.selection.ranges)) {
       deco.push(SYNTAX.range(span.from, span.innerFrom), SYNTAX.range(span.innerTo, span.to));
     } else {
       // 藏起来的标记符做成原子范围：光标一步跳过，删除也是整个删，不会删出半个标签
@@ -132,6 +175,8 @@ export class InlineEditor {
           keymap.of([...(opts.multiline ? [{ key: "Shift-Enter", run: insertNewline }] : []), ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),
           EditorView.lineWrapping,
           livePreview,
+          hideAll.of(!!opts.hideSyntax),
+          keepMarksPaired,
           ...(opts.placeholder ? [placeholder(opts.placeholder)] : []),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) later(opts.onChange);

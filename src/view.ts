@@ -305,6 +305,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       notePreview: () => this.plugin.settings.notePreview,
       formatBar: () => this.plugin.settings.formatBar,
       centerOnSelect: () => this.plugin.settings.centerOnSelect,
+      hideSyntax: () => this.plugin.settings.hideSyntax,
+      widthHandleOnHover: () => this.plugin.settings.widthHandleOnHover,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),

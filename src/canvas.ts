@@ -222,6 +222,10 @@ export interface CanvasOptions {
   formatBar?: () => boolean;
   /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
   centerOnSelect?: () => boolean;
+  /** 编辑时光标挨着格式也不露出 ** == 这些标记（默认关） */
+  hideSyntax?: () => boolean;
+  /** 鼠标移到任意节点的右边缘就能拖动改宽、双击，不用先选中（默认关：只有选中的节点有手柄） */
+  widthHandleOnHover?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
@@ -649,6 +653,9 @@ export class MindMapCanvas {
   private dropHover: HTMLElement | null = null;
   private imgHandle: HTMLElement | null = null;
   private widthHandle: HTMLElement | null = null;
+  private widthHandleNode: MindNode | null = null;
+  /** 鼠标正指着的节点（悬停调宽度用） */
+  private hoverNode: MindNode | null = null;
   private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1 } | null = null;
   private imgResize: {
     node: MindNode;
@@ -1856,13 +1863,25 @@ export class MindMapCanvas {
   }
 
   private relMenuEntries(src: MindNode, rel: Relation): MenuEntry[] {
+    const dst = this.relTarget(rel);
     return [
+      { title: t("menu.relGoSource"), icon: "locate", run: () => this.jumpToNode(src) },
+      { title: t("menu.relGoTarget"), icon: "locate-fixed", disabled: !dst, run: () => dst && this.jumpToNode(dst) },
+      { separator: true },
       { title: t("menu.editRelLabel"), icon: "pencil", run: () => this.editRelLabel(rel) },
       { title: t("menu.reverseRel"), icon: "arrow-left-right", run: () => this.reverseRel(src, rel) },
       { title: t("menu.resetRelCurve"), icon: "spline", disabled: !rel.c, run: () => this.resetRelCurve(rel) },
       { separator: true },
       { title: t("menu.deleteRel"), icon: "trash", run: () => this.deleteRel(src, rel) },
     ];
+  }
+
+  /** 选中节点并把它平滑移到画布中间（关联线的「跳到起点 / 终点」） */
+  jumpToNode(node: MindNode): void {
+    if (!this.els.has(node.id)) return;
+    this.activateRel(null);
+    this.select(node);
+    this.centerOn(node, true);
   }
 
   /** 原地改线上的文字；Enter 完成，Esc 取消，清空就是没有文字（线还在） */
@@ -3121,6 +3140,7 @@ export class MindMapCanvas {
       multiline: opts.multiline,
       placeholder: opts.placeholder,
       linkTitle: this.linkTitle,
+      hideSyntax: this.hideSyntax(),
       onKey: (ev) => {
         ev.stopPropagation();
         if (ev.isComposing || ev.keyCode === 229) return false;
@@ -4005,6 +4025,14 @@ export class MindMapCanvas {
       else if (img) this.openLightbox(img);
       else this.editOnDoubleTap(node);
     });
+
+    // 悬停调宽度：记下鼠标指着哪个节点；按着键（拖动、平移、框选）时不算
+    this.on(el, "pointerover", (ev) => {
+      if (ev.pointerType === "touch") return;
+      const nodeEl = ev.buttons ? null : (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
+      this.setHoverNode(nodeEl ? this.nodeFromEl(nodeEl) : null);
+    });
+    this.on(el, "pointerleave", () => this.setHoverNode(null));
 
     // 链接节点的悬停预览：用一个委托监听，元素复用时不会重复绑定
     this.on(el, "mouseover", (ev) => {
@@ -5425,6 +5453,7 @@ export class MindMapCanvas {
       },
       onInput: (from, to, text) => this.wrapOnInput(from, to, text),
       linkTitle: this.linkTitle,
+      hideSyntax: this.hideSyntax(),
       // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
       onPaste: (ev) => {
         const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
@@ -5447,6 +5476,7 @@ export class MindMapCanvas {
 
   /** 交给行内编辑框：粘贴网页地址时抓标题 */
   readonly linkTitle = (url: string): Promise<string | null> | null => this.opts.host?.linkTitle?.(url) ?? null;
+  readonly hideSyntax = (): boolean => !!this.opts.hideSyntax?.();
 
   commitEdit(cancel = false, refocus = true): void {
     const node = this.editing;
@@ -6718,22 +6748,35 @@ export class MindMapCanvas {
   // ---------- 图片缩放手柄 ----------
 
   /** 选中含图片的节点时，在图片右下角放一个拖拽手柄 */
-  /** 选中节点侧边的宽度手柄：拖动改宽（文字跟着换行），双击恢复自适应。图片/视频节点有自己的手柄 */
+  /**
+   * 节点右边缘的宽度手柄：一条铺满右边、平时透明的窄条，拖动改宽（文字跟着换行），双击见 toggleWidth。
+   * 选中的节点一直有；设置里打开「悬停调宽度」后，鼠标指着的节点也有，不用先选中。图片/视频节点有自己的手柄
+   */
   private updateWidthHandle(): void {
     if (this.widthResize) return;
+    const target = this.widthHandleTarget();
+    const el = target ? this.els.get(target.id) : undefined;
+    const usable = target && el && !el.querySelector("img.mm-img, iframe.mm-frame") ? target : null;
+    const hover = !!usable && !(this.selected.size === 1 && this.primary === usable);
+    // 还是同一个节点、同一个元素：留着，悬停时鼠标在节点里移动不会一直重建
+    const kept = this.widthHandle;
+    if (usable && kept && kept.parentElement === el && this.widthHandleNode === usable) {
+      kept.classList.toggle("is-hover", hover);
+      return;
+    }
     this.widthHandle?.remove();
     this.widthHandle = null;
-    if (!this.opts.editable || !this.primary || this.editing || this.selected.size !== 1) return;
-    const el = this.els.get(this.primary.id);
-    if (!el || el.querySelector("img.mm-img, iframe.mm-frame")) return;
-    const node = this.primary;
+    this.widthHandleNode = null;
+    if (!usable || !el) return;
+    const node = usable;
     // 左侧分支向左长：手柄放在外侧（左边），往左拖是变宽
     const dir: 1 | -1 = el.dataset.side === "left" ? -1 : 1;
     const handle = createDiv();
-    handle.className = "mm-width-handle" + (dir < 0 ? " is-left" : "");
+    handle.className = "mm-width-handle" + (dir < 0 ? " is-left" : "") + (hover ? " is-hover" : "");
     this.tip(handle, t("canvas.resizeWidth"), "fixed", dir < 0 ? "left" : "right");
     el.append(handle);
     handle.addEventListener("pointerdown", (ev) => {
+      if (ev.button !== 0) return;
       ev.stopPropagation();
       ev.preventDefault();
       this.widthResize = { node, el, startWorldX: this.toWorld(ev.clientX, ev.clientY).x, startW: el.offsetWidth, dir };
@@ -6775,11 +6818,53 @@ export class MindMapCanvas {
     };
     handle.addEventListener("pointerup", finish);
     handle.addEventListener("pointercancel", finish);
+    // 手柄上的单击、双击都不落到节点和画布上（不选中、不进编辑）
+    handle.addEventListener("click", (ev) => ev.stopPropagation());
     handle.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
-      this.resetWidth(node);
+      ev.preventDefault();
+      this.toggleWidth(node);
     });
     this.widthHandle = handle;
+    this.widthHandleNode = node;
+  }
+
+  /** 谁该有宽度手柄：悬停打开时是鼠标指着的节点，否则（或没指着）是唯一选中的节点；编辑、拖动中都没有 */
+  private widthHandleTarget(): MindNode | null {
+    if (!this.opts.editable || this.editing || this.drag) return null;
+    const hovered = this.hoverNode;
+    if (hovered && this.opts.widthHandleOnHover?.() && this.els.has(hovered.id)) return hovered;
+    return this.primary && this.selected.size === 1 ? this.primary : null;
+  }
+
+  /** 鼠标指着的节点变了：悬停调宽度打开时把手柄挪过去 */
+  private setHoverNode(node: MindNode | null): void {
+    this.hoverNode = node;
+    // 同一个节点也要看一下：开关刚打开时鼠标可能本来就停在节点上；手柄没变时 updateWidthHandle 什么都不做
+    if (this.opts.widthHandleOnHover?.()) this.updateWidthHandle();
+  }
+
+  /**
+   * 双击宽度手柄：设过宽度的恢复自动宽度；自动宽度、文字折了行的拉成一行（最宽 NODE_MAX_WIDTH），
+   * 已经是一行的不动
+   */
+  toggleWidth(node: MindNode): void {
+    if (!this.opts.editable) return;
+    if (node.width) {
+      this.resetWidth(node);
+      return;
+    }
+    const el = this.els.get(node.id);
+    if (!el) return;
+    const now = el.offsetWidth;
+    el.classList.add("has-width");
+    // 量的是缩放后的屏幕宽度，换回画布上的宽度；往上取整，免得差零点几像素又折一行
+    const one = Math.ceil(el.getBoundingClientRect().width / this.k);
+    el.classList.remove("has-width");
+    if (one <= now + 1) return;
+    node.width = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, one));
+    this.render();
+    this.notify();
   }
 
   /** 右键的是选中的节点之一时就是选中的这几个，否则只有它；只留下文字能拆出两段以上的 */

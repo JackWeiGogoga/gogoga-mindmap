@@ -222,6 +222,7 @@ export class OutlinePanel {
       selectAll: true,
       multiline: false,
       linkTitle: this.canvas.linkTitle,
+      hideSyntax: this.canvas.hideSyntax(),
       // Enter、Esc、Tab 走面板的按键处理（编辑中它会拦下事件，不再往面板上冒）；别的键归编辑框
       onKey: (ev) => {
         this.onKeyDown(ev);

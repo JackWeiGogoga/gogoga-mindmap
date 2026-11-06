@@ -1170,6 +1170,8 @@ export default class MindMapPlugin extends Plugin {
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
         centerOnSelect: () => this.settings.centerOnSelect,
+        hideSyntax: () => this.settings.hideSyntax,
+        widthHandleOnHover: () => this.settings.widthHandleOnHover,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),

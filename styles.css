@@ -445,6 +445,8 @@
 .mm-has-editor .mm-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
 .mm-has-editor .mm-ed-mark { background: rgba(255, 210, 0, 0.45); border-radius: 2px; }
 .mm-has-editor .mm-ed-syntax { opacity: 0.45; }
+/* 藏起来的标记两边 CodeMirror 会垫一个空图片，它会打断中文标点挤压（「）：」相邻时压掉半个字），编辑时比显示宽一截；去掉它 */
+.mm-has-editor img.cm-widgetBuffer { display: none; }
 .mm-label strong { font-weight: 700; }
 .mm-label code {
   font-family: var(--font-monospace, ui-monospace, Menlo, monospace);
@@ -1398,11 +1400,22 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 /* ---------- 图片缩放手柄 ---------- */
 /* 手动宽度：节点不再受最大宽度限制，文字按设定宽度换行 */
 .gg-mm-root .gg-mm-node.has-width { max-width: none; }
+/* 宽度手柄：铺满节点右边的一条透明窄条，指上去才看见中间的小竖条；选中的节点一直显示竖条 */
 .mm-width-handle {
   position: absolute;
   z-index: 2;
+  top: 0;
+  bottom: 0;
+  right: -6px;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.mm-width-handle::after {
+  content: "";
+  position: absolute;
   top: 50%;
-  right: -5px;
+  left: 1px;
   width: 8px;
   height: 22px;
   max-height: calc(100% - 8px);
@@ -1412,11 +1425,17 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
   border: 2px solid var(--mm-selection);
   border-radius: 4px;
   background: var(--mm-bg);
-  cursor: ew-resize;
-  touch-action: none;
+  pointer-events: none;
 }
-.mm-width-handle.is-left { right: auto; left: -5px; }
-@media (pointer: coarse) { .mm-width-handle { width: 14px; right: -8px; } .mm-width-handle.is-left { left: -8px; } }
+/* 悬停出来的（节点没选中）：平时看不见，指到右边缘才出现 */
+.mm-width-handle.is-hover::after { opacity: 0; transition: opacity 0.12s; }
+.mm-width-handle.is-hover:hover::after { opacity: 1; }
+.mm-width-handle.is-left { right: auto; left: -6px; }
+@media (pointer: coarse) {
+  .mm-width-handle { width: 16px; right: -9px; }
+  .mm-width-handle::after { left: 1px; width: 14px; }
+  .mm-width-handle.is-left { left: -9px; }
+}
 
 /* 双击图片看大图 */
 .mm-lightbox {

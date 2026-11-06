@@ -4,6 +4,21 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-06
+
+### Added
+- **Resize width from the right edge on hover** setting (on the Editing and interaction page, off by default): hovering over any node shows the width handle on its right edge, so you can drag or double-click it without selecting the node first; the current selection stays as it is.
+- Double-clicking the width handle of an automatic-width node whose text wraps now stretches it to one line (up to 1200); a node with a set width still goes back to automatic width.
+- **Keep format marks hidden while editing** setting (on the Editing and interaction page, off by default): while editing a node, `**` and `==` stay hidden even when the cursor is next to bold or highlighted text, so the line width doesn't jump.
+- Right-clicking a relationship line (or its label) now offers **Go to start** and **Go to end**, which select that node and glide it to the middle of the canvas.
+
+### Changed
+- The width handle covers the node's whole right edge, so you can grab it anywhere from top to bottom instead of aiming for the small bar in the middle.
+
+### Fixed
+- While editing, bold or highlighted text right next to CJK punctuation (such as `**换行）**：`) was a few pixels wider than when displayed, so a node near its width limit wrapped an extra line as soon as you started editing. Editing and display now have the same width.
+- Pressing Backspace right after colored text deleted the whole hidden `</span>`, leaving an unclosed color tag; deleting a selection that ran from inside colored text to outside it did the same. Now only the visible characters are deleted, and the tags go once the text inside is gone.
+
 ## [0.44.0] - 2026-11-05
 
 ### Added
@@ -542,7 +557,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...HEAD
+[0.45.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...0.45.0
 [0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
 [0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0

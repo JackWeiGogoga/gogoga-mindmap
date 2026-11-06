@@ -36,6 +36,10 @@ export interface MindMapSettings {
   formatBar: boolean;
   /** 选中节点时把它平滑移到画布中间（默认关） */
   centerOnSelect: boolean;
+  /** 编辑时始终藏起格式标记（默认关） */
+  hideSyntax: boolean;
+  /** 悬停在节点右边缘就能调宽度（默认关） */
+  widthHandleOnHover: boolean;
   /** 编辑时粘贴网页地址，自动抓网页标题粘成 [标题](网址)（默认关） */
   pasteLinkTitle: boolean;
   /** 复制节点时去掉 %%…%% 标记（默认关） */
@@ -165,6 +169,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   copyPlain: false,
   pasteLinkTitle: false,
   centerOnSelect: false,
+  hideSyntax: false,
+  widthHandleOnHover: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
@@ -300,6 +306,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),
         toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
+        toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
+        toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
         toggle("copyPlain", t("settings.copyPlain.name"), t("settings.copyPlain.desc"), ["clipboard", "剪贴板"]),
         toggle("pasteLinkTitle", t("settings.pasteLinkTitle.name"), t("settings.pasteLinkTitle.desc"), ["link", "url", "链接", "网址"]),
         { name: t("settings.hover.name"), desc: t("settings.hover.desc", { source: t("hover.display") }), aliases: ["page preview", "页面预览"] },

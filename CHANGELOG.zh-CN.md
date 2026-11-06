@@ -4,6 +4,21 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-06
+
+### 新增
+- 设置「鼠标移到节点右边缘就能调宽度」（「编辑与操作」页，默认关）：打开后鼠标指着任意节点，右边缘就有宽度手柄，不用先选中就能直接拖动改宽、双击，原来选中的节点不变。
+- 双击宽度手柄时，自动宽度、文字折了行的节点拉成一行（最宽 1200）；设过宽度的照旧恢复自动宽度。
+- 设置「编辑时不露出格式标记」（「编辑与操作」页，默认关）：编辑节点时光标挨着粗体、高亮也不露出 `**`、`==`，一行的长度不会跳。
+- 右键关联线（或线上的文字）多了「跳到起点」「跳到终点」：选中那一头的节点，平滑移到画布中间。
+
+### 改进
+- 宽度手柄铺满节点的整条右边，从上到下哪里都能拖，不用对准中间的小竖条。
+
+### 修复
+- 编辑节点时，粗体、高亮紧挨着中文标点（比如 `**换行）**：`）会比显示时宽一截，接近宽度上限时进编辑就多折一行。现在编辑和显示一样宽。
+- 在彩色字后面按退格会把看不见的 `</span>` 整个删掉，留下没收尾的颜色标签；选区从彩色字里拖到外面再删也一样。现在只删看得见的字，删光了标签一起去掉。
+
 ## [0.44.0] - 2026-11-05
 
 ### 新增
@@ -542,7 +557,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...HEAD
+[0.45.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...0.45.0
 [0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
 [0.43.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.42.0...0.43.0
 [0.42.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.41.0...0.42.0
