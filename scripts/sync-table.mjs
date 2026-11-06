@@ -38,4 +38,5 @@ function main() {
   console.log("synced gogoga-table → src/table, styles.css");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// 只在 `node scripts/sync-table.mjs` 直接运行时同步（测试会把本文件打包进去，那时不能动文件）
+if (path.basename(process.argv[1] ?? "") === "sync-table.mjs") main();
