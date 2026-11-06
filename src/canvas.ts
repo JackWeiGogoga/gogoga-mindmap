@@ -2406,12 +2406,20 @@ export class MindMapCanvas {
     this.syncRangeHandles();
   }
 
-  /** 给选中的节点加外框：同一父节点下相邻的合成一个，其余各自一个；已在外框里的跳过 */
+  /**
+   * 给选中的节点加外框：同一父节点下相邻的合成一个，其余各自一个；已在外框里的跳过。
+   * 外框连同分支一起框，祖先也选中了的节点不再单独加（框选整个分支时只出最外层一个框）
+   */
   addBoxToSelected(): void {
     if (!this.opts.editable) return;
     const byParent = new Map<MindNode, number[]>();
+    // 祖先自己加不了外框（中心主题、自由主题、概要主题）时不算，子节点照常加
+    const ancestorSelected = (n: MindNode) => {
+      for (let p = n.parent; p; p = p.parent) if (this.selected.has(p) && p.parent && !this.isFloating(p) && !isSummaryTopic(p)) return true;
+      return false;
+    };
     for (const n of this.selected) {
-      if (!n.parent || this.boxOf(n) || this.isFloating(n) || isSummaryTopic(n)) continue;
+      if (!n.parent || this.boxOf(n) || this.isFloating(n) || isSummaryTopic(n) || ancestorSelected(n)) continue;
       const arr = byParent.get(n.parent) ?? [];
       arr.push(n.parent.children.indexOf(n));
       byParent.set(n.parent, arr);
@@ -6750,14 +6758,15 @@ export class MindMapCanvas {
   /** 选中含图片的节点时，在图片右下角放一个拖拽手柄 */
   /**
    * 节点右边缘的宽度手柄：一条铺满右边、平时透明的窄条，拖动改宽（文字跟着换行），双击见 toggleWidth。
-   * 选中的节点一直有；设置里打开「悬停调宽度」后，鼠标指着的节点也有，不用先选中。图片/视频节点有自己的手柄
+   * 选中的节点一直有；设置里打开「悬停调宽度」后，鼠标指着的节点也有，不用先选中，竖条（选中的也一样）指到边上才显示。图片/视频节点有自己的手柄
    */
   private updateWidthHandle(): void {
     if (this.widthResize) return;
     const target = this.widthHandleTarget();
     const el = target ? this.els.get(target.id) : undefined;
     const usable = target && el && !el.querySelector("img.mm-img, iframe.mm-frame") ? target : null;
-    const hover = !!usable && !(this.selected.size === 1 && this.primary === usable);
+    // 悬停调宽度打开时，选中的节点也一样：竖条平时透明，指到右边缘才出现
+    const hover = !!usable && !!this.opts.widthHandleOnHover?.();
     // 还是同一个节点、同一个元素：留着，悬停时鼠标在节点里移动不会一直重建
     const kept = this.widthHandle;
     if (usable && kept && kept.parentElement === el && this.widthHandleNode === usable) {
