@@ -2028,3 +2028,422 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 /* 「显示隐藏的节点」：带 %%hide%% 的节点半透明、虚线框 */
 .gg-mm-node.is-hidden-node { opacity: 0.45; outline: 1.5px dashed var(--text-faint, #999); outline-offset: 2px; }
 .gg-mm-node.is-hidden-node.is-selected { opacity: 0.75; }
+
+/* 节点里的表格（%%table%%）：标题在上、表格在下，表格自己一块底色，节点配了深色也看得清 */
+/* 用网格不用折行的 flex：折行 flex 容器按「排成一行」算 max-content，节点会多出标题那么宽的空白 */
+.gg-mm-node.has-table { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; align-items: center; column-gap: 6px; max-width: none; }
+.gg-mm-root .gg-mm-node.has-table.has-width { max-width: none; }
+.gg-mm-node .mm-node-table {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  font-size: calc(14px * var(--mm-font-scale, 1));
+  font-weight: var(--font-normal, 400);
+  line-height: normal;
+  color: var(--text-normal);
+  overflow-wrap: normal;
+  cursor: auto;
+}
+/* 表格贴着节点的内边距放，不额外留白；加行加列的按钮悬停时骑在节点边上 */
+.gg-mm-node .mm-node-table .ggt { margin: 0; padding: 6px 0 0; max-width: none; }
+.gg-mm-node .mm-node-table .ggt-add-col { top: 6px; bottom: 0; right: -20px; }
+.gg-mm-node .mm-node-table .ggt-add-row { left: 0; right: 0; bottom: -20px; }
+.gg-mm-node .mm-node-table .ggt-table { background: var(--background-primary); }
+
+/* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */
+/*
+ * gogoga Table
+ * 默认样式参考 Notion 的简单表格：直角、极淡的分隔线、表头一点浅底，靠留白分层。
+ * 颜色全部取 Obsidian 主题变量，换主题、深浅色都跟着变。
+ */
+
+.ggt {
+  --ggt-line: var(--table-border-color, var(--background-modifier-border));
+  --ggt-head-bg: rgba(var(--mono-rgb-100), 0.035);
+  --ggt-zebra: rgba(var(--mono-rgb-100), 0.025);
+  --ggt-hover: rgba(var(--mono-rgb-100), 0.03);
+  --ggt-sel: var(--interactive-accent);
+  --ggt-sel-soft: rgba(var(--interactive-accent-rgb, 72, 54, 153), 0.08);
+  --ggt-pad-y: 7px;
+  --ggt-pad-x: 10px;
+  --ggt-font-size: var(--table-text-size, 0.93em);
+  position: relative;
+  margin: 0.4em 0 0.8em;
+  padding: 10px 26px 26px 14px;
+  margin-left: -14px;
+  width: fit-content;
+  max-width: calc(100% + 40px);
+  box-sizing: border-box;
+}
+.ggt[data-density="compact"] { --ggt-pad-y: 3px; --ggt-pad-x: 8px; }
+
+/* 右边、下边留出位置：骑在表格右下角的填充柄（连同它放大的点击范围）不会被裁掉，也不会把表格撑出横向滚动 */
+.ggt-scroll { overflow-x: auto; overflow-y: visible; padding: 0 12px 12px 0; margin: 0 -12px -12px 0; }
+.ggt-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+  margin: 0 !important;
+  font-size: var(--ggt-font-size);
+  line-height: 1.5;
+}
+.ggt-table col { min-width: 40px; }
+.ggt .ggt-cell {
+  position: relative;
+  padding: 0;
+  min-width: 80px;
+  border: 0;
+  border-right: 1px solid var(--ggt-line);
+  border-bottom: 1px solid var(--ggt-line);
+  background: transparent;
+  vertical-align: top;
+  text-align: left;
+  font-weight: inherit;
+  color: var(--text-normal);
+}
+/* 第一列才有左边框（按列号，不按 :first-child：第一列被合并盖住的行，第一个元素是第二列） */
+.ggt .ggt-table .ggt-cell[data-c="0"] { border-left: 1px solid var(--ggt-line); }
+.ggt .ggt-table thead .ggt-cell { border-top: 1px solid var(--ggt-line); background: var(--ggt-head-bg); font-weight: var(--font-semibold, 600); }
+.ggt .ggt-cell[data-align="center"] { text-align: center; }
+.ggt .ggt-cell[data-align="right"] { text-align: right; }
+
+.ggt-content {
+  padding: var(--ggt-pad-y) var(--ggt-pad-x);
+  min-height: calc(1.5em + 2 * var(--ggt-pad-y));
+  /* 渲染出来的 Markdown 自己会把换行变成 <br>，这里再保留换行符就会多出一个空行 */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+/* 没有 Markdown 渲染（纯文字显示）时，换行靠这里保留 */
+.ggt-content.is-plain { white-space: pre-wrap; }
+.ggt-content > :first-child { margin-top: 0; }
+.ggt-content > :last-child { margin-bottom: 0; }
+.ggt-content p { margin: 0; }
+.ggt-content.is-empty::after { content: "\200b"; }
+
+/* 悬停、选中 */
+.ggt:not(.is-readonly) .ggt-cell:hover { box-shadow: inset 0 0 0 999px var(--ggt-hover); }
+.ggt .ggt-cell.is-selected { box-shadow: inset 0 0 0 2px var(--ggt-sel) !important; z-index: 1; }
+.ggt .ggt-cell.is-sel-head { background-image: linear-gradient(var(--ggt-sel-soft), var(--ggt-sel-soft)); }
+
+/* 选中时藏在格子里的输入框；编辑时变成这一格的编辑框 */
+.ggt-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  resize: none;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: var(--ggt-pad-y) var(--ggt-pad-x) !important;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: inherit;
+  border-radius: 0 !important;
+  overflow: hidden;
+}
+/* 编辑中：内容区换成看不见的原文撑开高度，编辑框盖在上面 */
+.ggt-cell.is-editing .ggt-content { visibility: hidden; white-space: pre-wrap; }
+.ggt-cell.is-editing .ggt-input {
+  opacity: 1;
+  pointer-events: auto;
+  caret-color: var(--ggt-sel);
+}
+
+/* 底色：主题的颜色调淡，深浅色都合适 */
+.ggt .ggt-cell[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.07); }
+.ggt .ggt-cell[data-bg="red"] { background: rgba(var(--color-red-rgb), 0.14); }
+.ggt .ggt-cell[data-bg="orange"] { background: rgba(var(--color-orange-rgb), 0.15); }
+.ggt .ggt-cell[data-bg="yellow"] { background: rgba(var(--color-yellow-rgb), 0.18); }
+.ggt .ggt-cell[data-bg="green"] { background: rgba(var(--color-green-rgb), 0.14); }
+.ggt .ggt-cell[data-bg="blue"] { background: rgba(var(--color-blue-rgb), 0.13); }
+.ggt .ggt-cell[data-bg="purple"] { background: rgba(var(--color-purple-rgb), 0.13); }
+
+/* 预设：斑马纹 */
+.ggt[data-preset="zebra"] tbody tr:nth-child(even) .ggt-cell:not([data-bg]) { background: var(--ggt-zebra); }
+/* 预设：极简线（只有横线，表头下面一道深线） */
+.ggt[data-preset="minimal"] .ggt-cell { border-left: 0 !important; border-right: 0; }
+.ggt[data-preset="minimal"] thead .ggt-cell { background: transparent; border-top: 0; border-bottom: 1.5px solid var(--text-normal); }
+
+/* 列宽线：鼠标靠近任意两列之间的竖线时出现，贯穿整张表 */
+.ggt-resize {
+  position: absolute;
+  z-index: 5;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  display: none;
+}
+.ggt-resize.is-shown, .ggt-resize.is-active { display: block; }
+.ggt-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 1px; background: var(--ggt-sel); opacity: 0.7; }
+.ggt-resize.is-active::after { opacity: 1; }
+.ggt.is-resizing, .ggt.is-resizing * { cursor: col-resize !important; user-select: none; }
+
+/* 行、列手柄：悬停时出现在边框上 */
+.ggt button.ggt-handle {
+  position: absolute;
+  height: auto;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--ggt-line);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.ggt button.ggt-handle.is-shown { opacity: 1; pointer-events: auto; }
+.ggt button.ggt-handle:hover { color: var(--text-normal); border-color: var(--ggt-sel); }
+/* 尺寸写在和上面同样权重的选择器上：不然会被上面的 height: auto 盖掉（行手柄曾被压成 14×14，图标只露一半） */
+.ggt button.ggt-handle svg { width: 15px; height: 15px; flex: none; }
+.ggt button.ggt-row-handle { width: 18px; height: 28px; transform: translate(-50%, -50%); }
+.ggt button.ggt-col-handle { width: 28px; height: 18px; transform: translate(-50%, -50%); }
+
+/* 加行、加列 */
+.ggt button.ggt-add {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s;
+  box-shadow: none;
+}
+.ggt-add svg { width: 14px; height: 14px; }
+.ggt:hover button.ggt-add { opacity: 1; }
+.ggt button.ggt-add:hover { background: rgba(var(--mono-rgb-100), 0.06); color: var(--text-normal); }
+.ggt-add-col { top: 10px; bottom: 26px; right: 4px; width: 18px; height: auto; }
+.ggt-add-row { left: 14px; right: 26px; bottom: 4px; height: 18px; width: auto; }
+.ggt.is-readonly .ggt-add, .ggt.is-readonly .ggt-handle { display: none; }
+
+/* 弹出菜单 */
+.ggt-menu {
+  position: fixed;
+  z-index: var(--layer-menu, 65);
+  min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16));
+  font-size: var(--font-ui-small, 13px);
+}
+.ggt-menu button.ggt-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.ggt-menu button.ggt-menu-item:hover:not(:disabled) { background: var(--background-modifier-hover); }
+.ggt-menu button.ggt-menu-item:disabled { opacity: 0.4; cursor: default; }
+.ggt-menu button.ggt-menu-item.is-danger:not(:disabled) { color: var(--text-error); }
+.ggt-menu-icon { display: inline-flex; width: 16px; color: var(--text-muted); }
+.ggt-menu-icon svg { width: 15px; height: 15px; }
+.ggt-menu-check { margin-left: auto; display: inline-flex; color: var(--ggt-sel, var(--interactive-accent)); }
+.ggt-menu-check svg { width: 14px; height: 14px; }
+.ggt-menu-sep { height: 1px; margin: 4px 6px; background: var(--background-modifier-border); }
+.ggt-menu-label { padding: 4px 8px 2px; color: var(--text-faint); font-size: 0.92em; }
+.ggt-menu-swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 6px; }
+.ggt-menu button.ggt-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  box-shadow: none;
+  cursor: pointer;
+}
+.ggt-menu button.ggt-swatch:hover { border-color: var(--text-muted); }
+.ggt-menu button.ggt-swatch.is-checked { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.ggt-menu button.ggt-swatch[data-bg="none"] { background: linear-gradient(135deg, transparent 45%, var(--text-faint) 45%, var(--text-faint) 55%, transparent 55%), var(--background-primary); }
+.ggt-menu button.ggt-swatch[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.12); }
+.ggt-menu button.ggt-swatch[data-bg="red"] { background: rgba(var(--color-red-rgb), 0.3); }
+.ggt-menu button.ggt-swatch[data-bg="orange"] { background: rgba(var(--color-orange-rgb), 0.3); }
+.ggt-menu button.ggt-swatch[data-bg="yellow"] { background: rgba(var(--color-yellow-rgb), 0.35); }
+.ggt-menu button.ggt-swatch[data-bg="green"] { background: rgba(var(--color-green-rgb), 0.3); }
+.ggt-menu button.ggt-swatch[data-bg="blue"] { background: rgba(var(--color-blue-rgb), 0.3); }
+.ggt-menu button.ggt-swatch[data-bg="purple"] { background: rgba(var(--color-purple-rgb), 0.3); }
+
+/* 手机：手柄和加号一直显示、放大，手指能点中 */
+.is-mobile .ggt-add, .is-phone .ggt-add { opacity: 0.8; }
+.is-mobile .ggt button.ggt-row-handle { width: 24px; height: 36px; }
+.is-mobile .ggt button.ggt-col-handle { width: 36px; height: 24px; }
+.is-mobile .ggt button.ggt-handle svg { width: 18px; height: 18px; }
+.is-mobile .ggt-menu-item { padding: 9px 10px; }
+.is-mobile .ggt-swatch { width: 30px; height: 30px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ggt-handle, .ggt-add, .ggt-resize::after { transition: none; }
+}
+
+/* 拖动行列：被拖的那一行 / 列淡一点，落点处一条强调色的线 */
+.ggt .ggt-cell.is-drag-source { opacity: 0.45; }
+.ggt.is-dragging, .ggt.is-dragging * { cursor: grabbing !important; user-select: none; }
+.ggt-drop-line { position: absolute; z-index: 5; background: var(--ggt-sel); border-radius: 1px; pointer-events: none; }
+.ggt-drop-line.is-row { height: 2px; }
+.ggt-drop-line.is-col { width: 2px; }
+.ggt button.ggt-handle { cursor: grab; }
+
+/* 多格选区 */
+/* 选了一片：一个蓝框框住整片，格子不上色（原来的底色照样看得见），里面的当前格也不再单独描边 */
+.ggt-scroll { position: relative; }
+/* 框里铺一层同色系的浅色（铺在框这一层，整片均匀；格子原来的底色透得出来） */
+.ggt-range-box { position: absolute; display: none; z-index: 2; border: 2px solid var(--ggt-sel); border-radius: 2px; background: color-mix(in srgb, var(--ggt-sel) 8%, transparent); pointer-events: none; box-sizing: border-box; }
+.ggt-range-box.is-shown { display: block; }
+.ggt.has-range .ggt-cell.is-selected { box-shadow: none !important; }
+.ggt .ggt-cell.is-merged { vertical-align: middle; }
+
+/* 表头吸顶：贴着时表头要不透明，压在内容上面 */
+.ggt thead { position: relative; z-index: 3; }
+.ggt.is-stuck thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); box-shadow: 0 1px 0 var(--ggt-line); }
+
+/* 横向能滚时，两边出一道淡淡的阴影提示还有内容 */
+.ggt::before, .ggt::after { content: ""; position: absolute; top: 10px; bottom: 26px; width: 14px; pointer-events: none; z-index: 4; opacity: 0; transition: opacity 0.15s; }
+.ggt::before { left: 14px; background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent); }
+.ggt::after { right: 26px; background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent); }
+.ggt.can-left::before, .ggt.can-right::after { opacity: 1; }
+.theme-dark .ggt::before { background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent); }
+.theme-dark .ggt::after { background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent); }
+.ggt button.ggt-handle { touch-action: none; }
+
+/* 实时预览里包表格的那层默认带 contain: paint，会把伸到表格外面的行手柄、加号裁掉一半 */
+/* Obsidian 的规则是 .markdown-source-view.mod-cm6 .cm-content > [contenteditable="false"] { contain: paint !important }，要比它更具体才盖得住 */
+.markdown-source-view.mod-cm6 .cm-content > .ggt-lp[contenteditable="false"] { contain: none !important; }
+
+/* 表头的行手柄拖不动，只能点开菜单 */
+.ggt button.ggt-row-handle.is-fixed { cursor: pointer; }
+.ggt.has-range .ggt-cell.is-sel-head { background-image: none; }
+
+/* 下拉填充：选区右下角的小方块，拖动时虚线框出要填的地方 */
+.ggt-fill { position: absolute; z-index: 6; display: none; width: 8px; height: 8px; box-sizing: border-box; border: 1.5px solid var(--background-primary); border-radius: 2px; background: var(--ggt-sel); cursor: crosshair; touch-action: none; }
+.ggt-fill.is-shown { display: block; }
+.ggt-fill::before { content: ""; position: absolute; inset: -6px; }
+.is-mobile .ggt-fill { width: 14px; height: 14px; border-radius: 4px; }
+.ggt-fill-preview { position: absolute; z-index: 3; display: none; border: 1.5px dashed var(--ggt-sel); border-radius: 2px; pointer-events: none; box-sizing: border-box; }
+.ggt-fill-preview.is-shown { display: block; }
+.ggt.is-filling, .ggt.is-filling * { cursor: crosshair !important; user-select: none; }
+
+/* 表格左上角的按钮：鼠标在表格上时出现，点开是整张表的设置 */
+.ggt button.ggt-corner { position: absolute; z-index: 4; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; transform: translate(-50%, -50%); border: 1px solid var(--ggt-line); border-radius: 6px; background: var(--background-primary); color: var(--text-muted); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.12s; }
+.ggt:hover button.ggt-corner, .ggt button.ggt-corner:focus-visible { opacity: 1; pointer-events: auto; }
+.ggt button.ggt-corner:hover { color: var(--text-normal); border-color: var(--ggt-sel); }
+.ggt button.ggt-corner svg { width: 14px; height: 14px; }
+.is-mobile .ggt button.ggt-corner { opacity: 1; pointer-events: auto; width: 28px; height: 28px; }
+.ggt.is-readonly button.ggt-corner { display: none; }
+
+/* 导出 PDF、打印：只留表格本身，手柄、加号、按钮、选区都不要 */
+@media print {
+  .ggt-handle, .ggt-add, .ggt-corner, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-input { display: none !important; }
+  .ggt::before, .ggt::after { display: none !important; }
+  .ggt .ggt-cell.is-selected { box-shadow: none !important; }
+  .ggt-scroll { overflow: visible !important; }
+}
+
+/* 勾选框：和 Obsidian 任务列表的勾选框一个样子 */
+.ggt-content .ggt-check { margin: 0 6px 0 0; vertical-align: -2px; cursor: pointer; }
+.ggt-check-text > p { display: inline; }
+.ggt-check:checked + .ggt-check-text { color: var(--text-faint); text-decoration: line-through; }
+
+/* 编辑格子时的 [[ 链接、# 标签补全 */
+.ggt-suggest { position: fixed; z-index: var(--layer-menu, 65); min-width: 200px; max-width: 360px; max-height: 280px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); background: var(--background-primary); box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16)); font-size: var(--font-ui-small, 13px); }
+.ggt-suggest-item { padding: 5px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ggt-suggest-item.is-active { background: var(--background-modifier-hover); }
+
+/* 插入表格：悬停网格选行列数 */
+.ggt-grid { display: grid; grid-template-columns: repeat(8, 22px); gap: 4px; padding: 4px 0; }
+.ggt-grid-cell { width: 22px; height: 22px; border: 1px solid var(--background-modifier-border); border-radius: 4px; cursor: pointer; }
+.ggt-grid-cell.is-on { background: color-mix(in srgb, var(--interactive-accent) 22%, transparent); border-color: var(--interactive-accent); }
+.ggt-grid-hint { margin-top: 8px; color: var(--text-muted); font-size: var(--font-ui-small, 13px); }
+.ggt-grid-modal { width: auto; }
+
+/* 文字颜色：用主题的颜色，深浅色都清楚 */
+.ggt .ggt-cell[data-fg="gray"] { color: var(--text-muted); }
+.ggt .ggt-cell[data-fg="red"] { color: var(--color-red); }
+.ggt .ggt-cell[data-fg="orange"] { color: var(--color-orange); }
+.ggt .ggt-cell[data-fg="yellow"] { color: var(--color-yellow); }
+.ggt .ggt-cell[data-fg="green"] { color: var(--color-green); }
+.ggt .ggt-cell[data-fg="blue"] { color: var(--color-blue); }
+.ggt .ggt-cell[data-fg="purple"] { color: var(--color-purple); }
+.ggt-menu button.ggt-swatch.is-text { background: var(--background-primary); font-weight: 700; font-size: 13px; line-height: 1; color: var(--text-normal); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="none"] { background: var(--background-primary); color: var(--text-normal); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="gray"] { color: var(--text-muted); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="red"] { color: var(--color-red); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="orange"] { color: var(--color-orange); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="yellow"] { color: var(--color-yellow); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="green"] { color: var(--color-green); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="blue"] { color: var(--color-blue); }
+.ggt-menu button.ggt-swatch.is-text[data-fg="purple"] { color: var(--color-purple); }
+
+/* 标题列：第一列和表头一样的浅底、加粗 */
+.ggt .ggt-cell.is-head-col { background-color: var(--ggt-head-bg); font-weight: var(--font-semibold, 600); }
+
+/* 三线表：顶线、表头下线、底线，没有竖线和中间的横线 */
+.ggt[data-preset="academic"] .ggt-cell { border-left: 0 !important; border-right: 0; border-bottom: 0; background: transparent; }
+.ggt[data-preset="academic"] thead .ggt-cell { border-top: 1.5px solid var(--text-normal); border-bottom: 1px solid var(--text-normal); background: transparent; }
+.ggt[data-preset="academic"] tbody tr:last-child .ggt-cell { border-bottom: 1.5px solid var(--text-normal); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.07); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="red"] { background: rgba(var(--color-red-rgb), 0.14); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="orange"] { background: rgba(var(--color-orange-rgb), 0.15); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="yellow"] { background: rgba(var(--color-yellow-rgb), 0.18); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="green"] { background: rgba(var(--color-green-rgb), 0.14); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="blue"] { background: rgba(var(--color-blue-rgb), 0.13); }
+.ggt[data-preset="academic"] .ggt-cell[data-bg="purple"] { background: rgba(var(--color-purple-rgb), 0.13); }
+
+/* 合计行：加粗，上面一道线 */
+.ggt .ggt-cell.is-total-row { font-weight: var(--font-semibold, 600); border-top: 1.5px solid var(--ggt-line-strong, var(--text-faint)); }
+
+/* 状态标签：圆角小块，颜色取主题色调淡 */
+.ggt-pill { display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 0.92em; line-height: 1.6; white-space: nowrap; color: var(--text-normal); background: rgba(var(--mono-rgb-100), 0.08); }
+.ggt-pill[data-c="red"] { background: rgba(var(--color-red-rgb), 0.18); color: var(--color-red); }
+.ggt-pill[data-c="orange"] { background: rgba(var(--color-orange-rgb), 0.18); color: var(--color-orange); }
+.ggt-pill[data-c="yellow"] { background: rgba(var(--color-yellow-rgb), 0.22); color: color-mix(in srgb, var(--color-yellow) 70%, var(--text-normal)); }
+.ggt-pill[data-c="green"] { background: rgba(var(--color-green-rgb), 0.18); color: var(--color-green); }
+.ggt-pill[data-c="blue"] { background: rgba(var(--color-blue-rgb), 0.16); color: var(--color-blue); }
+.ggt-pill[data-c="purple"] { background: rgba(var(--color-purple-rgb), 0.16); color: var(--color-purple); }
+.ggt-pill[data-c="gray"] { background: rgba(var(--mono-rgb-100), 0.08); color: var(--text-muted); }
+
+/* 格子里的列表：缩进收窄到一个字左右，去掉上下间距（Obsidian 正文的列表缩进放在格子里太宽） */
+.ggt .ggt-cell .ggt-content ul, .ggt .ggt-cell .ggt-content ol { margin: 0; padding-inline-start: 1.3em; }
+.ggt-content ul ul, .ggt-content ol ol, .ggt-content ul ol, .ggt-content ol ul { padding-inline-start: 1.1em; }
+/* Obsidian 给列表项上下各加了一点内边距（优先级比这里高），表格里不要 */
+.ggt .ggt-cell .ggt-content li { margin: 0; padding-top: 0; padding-bottom: 0; }
+.ggt-content li > p { margin: 0; }
+.ggt-content .list-bullet { margin-inline-start: -0.9em; }
+.ggt-content ul > li.task-list-item, .ggt-content ol > li.task-list-item { margin-inline-start: 0; }
+/* ==== gogoga-table 同步结束 ==== */

@@ -4,6 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Tables inside nodes: right-click a node → **Insert ▸ Insert table** to put a table in the node box, under its title, and edit cells right there with the same editor as the gogoga Table plugin: Enter / Tab to move, drag column widths, cell colors, merged cells, row and column handles, copy and paste with Excel or Feishu, ⌘Z to undo. No need to install the table plugin. The table is stored in the node's note as a plain Markdown table, with `%%table%%` added after the node; for a node whose note already has a table, right-click → **Insert ▸ Show table in node** moves it into the node, and **More ▸ Move table back to note** puts it back. Nodes without the marker and existing notes don't change.
+
+### Changed
+- With **Resize width from the right edge on hover** on, the selected node behaves the same way: its right-edge bar stays hidden until you point at the edge.
+- Adding a boundary after selecting a whole branch adds just one around the outermost node instead of one around every child.
+
 ## [0.45.0] - 2026-11-06
 
 ### Added

@@ -15,6 +15,7 @@ import {
   MenuItem,
   moment,
   Notice,
+  setIcon,
   setTooltip,
   Plugin,
   renderMath,
@@ -34,6 +35,7 @@ import { parseColorList } from "./format";
 import { htmlCharset, titleFromHtml } from "./paste-link";
 import { PdfExcerpt } from "./pdf-excerpt";
 import { Key, setLocale, t } from "./i18n";
+import { setLanguage as setTableLanguage } from "./table/editor/i18n";
 import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
@@ -130,6 +132,7 @@ export default class MindMapPlugin extends Plugin {
     const atStartup = !this.app.workspace.layoutReady;
     // 界面语言跟随 Obsidian；必须在注册命令、视图、功能区图标和设置页之前定下来
     setLocale(getLanguage());
+    setTableLanguage(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
     this.register(() => this.pdfExcerpt.stop());
@@ -1584,6 +1587,8 @@ export default class MindMapPlugin extends Plugin {
       linkTitle: (url) => (this.settings.pasteLinkTitle ? this.fetchPageTitle(url) : null),
       // 工具栏按钮只有图标：提示别让人等（Obsidian 默认要停一会儿才出）
       setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
+      setIcon: (el, name) => setIcon(el, name),
+      listTags: () => Object.keys((this.app.metadataCache as unknown as { getTags?: () => Record<string, number> }).getTags?.() ?? {}).map((x) => x.replace(/^#/, "")),
       openLink: (href, internal, ev) => {
         const newTab = ev.metaKey || ev.ctrlKey;
         if (internal && !newTab && this.revealInOpenPdf(href, sourcePath())) return;

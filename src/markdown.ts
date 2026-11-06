@@ -71,6 +71,7 @@ interface Marker {
   callout?: string;
   calloutColor?: string;
   hidden?: boolean;
+  table?: boolean;
   anchor?: string;
   rels?: Relation[];
   /** %%summary-topic=N%%：这一项是前面 N 个兄弟的概要主题 */
@@ -163,6 +164,7 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       else fy = Number(lower.slice(2));
     } else if (lower === "fold") marker.folded = true;
     else if (lower === "hide") marker.hidden = true;
+    else if (lower === "table") marker.table = true;
     else if ((COLOR_NAMES as readonly string[]).includes(lower)) marker.color = lower;
     // 内存里保留 # 前缀，直接当 CSS 颜色用
     else if (HEX_RE.test(t)) marker.color = lower.startsWith("#") ? lower : `#${lower}`;
@@ -190,13 +192,14 @@ const spanOf = (g: { span: number; raw?: HiddenSpan }) => (g.raw && g.raw.visibl
 
 /** noTopic：概要主题单独复制出去时不带 summary-topic（粘到别处就是普通节点） */
 export function formatMarker(
-  node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "anchor" | "rels" | "topicOf" | "topicSpan">,
+  node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "table" | "anchor" | "rels" | "topicOf" | "topicSpan">,
   noTopic = false,
 ): string {
   const parts: string[] = [];
   if (node.color) parts.push(node.color.startsWith("#") ? node.color.slice(1) : node.color);
   if (node.folded) parts.push("fold");
   if (node.hidden) parts.push("hide");
+  if (node.table) parts.push("table");
   if (node.width) parts.push(`w=${Math.round(node.width)}`);
   if (node.side) parts.push(node.side);
   if (node.box) {
@@ -628,6 +631,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         // 中心主题上的 float、hide 没有意义，但原样保留，写回不改用户的文本
         root.float = marker.float;
         root.hidden = marker.hidden;
+        root.table = marker.table;
         root.callout = marker.callout;
         root.calloutColor = marker.calloutColor;
         root.anchor = marker.anchor;
@@ -644,7 +648,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -666,7 +670,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);

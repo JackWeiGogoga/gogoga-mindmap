@@ -51,6 +51,8 @@ export interface MindNode {
   blockId?: string;
   /** %%hide%%：不在脑图里显示（连同子树），笔记里照旧 */
   hidden?: boolean;
+  /** %%table%%：备注里的第一张表格画在节点框里（标题下面），能直接点格子编辑；备注的其余部分照旧 */
+  table?: boolean;
   /** 关联线的终点标识：%%id=r1%%，别的节点用 rel=r1 指过来。只在注释里，改名、挪动都不受影响 */
   anchor?: string;
   /** 从这个节点出发的关联线：%%rel=r1 "文字" c=40,-60%%，一个节点可以有好几条 */
@@ -174,6 +176,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     bullet: init.bullet ?? "",
     blockId: init.blockId,
     hidden: init.hidden,
+    table: init.table,
     anchor: init.anchor,
     rels: init.rels,
     topicSpan: init.topicSpan,
@@ -858,6 +861,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     bullet: node.bullet,
     blockId: node.blockId,
     hidden: node.hidden,
+    table: node.table,
     anchor: node.anchor,
     rels: node.rels?.map((r) => ({ ...r, c: r.c && { ...r.c } })),
     topicSpan: node.topicSpan,
