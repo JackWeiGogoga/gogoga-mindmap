@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { matchLines, merge3, mergeExternal, preserveFormat } from "../../src/merge";
 import { parseMarkdown, serializeMarkdown } from "../../src/markdown";
-import { findByPath } from "../../src/model";
+import { findByPath, moveNode } from "../../src/model";
 
 /** 朴素 LCS 长度，用来核对 Myers 找到的是最长公共子序列 */
 function lcs(a: string[], b: string[]): number {
@@ -92,4 +92,18 @@ test("外部改动合并：两边改不同的地方都留下，改到同一处�
   assert.equal(mergeExternal(base, ours, "# 根\n\n## 甲改\n\n## 乙改\n\n## 丙\n"), "# 根\n\n## 甲改\n\n## 乙改\n\n## 丙\n");
   // 同一位置都插入了不同的行
   assert.equal(mergeExternal(base, base + "\n## 戊\n", base + "\n## 己\n"), null);
+});
+
+test("#25 挪走一大段后原位置不留一串空行：原文有多余空行时也一样，文末的空行原样", () => {
+  const canon = (t: string) => serializeMarkdown(parseMarkdown(t, { fallbackTitle: "" }));
+  const body = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag}${i + 1}`).join("\n\n");
+  const src = `# 长文\n\n\n## 第一章\n\n\n${body(6, "一")}\n\n\n## 第二章\n\n${body(5, "二")}\n\n## 第三章\n\n${body(4, "三")}\n\n\n`;
+  const doc = parseMarkdown(src, { fallbackTitle: "" });
+  moveNode(doc.root.children[0], doc.root, 3, doc.style);
+  const out = preserveFormat(src, serializeMarkdown(doc), canon);
+  // 原文最多连着两个空行，结果里也不超过
+  assert.ok(!/\n{4,}[^\n]/.test(out), JSON.stringify(out));
+  assert.ok(out.startsWith("# 长文\n\n\n## 第二章\n"), JSON.stringify(out.slice(0, 40)));
+  assert.ok(out.endsWith("一6\n\n\n"), JSON.stringify(out.slice(-20)));
+  assert.equal(canon(out), serializeMarkdown(doc));
 });

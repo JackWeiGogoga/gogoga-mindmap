@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- After moving a node in the map, its old spot in the Markdown could be left with a long run of blank lines (most visible when the note already had several blank lines in a row; the longer the moved content, the more blank lines). The old spot is now left clean, and the seam never has more blank lines in a row than the note already did.
+
 ## [0.48.0] - 2026-11-07
 
 ### Added

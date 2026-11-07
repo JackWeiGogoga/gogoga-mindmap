@@ -210,6 +210,25 @@ function resolve(base: string[], start: number, end: number, oursHunks: Hunk[], 
   for (const h of theirsHunks) {
     emitBase(h.start);
     const same = h.end - h.start === h.lines.length;
+    if (!same) {
+      // 这次编辑删掉 / 换掉了 base[h.start, h.end)（挪走的分支、删掉的段落）：原文里夹在这几行中间的空行一起不要，
+      // 不然挪走一大段后原位置会留下一串空行（#25）。这几行前面的空行照常带上
+      const gone: number[] = [];
+      for (let b = h.start; b < h.end; b++) {
+        const o = counterpart.get(b);
+        if (o !== undefined) gone.push(o);
+      }
+      if (gone.length) {
+        const first = Math.min(...gone);
+        for (; q < first; q++) if (oursLines[q].trim() === "") out.push(oursLines[q]);
+        q = Math.max(q, Math.max(...gone) + 1);
+        // 删掉的那段后面原文多出来的空行，和前面已经带上的空行接在一起了：不重复叠加（两段空行取较长的那段）
+        let before = 0;
+        for (let i = out.length - 1; i >= 0 && out[i].trim() === ""; i--) before++;
+        const used = new Set(counterpart.values());
+        for (let skipped = 0; skipped < before && q < oursLines.length && oursLines[q].trim() === "" && !used.has(q); skipped++) q++;
+      }
+    }
     h.lines.forEach((line, k) => {
       const o = same ? counterpart.get(h.start + k) : undefined;
       if (o === undefined) {
@@ -270,8 +289,28 @@ export function preserveFormat(original: string, next: string, canonical: (text:
   // 依次试：冲突组细合并（保留原文的空白）→ 冲突组按新格式 → 相邻改动也并成组
   const oursLines = ours.split("\n");
   const baseLines = base.split("\n");
+  // 原文里最长的一段连续空行：合并结果里拼出来的空行不超过它（挪走一段后前后的空行接在一起，不叠加成一大段）
+  let maxRun = 1;
+  // 文末的换行切出来的最后一个空串不算一行
+  const realLines = ours.endsWith("\n") ? oursLines.length - 1 : oursLines.length;
+  for (let i = 0, run = 0; i < realLines; i++) {
+    run = oursLines[i].trim() === "" ? run + 1 : 0;
+    maxRun = Math.max(maxRun, run);
+  }
+  const capBlank = (lines: string[]): string[] => {
+    // 文末那一串（连同最后的空串）原样留着，只收中间拼出来的
+    let tail = lines.length;
+    while (tail > 0 && lines[tail - 1].trim() === "") tail--;
+    const out: string[] = [];
+    let run = 0;
+    for (let i = 0; i < tail; i++) {
+      run = lines[i].trim() === "" ? run + 1 : 0;
+      if (run <= maxRun) out.push(lines[i]);
+    }
+    return out.concat(lines.slice(tail));
+  };
   for (const [touching, refine] of [[false, true], [false, false], [true, true], [true, false]]) {
-    const lines = merge3(baseLines, oursLines, next.split("\n"), touching, refine);
+    const lines = capBlank(merge3(baseLines, oursLines, next.split("\n"), touching, refine));
     for (const merged of [restoreMoved(baseLines, oursLines, lines).join("\n"), lines.join("\n")]) {
       if (canonical(merged) === next) return finish(merged);
     }
