@@ -7,6 +7,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Added
 - Five timeline structures (#24), in the toolbar's structure menu: horizontal timeline (one side / alternating up and down) and vertical timeline (rightward / leftward / alternating). Main topics are strung in order along an arrowed axis with their content hanging beside it: as an indented list on horizontal timelines and as a logic chart on vertical ones. When alternating, neighboring branches go on opposite sides and tuck in, so more fits on screen. Arrow keys move along the axis and into a branch toward the side it grows; drag main topics to reorder them along the axis. The structure is stored only in the frontmatter's `mindmap-structure`; the note's body is unchanged.
 
+### Fixed
+- With **Fold Markdown along with the map** on and the Markdown beside the map, expanding or collapsing a branch in the map made the Markdown jump dozens of lines away, losing the spot you had just located (most visible in long notes with many folded sections above). The Markdown now stays where it was.
+
 ## [0.50.0] - 2026-11-07
 
 ### Added

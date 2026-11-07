@@ -790,8 +790,33 @@ export default class MindMapPlugin extends Plugin {
       const cur = mode.getFoldInfo()?.folds ?? [];
       const kept = cur.filter((f) => !unfold.has(f.from) && !add.some((a) => a.from === f.from));
       const folds = [...kept, ...add].sort((a, b) => a.from - b.from);
+      const keep = this.keepScroll(view);
       mode.applyFoldInfo({ folds, lines: view.editor.lineCount() });
+      keep();
     }
+  }
+
+  /**
+   * 重新套一遍折叠（applyFoldInfo）后 Obsidian 会把滚动位置算歪：长笔记里前面折着很多段时，
+   * 在脑图里展开一个分支，旁边 Markdown 一下子跳到几十行开外。套之前记下顶端是哪一行、离顶端多远，
+   * 套完把同一行放回原处（编辑器按 CodeMirror 的行块高度算，阅读视图按行号）
+   */
+  private keepScroll(view: MarkdownView): () => void {
+    type Block = { from: number; top: number };
+    type CM = { scrollDOM: HTMLElement; lineBlockAtHeight(h: number): Block; lineBlockAt(pos: number): Block; state: { doc: { length: number } } };
+    if (view.getMode() === "preview") {
+      const line = view.previewMode.getScroll();
+      return () => view.previewMode.applyScroll(line);
+    }
+    const cm = (view.editor as unknown as { cm?: CM }).cm;
+    if (!cm) return () => {};
+    const top = cm.scrollDOM.scrollTop;
+    const block = cm.lineBlockAtHeight(top);
+    const offset = top - block.top;
+    return () => {
+      if (block.from > cm.state.doc.length) return;
+      cm.scrollDOM.scrollTop = cm.lineBlockAt(block.from).top + offset;
+    };
   }
 
   /** 正在显示（不是藏在别的标签页后面）的同一文件的脑图 */
