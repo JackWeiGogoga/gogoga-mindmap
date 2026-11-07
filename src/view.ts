@@ -230,6 +230,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.canvas?.toggleSummaryOnSelected();
   }
 
+  toggleNumberingOnSelected(): void {
+    this.canvas?.toggleNumbering();
+  }
+
   runNodeCommand(cmd: NodeCommand): void {
     this.canvas?.runNodeCommand(cmd);
   }
@@ -308,6 +312,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       hideSyntax: () => this.plugin.settings.hideSyntax,
       widthHandleOnHover: () => this.plugin.settings.widthHandleOnHover,
       newNodeName: () => this.plugin.settings.newNodeName,
+      autoNumber: () => this.plugin.settings.autoNumber,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),

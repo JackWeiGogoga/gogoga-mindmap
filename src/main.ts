@@ -1003,6 +1003,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("fit-branch", t("command.fitBranch"), async (v) => v.fitSelectedBranch());
     exportCommand("toggle-box", t("command.toggleBox"), async (v) => v.toggleBoxOnSelected());
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
+    exportCommand("toggle-numbering", t("command.toggleNumbering"), async (v) => v.toggleNumberingOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("toggle-pdf-excerpt", t("command.togglePdfExcerpt"), async (v) => this.pdfExcerpt.toggle(v));
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
@@ -1185,6 +1186,7 @@ export default class MindMapPlugin extends Plugin {
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,
         newNodeName: () => this.settings.newNodeName,
+        autoNumber: () => this.settings.autoNumber,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),

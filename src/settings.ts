@@ -42,6 +42,8 @@ export interface MindMapSettings {
   widthHandleOnHover: boolean;
   /** 新建的节点自带名字「主题1」，不写字也留着（默认关） */
   newNodeName: boolean;
+  /** 编辑时开头打「1.」就给这组同级编号（默认关） */
+  autoNumber: boolean;
   /** 勾上的任务（[x]）在脑图里显示删除线（默认关） */
   strikeDoneTasks: boolean;
   /** 编辑时粘贴网页地址，自动抓网页标题粘成 [标题](网址)（默认关） */
@@ -179,6 +181,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   hideSyntax: false,
   widthHandleOnHover: false,
   newNodeName: false,
+  autoNumber: false,
   strikeDoneTasks: false,
   textColors: DEFAULT_TEXT_COLORS,
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
@@ -322,6 +325,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
         toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
         toggle("newNodeName", t("settings.newNodeName.name"), t("settings.newNodeName.desc"), ["new node", "新建", "默认名字", "主题1"]),
+        toggle("autoNumber", t("settings.autoNumber.name"), t("settings.autoNumber.desc"), ["number", "编号", "序号", "有序列表"]),
         toggle("strikeDoneTasks", t("settings.strikeDoneTasks.name"), t("settings.strikeDoneTasks.desc"), ["task", "任务", "删除线", "strikethrough"]),
         toggle("copyPlain", t("settings.copyPlain.name"), t("settings.copyPlain.desc"), ["clipboard", "剪贴板"]),
         toggle("pasteLinkTitle", t("settings.pasteLinkTitle.name"), t("settings.pasteLinkTitle.desc"), ["link", "url", "链接", "网址"]),

@@ -8,7 +8,7 @@ import type { MindMapCanvas } from "./canvas";
 import { t } from "./i18n";
 import { InlineEditor } from "./inline-editor";
 import { plainText } from "./inline";
-import { isSummaryTopic, MindNode, visibleChildren, withTopics } from "./model";
+import { isSummaryTopic, MindNode, numberLabel, visibleChildren, withTopics } from "./model";
 
 export class OutlinePanel {
   readonly el: HTMLElement;
@@ -89,6 +89,9 @@ export class OutlinePanel {
       text.className = "mm-outline-text";
       if (plainText(node.text)) this.canvas.renderOutlineText(text, node.text);
       else text.textContent = node.depth === 0 ? t("canvas.centralTopic") : "";
+      // 同级编号：和脑图里一样显示在前面
+      const num = numberLabel(node);
+      if (num) text.prepend(createSpan({ cls: "mm-num", text: `${num} ` }));
       row.append(text);
 
       if (node.note) {

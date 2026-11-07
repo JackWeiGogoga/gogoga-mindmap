@@ -51,6 +51,11 @@ export interface MindNode {
   blockId?: string;
   /** %%hide%%：不在脑图里显示（连同子树），笔记里照旧 */
   hidden?: boolean;
+  /**
+   * 子节点带编号（1. 2. 3.）：编号是算出来的，不写进节点文字。列表子节点用 Markdown 有序列表存（全是 1. 2. 这种项目符号的
+   * 一组读进来就是编号的）；有标题子节点时在本节点写 %%num%%（标题没有原生编号）
+   */
+  numbered?: boolean;
   /** %%table%%：备注里的第一张表格画在节点框里（标题下面），能直接点格子编辑；备注的其余部分照旧 */
   table?: boolean;
   /** 关联线的终点标识：%%id=r1%%，别的节点用 rel=r1 指过来。只在注释里，改名、挪动都不受影响 */
@@ -177,6 +182,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     blockId: init.blockId,
     hidden: init.hidden,
     table: init.table,
+    numbered: init.numbered,
     anchor: init.anchor,
     rels: init.rels,
     topicSpan: init.topicSpan,
@@ -755,6 +761,8 @@ export function moveNode(node: MindNode, newParent: MindNode, index: number, sty
   const at = Math.max(0, Math.min(index, newParent.children.length));
   newParent.children.splice(at, 0, node);
   node.parent = newParent;
+  // 从编号组拖到没编号的一组：有序列表的项目符号（2.）换回普通的，不然会把那组列表从中间断开
+  if (oldParent !== newParent && !newParent.numbered && orderedBullet(node.bullet)) node.bullet = "";
   // 自由主题只能挂在中心主题下；挪到别处就是普通节点了
   if (newParent.parent) node.float = undefined;
   settleKind(node, style, promoted);
@@ -825,6 +833,7 @@ export function attachSubtree(node: MindNode, parent: MindNode, style: DocStyle,
   node.kind = top.kind;
   node.level = top.level;
   node.depth = parent.depth + 1;
+  if (!parent.numbered && orderedBullet(node.bullet)) node.bullet = "";
   const fix = (n: MindNode) => {
     const k = kindBelow(n, style);
     for (const c of n.children) {
@@ -862,6 +871,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     blockId: node.blockId,
     hidden: node.hidden,
     table: node.table,
+    numbered: node.numbered,
     anchor: node.anchor,
     rels: node.rels?.map((r) => ({ ...r, c: r.c && { ...r.c } })),
     topicSpan: node.topicSpan,
@@ -875,4 +885,26 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
   if (node.hiddenFirst) copy.hiddenFirst = node.hiddenFirst.map((c) => cloneTree(c, copy));
   if (node.hiddenAfter) copy.hiddenAfter = node.hiddenAfter.map((c) => cloneTree(c, parent));
   return copy;
+}
+
+/** 有序列表的项目符号（1. / 1)），返回数字和分隔符 */
+export function orderedBullet(bullet: string): { n: number; delim: string; pad: number } | null {
+  const m = /^(\d{1,9})([.)])$/.exec(bullet);
+  // 补零的写法（01. 02.）记下位数，写回时照着补
+  return m ? { n: Number(m[1]), delim: m[2], pad: m[1].startsWith("0") ? m[1].length : 0 } : null;
+}
+
+/** 编号从几开始：第一个列表子节点是有序列表就用它的数字（Markdown 也是这样），否则从 1 */
+export function numberStart(parent: MindNode): number {
+  const first = fileChildren(parent).find((c) => c.kind === "list");
+  return (first && orderedBullet(first.bullet)?.n) ?? 1;
+}
+
+/** 编号组里节点前面显示的编号（「3.」）；父节点没开编号、概要主题、自由主题返回 null */
+export function numberLabel(node: MindNode): string | null {
+  const p = node.parent;
+  if (!p?.numbered || node.topicOf || node.float) return null;
+  const kids = p.children.filter((c) => !c.topicOf && !c.float);
+  const i = kids.indexOf(node);
+  return i < 0 ? null : `${numberStart(p) + i}.`;
 }

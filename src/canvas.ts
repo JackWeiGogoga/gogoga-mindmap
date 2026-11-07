@@ -36,6 +36,9 @@ import {
   fixTopics,
   hideNode,
   countHidden,
+  numberLabel,
+  orderedBullet,
+  allChildren,
 } from "./model";
 import {
   BOX_PAD,
@@ -235,6 +238,8 @@ export interface CanvasOptions {
   widthHandleOnHover?: () => boolean;
   /** 新建的节点自带名字「主题1」「主题2」…：不写字直接确认也留着（默认关：没写字的新节点不保留） */
   newNodeName?: () => boolean;
+  /** 编辑时在开头打「1.」「1、」：这组同级开始编号，打的数字去掉（默认关） */
+  autoNumber?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
@@ -1367,7 +1372,8 @@ export class MindMapCanvas {
       // 只有前者变了才重建 DOM，选一下节点不该把里面的 iframe 打回重载
       const nt = node.table ? noteTable(node.note) : null;
       const tableSig = nt ? `T${this.opts.editable && !this.recite ? "e" : ""}` : "";
-      const contentSig = [node.text, this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
+      const num = numberLabel(node);
+      const contentSig = [node.text, num ?? "", this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
@@ -1470,12 +1476,15 @@ export class MindMapCanvas {
             });
           }
         }
+        // 编号（这组同级开了编号时）：放在标题前面，不在文字里，编辑时也留着
+        if (num) el.append(createSpan({ cls: "mm-num", text: num }));
         el.append(label);
         if (nt) this.mountTable(node, el, nt.table);
       } else if (nt) {
         this.syncTable(node, nt.table);
       }
       if (nt) el.classList.add("has-table");
+      if (num) el.classList.add("has-num");
       if (el.querySelector(".mm-label img")) el.classList.add("has-image");
       if (this.frames.has(node.id)) {
         el.classList.add("has-frame");
@@ -3038,6 +3047,39 @@ export class MindMapCanvas {
     }
     this.render();
     if (first) this.editSummary(first, true);
+  }
+
+  // ---------- 同级编号 ----------
+
+  /** 这组子节点能不能编号：用文件名当中心主题时，它下面的标题没处记 %%num%%，只有列表子节点才行 */
+  private canNumber(parent: MindNode): boolean {
+    if (parent !== this.doc?.root || this.doc.rootFromHeading) return true;
+    return !allChildren(parent).some((c) => c.kind === "heading");
+  }
+
+  /**
+   * 给选中节点所在的几组同级加上 / 取消编号。on 不给时：有一组没编号就全加，都编了就全取消。
+   * 取消时列表子节点的有序项目符号换回普通的
+   */
+  toggleNumbering(on?: boolean): void {
+    if (!this.opts.editable || !this.selected.size) return;
+    const parents = new Set<MindNode>();
+    for (const n of this.selected) if (n.parent && !isSummaryTopic(n) && this.canNumber(n.parent)) parents.add(n.parent);
+    if (!parents.size) return;
+    const next = on ?? [...parents].some((p) => !p.numbered);
+    let changed = false;
+    for (const p of parents) changed = this.setNumbered(p, next) || changed;
+    if (!changed) return;
+    this.render();
+    this.reflow();
+    this.notify();
+  }
+
+  private setNumbered(parent: MindNode, on: boolean): boolean {
+    if (!!parent.numbered === on) return false;
+    parent.numbered = on || undefined;
+    if (!on) for (const c of allChildren(parent)) if (c.kind === "list" && orderedBullet(c.bullet)) c.bullet = "";
+    return true;
   }
 
   /** 命令：选中的有在概要里的就移除，否则加 */
@@ -5574,8 +5616,17 @@ export class MindMapCanvas {
       return;
     }
     // 新节点留下来了（自带名字的按 Esc 也留着）就得存
-    const changed = isNew || (!cancel && text !== node.text);
+    let changed = isNew || (!cancel && text !== node.text);
     node.text = text;
+    // 快捷编号（设置打开时）：开头打了「1.」「1、」，这组同级开始编号，打的数字去掉
+    if (!cancel && this.opts.autoNumber?.() && node.parent && !isSummaryTopic(node) && this.canNumber(node.parent)) {
+      const m = /^\d{1,3}(?:[.)．]\s+|、\s*)(?=\S)/.exec(text);
+      if (m) {
+        node.text = text.slice(m[0].length);
+        this.setNumbered(node.parent, true);
+        changed = true;
+      }
+    }
     // startEdit 把 label 换成了编辑框。文字没改的话签名跟着没变，
     // rebuild 会认为这个节点不用动，于是原文就留在那儿了 —— 纯文字节点看不出来，
     // 图片、链接、iframe 这种有渲染形态的就露馅。所以提交时强制让这个节点失效。
@@ -6379,6 +6430,10 @@ export class MindMapCanvas {
       if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
       else if (node.parent && !topic && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       more.push(sep);
+    }
+    if (editable && node.parent && !topic) {
+      const on = !!node.parent.numbered;
+      more.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) }, sep);
     }
     if (editable && this.nodeTable(node)) {
       more.push(
