@@ -10,6 +10,23 @@ The interface follows Obsidian's language setting — English, or Simplified Chi
 
 ![The Mind Map user guide note (snow theme)](https://raw.githubusercontent.com/JackWeiGogoga/gogoga-mindmap/main/docs/snow.png)
 
+## Install
+
+### Community plugins (recommended)
+
+Settings → Community plugins → turn off **Restricted mode** → **Browse**, search for **gogoga Mind Map**, install it, then click **Enable**. Updates show up there too.
+
+### Manual install
+
+For offline machines (such as a company network) or to pin a specific version:
+
+1. Open the [Releases page](https://github.com/JackWeiGogoga/gogoga-mindmap/releases/latest) and download the three files `main.js`, `manifest.json`, `styles.css` under **Assets**. **Don't download the Source code archives**: they are the source code, which Obsidian can't load.
+2. In your vault's folder, go to `.obsidian/plugins/`, create a folder named `gogoga-mindmap`, and put the files in it, so you end up with paths like `<vault>/.obsidian/plugins/gogoga-mindmap/main.js`.
+   - `.obsidian` is a hidden folder: press `⌘ ⇧ .` in Finder on macOS; on Windows, tick **Hidden items** under **View** in File Explorer.
+3. Restart Obsidian (or click the refresh button under Settings → Community plugins), then enable **gogoga Mind Map** in the list of installed plugins.
+
+On phones, where moving files around is awkward, use the community plugins browser.
+
 ## Usage
 
 > [!tip] For a quick start, copy the [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) folder into your vault (the notes are in Chinese).
