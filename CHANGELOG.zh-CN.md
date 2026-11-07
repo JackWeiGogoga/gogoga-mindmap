@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-07
+
 ### 新增
 - 右键「插入 ▸ 表格子节点」：直接新建一个只放表格的子节点，不用先写标题，光标落在第一格；没有标题时节点里只显示表格。
 - 节点表格左上角按钮的菜单里多了「删除表格」：只删表格，节点留着。
@@ -579,7 +581,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...HEAD
+[0.47.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...0.47.0
 [0.46.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...0.46.0
 [0.45.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...0.45.0
 [0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0

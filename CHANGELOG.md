@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-07
+
 ### Added
 - Right-click → **Insert ▸ Child node with a table** creates a child that holds just a table, without typing a title first; the cursor lands in the first cell, and a node without a title shows only the table.
 - **Delete table** in the menu of a node table's top-left button: removes the table and keeps the node.
@@ -579,7 +581,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...HEAD
+[0.47.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...0.47.0
 [0.46.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...0.46.0
 [0.45.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.44.0...0.45.0
 [0.44.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.43.0...0.44.0
