@@ -5,11 +5,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Added
+- Right-click → **Insert ▸ Child node with a table** creates a child that holds just a table, without typing a title first; the cursor lands in the first cell, and a node without a title shows only the table.
+- **Delete table** in the menu of a node table's top-left button: removes the table and keeps the node.
 - Numbered siblings: right-click a node → **More ▸ Number siblings (1. 2. 3.)** to show 1. 2. 3. in front of that group; numbers update when you add, delete or reorder. The numbers aren't written into the text: list items are stored as a Markdown ordered list, so Obsidian shows them numbered too, and headings get a `%%num%%` after their parent heading. Ordered lists already in your notes show their numbers in the map as well. There's also a command, **Number the selected nodes and their siblings (on / off)**, to bind a hotkey to; the outline panel shows the numbers too.
 - **Start numbering by typing 1.** setting (Editing and interaction page, off by default): typing "1. " or "1、" at the start of a node numbers its group, and the typed number is removed.
 - A strikethrough button (S) in the formatting toolbar while editing a node: select text and click to add `~~`, click again to remove it.
 - **Strike through completed tasks** setting (Editing and interaction page, off by default): nodes whose task box is checked show struck-through, dimmed text; not in recite mode.
 - **Name new nodes Topic 1, Topic 2…** setting (Editing and interaction page, off by default): a new node starts as "Topic 1", "Topic 2"… selected, so typing replaces it; pressing Enter or Esc without typing keeps it, so you can add several nodes in a row.
+
+### Changed
+- A node table under a list item is now written after a blank line, so Obsidian's Reading view shows it as a table even without the table plugin. Tables written earlier get the blank line the next time the map is saved.
+- Node tables have the same margin on every side, so the table sits centered in the node.
 
 ## [0.46.0] - 2026-11-07
 
