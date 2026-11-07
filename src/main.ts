@@ -49,7 +49,7 @@ import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, Sav
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
-import { parseCustomMarkers, setCustomMarkers } from "./inline";
+import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -149,6 +149,7 @@ export default class MindMapPlugin extends Plugin {
       for (const d of this.allDocs()) {
         d.body.style.removeProperty("--mm-font-scale");
         d.body.classList.remove("mm-strike-done");
+        d.body.style.removeProperty("--mm-img-thumb-w");
         d.body.style.removeProperty("--mm-note-max-h");
         d.body.style.removeProperty("--mm-note-max-w");
       }
@@ -291,6 +292,7 @@ export default class MindMapPlugin extends Plugin {
    */
   applyDisplayScale(redraw = true): void {
     setSpacingScale(this.settings.spacingScale / 100);
+    setImageMaxWidth(this.settings.imageMaxWidth);
     for (const d of this.allDocs()) this.setFontScale(d);
     if (redraw) redrawAllCanvases();
   }
@@ -299,6 +301,10 @@ export default class MindMapPlugin extends Plugin {
     const k = this.settings.fontScale / 100;
     if (k === 1) doc.body.style.removeProperty("--mm-font-scale");
     else doc.body.style.setProperty("--mm-font-scale", String(k));
+    // 没设宽度的图片默认显示多宽（样式表按它算高度上限和中心主题里的宽度）
+    const thumb = this.settings.imageThumbWidth;
+    if (thumb === DEFAULT_SETTINGS.imageThumbWidth) doc.body.style.removeProperty("--mm-img-thumb-w");
+    else doc.body.style.setProperty("--mm-img-thumb-w", `${thumb}px`);
     // 完成的任务（[x]）显示删除线：样式表按这个类画
     doc.body.classList.toggle("mm-strike-done", this.settings.strikeDoneTasks);
     const h = this.settings.noteMaxHeight;

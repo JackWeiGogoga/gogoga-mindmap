@@ -57,6 +57,10 @@ export interface MindMapSettings {
   noteMaxHeight: number;
   /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
   noteMaxWidth: number;
+  /** 图片拖动调整的最大宽度（像素）：文件里写了更宽的也按它显示 */
+  imageMaxWidth: number;
+  /** 没设宽度的图片默认显示多宽（像素，高度最多是它的 3/4；中心主题里是它的 4/3） */
+  imageThumbWidth: number;
   /** 节点里表格的最大宽度、高度（像素，随节点字号缩放）：超出的在节点里滚动 */
   tableMaxWidth: number;
   tableMaxHeight: number;
@@ -187,6 +191,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
   noteMaxWidth: 320,
+  imageMaxWidth: 800,
+  imageThumbWidth: 240,
   tableMaxWidth: 640,
   tableMaxHeight: 480,
   customThemes: [],
@@ -313,6 +319,8 @@ export class MindMapSettingTab extends PluginSettingTab {
           dropdown("defaultTheme", t("settings.theme.name"), t("settings.theme.desc"), Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])), ["style", "风格", "配色"]),
           this.scaleSetting("spacingScale", t("settings.spacing.name"), t("settings.spacing.desc"), 50, 200),
           this.scaleSetting("fontScale", t("settings.fontScale.name"), t("settings.fontScale.desc"), 70, 150),
+          this.sizeSetting("imageThumbWidth", t("settings.imageThumbWidth.name"), t("settings.imageThumbWidth.desc"), 120, 800, t("settings.resetImageThumb")),
+          this.sizeSetting("imageMaxWidth", t("settings.imageMaxWidth.name"), t("settings.imageMaxWidth.desc"), 400, 2000, t("settings.resetImageMax")),
         ],
         () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
       ),
@@ -404,12 +412,12 @@ export class MindMapSettingTab extends PluginSettingTab {
     return this.sliderWithReset(key, name, desc, min, max, 5, 100, t("settings.reset"), () => this.plugin.applyDisplayScale());
   }
 
-  private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
+  private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
     return this.sliderWithReset(key, name, desc, min, max, 20, DEFAULT_SETTINGS[key], resetTip, () => this.plugin.applyDisplayScale());
   }
 
   private sliderWithReset(
-    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight",
+    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth",
     name: string,
     desc: string,
     min: number,

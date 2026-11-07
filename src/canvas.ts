@@ -62,7 +62,7 @@ import { applyInlineFormat, highlightOf, type InlineFormat } from "./format";
 import { InlineEditor } from "./inline-editor";
 import {
   fromEditableText,
-  IMAGE_MAX_WIDTH,
+  getImageMaxWidth,
   FRAME_DEFAULT_H,
   FRAME_DEFAULT_W,
   FRAME_MAX,
@@ -7110,7 +7110,7 @@ export class MindMapCanvas {
         r.box.style.width = `${Math.round(w)}px`;
         r.box.style.height = `${Math.round(h)}px`;
       } else {
-        const w = Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, r.startW + dx));
+        const w = Math.max(IMAGE_MIN_WIDTH, Math.min(getImageMaxWidth(), r.startW + dx));
         r.box.classList.add("has-size");
         r.box.style.width = `${Math.round(w)}px`;
       }

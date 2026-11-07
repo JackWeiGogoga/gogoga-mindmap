@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- **Default image size** and **Maximum image width** settings (Opening and display page): how wide images without a set width appear (was fixed at 240), and how far you can drag an image's corner (was fixed at 800, now up to 2000). Images whose width in the note is larger show at the maximum; the note isn't changed.
+
 ## [0.47.0] - 2026-11-07
 
 ### Added

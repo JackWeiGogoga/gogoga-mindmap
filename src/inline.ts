@@ -286,9 +286,16 @@ function math(tex: string, opts: InlineOptions): HTMLElement {
   return code;
 }
 
-/** 图片节点允许的宽度范围（像素） */
+/** 图片节点允许的宽度范围（像素）：最小值固定，最大值是设置「图片最大宽度」（默认 800） */
 export const IMAGE_MIN_WIDTH = 40;
-export const IMAGE_MAX_WIDTH = 800;
+export const IMAGE_MAX_WIDTH_DEFAULT = 800;
+let imageMaxWidth = IMAGE_MAX_WIDTH_DEFAULT;
+export function setImageMaxWidth(w: number): void {
+  imageMaxWidth = Math.max(IMAGE_MIN_WIDTH, w);
+}
+export function getImageMaxWidth(): number {
+  return imageMaxWidth;
+}
 
 function splitAltParam(alt: string): [string, string | undefined] {
   const i = alt.lastIndexOf("|");
@@ -424,7 +431,7 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
   const width = param && /^\d+$/.test(param.trim()) ? Number(param) : null;
   if (width) {
     // 明确设了宽度就以它为准，不受默认缩略图上限约束
-    img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, width))}px`;
+    img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(imageMaxWidth, width))}px`;
     img.classList.add("has-size");
   }
   img.addEventListener("load", () => opts.onImageLoad?.());
@@ -455,7 +462,7 @@ function pdfCrop(target: string, param: string | undefined, opts: InlineOptions)
     img.classList.add("mm-img");
     img.draggable = false;
     if (width) {
-      img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(IMAGE_MAX_WIDTH, width))}px`;
+      img.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(imageMaxWidth, width))}px`;
       img.classList.add("has-size");
     }
     opts.onImageLoad?.();

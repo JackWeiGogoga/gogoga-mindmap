@@ -1194,8 +1194,8 @@
 .mm-label .mm-math-fallback { opacity: 0.8; }
 .mm-label img.mm-img {
   display: block;
-  max-width: 240px;
-  max-height: 180px;
+  max-width: var(--mm-img-thumb-w, 240px);
+  max-height: calc(var(--mm-img-thumb-w, 240px) * 0.75);
   margin: 2px auto;
   border-radius: 6px;
   object-fit: contain;
@@ -1206,7 +1206,7 @@
 .mm-label img.mm-img.has-size { max-width: none; max-height: none; }
 .gg-mm-node.has-image { align-items: flex-start; min-width: min-content; }
 .gg-mm-node.has-image .mm-label { display: block; text-align: center; }
-.gg-mm-node[data-depth="0"] img.mm-img { max-width: 320px; }
+.gg-mm-node[data-depth="0"] img.mm-img { max-width: calc(var(--mm-img-thumb-w, 240px) * 4 / 3); }
 /* PDF 截区（PDF++ 画的裁切图）：外面包着 MarkdownRenderer 的段落和嵌入容器，去掉它们的边距，
    鼠标事件一律交给节点（和普通图片一样按坐标判断点没点在图上） */
 .mm-label .mm-pdf-crop { display: block; position: relative; pointer-events: none; }
