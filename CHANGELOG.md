@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-11-07
+
 ### Added
 - Five timeline structures (#24), in the toolbar's structure menu: horizontal timeline (one side / alternating up and down) and vertical timeline (rightward / leftward / alternating). Main topics are strung in order along an arrowed axis with their content hanging beside it: as an indented list on horizontal timelines and as a logic chart on vertical ones. When alternating, neighboring branches go on opposite sides and tuck in, so more fits on screen. Arrow keys move along the axis and into a branch toward the side it grows; drag main topics to reorder them along the axis. The structure is stored only in the frontmatter's `mindmap-structure`; the note's body is unchanged.
 
@@ -609,7 +611,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...HEAD
+[0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0
 [0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0
 [0.48.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...0.48.0

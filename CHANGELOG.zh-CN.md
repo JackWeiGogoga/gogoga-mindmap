@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-11-07
+
 ### 新增
 - 五种时间轴结构（#24），在工具栏的结构菜单里选：横向时间轴（同侧 / 上下交错）、纵向时间轴（向右 / 向左 / 左右交错）。主主题按顺序串在一条带箭头的主轴上，下面的内容挂在旁边：横向的分支是缩进清单，纵向的分支是逻辑图。交错时相邻分支分在两侧、往中间挤，同一屏能放下更多内容。方向键沿主轴走、朝分支方向进到分支里；拖动主主题可以在主轴上排序。结构只记在 frontmatter 的 `mindmap-structure` 里，笔记正文不变。
 
@@ -609,7 +611,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...HEAD
+[0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0
 [0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0
 [0.48.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...0.48.0
