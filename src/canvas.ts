@@ -649,7 +649,9 @@ export class MindMapCanvas {
   private editingIsNew = false;
 
   private pointers = new Map<number, { x: number; y: number }>();
-  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean; onNode?: boolean; button?: number } | null = null;
+  /** menuNode：右键按在这个节点上（拖动平移时鼠标已被画布接管，contextmenu 的 target 不再是节点，按下时先记住） */
+  private pan: { x: number; y: number; tx: number; ty: number; moved: boolean; onNode?: boolean; button?: number; menuNode?: MindNode } | null = null;
+  private pendingMenuNode: MindNode | null = null;
   /** 框选模式下右键按住拖动平移：macOS 按下就发 contextmenu，先存着，松开没拖动才弹菜单 */
   private pendingMenu: MouseEvent | null = null;
   /** Windows 上 contextmenu 在松开之后才来；刚拖完平移的那一下不弹菜单 */
@@ -3927,6 +3929,21 @@ export class MindMapCanvas {
     this.disposers.push(() => target.removeEventListener(type, handler as EventListener, options));
   }
 
+  /** 右键菜单：点在节点上弹节点菜单（顺带选中它），否则弹空白处的菜单 */
+  private contextMenuAt(ev: MouseEvent, pressed?: MindNode): void {
+    const nodeEl = (ev.target as HTMLElement | null)?.closest?.<HTMLElement>(".gg-mm-node");
+    const node = pressed ?? (nodeEl ? this.nodeFromEl(nodeEl) : null);
+    if (node) {
+      if (this.editing === node) return;
+      if (this.editing) this.commitEdit();
+      if (!this.selected.has(node)) this.select(node);
+      else this.setPrimary(node);
+      this.showContextMenu(this.nodeMenuEntries(node), ev);
+      return;
+    }
+    this.showBackgroundMenu(ev);
+  }
+
   private bindEvents(): void {
     const el = this.el;
 
@@ -3952,6 +3969,16 @@ export class MindMapCanvas {
         const node = this.nodeFromEl(nodeEl);
         if (!node) return;
         if (this.editing === node) return;
+        if (ev.button === 2 && ev.pointerType === "mouse") {
+          // 右键按住拖动平移画布，按在节点上也行（节点密的图里不用找空白）；没拖动就松开，照常弹节点菜单
+          if (this.editing) this.commitEdit();
+          this.closePopover();
+          this.el.focus({ preventScroll: true });
+          this.capture(ev);
+          this.pendingMenu = null;
+          this.pan = { x: ev.clientX, y: ev.clientY, tx: this.tx, ty: this.ty, moved: false, onNode: true, button: 2, menuNode: node };
+          return;
+        }
         if (this.editing) this.commitEdit();
         this.closePopover();
         // 先拿焦点再选中：选中会通知分屏联动，联动见旁边的 Markdown 编辑器还有焦点会当成用户在那边打字、不跳过去
@@ -3986,7 +4013,8 @@ export class MindMapCanvas {
       }
       // 框选模式（XMind 的习惯）：鼠标左键拖空白处框选，右键 / 中键拖动平移；触屏、触控笔照旧拖动平移
       const marqueeMode = ev.pointerType === "mouse" && !!this.opts.marqueeDrag?.();
-      if (ev.button !== 0 && ev.button !== 1 && !(marqueeMode && ev.button === 2)) return;
+      // 右键拖空白处平移：框选模式下一直有；平移模式下鼠标右键也能拖（和按在节点上一样）
+      if (ev.button !== 0 && ev.button !== 1 && !(ev.button === 2 && (marqueeMode || ev.pointerType === "mouse"))) return;
       if (this.editing) this.commitEdit();
       this.closePopover();
       this.el.focus({ preventScroll: true });
@@ -4074,13 +4102,15 @@ export class MindMapCanvas {
         this.lastTap = null;
       }
       if (this.pan) {
-        const { moved, onNode, button } = this.pan;
+        const { moved, onNode, button, menuNode } = this.pan;
         this.pan = null;
         if (button === 2) {
           const menu = this.pendingMenu;
           this.pendingMenu = null;
           if (moved) this.suppressMenuUntil = performance.now() + 500;
-          else if (menu && ev.type === "pointerup") this.showBackgroundMenu(menu);
+          else if (menu && ev.type === "pointerup") this.contextMenuAt(menu, menuNode);
+          // Windows 松开后才发 contextmenu：没拖动的话，它来的时候按节点弹
+          else if (!menu && !moved) this.pendingMenuNode = menuNode ?? null;
         } else if (!moved && !onNode) {
           this.select(null, "replace");
           // 点在外框里的空白处：选中这个外框，两端出现范围手柄
@@ -4235,23 +4265,16 @@ export class MindMapCanvas {
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar, .gg-mm-search, .mm-menu, .mm-crumbs")) return;
       ev.preventDefault();
       if (this.opts.embedded) ev.stopPropagation();
-      const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
-      const node = nodeEl ? this.nodeFromEl(nodeEl) : null;
-      if (node) {
-        if (this.editing === node) return;
-        if (this.editing) this.commitEdit();
-        if (!this.selected.has(node)) this.select(node);
-        else this.setPrimary(node);
-        this.showContextMenu(this.nodeMenuEntries(node), ev);
-        return;
-      }
-      // 右键正按着、可能要拖动平移：等松开再决定弹不弹
+      // 右键正按着、可能要拖动平移（macOS 按下就发 contextmenu）：等松开再决定弹不弹
       if (this.pan?.button === 2) {
         this.pendingMenu = ev;
         return;
       }
+      // Windows 松开后才发：刚拖完平移的那一下不弹
       if (performance.now() < this.suppressMenuUntil) return;
-      this.showBackgroundMenu(ev);
+      const pressed = this.pendingMenuNode;
+      this.pendingMenuNode = null;
+      this.contextMenuAt(ev, pressed ?? undefined);
     });
 
     // 拖入笔记 / 图片文件

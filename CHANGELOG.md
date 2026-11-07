@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Hold the right mouse button and drag to move the map (from a Bilibili comment): now also in the default Pan mode, and even when you press on a node, so dense maps don't need empty space to grab; a right-click without dragging still opens the menu.
+
 ## [0.51.0] - 2026-11-07
 
 ### Added
