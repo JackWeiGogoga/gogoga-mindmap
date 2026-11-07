@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-11-07
+
 ### Added
 - A sync toggle on the toolbar: when the same note is also open as Markdown, the toolbar shows a split-view button that turns syncing with the Markdown on or off in one click (struck through when off), without going to settings. It is the same switch as the "Sync with Markdown side by side" setting.
 
@@ -12,6 +14,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Fixed
 - After moving a node in the map, its old spot in the Markdown could be left with a long run of blank lines (most visible when the note already had several blank lines in a row; the longer the moved content, the more blank lines). The old spot is now left clean, and the seam never has more blank lines in a row than the note already did.
+- In a split or narrow pane, toolbar buttons that didn't fit at the bottom (or top) were cut off and couldn't be clicked. The toolbar now wraps onto a second row when needed, so every button stays visible.
 
 ## [0.48.0] - 2026-11-07
 
@@ -595,7 +598,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...HEAD
+[0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0
 [0.48.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...0.48.0
 [0.47.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...0.47.0
 [0.46.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...0.46.0

@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-11-07
+
 ### 新增
 - 工具栏上的「和 Markdown 联动」开关：同一篇笔记的 Markdown 也开着时，工具栏多一个分屏按钮，点一下就打开或关掉分屏联动（关着时图标上有一道斜线），不用每次去设置里切。和设置里的「和 Markdown 分屏联动」是同一个开关。
 
@@ -12,6 +14,7 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ### 修复
 - 在脑图里移动节点后，Markdown 里原来的位置会留下一大段空行（原文里有连续多个空行时最明显，挪走的内容越长空行越多）。现在原位置不留空行，接缝处的空行也不会比原文里最长的一段更多。
+- 分屏或窗格较窄时，底部（或顶部）工具栏放不下的按钮被截掉、点不到。现在放不下时自动折成两行，所有按钮都看得见。
 
 ## [0.48.0] - 2026-11-07
 
@@ -595,7 +598,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...HEAD
+[0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0
 [0.48.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.47.0...0.48.0
 [0.47.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.46.0...0.47.0
 [0.46.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.45.0...0.46.0
