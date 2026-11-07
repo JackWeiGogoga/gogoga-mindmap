@@ -238,6 +238,8 @@ export interface CanvasOptions {
   widthHandleOnHover?: () => boolean;
   /** 新建的节点自带名字「主题1」「主题2」…：不写字直接确认也留着（默认关：没写字的新节点不保留） */
   newNodeName?: () => boolean;
+  /** 和 Markdown 分屏联动的开关（工具栏按钮，同一篇的 Markdown 开着时才出现） */
+  splitSync?: { on: () => boolean; toggle: () => void };
   /** 编辑时在开头打「1.」「1、」：这组同级开始编号，打的数字去掉（默认关） */
   autoNumber?: () => boolean;
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
@@ -378,6 +380,8 @@ export function syncNotesExpandedAll(): void {
 
 const ICONS: Record<string, string> = {
   lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  splitSync: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M6.5 10h3M14.5 10h3M6.5 14h3M14.5 14h3"/></svg>',
+  splitSyncOff: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M3 3l18 18"/></svg>',
   unlock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.3"/></svg>',
   minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
@@ -1106,6 +1110,29 @@ export class MindMapCanvas {
     this.setEditable(!locked);
     this.el.classList.toggle("is-locked", locked);
     this.updateLockButton();
+  }
+
+  private splitSyncButton: HTMLElement | null = null;
+
+  /** 同一篇的 Markdown 有没有显示着：有才显示分屏联动按钮 */
+  setSplitSyncAvailable(available: boolean): void {
+    this.splitSyncButton?.classList.toggle("is-hidden", !available);
+    this.updateSplitSyncButton();
+  }
+
+  /** 按设置刷新分屏联动按钮：开着是高亮的分屏图标，关着加一道斜线 */
+  updateSplitSyncButton(): void {
+    const b = this.splitSyncButton;
+    const sync = this.opts.splitSync;
+    if (!b || !sync) return;
+    const on = sync.on();
+    const tool = on ? "splitSync" : "splitSyncOff";
+    // 状态没变就不换图标：点按钮时脑图这边被激活、会来刷新一次，按下时点中的图标被换掉，浏览器就不发 click 了
+    if (b.dataset.tool === tool && b.firstChild) return;
+    b.dataset.tool = tool;
+    b.replaceChildren(icon(tool));
+    b.classList.toggle("is-active", on);
+    this.tip(b, on ? t("canvas.splitSyncOn") : t("canvas.splitSyncOff"), "toolbar");
   }
 
   private updateLockButton(): void {
@@ -3420,6 +3447,16 @@ export class MindMapCanvas {
         onLock(this.locked);
       });
       this.updateLockButton();
+    }
+    // 分屏联动开关：同一篇的 Markdown 也开着时才显示（宿主调 setSplitSyncAvailable）
+    if (this.opts.splitSync) {
+      const sync = this.opts.splitSync;
+      this.splitSyncButton = btn("splitSync", "", () => {
+        sync.toggle();
+        this.updateSplitSyncButton();
+      });
+      this.splitSyncButton.classList.add("is-hidden");
+      this.updateSplitSyncButton();
     }
     if (this.opts.onToggleOutline || this.opts.onLockChange) {
       const sep0 = createSpan();

@@ -646,6 +646,12 @@ export default class MindMapPlugin extends Plugin {
   private lastFollowKey = "";
 
   private registerSplitSync(): void {
+    // 工具栏的分屏联动按钮：布局变了（开关分屏、换标签页、换文件）就看一下要不要显示
+    const refresh = () => window.setTimeout(() => this.updateSplitSyncButtons(), 0);
+    this.registerEvent(this.app.workspace.on("layout-change", refresh));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", refresh));
+    this.registerEvent(this.app.workspace.on("file-open", refresh));
+    this.app.workspace.onLayoutReady(refresh);
     let timer: number | null = null;
     const onSelectionChange = (ev: Event) => {
       if (!this.settings.syncSplit) return;
@@ -789,6 +795,28 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /** 正在显示（不是藏在别的标签页后面）的同一文件的脑图 */
+  /** 设置里的分屏联动开关（工具栏按钮也改它）：存下来，所有脑图的按钮跟着变 */
+  async setSyncSplit(on: boolean): Promise<void> {
+    this.settings.syncSplit = on;
+    await this.saveSettings();
+    this.updateSplitSyncButtons();
+  }
+
+  /** 每个脑图看一下同一篇的 Markdown 有没有显示着，有才在工具栏显示分屏联动按钮 */
+  updateSplitSyncButtons(): void {
+    const shownMd = new Set(
+      this.app.workspace
+        .getLeavesOfType("markdown")
+        .map((l) => l.view)
+        .filter((v): v is MarkdownView => v instanceof MarkdownView && !!v.file && v.containerEl.isShown())
+        .map((v) => v.file!.path),
+    );
+    for (const l of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      const v = l.view;
+      if (v instanceof MindMapView) v.updateSplitSync(!!v.file && shownMd.has(v.file.path));
+    }
+  }
+
   private visibleMapsOf(path: string): MindMapView[] {
     return this.app.workspace
       .getLeavesOfType(VIEW_TYPE_MINDMAP)

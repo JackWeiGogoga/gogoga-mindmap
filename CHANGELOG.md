@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- A sync toggle on the toolbar: when the same note is also open as Markdown, the toolbar shows a split-view button that turns syncing with the Markdown on or off in one click (struck through when off), without going to settings. It is the same switch as the "Sync with Markdown side by side" setting.
+
 ### Changed
 - Smoother with big notes: when you type in the Markdown beside the map, undo, or the file changes elsewhere, the map redraws only the nodes that changed instead of rebuilding every node. For a 3000-line note with over a thousand nodes, each sync drops from about 80 ms to about 25 ms.
 

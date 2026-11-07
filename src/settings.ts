@@ -272,6 +272,8 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "customMarkers":
       case "customMarkersExclusive":
         return p.applyCustomMarkers();
+      case "syncSplit":
+        return p.updateSplitSyncButtons();
       case "strikeDoneTasks":
         return p.applyDisplayScale(false);
       case "foldFollow":

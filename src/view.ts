@@ -127,6 +127,11 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   private following = false;
 
   /** 分屏联动：Markdown 光标在第 line 行，选中对应节点（只在看不见时挪画面） */
+  /** 同一篇的 Markdown 有没有显示着、联动开关现在的状态：刷新工具栏上的分屏联动按钮 */
+  updateSplitSync(available: boolean): void {
+    this.canvas?.setSplitSyncAvailable(available);
+  }
+
   followLine(text: string, line: number): void {
     if (!this.canvas) return;
     const path = pathAtLine(text, line, this.plugin.rootRule());
@@ -304,6 +309,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       onToggleHidden: () => this.plugin.toggleShowHidden(),
       onLockChange: (locked) => {
         if (this.file) this.plugin.setLocked(this.file.path, locked);
+      },
+      splitSync: {
+        on: () => this.plugin.settings.syncSplit,
+        toggle: () => void this.plugin.setSyncSplit(!this.plugin.settings.syncSplit),
       },
       toolbarPosition: this.plugin.settings.toolbarPosition,
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",

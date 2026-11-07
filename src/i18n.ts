@@ -167,6 +167,8 @@ const en = {
 
   // canvas.ts：节点
   "canvas.centralTopic": "Central topic",
+  "canvas.splitSyncOn": "Syncing with the Markdown beside: on (click to turn off)",
+  "canvas.splitSyncOff": "Syncing with the Markdown beside: off (click to turn on)",
   "canvas.newTopicName": "Topic {n}",
   "canvas.frameShield": "Double-click the player or click the activate button to play it and follow its links",
   "canvas.viewNote": "View note",
@@ -727,6 +729,8 @@ const zh: Record<Key, string> = {
   "canvas.foldLevels": "折叠层级 · 展开全部或只看前几层",
 
   "canvas.centralTopic": "中心主题",
+  "canvas.splitSyncOn": "和旁边的 Markdown 联动：开（点一下关掉）",
+  "canvas.splitSyncOff": "和旁边的 Markdown 联动：关（点一下打开）",
   "canvas.newTopicName": "主题{n}",
   "canvas.frameShield": "双击画面或点「激活」，之后才能播放和跳转",
   "canvas.viewNote": "查看备注",
