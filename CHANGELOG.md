@@ -4,8 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-11-07
+
 ### Added
 - Hold the right mouse button and drag to move the map (from a Bilibili comment): now also in the default Pan mode, and even when you press on a node, so dense maps don't need empty space to grab; a right-click without dragging still opens the menu.
+
+### Changed
+- On vertical timelines, a main topic's expanded note is now centered right below it, so the axis runs through the middle of the note instead of being cut off off-center.
+- The arrow at the end of a timeline now reaches past the farthest part of the map, so the axis no longer stops short when an earlier branch reaches farther than the last main topic.
 
 ## [0.51.0] - 2026-11-07
 
@@ -614,7 +620,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...HEAD
+[0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0
 [0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0
 [0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0

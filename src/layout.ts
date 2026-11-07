@@ -450,7 +450,8 @@ export function layoutTree(
     const rootNote = !horiz ? noteOf(parent) : null;
     if (rootNote) olds.push({ x: -rootNote.w / 2, y: rp.y + rp.h + NOTE_GAP, w: rootNote.w, h: rootNote.h });
     recordRuns(parent, list, horiz ? "down" : "right");
-    let prevEnd = horiz ? rp.x + rp.w : rp.y + rp.h + rootStem;
+    // 纵向：从中心主题底边就开始画（备注居中挂在下面，主轴从它背后穿过，和主主题一样）
+    let prevEnd = horiz ? rp.x + rp.w : rp.y + rp.h;
     type Open = { g: MindNode; rect: Bounds | null };
     // 只在下面的闭包里改：写成 as，免得 TS 把它收窄成 null
     let curBox = null as Open | null;
@@ -484,14 +485,16 @@ export function layoutTree(
       const own = (n: MindNode) => n === c;
       const mx = (x: number, w: number) => (mirror ? -(x + w) : x);
       const m = sub.placed.get(c.id)!;
+      // 纵向：主主题的备注在它正下方居中，主轴从备注正中穿过，像一张挂在轴上的卡片（左对齐时轴从备注偏左处穿过，像叠错了）
+      const subNotes = horiz ? sub.notes : sub.notes.map((n) => (own(n.node) ? { ...n, x: m.x + m.w / 2 - n.w / 2 } : n));
       // 主主题自己连同它的标注、备注
       let mainPart: Bounds | null = { x: mx(m.x, m.w), y: m.y, w: m.w, h: m.h };
       for (const x of sub.callouts) if (own(x.node)) mainPart = union(mainPart, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
-      for (const x of sub.notes) if (own(x.node)) mainPart = union(mainPart, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      for (const x of subNotes) if (own(x.node)) mainPart = union(mainPart, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
       // 分支里其余的部分
       let rest: Bounds | null = null;
       for (const p of sub.placed.values()) if (!own(p.node)) rest = union(rest, { x: mx(p.x, p.w), y: p.y, w: p.w, h: p.h });
-      for (const x of [...sub.callouts, ...sub.notes]) if (!own(x.node)) rest = union(rest, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      for (const x of [...sub.callouts, ...subNotes]) if (!own(x.node)) rest = union(rest, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
       for (const x of sub.boxes) rest = union(rest, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
       for (const x of sub.summaries) {
         rest = union(rest, { x: mx(x.brace.x, x.brace.w), y: x.brace.y, w: x.brace.w, h: x.brace.h });
@@ -534,7 +537,7 @@ export function layoutTree(
         placed.set(p.node.id, { ...p, ...at(p, p.node), side });
       }
       for (const x of sub.callouts) addCallout(x.node, at(x, x.node), x.dir);
-      for (const x of sub.notes) addNote(x.node, at(x, x.node), x.far);
+      for (const x of subNotes) addNote(x.node, at(x, x.node), x.far);
       for (const x of sub.boxes) branchBoxes.push({ ...x, ...at(x), side: flip(x.side) });
       let extra: Bounds | null = null;
       for (const x of sub.boxes) extra = union(extra, at(x));
@@ -558,7 +561,9 @@ export function layoutTree(
     closeBox();
     closeSum();
     const tail = Math.max(24, Math.round(gap * 0.75));
-    return { segs, end: horiz ? { x1: prevEnd, y1: 0, x2: prevEnd + tail, y2: 0 } : { x1: 0, y1: prevEnd, x2: 0, y2: prevEnd + tail } };
+    // 箭头画到整张图沿主轴方向的最远处再多一截：前面的分支比最后一个主主题伸得远时，主轴不在半路断掉
+    const far = Math.max(prevEnd, ...olds.map((o) => (horiz ? o.x + o.w : o.y + o.h)));
+    return { segs, end: horiz ? { x1: prevEnd, y1: 0, x2: far + tail, y2: 0 } : { x1: 0, y1: prevEnd, x2: 0, y2: far + tail } };
   }
 
   // ---- 水平结构：子树高度自底向上，子节点垂直堆叠并对父节点居中 ----

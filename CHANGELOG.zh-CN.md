@@ -4,8 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-11-07
+
 ### 新增
 - 按住鼠标右键拖动画布（B站评论）：默认的「平移」模式下也能用，按在节点上也行，节点密的图里不用再找空白处；右键点一下不拖，照常弹菜单。
+
+### 改进
+- 纵向时间轴里，主主题展开的备注改成在它正下方居中，主轴从备注正中穿过，不再从偏左的地方被挡住一段。
+- 时间轴末端的箭头画到整张图最远处再多出一截：前面的分支比最后一个主主题伸得远时，主轴不再在半路结束。
 
 ## [0.51.0] - 2026-11-07
 
@@ -614,7 +620,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...HEAD
+[0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0
 [0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0
 [0.49.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.48.0...0.49.0

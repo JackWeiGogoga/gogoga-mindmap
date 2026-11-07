@@ -91,6 +91,19 @@ for (const structure of STRUCTS) {
         if (!horiz) line.x = s.x1 - 0.1;
         for (const p of res.placed.values()) assert.ok(!hit(line, p), `${where}：主轴穿过 ${p.node.text}`);
       }
+      // 纵向：主主题（和中心主题）的备注在正下方居中，主轴从它正中穿过
+      if (!horiz) {
+        for (const n of res.notes) {
+          if (n.node !== doc.root && !mains.includes(n.node)) continue;
+          assert.ok(Math.abs(n.x + n.w / 2) < 0.01, `${where}：${n.node.text} 的备注没有在主轴上居中`);
+        }
+      }
+      // 箭头画到整张图沿主轴方向的最远处之外
+      if (spine.end) {
+        const tip = horiz ? spine.end.x2 : spine.end.y2;
+        for (const p of res.placed.values()) assert.ok(tip > (horiz ? p.x + p.w : p.y + p.h), `${where}：箭头没有越过 ${p.node.text}`);
+        for (const n of res.notes) assert.ok(tip > (horiz ? n.x + n.w : n.y + n.h), `${where}：箭头没有越过 ${n.node.text} 的备注`);
+      }
       for (const v of [res.bounds.x, res.bounds.y, res.bounds.w, res.bounds.h]) assert.ok(Number.isFinite(v));
     }
   });
