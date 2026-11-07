@@ -130,6 +130,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   /** 同一篇的 Markdown 有没有显示着、联动开关现在的状态：刷新工具栏上的分屏联动按钮 */
   updateSplitSync(available: boolean): void {
     this.canvas?.setSplitSyncAvailable(available);
+    this.sideAction?.toggle(!available);
   }
 
   followLine(text: string, line: number): void {
@@ -206,6 +207,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     return !!this.canvas && this.containerEl.isConnected;
   }
 
+  private sideAction: HTMLElement | null = null;
+
   /** 摘录开着时标题栏多一个高亮的按钮，点它关掉 */
   setExcerpting(on: boolean): void {
     this.excerptAction?.remove();
@@ -276,6 +279,11 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.addAction(MARKDOWN_ICON, t("menu.openAsMarkdown"), () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
     });
+    // 分屏对照：左边 Markdown、右边脑图。旁边已经开着这篇的 Markdown 时藏起来（见 updateSplitSync）
+    this.sideAction = this.addAction("columns-2", t("command.openPreview"), () => {
+      if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
+    });
+    this.sideAction.addClass("mm-side-action");
     this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
     const host = this.contentEl.createDiv({ cls: "mm-canvas-host" });
     this.canvas = new MindMapCanvas(host, {
