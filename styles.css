@@ -1368,11 +1368,9 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 
 /* 主视图里底部工具栏抬高，避开 Obsidian 右下角的状态栏 */
 .gg-mm-root:not(.is-embedded) .mm-toolbar[data-pos="bottom"] { bottom: var(--mm-bottom-inset, 44px); }
-/* 窄屏放不下所有按钮时横向滑动，不被截掉 */
+/* 窗格放不下所有按钮时自动折行（分屏、侧边栏），别藏在横向滚动里被截掉 */
 .mm-toolbar[data-pos="bottom"],
-.mm-toolbar[data-pos="top"] { max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; }
-/* 窄窗格（侧边栏）里底部工具栏放不下：折成两行，别藏在横向滚动里 */
-.gg-mm-root.is-narrow .mm-toolbar[data-pos="bottom"] { flex-wrap: wrap; justify-content: flex-end; row-gap: 2px; overflow-x: visible; }
+.mm-toolbar[data-pos="top"] { max-width: calc(100% - 24px); flex-wrap: wrap; justify-content: flex-end; row-gap: 2px; }
 .mm-toolbar[data-pos="left"],
 .mm-toolbar[data-pos="right"] { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; }
 .mm-toolbar::-webkit-scrollbar { display: none; }

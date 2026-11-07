@@ -779,9 +779,6 @@ export class MindMapCanvas {
 
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => {
-        // 窄窗格（侧边栏）：底部工具栏折成两行
-        const w = this.el.clientWidth;
-        if (w) this.el.classList.toggle("is-narrow", w < 480);
         // 恢复的视口：按现在的大小把原来的中心放回中间（下面的重画会直接返回，所以放在前面）
         if (this.viewAnchor) {
           this.applyViewAnchor();
