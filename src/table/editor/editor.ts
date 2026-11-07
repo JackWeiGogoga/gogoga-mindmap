@@ -47,6 +47,8 @@ export interface EditorHost {
   suggestLinks?(query: string): string[];
   /** 编辑格子时输入 # 补全标签：返回不带 # 的标签 */
   suggestTags?(query: string): string[];
+  /** 删掉整张表（连同下面的注释）：给了才在表格菜单里出现「删除表格」 */
+  onDeleteTable?(): void;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
   readonly?: boolean;
@@ -1786,6 +1788,20 @@ export class TableEditor {
       { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWidths(this.table, this.fitWidths())) },
       { title: t("autoWidthAll"), icon: "move-horizontal", disabled: !tb.meta.w?.some((x) => x != null), run: () => keep(autoWidthAll(this.table)) },
       { title: t("clearAllBg"), icon: "paintbrush", disabled: !Object.keys(tb.meta.bg ?? {}).length && !Object.keys(tb.meta.fg ?? {}).length, run: () => keep(clearAllBg(this.table)) },
+      ...(this.host.onDeleteTable
+        ? [
+            { separator: true },
+            {
+              title: t("deleteTable"),
+              icon: "trash-2",
+              danger: true,
+              run: () => {
+                if (this.editing) this.cancel();
+                this.host.onDeleteTable?.();
+              },
+            },
+          ]
+        : []),
     ];
   }
 

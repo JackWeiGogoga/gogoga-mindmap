@@ -1,6 +1,7 @@
 import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
+import { blankBeforeNodeTables } from "./node-table";
 import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { parseColorList, type InlineFormat } from "./format";
@@ -564,7 +565,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   private onDocChange(doc: MindDoc): void {
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
-    const next = preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text)));
+    const next = blankBeforeNodeTables(preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text))));
     // 标题的标记从行末挪到下一行后，标题文字变了：别的笔记里指向旧标题（带着 %%标记%%）的链接跟着改
     if (this.file && next !== this.data) this.plugin.fixHeadingLinks(this.file, strippedMarkerRenames(this.data, next));
     if (next === this.data) return;

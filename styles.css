@@ -2049,8 +2049,15 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
  * 加行、加列的按钮放在节点里面：表格右边、下边各留一条 18px 的窄带，两个按钮一样大、都在节点框里。
  * 节点自己右边、下边的内边距相应收小，表格四周的空白和标题那边差不多
  */
-.gg-mm-node.has-table { padding-right: 6px; padding-bottom: 6px; }
-.gg-mm-node .mm-node-table .ggt { margin: 0; padding: 6px 18px 18px 0; max-width: none; }
+.gg-mm-node.has-table { padding-left: 6px; padding-right: 6px; padding-bottom: 6px; }
+/* 标题行和节点左边对齐（节点左内边距收小了，标题补回来） */
+.gg-mm-node.has-table > .mm-label, .gg-mm-node.has-table > .mm-num { margin-left: 12px; }
+/* 只放了表格、没有标题：标题行不占位置（编辑时照常出现），上边也留 18px */
+.gg-mm-node.has-table.no-title:not(.is-editing) > .mm-label { display: none; }
+.gg-mm-node.has-table.no-title:not(.is-editing) { padding-top: 6px; row-gap: 0; }
+.gg-mm-node.has-table.no-title:not(.is-editing) .mm-node-table .ggt { padding-top: 18px; }
+/* 四边留一样宽（18px）：表格在节点里居中；左边、上边这条放行手柄和左上角的表格按钮 */
+.gg-mm-node .mm-node-table .ggt { margin: 0; padding: 6px 18px 18px 18px; max-width: none; }
 /*
  * 大表格：没拖过宽度的列最宽 240、文字换行；整张表最宽 / 最高按设置（默认 640 / 480），超出在节点里滚动，
  * 表头吸在顶上。节点设了宽度时表格跟着节点宽，不伸出框外
@@ -2073,7 +2080,7 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .gg-mm-node .mm-node-table .ggt:is([data-preset="minimal"], [data-preset="academic"]) thead .ggt-cell:not([data-bg]) { background-image: none; }
 .gg-mm-node .mm-node-table .ggt .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
 .gg-mm-node .mm-node-table .ggt button.ggt-add-col { top: 6px; bottom: 18px; right: 0; width: 16px; height: auto; }
-.gg-mm-node .mm-node-table .ggt button.ggt-add-row { left: 0; right: 18px; bottom: 0; height: 16px; width: auto; }
+.gg-mm-node .mm-node-table .ggt button.ggt-add-row { left: 18px; right: 18px; bottom: 0; height: 16px; width: auto; }
 .gg-mm-node .mm-node-table .ggt-table { background: var(--background-primary); }
 
 /* 同级编号：标题前面的 1. 2. 3.，比文字淡一点，不能编辑 */

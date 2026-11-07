@@ -1484,6 +1484,8 @@ export class MindMapCanvas {
         this.syncTable(node, nt.table);
       }
       if (nt) el.classList.add("has-table");
+      // 只放了表格、没有标题的节点：不显示空的标题行（编辑时照常出现）
+      if (nt && !node.text.trim()) el.classList.add("no-title");
       if (num) el.classList.add("has-num");
       if (el.querySelector(".mm-label img")) el.classList.add("has-image");
       if (this.frames.has(node.id)) {
@@ -6338,6 +6340,7 @@ export class MindMapCanvas {
             { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent || topic, run: () => this.insertParentForSelected() },
             // 节点里的表格：没有就插入一张，备注里有表就放进节点（第一层菜单放不下了，归到「插入」里）
             ...(this.nodeTable(node) ? [] : [this.tableMenuEntry(node)]),
+            { title: t("menu.tableChild"), icon: "table", run: () => this.insertTableChild(node) },
           ],
         },
         sep,
@@ -7241,6 +7244,8 @@ export class MindMapCanvas {
           }
         : undefined,
       readonly: !editable,
+      // 表格左上角菜单里的「删除表格」：只删表格，节点留着
+      onDeleteTable: editable ? () => this.deleteNodeTable(node) : undefined,
     };
     const ed = new TableEditor(wrap, table, tableHost);
     this.tableEds.set(node.id, { ed, src: tableSource(table), node });
@@ -7292,6 +7297,23 @@ export class MindMapCanvas {
     this.render();
     this.reflow();
     this.notify();
+    this.tableEds.get(node.id)?.ed.select(0, 0);
+  }
+
+  /** 新建一个只放表格的子节点（不用先写标题），选中第一格 */
+  insertTableChild(parent: MindNode): void {
+    if (!this.opts.editable || !this.doc) return;
+    this.closePopover();
+    if (this.editing) this.commitEdit();
+    if (parent.folded) parent.folded = false;
+    const node = addChild(parent, this.doc.style, "");
+    node.note = addTable("", node.kind === "list");
+    node.table = true;
+    this.select(node);
+    this.render();
+    this.reflow();
+    this.notify();
+    this.followSelection(node);
     this.tableEds.get(node.id)?.ed.select(0, 0);
   }
 

@@ -83,3 +83,25 @@ export function noteOnlyTable(note: string): string {
   if (!nt) return note;
   return nt.lines.slice(nt.start, nt.stop).join("\n");
 }
+
+const FENCE_LINE = /^\s*(`{3,}|~{3,})/;
+const TABLE_ITEM = /^\s*(?:[-*+]|\d{1,9}[.)])\s.*%%(?:[^%]|%(?!%))*\btable\b(?:[^%]|%(?!%))*%%/;
+
+/**
+ * 带 %%table%% 的列表项后面紧跟着表格时，中间补一个空行：没装表格插件的 Obsidian 阅读视图要有空行才认得出表格。
+ * 写回时「保留原格式」会把原文缺的空行当格式留着（0.46.0 写的就没有），所以保存时统一补上；别的行一概不动
+ */
+export function blankBeforeNodeTables(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    out.push(l);
+    if (FENCE_LINE.test(l)) fence = !fence;
+    if (fence || !TABLE_ITEM.test(l)) continue;
+    const next = lines[i + 1];
+    if (next !== undefined && /^\s+\|/.test(next)) out.push("");
+  }
+  return out.join("\n");
+}

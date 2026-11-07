@@ -883,11 +883,15 @@ export function serializeMarkdown(doc: MindDoc): string {
     if (node.lead) emitBlock(node.lead, depth);
     const bullet = numberedBullet(node) ?? (node.bullet || style.bullet);
     const blockId = node.blockId ? ` ^${node.blockId}` : "";
-    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${formatMarker(node)}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
+    // 没有文字的节点（只放了表格）：标记紧跟在项目符号后面，不留两个空格
+    const marker = node.text ? formatMarker(node) : formatMarker(node).trimStart();
+    out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${marker}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
     lastNode = node;
     nodeEnd = out.length;
     if (node.note) {
       const note = normalizeNote(node.note);
+      // 节点里的表格（%%table%%）：列表项和表格之间空一行，没装表格插件时 Obsidian 的阅读视图才认得出是表格
+      if (node.table && note.startsWith("|")) out.push("");
       for (const l of note.split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
       // 包成标注块的备注后面空一行：实时预览会把缩进的标注块后面紧跟的列表项（子节点、兄弟）也算进标注块
       if (isEscapedNote(note)) out.push("");

@@ -30,6 +30,7 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { locateBlock, replaceBlock } from "./codeblock";
+import { blankBeforeNodeTables } from "./node-table";
 import { preserveFormat } from "./merge";
 import { parseColorList } from "./format";
 import { htmlCharset, titleFromHtml } from "./paste-link";
@@ -1153,7 +1154,7 @@ export default class MindMapPlugin extends Plugin {
 
       // 代码块里没被这次编辑碰到的行保持原样，和脑图笔记一样
       const keepFormat = (next: string) =>
-        preserveFormat(current, next.replace(/\n$/, ""), (text) => serializeMarkdown(parseMarkdown(text, { fallbackTitle: "", style })).replace(/\n$/, ""));
+        blankBeforeNodeTables(preserveFormat(current, next.replace(/\n$/, ""), (text) => serializeMarkdown(parseMarkdown(text, { fallbackTitle: "", style })).replace(/\n$/, "")));
       const writeBack = (next: string, pushHistory = true) => {
         next = next.replace(/\n$/, "");
         if (next === current) return;
