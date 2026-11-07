@@ -47,6 +47,8 @@ import {
   DEFAULT_LAYOUT,
   edgeGeometry,
   edgePath,
+  isTimeline,
+  isTimelineH,
   layoutMap,
   LayoutOptions,
   LayoutResult,
@@ -1713,6 +1715,8 @@ export class MindMapCanvas {
       if (this.layout.floating?.has(child.node) || isSummaryTopic(child.node)) continue;
       const parent = this.layout.placed.get(parentNode.id);
       if (!parent) continue;
+      // 时间轴的主主题：不和中心主题连线，改画主轴上从前一个连过来的那一段
+      const seg = this.layout.spine?.segs.get(child.node.id);
       const g = edgeGeometry(parent, child);
       if (child.side === "right" || child.side === "left") {
         if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
@@ -1733,11 +1737,38 @@ export class MindMapCanvas {
       const tail = anchorBottom(child)
         ? ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`
         : "";
-      const d = edgePath(g, style, (this.opts.edge?.sharp ?? theme.sharp) ? 0 : 8) + tail;
+      const d = seg
+        ? `M${round2(seg.x1)},${round2(seg.y1)} L${round2(seg.x2)},${round2(seg.y2)}`
+        : edgePath(g, style, (this.opts.edge?.sharp ?? theme.sharp) ? 0 : 8) + tail;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;
       const branch = this.els.get(child.node.id)?.dataset.branch;
+      const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      if (path.style.stroke !== stroke) path.style.stroke = stroke;
+      if (path.style.display) path.setCssStyles({ display: "" });
+    }
+    // 时间轴主轴的最后一段：带箭头，颜色跟最后一个主主题
+    const end = this.layout.spine?.end;
+    if (end) {
+      let path = this.edgePaths[edgeIndex];
+      if (!path) {
+        path = createSvg("path");
+        path.setAttribute("class", "mm-edge");
+        this.svg.append(path);
+        this.edgePaths.push(path);
+      }
+      edgeIndex += 1;
+      const horiz = end.y1 === end.y2;
+      const a = 5;
+      const head = horiz
+        ? ` M${round2(end.x2 - a * 1.4)},${round2(end.y2 - a)} L${round2(end.x2)},${round2(end.y2)} L${round2(end.x2 - a * 1.4)},${round2(end.y2 + a)}`
+        : ` M${round2(end.x2 - a)},${round2(end.y2 - a * 1.4)} L${round2(end.x2)},${round2(end.y2)} L${round2(end.x2 + a)},${round2(end.y2 - a * 1.4)}`;
+      const d = `M${round2(end.x1)},${round2(end.y1)} L${round2(end.x2)},${round2(end.y2)}` + head;
+      if (path.getAttribute("d") !== d) path.setAttribute("d", d);
+      if (path.dataset.depth !== "1") path.dataset.depth = "1";
+      const last = [...this.layout.spine!.segs.keys()].pop();
+      const branch = last ? this.els.get(last)?.dataset.branch : undefined;
       const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
       if (path.style.stroke !== stroke) path.style.stroke = stroke;
       if (path.style.display) path.setCssStyles({ display: "" });
@@ -3842,6 +3873,9 @@ export class MindMapCanvas {
       const host = this.el.getBoundingClientRect();
       if (b.bottom - host.top <= r.y + 1) above = Math.min(above, b.top - host.top);
     }
+    // 横向时间轴里朝上长的主主题：折叠按钮在节点上面，工具栏放到按钮上方，不然盖住按钮点不到
+    const toggle = this.layout?.placed.get(this.primary!.id)?.side === "up" ? this.els.get(this.primary!.id)?.querySelector(".mm-toggle") : null;
+    if (toggle) above = Math.min(above, toggle.getBoundingClientRect().top - this.el.getBoundingClientRect().top);
     let top = above - bh - 10;
     if (top < 4) {
       // 上面放不下改放下面：节点下方挂着展开的备注时放到备注下面，同样不盖住它
@@ -4656,6 +4690,7 @@ export class MindMapCanvas {
         if (topic && this.layout?.placed.has(topic.id)) this.select(topic);
       }
     };
+    if (isTimeline(structure) && this.navigateTimeline(node, p, key, forward)) return;
     if (structure === "org-down") {
       // 向下结构：上下是父子，左右在兄弟间找最近的
       if (key === "ArrowDown") {
@@ -4669,7 +4704,7 @@ export class MindMapCanvas {
       this.selectNearest(p, key === "ArrowLeft" ? "left" : "right");
       return;
     }
-    if (structure === "tree-right") {
+    if (structure === "tree-right" || isTimelineH(structure)) {
       if (key === "ArrowRight") {
         const kids = visibleChildren(node);
         if (kids.length) this.select(kids[0]);
@@ -4696,6 +4731,38 @@ export class MindMapCanvas {
       return;
     }
     this.selectVertical(node, p, key === "ArrowUp" ? -1 : 1);
+  }
+
+  /**
+   * 时间轴：中心主题和主主题沿主轴走（横向 ←→、纵向 ↑↓），朝分支长的方向进到分支里；
+   * 分支里面照它自己的结构走（横向的分支是树形图，纵向的是逻辑图），交给 navigate 的通用逻辑。返回是否处理了
+   */
+  private navigateTimeline(node: MindNode, p: Placed, key: string, forward: (kids: MindNode[]) => void): boolean {
+    const base = this.focusRoot ?? this.doc?.root;
+    if (!base || !this.layout) return false;
+    const horiz = isTimelineH(this.opts.structure);
+    const mains = visibleChildren(base).filter((c) => !this.isFloating(c) && this.layout!.placed.has(c.id));
+    const along = horiz ? (key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0) : key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0;
+    if (node === base) {
+      if (along > 0 && mains.length) this.select(mains[0]);
+      return true;
+    }
+    const i = mains.indexOf(node);
+    if (i < 0) return false;
+    if (along) {
+      const next = i + along < 0 ? base : mains[i + along];
+      if (next) this.select(next);
+      return true;
+    }
+    // 朝分支长的方向：进到子节点（横向朝上的分支，离主轴最近的是最后一个）
+    const toward =
+      (key === "ArrowDown" && p.side === "down") || (key === "ArrowUp" && p.side === "up") || (key === "ArrowRight" && p.side === "right") || (key === "ArrowLeft" && p.side === "left");
+    if (toward) {
+      const kids = visibleChildren(node);
+      if (horiz && kids.length) this.select(p.side === "up" ? kids[kids.length - 1] : kids[0]);
+      else forward(kids);
+    }
+    return true;
   }
 
   /**
@@ -4875,8 +4942,9 @@ export class MindMapCanvas {
           ? -1
           : target.slot
         : kids.findIndex((k) => target.parent.children.indexOf(k.node) >= target.index);
-    ind.classList.toggle("is-vertical", side === "down");
-    if (side === "down") {
+    const across = side === "down" || side === "up";
+    ind.classList.toggle("is-vertical", across);
+    if (across) {
       let x: number;
       if (pos === -1) x = kids[kids.length - 1].x + kids[kids.length - 1].w + gap;
       else if (pos === 0) x = kids[0].x - gap;
@@ -4940,7 +5008,8 @@ export class MindMapCanvas {
       if (this.opts.structure === "mindmap" && p.node === base) continue;
       const kids = kidsOf(p);
       if (!kids.length) continue;
-      const across = kids[0].side === "down";
+      // 横向时间轴的主主题沿主轴从左往右排（分支朝下朝上都有）
+      const across = kids[0].side === "down" || kids[0].side === "up";
       // 沿堆叠方向排好：纵向排的按 y，横向排的（组织结构图）按 x
       kids.sort((a, b) => (across ? a.x - b.x : a.y - b.y));
       const edgeGap = p.node === base ? DEFAULT_LAYOUT.gapMain : 24;
@@ -4992,6 +5061,12 @@ export class MindMapCanvas {
         d = p.side === "right" ? wx - outer : outer - wx;
         const kidEdge = kids.length ? Math.min(...kids.map((k) => (p.side === "right" ? k.x - outer : outer - (k.x + k.w)))) : Infinity;
         if (d <= 4 || d > Math.min(96, kidEdge - 4)) continue;
+      } else if (p.side === "up") {
+        // 横向时间轴里朝上长的分支：子节点在上面
+        if (wx < p.x || wx > p.x + p.w) continue;
+        d = p.y - wy;
+        const kidEdge = kids.length ? Math.min(...kids.map((k) => p.y - (k.y + k.h))) : Infinity;
+        if (d <= 4 || d > Math.min(64, kidEdge - 4)) continue;
       } else {
         if (wx < p.x || wx > p.x + p.w) continue;
         d = wy - (p.y + p.h);

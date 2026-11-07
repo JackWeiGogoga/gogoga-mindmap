@@ -5,25 +5,52 @@
  *   mindmap      思维导图：主主题左右分布，顺时针
  *   org-down     组织结构图：子节点水平排在父节点下方
  *   tree-right   树形图：子节点在父节点下方向右缩进，像文件树
+ *   timeline-*   时间轴：主主题按顺序串在一条带箭头的主轴上（横向从左到右、纵向从上到下），
+ *                每个主主题连同分支照现成的结构排（横向用树形图、纵向用逻辑图），
+ *                同侧 / 交错地挂在主轴旁边；交错时相邻分支在两侧，往中间挤
  */
 
 import { t } from "./i18n";
 import { boxGroups, MindNode, summaryGroups, visibleChildren } from "./model";
 
-export type Structure = "logic-right" | "mindmap" | "org-down" | "tree-right";
+export type Structure =
+  | "logic-right"
+  | "mindmap"
+  | "org-down"
+  | "tree-right"
+  | "timeline-h"
+  | "timeline-h-alt"
+  | "timeline-v-right"
+  | "timeline-v-left"
+  | "timeline-v-alt";
 /** label 是 getter：模块加载时界面语言还没定，用到时再取 */
 export const STRUCTURES: { id: Structure; readonly label: string }[] = [
   { id: "logic-right", get label() { return t("structure.logicRight"); } },
   { id: "mindmap", get label() { return t("structure.mindmap"); } },
   { id: "org-down", get label() { return t("structure.orgDown"); } },
   { id: "tree-right", get label() { return t("structure.treeRight"); } },
+  { id: "timeline-h", get label() { return t("structure.timelineH"); } },
+  { id: "timeline-h-alt", get label() { return t("structure.timelineHAlt"); } },
+  { id: "timeline-v-right", get label() { return t("structure.timelineVRight"); } },
+  { id: "timeline-v-left", get label() { return t("structure.timelineVLeft"); } },
+  { id: "timeline-v-alt", get label() { return t("structure.timelineVAlt"); } },
 ];
+export function isTimeline(s: Structure): boolean {
+  return s.startsWith("timeline-");
+}
+/** 横向时间轴（主轴从左到右） */
+export function isTimelineH(s: Structure): boolean {
+  return s === "timeline-h" || s === "timeline-h-alt";
+}
 export function isStructure(s: unknown): s is Structure {
   return STRUCTURES.some((x) => x.id === s);
 }
 
-/** 子节点相对父节点的方向；连线和折叠徽章都按它画 */
-export type Side = "right" | "left" | "down" | "tree";
+/**
+ * 子节点相对父节点的方向；连线和折叠徽章都按它画。
+ * up：横向时间轴里分支朝上长的主主题（折叠按钮在上面）；tree-up：它的直接子节点，竖干从主主题顶边往上
+ */
+export type Side = "right" | "left" | "down" | "tree" | "up" | "tree-up";
 
 export interface Size {
   w: number;
@@ -138,6 +165,18 @@ export interface LayoutResult {
   bounds: Bounds;
   /** 按自由主题排的节点（中心主题的直接子节点）：不和中心主题连线 */
   floating?: Set<MindNode>;
+  /**
+   * 时间轴的主轴：segs 是每个主主题前面那一段（从上一个主主题或中心主题连过来，代替它和中心主题的连线），
+   * end 是最后一个主主题后面带箭头的那一段
+   */
+  spine?: { segs: Map<string, Segment>; end: Segment | null };
+}
+
+export interface Segment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 /**
@@ -370,11 +409,19 @@ export function layoutTree(
   }
 
   const rs = sizeOf(root);
-  const vertical = opts.structure === "org-down" || opts.structure === "tree-right";
+  const vertical = opts.structure === "org-down" || opts.structure === "tree-right" || (isTimeline(opts.structure) && !isTimelineH(opts.structure));
   placed.set(root.id, { node: root, x: -rs.w / 2, y: -rs.h / 2, w: rs.w, h: rs.h, side: "right", stem: vertical ? stemOf(root) : undefined });
   const kids = root.folded ? [] : childrenOf(root);
 
-  if (opts.structure === "org-down") {
+  /** 时间轴里各分支自己排出来的外框、概要（分支里面的），最后并进结果 */
+  const branchBoxes: PlacedBox[] = [];
+  const branchSummaries: PlacedSummary[] = [];
+  /** 时间轴：主主题 id → 它分支里外框、概要占的范围（套在主主题外面的外框要把它们也框进去） */
+  const branchExtra = new Map<string, Bounds>();
+  let spine: LayoutResult["spine"];
+  if (isTimeline(opts.structure)) {
+    spine = layoutTimeline(root, kids);
+  } else if (opts.structure === "org-down") {
     layoutDown(root, kids);
   } else if (opts.structure === "tree-right") {
     layoutTreeRight(root, kids);
@@ -385,6 +432,133 @@ export function layoutTree(
     placeColumn(root, left.reverse(), "left", 0);
   } else {
     placeColumn(root, kids, "right", 0);
+  }
+
+  // ---- 时间轴：每个主主题连同分支先单独排好，再沿主轴依次往后放，不和已经放好的部分重叠 ----
+  function layoutTimeline(parent: MindNode, list: MindNode[]): LayoutResult["spine"] {
+    const segs = new Map<string, Segment>();
+    if (!list.length) return { segs, end: null };
+    const s = opts.structure;
+    const horiz = isTimelineH(s);
+    const alt = s.endsWith("-alt");
+    const gap = opts.gapMain;
+    const cross = opts.gapSibling;
+    const rp = placed.get(parent.id)!;
+    const rootStem = rp.stem ?? 0;
+    /** 已经放好的部分；新分支沿主轴往后推，直到和它们都隔开 */
+    const olds: Bounds[] = [{ x: rp.x, y: rp.y, w: rp.w, h: rp.h + rootStem }];
+    const rootNote = !horiz ? noteOf(parent) : null;
+    if (rootNote) olds.push({ x: -rootNote.w / 2, y: rp.y + rp.h + NOTE_GAP, w: rootNote.w, h: rootNote.h });
+    recordRuns(parent, list, horiz ? "down" : "right");
+    let prevEnd = horiz ? rp.x + rp.w : rp.y + rp.h + rootStem;
+    type Open = { g: MindNode; rect: Bounds | null };
+    // 只在下面的闭包里改：写成 as，免得 TS 把它收窄成 null
+    let curBox = null as Open | null;
+    let curSum = null as Open | null;
+    /** 一个外框的成员排完了：整个框（连同留白、标题）当成一块已经放好的部分 */
+    function closeBox(): void {
+      if (curBox?.rect) {
+        const r = curBox.rect;
+        const top = boxTop(curBox.g);
+        olds.push({ x: r.x - BOX_PAD, y: r.y - top, w: r.w + 2 * BOX_PAD, h: r.h + top + BOX_PAD });
+      }
+      curBox = null;
+    }
+    /** 一个概要的成员排完了：括号和文字（或概要主题）在横向时画在下面、纵向时画在右边，占的那块也让出来 */
+    function closeSum(): void {
+      if (curSum?.rect) {
+        const r = curSum.rect;
+        const sub = topicLayout(curSum.g, horiz);
+        const ls = sub ? { w: sub.bounds.w, h: sub.bounds.h } : (measureSummary?.(curSum.g) ?? { w: 0, h: 0 });
+        const reach = SUMMARY_GAP + BRACE_W + SUMMARY_LABEL_GAP;
+        olds.push(horiz ? { x: r.x, y: r.y + r.h, w: Math.max(r.w, ls.w), h: reach + ls.h + BOX_PAD } : { x: r.x + r.w, y: r.y, w: reach + ls.w + BOX_PAD, h: Math.max(r.h, ls.h) });
+      }
+      curSum = null;
+    }
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const other = alt && i % 2 === 1;
+      const up = horiz && other;
+      const mirror = !horiz && (s === "timeline-v-left" || other);
+      const sub = layoutTree(c, measure, { ...opts, structure: horiz ? "tree-right" : "logic-right", gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+      const own = (n: MindNode) => n === c;
+      const mx = (x: number, w: number) => (mirror ? -(x + w) : x);
+      const m = sub.placed.get(c.id)!;
+      // 主主题自己连同它的标注、备注
+      let mainPart: Bounds | null = { x: mx(m.x, m.w), y: m.y, w: m.w, h: m.h };
+      for (const x of sub.callouts) if (own(x.node)) mainPart = union(mainPart, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      for (const x of sub.notes) if (own(x.node)) mainPart = union(mainPart, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      // 分支里其余的部分
+      let rest: Bounds | null = null;
+      for (const p of sub.placed.values()) if (!own(p.node)) rest = union(rest, { x: mx(p.x, p.w), y: p.y, w: p.w, h: p.h });
+      for (const x of [...sub.callouts, ...sub.notes]) if (!own(x.node)) rest = union(rest, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      for (const x of sub.boxes) rest = union(rest, { x: mx(x.x, x.w), y: x.y, w: x.w, h: x.h });
+      for (const x of sub.summaries) {
+        rest = union(rest, { x: mx(x.brace.x, x.brace.w), y: x.brace.y, w: x.brace.w, h: x.brace.h });
+        if (x.label) rest = union(rest, { x: mx(x.label.x, x.label.w), y: x.label.y, w: x.label.w, h: x.label.h });
+      }
+      // 朝上长：分支整块挪到主主题上面，阅读顺序不变（仍是从上往下）
+      const restDy = up && rest && mainPart ? mainPart.y - opts.gapLevel - (rest.y + rest.h) : 0;
+      if (rest) rest = { ...rest, y: rest.y + restDy };
+      const parts = [mainPart!, ...(rest ? [rest] : [])];
+      // 套着主主题的外框：成员四周留出外框的留白（顶上还有标题），框外面的概要另占一块，后面的分支都要让开
+      const g = groupOf(c);
+      const sg = summaryOf(c);
+      if (g !== curBox?.g) closeBox();
+      if (sg !== curSum?.g) closeSum();
+      const pad = (q: Bounds): Bounds => {
+        let r = q;
+        if (sg) r = { x: r.x - SUMMARY_GAP, y: r.y - SUMMARY_GAP, w: r.w + 2 * SUMMARY_GAP, h: r.h + 2 * SUMMARY_GAP };
+        if (g) r = { x: r.x - BOX_PAD, y: r.y - boxTop(g), w: r.w + 2 * BOX_PAD, h: r.h + boxTop(g) + BOX_PAD };
+        return r;
+      };
+      const probe = parts.map(pad);
+      // 沿主轴的偏移：主主题跟在上一个后面，每一块都排到和它有交叠的旧块后面
+      const mainRect = { x: mx(m.x, m.w), y: m.y, w: m.w, h: m.h };
+      let off = horiz ? prevEnd + gap - mainRect.x : prevEnd + gap - mainRect.y;
+      for (const o of olds) {
+        for (const q of probe) {
+          if (horiz) {
+            if (q.y < o.y + o.h + cross && o.y < q.y + q.h + cross) off = Math.max(off, o.x + o.w + gap - q.x);
+          } else if (q.x < o.x + o.w + cross && o.x < q.x + q.w + cross) off = Math.max(off, o.y + o.h + gap - q.y);
+        }
+      }
+      const dx = horiz ? off : 0;
+      const dy = horiz ? 0 : off;
+      const flip = (side: Side): Side => (mirror && side === "right" ? "left" : side);
+      const at = (b: Bounds, n?: MindNode): Bounds => ({ x: mx(b.x, b.w) + dx, y: b.y + dy + (n && own(n) ? 0 : restDy), w: b.w, h: b.h });
+      for (const p of sub.placed.values()) {
+        let side: Side;
+        if (own(p.node)) side = horiz ? (up ? "up" : "down") : mirror ? "left" : "right";
+        else side = up && p.node.parent === c ? "tree-up" : flip(p.side);
+        placed.set(p.node.id, { ...p, ...at(p, p.node), side });
+      }
+      for (const x of sub.callouts) addCallout(x.node, at(x, x.node), x.dir);
+      for (const x of sub.notes) addNote(x.node, at(x, x.node), x.far);
+      for (const x of sub.boxes) branchBoxes.push({ ...x, ...at(x), side: flip(x.side) });
+      let extra: Bounds | null = null;
+      for (const x of sub.boxes) extra = union(extra, at(x));
+      for (const x of sub.summaries) {
+        branchSummaries.push({ ...x, side: flip(x.side), brace: { ...x.brace, ...at(x.brace) }, label: x.label && { ...x.label, ...at(x.label) } });
+        extra = union(union(extra, at(x.brace)), x.label ? at(x.label) : null);
+      }
+      if (extra) branchExtra.set(c.id, extra);
+      let whole: Bounds | null = null;
+      for (const q of parts) {
+        const moved = { ...q, x: q.x + dx, y: q.y + dy };
+        olds.push(moved);
+        whole = union(whole, moved);
+      }
+      if (g) curBox = { g, rect: union(curBox?.rect ?? null, whole) };
+      if (sg) curSum = { g: sg, rect: union(curSum?.rect ?? null, whole) };
+      const mp = placed.get(c.id)!;
+      segs.set(c.id, horiz ? { x1: prevEnd, y1: 0, x2: mp.x, y2: 0 } : { x1: 0, y1: prevEnd, x2: 0, y2: mp.y });
+      prevEnd = horiz ? mp.x + mp.w : mp.y + mp.h;
+    }
+    closeBox();
+    closeSum();
+    const tail = Math.max(24, Math.round(gap * 0.75));
+    return { segs, end: horiz ? { x1: prevEnd, y1: 0, x2: prevEnd + tail, y2: 0 } : { x1: 0, y1: prevEnd, x2: 0, y2: prevEnd + tail } };
   }
 
   // ---- 水平结构：子树高度自底向上，子节点垂直堆叠并对父节点居中 ----
@@ -582,18 +756,19 @@ export function layoutTree(
 
   // 外框自底向上：子树范围（含里层外框）外扩留白
   const boxes: PlacedBox[] = [];
-  const union = (a: Bounds | null, b: Bounds | null): Bounds | null => {
+  // 函数声明（会提升）：时间轴排布在它前面就要用
+  function union(a: Bounds | null, b: Bounds | null): Bounds | null {
     if (!a) return b;
     if (!b) return a;
     const x = Math.min(a.x, b.x);
     const y = Math.min(a.y, b.y);
     return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
-  };
+  }
   const subtree = new Map<string, Bounds | null>();
   function boundsOf(n: MindNode): Bounds | null {
     const p = placed.get(n.id);
     if (!p) return null;
-    let b: Bounds | null = union(union({ x: p.x, y: p.y, w: p.w, h: p.h }, calloutRects.get(n.id) ?? null), noteRects.get(n.id) ?? null);
+    let b: Bounds | null = union(union(union({ x: p.x, y: p.y, w: p.w, h: p.h }, calloutRects.get(n.id) ?? null), noteRects.get(n.id) ?? null), branchExtra.get(n.id) ?? null);
     for (const c of visibleChildren(n)) {
       const cb = boundsOf(c);
       subtree.set(c.id, cb);
@@ -709,10 +884,16 @@ export function layoutTree(
   // 根节点的备注：组织结构图居中、树形图左对齐，直接挂在下面（子节点已经让开了）
   const rootNo = noteOf(root);
   if (rootNo && vertical) {
-    const nx = opts.structure === "org-down" ? -rootNo.w / 2 : -rs.w / 2;
+    const nx = opts.structure === "org-down" || isTimeline(opts.structure) ? -rootNo.w / 2 : -rs.w / 2;
     addNote(root, { x: nx, y: rs.h / 2 + noteLift(root) + NOTE_GAP, w: rootNo.w, h: rootNo.h });
   }
   let all = boundsOf(root) ?? { x: 0, y: 0, w: 0, h: 0 };
+  // 时间轴各分支里的外框、概要：里层的排在前面（boxes 由内向外）
+  if (branchBoxes.length) boxes.unshift(...branchBoxes);
+  summaries.push(...branchSummaries);
+  for (const b of branchBoxes) all = union(all, b)!;
+  for (const sm of branchSummaries) all = union(union(all, sm.brace), sm.label)!;
+  if (spine?.end) all = union(all, { x: Math.min(spine.end.x1, spine.end.x2), y: Math.min(spine.end.y1, spine.end.y2), w: Math.abs(spine.end.x2 - spine.end.x1), h: Math.abs(spine.end.y2 - spine.end.y1) })!;
   if (rootCo && opts.structure !== "org-down" && opts.structure !== "tree-right") {
     const wide = rootCo.w > rs.w && all.y < -rs.h / 2 - CALLOUT_GAP;
     const bottom = wide ? all.y : -rs.h / 2;
@@ -729,7 +910,7 @@ export function layoutTree(
     addNote(root, rect, far);
     all = union(all, rect)!;
   }
-  return { placed, boxes, summaries, callouts, notes, bounds: all };
+  return { placed, boxes, summaries, callouts, notes, bounds: all, ...(spine ? { spine } : {}) };
 }
 
 /**
@@ -808,6 +989,10 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
         x2: child.x,
         y2: child.y + child.h / 2,
       };
+    case "up":
+      return { parent, child, x1: parent.x + parent.w / 2, y1: parent.y, x2: child.x + child.w / 2, y2: child.y + child.h };
+    case "tree-up":
+      return { parent, child, x1: parent.x + Math.min(TREE_INDENT / 2, parent.w / 2), y1: parent.y, x2: child.x, y2: child.y + child.h / 2 };
   }
 }
 
@@ -815,8 +1000,9 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
 /** radius：折线拐角的圆角半径，0 为尖角 */
 export function edgePath(e: EdgeGeometry, style: "curve" | "elbow" | "straight", radius = 8): string {
   if (e.child.side === "tree") return treePath(e, radius);
+  if (e.child.side === "tree-up") return treeUpPath(e, radius);
   if (style === "straight") return `M${r(e.x1)},${r(e.y1)} L${r(e.x2)},${r(e.y2)}`;
-  if (e.child.side === "down") return style === "curve" ? curvePathVertical(e) : elbowPathVertical(e, radius);
+  if (e.child.side === "down" || e.child.side === "up") return style === "curve" ? curvePathVertical(e) : elbowPathVertical(e, radius);
   return style === "curve" ? curvePath(e) : elbowPath(e, radius);
 }
 
@@ -870,6 +1056,12 @@ export function elbowPathVertical(e: EdgeGeometry, radius = 8): string {
 export function treePath(e: EdgeGeometry, radius = 8): string {
   const rad = Math.min(radius, Math.max(0, e.y2 - e.y1) / 2, Math.max(0, e.x2 - e.x1) / 2);
   return [`M${r(e.x1)},${r(e.y1)}`, `L${r(e.x1)},${r(e.y2 - rad)}`, `Q${r(e.x1)},${r(e.y2)} ${r(e.x1 + rad)},${r(e.y2)}`, `L${r(e.x2)},${r(e.y2)}`].join(" ");
+}
+
+/** 时间轴里朝上长的分支：竖干从主主题顶边往上，到子节点的高度后转向右进入 */
+export function treeUpPath(e: EdgeGeometry, radius = 8): string {
+  const rad = Math.min(radius, Math.max(0, e.y1 - e.y2) / 2, Math.max(0, e.x2 - e.x1) / 2);
+  return [`M${r(e.x1)},${r(e.y1)}`, `L${r(e.x1)},${r(e.y2 + rad)}`, `Q${r(e.x1)},${r(e.y2)} ${r(e.x1 + rad)},${r(e.y2)}`, `L${r(e.x2)},${r(e.y2)}`].join(" ");
 }
 
 function r(n: number): string {

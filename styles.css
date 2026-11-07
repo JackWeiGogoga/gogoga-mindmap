@@ -1181,6 +1181,21 @@
   height: 10px;
   margin: 0 0 0 -0.75px;
 }
+/* 横向时间轴里朝上长的分支：折叠按钮在主主题上面 */
+.gg-mm-node[data-side="up"] .mm-toggle {
+  left: 50%;
+  top: auto;
+  bottom: 100%;
+  transform: translate(-50%, -10px);
+}
+.gg-mm-node[data-side="up"] .mm-toggle::before {
+  right: auto;
+  left: 50%;
+  top: 100%;
+  width: 1.5px;
+  height: 10px;
+  margin: 0 0 0 -0.75px;
+}
 .mm-drop-indicator.is-vertical { width: 4px; height: 40px; }
 .gg-mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
 .gg-mm-root button.mm-menu-item.is-active::before { content: "✓"; }
