@@ -619,6 +619,8 @@ export class MindMapCanvas {
   private noteRo: ResizeObserver | null = null;
   /** 节点框里的表格（%%table%%）：按节点 id 记着编辑器和它显示的那张表的 Markdown */
   private tableEds = new Map<string, { ed: TableEditor; src: string; node: MindNode }>();
+  /** 这一轮渲染里节点编号 → 节点（事件里按编号现查当前的节点；按元素找节点也用它） */
+  private nodeById = new Map<string, MindNode>();
   /** 正在拖右下角改大小的那条备注：松手前还没记进 cardState，重新布局时按它来，不然会被改回旧尺寸、一闪一闪 */
   private cardDrag: { id: string; size: NoteCardState } | null = null;
 
@@ -1365,7 +1367,11 @@ export class MindMapCanvas {
     const prev = this.els;
     const next = new Map<string, HTMLElement>();
 
+    this.nodeById.clear();
     const visit = (node: MindNode) => {
+      this.nodeById.set(node.id, node);
+      // 事件里用的节点按编号现查：重新解析后没变的节点沿用编号、DOM 留着，事件绑定时的 node 已经不在树里了
+      const live = (): MindNode => this.nodeById.get(node.id) ?? node;
       const rel = node.depth - base.depth;
       const branch = theme.branchColors ? branchOf.get(node.id) : undefined;
       // 内容签名管子节点，整体签名再叠上纯表现的部分（选中、配色、层级）；
@@ -1387,6 +1393,8 @@ export class MindMapCanvas {
       const reused = prev.get(node.id);
       if (reused && this.elSigs.get(reused) === sig) {
         next.set(node.id, reused);
+        // 外观没变也要把当前的表交给节点里的表格（Markdown 里改了格子、或者节点对象重新解析换了）
+        if (nt) this.syncTable(node, nt.table);
         for (const c of visibleChildren(node)) visit(c);
         for (const t of visibleTopics(node)) visit(t);
         return;
@@ -1449,7 +1457,8 @@ export class MindMapCanvas {
           onTaskToggle: () => {
             // 背诵模式下勾选框是题目的答案，点了不能改
             if (!this.opts.editable || this.recite) return;
-            node.text = toggleTask(node.text);
+            const n = live();
+            n.text = toggleTask(n.text);
             this.render();
             this.notify();
           },
@@ -1470,7 +1479,7 @@ export class MindMapCanvas {
             activate.addEventListener("pointerdown", (ev) => ev.stopPropagation());
             activate.addEventListener("click", (ev) => {
               ev.stopPropagation();
-              this.select(node);
+              this.select(live());
               this.positionNodebar();
               this.setLiveFrame(node.id);
             });
@@ -1508,8 +1517,8 @@ export class MindMapCanvas {
         n.addEventListener("click", (ev) => {
           ev.stopPropagation();
           // 展开备注时图标管这一条的收起 / 展开；收起时还是弹窗看
-          if (this.notesExpanded) this.toggleNoteCard(node);
-          else this.toggleNotePopover(node);
+          if (this.notesExpanded) this.toggleNoteCard(live());
+          else this.toggleNotePopover(live());
         });
         el.append(n);
       }
@@ -1522,7 +1531,8 @@ export class MindMapCanvas {
         c.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         c.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          this.peekCallout = this.peekCallout === node ? null : node;
+          const n = live();
+          this.peekCallout = this.peekCallout?.id === n.id ? null : n;
           this.reflow();
         });
         el.append(c);
@@ -1538,7 +1548,7 @@ export class MindMapCanvas {
         toggle.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         toggle.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          this.toggleFold(node);
+          this.toggleFold(live());
         });
         el.append(toggle);
       }
@@ -4535,6 +4545,8 @@ export class MindMapCanvas {
   private nodeFromEl(el: HTMLElement): MindNode | null {
     const id = el.dataset.id;
     if (!id || !this.doc) return null;
+    const hit = this.nodeById.get(id);
+    if (hit) return hit;
     let found: MindNode | null = null;
     walkMap(this.doc.root, (n) => {
       if (n.id === id) found = n;
@@ -6335,6 +6347,8 @@ export class MindMapCanvas {
         {
           title: t("menu.insertGroup"),
           icon: "between-horizontal-start",
+          // 概要主题跟着括住的范围走，前后插不了，也不放表格
+          disabled: topic,
           submenu: [
             { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", disabled: !node.parent || topic, run: () => this.addSiblingToSelected(true) },
             { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent || topic, run: () => this.insertParentForSelected() },
@@ -7191,7 +7205,10 @@ export class MindMapCanvas {
   }
 
   /** 在节点里（标题下面）挂一张表格编辑器 */
-  private mountTable(node: MindNode, el: HTMLElement, table: Table): void {
+  private mountTable(first: MindNode, el: HTMLElement, table: Table): void {
+    // 节点沿用编号重新解析后对象会换：事件里按编号取当前的
+    const id = first.id;
+    const live = (): MindNode => this.nodeById.get(id) ?? this.tableEds.get(id)?.node ?? first;
     const wrap = el.createDiv({ cls: "mm-node-table" });
     const editable = this.opts.editable && !this.recite;
     // 表格里的按键、粘贴、双击、右键归表格自己，不能冒泡到画布（画布会当成节点快捷键、新建节点、编辑标题）
@@ -7208,7 +7225,10 @@ export class MindMapCanvas {
         if (this.editing) this.commitEdit();
         this.closePopover();
         // 节点还没选中就顺手选中它（工具栏、右键菜单照常）
-        if (!(this.selected.size === 1 && this.selected.has(node))) this.select(node, "replace");
+        {
+          const node = live();
+          if (!(this.selected.size === 1 && this.selected.has(node))) this.select(node, "replace");
+        }
         this.positionNodebar();
       },
       true,
@@ -7221,12 +7241,13 @@ export class MindMapCanvas {
     const tableHost: EditorHost = {
       renderMarkdown: host?.renderNote ? (cell, md) => host.renderNote!(cell, md) : undefined,
       setIcon: host?.setIcon,
-      onChange: (next) => this.onTableEdit(node, next),
+      onChange: (next) => this.onTableEdit(live(), next),
       undo: () => this.opts.onUndo?.(),
       redo: () => this.opts.onRedo?.(),
       // Esc、从第一行往上、最后一行往下：回到画布，节点还选着，方向键接着在节点之间走
       onLeave: () => {
         this.el.focus({ preventScroll: true });
+        const node = live();
         if (!this.selected.has(node)) this.select(node, "replace");
       },
       suggestLinks: host?.listLinkTargets
@@ -7245,10 +7266,10 @@ export class MindMapCanvas {
         : undefined,
       readonly: !editable,
       // 表格左上角菜单里的「删除表格」：只删表格，节点留着
-      onDeleteTable: editable ? () => this.deleteNodeTable(node) : undefined,
+      onDeleteTable: editable ? () => this.deleteNodeTable(live()) : undefined,
     };
     const ed = new TableEditor(wrap, table, tableHost);
-    this.tableEds.set(node.id, { ed, src: tableSource(table), node });
+    this.tableEds.set(id, { ed, src: tableSource(table), node: first });
     // 格子里的图片、公式渲染完会变高：节点跟着重新排
     this.noteRo?.observe(wrap);
   }
@@ -7257,6 +7278,7 @@ export class MindMapCanvas {
   private syncTable(node: MindNode, table: Table): void {
     const e = this.tableEds.get(node.id);
     if (!e) return;
+    e.node = node;
     const src = tableSource(table);
     if (e.src === src) return;
     e.src = src;

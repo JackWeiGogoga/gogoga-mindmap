@@ -908,3 +908,26 @@ export function numberLabel(node: MindNode): string | null {
   const i = kids.indexOf(node);
   return i < 0 ? null : `${numberStart(p) + i}.`;
 }
+
+/**
+ * 重新解析后（Markdown 里改了、撤销、外部改动），把新树里没变的节点对上旧树，沿用旧的编号：
+ * 画布按编号复用节点的 DOM，只有真正改了的节点重建，几千个节点的笔记打字时不用整张重画。
+ * 从根往下一层层对：同一层里种类和文字都一样的按顺序配对，配上的再往下对它的子节点
+ */
+export function adoptIds(prev: MindNode, next: MindNode): void {
+  const key = (n: MindNode) => n.kind + "\u0001" + n.text;
+  const match = (a: MindNode, b: MindNode) => {
+    b.id = a.id;
+    const pool = new Map<string, MindNode[]>();
+    for (const c of fileChildren(a)) {
+      const list = pool.get(key(c));
+      if (list) list.push(c);
+      else pool.set(key(c), [c]);
+    }
+    for (const c of fileChildren(b)) {
+      const old = pool.get(key(c))?.shift();
+      if (old) match(old, c);
+    }
+  };
+  match(prev, next);
+}

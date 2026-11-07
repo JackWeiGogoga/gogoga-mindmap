@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- Smoother with big notes: when you type in the Markdown beside the map, undo, or the file changes elsewhere, the map redraws only the nodes that changed instead of rebuilding every node. For a 3000-line note with over a thousand nodes, each sync drops from about 80 ms to about 25 ms.
+
 ### Fixed
 - After moving a node in the map, its old spot in the Markdown could be left with a long run of blank lines (most visible when the note already had several blank lines in a row; the longer the moved content, the more blank lines). The old spot is now left clean, and the seam never has more blank lines in a row than the note already did.
 

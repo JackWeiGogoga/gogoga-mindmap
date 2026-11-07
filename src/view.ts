@@ -10,7 +10,7 @@ import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
 import { frontmatterValue, parseMarkdown, parseNodeColors, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
-import { pathOf, walk, type MindDoc } from "./model";
+import { pathOf, walk, type MindDoc, adoptIds } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import type MindMapPlugin from "./main";
@@ -495,7 +495,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     }
     this.disk = data;
     this.data = this.local = data;
+    const prev = this.doc;
     this.doc = this.parseText(data);
+    // 内容变了（不是打开文件）：没变的节点沿用编号，画布只重建改了的
+    if (!clear && prev) adoptIds(prev.root, this.doc.root);
     this.lastFolds = foldedSignature(this.doc);
     this.applyFrontmatterOptions(this.doc);
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
@@ -644,7 +647,9 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   private reparse(): void {
+    const prev = this.doc;
     this.doc = this.parseText(this.data);
+    if (prev) adoptIds(prev.root, this.doc.root);
     this.applyFrontmatterOptions(this.doc);
     this.canvas?.setDoc(this.doc);
   }
