@@ -40,6 +40,8 @@ export interface MindMapSettings {
   hideSyntax: boolean;
   /** Markdown 笔记的实时预览里藏起颜色、荧光笔、下划线的 HTML 标签，直接显示效果（默认关） */
   hideTagsInNotes: boolean;
+  /** 脑图笔记的实时预览里，行尾的 %%…%% 节点标记缩成小灰点（默认关） */
+  hideMarkersInNotes: boolean;
   /** 悬停在节点右边缘就能调宽度（默认关） */
   widthHandleOnHover: boolean;
   /** 新建的节点自带名字「主题1」，不写字也留着（默认关） */
@@ -186,6 +188,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   centerOnSelect: false,
   hideSyntax: false,
   hideTagsInNotes: false,
+  hideMarkersInNotes: false,
   widthHandleOnHover: false,
   newNodeName: false,
   autoNumber: false,
@@ -280,6 +283,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "strikeDoneTasks":
         return p.applyDisplayScale(false);
       case "hideTagsInNotes":
+      case "hideMarkersInNotes":
         return p.applyNoteTags();
       case "foldFollow":
         if (value) p.syncFolds();
@@ -339,6 +343,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
         toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
         toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),
+        toggle("hideMarkersInNotes", t("settings.hideMarkersInNotes.name"), t("settings.hideMarkersInNotes.desc"), ["%%", "marker", "comment", "标记", "注释"]),
         toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
         toggle("newNodeName", t("settings.newNodeName.name"), t("settings.newNodeName.desc"), ["new node", "新建", "默认名字", "主题1"]),
         toggle("autoNumber", t("settings.autoNumber.name"), t("settings.autoNumber.desc"), ["number", "编号", "序号", "有序列表"]),

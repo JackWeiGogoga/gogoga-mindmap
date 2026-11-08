@@ -26,6 +26,8 @@ import {
   TFolder,
   WorkspaceLeaf,
   ViewState,
+  editorInfoField,
+  editorLivePreviewField,
 } from "obsidian";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
@@ -52,6 +54,7 @@ import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
 import { noteTagsExtension } from "./note-tags";
+import { noteMarkersExtension } from "./note-markers";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -335,6 +338,16 @@ export default class MindMapPlugin extends Plugin {
   applyNoteTags(refresh = true): void {
     this.noteTagExt.length = 0;
     if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());
+    if (this.settings.hideMarkersInNotes) {
+      // 只在实时预览、只在脑图笔记（frontmatter 有 mindmap）里
+      this.noteTagExt.push(
+        noteMarkersExtension((s) => {
+          if (!s.field(editorLivePreviewField, false)) return false;
+          const path = s.field(editorInfoField, false)?.file?.path;
+          return !!path && this.isMindMapFile(path);
+        }),
+      );
+    }
     if (refresh) this.app.workspace.updateOptions();
   }
 
