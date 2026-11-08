@@ -7,7 +7,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Added
 - Underline: press ⌘U (Ctrl+U) while editing a node or with nodes selected, click U in the format bar, or use the command "Underline the selected text". Saved as `<u>text</u>`, which nodes now display as underlined text.
 - **Hide format tags in notes** setting (off by default): in a Markdown note's Live Preview, clicking into colored, highlighted or underlined text no longer reveals the whole `<span style=…>`, `<mark style=…>` or `<u>` tag; the formatting keeps showing, as in the node editor, and deleting or typing next to it keeps the tags paired. Source mode, code blocks, math and frontmatter are left alone.
-- **Node markers in notes** setting: in mind map notes opened as Markdown, the `%%…%%` marker at the end of a line (colors, folding, relationships…) can show as is (default), shrink to a small gray dot (hover to see it, click to edit it) or be hidden completely in Live Preview. While hidden, typing, Enter, Backspace and joining lines keep the marker at the end of the line so nothing is lost; ordinary comments are left alone.
+- **Node markers in notes** setting: in mind map notes opened as Markdown, the `%%…%%` marker at the end of a line (colors, folding, relationships…) can show as is (default), shrink to a small gray dot (hover to see it, click to edit it) or be hidden completely in Live Preview; a heading's marker line takes no space and its dot goes at the end of the heading. While hidden, typing, Enter, Backspace and joining lines keep the marker in place, deleting a whole line deletes its marker, and moving a heading line takes its marker line along, so nothing is lost; ordinary comments are left alone.
 
 ## [0.54.0] - 2026-11-08
 

@@ -1,9 +1,8 @@
 /** 「笔记里的脑图节点标记」的显示部分：藏着的标记画成一个小灰点（悬停看原文，点一下露出原文），或者什么都不画（规则见 note-markers-core） */
 
-import { type EditorState, type Extension, type Range } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, WidgetType } from "@codemirror/view";
-import { fencedLines } from "./fence";
-import { markerGuards, markerInLine, revealedMarker } from "./note-markers-core";
+import { type EditorState, type Extension, type Range, StateField } from "@codemirror/state";
+import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import { allHidden, markerGuards } from "./note-markers-core";
 
 class MarkerDot extends WidgetType {
   constructor(
@@ -48,46 +47,23 @@ class HiddenMarker extends WidgetType {
 }
 const NOTHING = Decoration.replace({ widget: new HiddenMarker() });
 
-function build(view: EditorView, mode: "dot" | "hide", active: (s: EditorState) => boolean): { deco: DecorationSet; atomic: DecorationSet } {
+function build(state: EditorState, mode: "dot" | "hide", active: (s: EditorState) => boolean): DecorationSet {
+  if (!active(state)) return Decoration.none;
   const deco: Range<Decoration>[] = [];
-  const st = view.state;
-  if (active(st)) {
-    const doc = st.doc;
-    const ranges = view.visibleRanges;
-    const skip = ranges.length ? fencedLines((i) => doc.line(i + 1).text, doc.lineAt(ranges[ranges.length - 1].to).number) : [];
-    for (const { from, to } of ranges) {
-      for (let pos = from; pos <= to; ) {
-        const line = doc.lineAt(pos);
-        pos = line.to + 1;
-        if (skip[line.number - 1]) continue;
-        const r = markerInLine(line.text, line.from);
-        if (!r || revealedMarker(r, st.selection)) continue;
-        const raw = doc.sliceString(r.from, r.to);
-        deco.push((mode === "hide" ? NOTHING : Decoration.replace({ widget: new MarkerDot(raw, r.inner - r.from) })).range(r.from, r.to));
-      }
-    }
+  for (const r of allHidden(state)) {
+    const raw = state.doc.sliceString(r.from, r.to).trim();
+    deco.push((mode === "hide" ? NOTHING : Decoration.replace({ widget: new MarkerDot(raw, r.inner - r.from) })).range(r.from, r.to));
   }
-  const set = Decoration.set(deco, true);
-  return { deco: set, atomic: set };
+  return Decoration.set(deco, true);
 }
 
-/** mode：dot 画成小圆点（点一下露出原文）；hide 什么都不画。两种都一样防改坏 */
+/** mode：dot 画成小圆点（点一下露出原文）；hide 什么都不画。两种都一样防改坏。
+ * 标题下面的标记行要连换行一起藏，跨行的替换只能由 StateField 提供（ViewPlugin 不行） */
 export function noteMarkersExtension(mode: "dot" | "hide", active: (s: EditorState) => boolean): Extension {
-  const plugin = ViewPlugin.fromClass(
-    class {
-      deco: DecorationSet;
-      atomic: DecorationSet;
-      constructor(view: EditorView) {
-        ({ deco: this.deco, atomic: this.atomic } = build(view, mode, active));
-      }
-      update(u: ViewUpdate) {
-        if (u.docChanged || u.viewportChanged || u.selectionSet || active(u.state) !== active(u.startState)) ({ deco: this.deco, atomic: this.atomic } = build(u.view, mode, active));
-      }
-    },
-    {
-      decorations: (v) => v.deco,
-      provide: (p) => EditorView.atomicRanges.of((view) => view.plugin(p)?.atomic ?? Decoration.none),
-    },
-  );
-  return [plugin, markerGuards(active)];
+  const field = StateField.define<DecorationSet>({
+    create: (state) => build(state, mode, active),
+    update: (deco, tr) => (tr.docChanged || tr.selection || active(tr.state) !== active(tr.startState) ? build(tr.state, mode, active) : deco),
+    provide: (f) => [EditorView.decorations.from(f), EditorView.atomicRanges.of((view) => view.state.field(f))],
+  });
+  return [field, markerGuards(active)];
 }
