@@ -88,8 +88,14 @@ export interface Relation {
   to: string;
   /** 线上的文字，行内 Markdown，不能含 " 和 %%；没有就是空串 */
   label: string;
-  /** 线的弯曲：弧顶相对两个节点中心连线中点的偏移（px）；没拖过就按默认弯法 */
+  /** 线的弯曲（旧写法，一个控制点）：弧顶相对两个节点中心连线中点的偏移（px）；没拖过就按默认弯法 */
   c?: { x: number; y: number };
+  /**
+   * 两个控制点（#28，拖过手柄后用它，c 不再用）：c1 相对起点节点中心、c2 相对终点节点中心的偏移（px），
+   * 节点挪动时控制点跟着各自的节点走。%%rel=x c1=40,-60 c2=-40,-60%%
+   */
+  c1?: { x: number; y: number };
+  c2?: { x: number; y: number };
 }
 
 export interface FloatPos {

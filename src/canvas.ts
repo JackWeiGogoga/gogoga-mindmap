@@ -527,6 +527,11 @@ export function findSubpathNode(root: MindNode, subpath: string): MindNode | nul
   return target;
 }
 
+/** 关联线的两个控制点（#28）；没有就是一个控制点或默认弯法 */
+function relCubic(rel: Relation): { c1: { x: number; y: number }; c2: { x: number; y: number } } | undefined {
+  return rel.c1 && rel.c2 ? { c1: rel.c1, c2: rel.c2 } : undefined;
+}
+
 export class MindMapCanvas {
   readonly el: HTMLElement;
   private viewport: HTMLElement;
@@ -1797,7 +1802,7 @@ export class MindMapCanvas {
    * 每条关联线的元素（看得见的线、加宽的透明点击区、箭头、线上的文字），按「起点节点 id:序号」复用。
    * 线在连线层里（压在节点下面），文字在节点层里，导出时跟着一起走
    */
-  private relEls = new Map<string, { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement }>();
+  private relEls = new Map<string, { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement; guides: SVGPathElement; handles: [HTMLElement, HTMLElement] }>();
   private relOf = new WeakMap<Element, { src: MindNode; rel: Relation }>();
   /** 单击选中的那条线：高亮、出现拖弯曲的手柄，Delete 删掉 */
   private activeRel: Relation | null = null;
@@ -1829,7 +1834,7 @@ export class MindMapCanvas {
         }
         this.relOf.set(r.hit, { src, rel });
         this.relOf.set(r.label, { src, rel });
-        const geo = relGeometry(a, b, rel.c);
+        const geo = relGeometry(a, b, rel.c, relCubic(rel));
         if (r.line.getAttribute("d") !== geo.d) {
           r.line.setAttribute("d", geo.d);
           r.hit.setAttribute("d", geo.d);
@@ -1845,17 +1850,28 @@ export class MindMapCanvas {
         r.label.classList.toggle("is-active", active);
         r.label.style.left = `${round2(geo.top.x)}px`;
         r.label.style.top = `${round2(geo.top.y)}px`;
+        // 选中的线：两头各一个控制点手柄，用细线连到线头（#28）
+        const handles = active && !!this.opts.editable;
+        r.g.classList.toggle("has-handles", handles);
+        r.guides.setAttribute("d", handles ? `M${round2(geo.s.x)},${round2(geo.s.y)} L${round2(geo.h1.x)},${round2(geo.h1.y)} M${round2(geo.e.x)},${round2(geo.e.y)} L${round2(geo.h2.x)},${round2(geo.h2.y)}` : "");
+        [geo.h1, geo.h2].forEach((h, j) => {
+          const el = r!.handles[j];
+          el.classList.toggle("is-shown", handles);
+          el.style.left = `${round2(h.x)}px`;
+          el.style.top = `${round2(h.y)}px`;
+        });
       });
     });
     for (const [key, r] of this.relEls) {
       if (seen.has(key)) continue;
       r.g.remove();
       r.label.remove();
+      r.handles.forEach((h) => h.remove());
       this.relEls.delete(key);
     }
   }
 
-  private createRel(): { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement } {
+  private createRel(): { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement; guides: SVGPathElement; handles: [HTMLElement, HTMLElement] } {
     const g = createSvg("g");
     g.setAttribute("class", "mm-rel");
     const line = createSvg("path");
@@ -1864,12 +1880,32 @@ export class MindMapCanvas {
     arrow.setAttribute("class", "mm-rel-arrow");
     const hit = createSvg("path");
     hit.setAttribute("class", "mm-rel-hit");
-    g.append(line, arrow, hit);
+    const guides = createSvg("path");
+    guides.setAttribute("class", "mm-rel-guide");
+    g.append(line, arrow, hit, guides);
     this.relLayer.append(g);
     const label = createDiv({ cls: "mm-rel-label" });
     this.nodesEl.append(label);
+    const handles: [HTMLElement, HTMLElement] = [createDiv({ cls: "mm-rel-handle" }), createDiv({ cls: "mm-rel-handle" })];
+    handles.forEach((h, j) => {
+      h.dataset.end = j === 0 ? "start" : "end";
+      this.nodesEl.append(h);
+      h.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation();
+        const r = this.relOf.get(label);
+        if (!r || ev.button !== 0) return;
+        ev.preventDefault();
+        this.el.focus({ preventScroll: true });
+        this.dragRelHandle(r.src, r.rel, j as 0 | 1, h, ev);
+      });
+      h.addEventListener("click", (ev) => ev.stopPropagation());
+    });
     const info = (el: Element) => this.relOf.get(el) ?? null;
-    hit.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    // 点线、拖文字和手柄都把键盘焦点给画布：之后按 ⌘Z、Delete 才作用在脑图上
+    hit.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      this.el.focus({ preventScroll: true });
+    });
     hit.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const r = info(hit);
@@ -1894,6 +1930,7 @@ export class MindMapCanvas {
       const r = info(label);
       if (!r || this.editingRel === r.rel || ev.button !== 0) return;
       ev.preventDefault();
+      this.el.focus({ preventScroll: true });
       this.dragRelCurve(r.src, r.rel, label, ev);
     });
     label.addEventListener("click", (ev) => ev.stopPropagation());
@@ -1910,7 +1947,7 @@ export class MindMapCanvas {
       this.activateRel(r.rel);
       this.showContextMenu(this.relMenuEntries(r.src, r.rel), ev);
     });
-    return { g, line, hit, arrow, label };
+    return { g, line, hit, arrow, label, guides, handles };
   }
 
   private activateRel(rel: Relation | null): void {
@@ -1930,7 +1967,10 @@ export class MindMapCanvas {
     const geo = this.relGeoOf(src, rel);
     if (!geo) return;
     const from = { ...geo.c };
-    const before = rel.c && { ...rel.c };
+    const before = JSON.stringify([rel.c, rel.c1, rel.c2]);
+    const cubic = relCubic(rel);
+    const c1 = cubic && { ...cubic.c1 };
+    const c2 = cubic && { ...cubic.c2 };
     let moved = false;
     label.setPointerCapture(down.pointerId);
     const move = (e: PointerEvent) => {
@@ -1939,7 +1979,11 @@ export class MindMapCanvas {
       if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
       if (!this.opts.editable) return;
       moved = true;
-      rel.c = { x: Math.round(from.x + dx), y: Math.round(from.y + dy) };
+      // 三次曲线 t=0.5 处 = (起点 + 3·控制点1 + 3·控制点2 + 终点) / 8：两个控制点各挪 4/3，文字正好挪一个鼠标的距离
+      if (c1 && c2) {
+        rel.c1 = { x: Math.round(c1.x + (dx * 4) / 3), y: Math.round(c1.y + (dy * 4) / 3) };
+        rel.c2 = { x: Math.round(c2.x + (dx * 4) / 3), y: Math.round(c2.y + (dy * 4) / 3) };
+      } else rel.c = { x: Math.round(from.x + dx), y: Math.round(from.y + dy) };
       this.drawRels();
     };
     const up = () => {
@@ -1950,7 +1994,7 @@ export class MindMapCanvas {
         this.activateRel(rel);
         return;
       }
-      if (before?.x !== rel.c?.x || before?.y !== rel.c?.y) this.notify();
+      if (before !== JSON.stringify([rel.c, rel.c1, rel.c2])) this.notify();
       this.activateRel(rel);
     };
     label.addEventListener("pointermove", move);
@@ -1962,7 +2006,53 @@ export class MindMapCanvas {
     const dst = this.relTarget(rel);
     const a = this.layout?.placed.get(src.id);
     const b = dst && this.layout?.placed.get(dst.id);
-    return a && b ? relGeometry(a, b, rel.c) : null;
+    return a && b ? relGeometry(a, b, rel.c, relCubic(rel)) : null;
+  }
+
+  /**
+   * 拖控制点手柄（#28）：手柄跟着鼠标走。还是一个控制点（或默认弯法）的线，先换成画出同一条线的两个控制点再拖；
+   * 控制点记成相对各自节点中心的偏移。没怎么动就当单击
+   */
+  private dragRelHandle(src: MindNode, rel: Relation, which: 0 | 1, el: HTMLElement, down: PointerEvent): void {
+    const dst = this.relTarget(rel);
+    const a = this.layout?.placed.get(src.id);
+    const b = dst && this.layout?.placed.get(dst.id);
+    const geo = this.relGeoOf(src, rel);
+    if (!a || !b || !geo || !this.opts.editable) return;
+    const center = (n: { x: number; y: number; w: number; h: number }) => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
+    const ca = center(a);
+    const cb = center(b);
+    const start = { x: down.clientX, y: down.clientY };
+    const h = which === 0 ? geo.h1 : geo.h2;
+    const before = JSON.stringify([rel.c, rel.c1, rel.c2]);
+    let moved = false;
+    el.setPointerCapture(down.pointerId);
+    const move = (e: PointerEvent) => {
+      if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+      if (!moved) {
+        moved = true;
+        rel.c1 ??= { x: Math.round(geo.h1.x - ca.x), y: Math.round(geo.h1.y - ca.y) };
+        rel.c2 ??= { x: Math.round(geo.h2.x - cb.x), y: Math.round(geo.h2.y - cb.y) };
+        rel.c = undefined;
+      }
+      const x = h.x + (e.clientX - start.x) / this.k;
+      const y = h.y + (e.clientY - start.y) / this.k;
+      const c = which === 0 ? ca : cb;
+      const off = { x: Math.round(x - c.x), y: Math.round(y - c.y) };
+      if (which === 0) rel.c1 = off;
+      else rel.c2 = off;
+      this.drawRels();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+      if (moved && before !== JSON.stringify([rel.c, rel.c1, rel.c2])) this.notify();
+      this.activateRel(rel);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
   }
 
   private relSource(rel: Relation): MindNode | null {
@@ -1989,7 +2079,7 @@ export class MindMapCanvas {
       { separator: true },
       { title: t("menu.editRelLabel"), icon: "pencil", run: () => this.editRelLabel(rel) },
       { title: t("menu.reverseRel"), icon: "arrow-left-right", run: () => this.reverseRel(src, rel) },
-      { title: t("menu.resetRelCurve"), icon: "spline", disabled: !rel.c, run: () => this.resetRelCurve(rel) },
+      { title: t("menu.resetRelCurve"), icon: "spline", disabled: !rel.c && !rel.c1 && !rel.c2, run: () => this.resetRelCurve(rel) },
       { separator: true },
       { title: t("menu.deleteRel"), icon: "trash", run: () => this.deleteRel(src, rel) },
     ];
@@ -2037,7 +2127,8 @@ export class MindMapCanvas {
     src.anchor ??= this.newRelId();
     src.rels = src.rels.filter((r) => r !== rel);
     if (!src.rels.length) src.rels = undefined;
-    const back: Relation = { to: src.anchor, label: rel.label, c: rel.c };
+    // 反过来时两个控制点对调（各自还跟着原来的节点）
+    const back: Relation = { to: src.anchor, label: rel.label, c: rel.c, c1: rel.c2, c2: rel.c1 };
     (dst.rels ??= []).push(back);
     this.pruneRels();
     this.activeRel = back;
@@ -2046,8 +2137,10 @@ export class MindMapCanvas {
   }
 
   resetRelCurve(rel: Relation): void {
-    if (!this.opts.editable || !rel.c) return;
+    if (!this.opts.editable || (!rel.c && !rel.c1 && !rel.c2)) return;
     rel.c = undefined;
+    rel.c1 = undefined;
+    rel.c2 = undefined;
     this.render();
     this.notify();
   }

@@ -132,10 +132,13 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
     const lower = t.toLowerCase();
     if (tok[4] !== undefined) {
       (marker.rels ??= []).push({ to: tok[4], label: tok[5]?.trim() ?? "" });
-    } else if (/^c=-?\d{1,6},-?\d{1,6}$/.test(lower) && marker.rels?.length) {
-      // 弯曲跟着前面最近的那条 rel
-      const [x, y] = lower.slice(2).split(",").map(Number);
-      marker.rels[marker.rels.length - 1].c = { x, y };
+    } else if (/^c[12]?=-?\d{1,6},-?\d{1,6}$/.test(lower) && marker.rels?.length) {
+      // 弯曲跟着前面最近的那条 rel：c= 旧的一个控制点；c1= c2= 两个控制点（#28）
+      const eq = lower.indexOf("=");
+      const [x, y] = lower.slice(eq + 1).split(",").map(Number);
+      const rel = marker.rels[marker.rels.length - 1];
+      const which = lower.slice(0, eq) as "c" | "c1" | "c2";
+      rel[which] = { x, y };
     } else if (/^id=/.test(lower) && REL_ID_RE.test(t.slice(3))) {
       marker.anchor = t.slice(3);
     } else if (tok[1] === "box") {
@@ -229,7 +232,8 @@ export function formatMarker(
   for (const r of node.rels ?? []) {
     const label = markerText(r.label);
     parts.push(`rel=${r.to}${label ? ` "${label}"` : ""}`);
-    if (r.c) parts.push(`c=${Math.round(r.c.x)},${Math.round(r.c.y)}`);
+    if (r.c1 && r.c2) parts.push(`c1=${Math.round(r.c1.x)},${Math.round(r.c1.y)}`, `c2=${Math.round(r.c2.x)},${Math.round(r.c2.y)}`);
+    else if (r.c) parts.push(`c=${Math.round(r.c.x)},${Math.round(r.c.y)}`);
   }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }

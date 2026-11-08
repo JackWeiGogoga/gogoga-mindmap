@@ -6,10 +6,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Added
 - When the central topic is the note's only top-level heading, you can now add a sibling to it from the right-click menu or the toolbar's **Add sibling** button: a second top-level heading is added, the note's file name becomes the central topic, and both headings become its branches (#27). Pressing Enter on the central topic still adds a child.
+- Relationship lines get two control handles (#28): select a line and a handle appears near each end, linked to it by a thin guide; drag them to shape the start and end of the curve separately. The label stays in the middle, so it no longer covers the handle, and each handle moves with its node. Lines you haven't touched keep their current shape and file text; once a handle is dragged the line is stored as `c1=… c2=…` instead of `c=…`. Older versions of the plugin don't understand that and show the marker as text on the node.
 
 ### Fixed
 - In a code-block mind map without a single top-level heading (only a list, or several top-level headings), a name given to the central topic wasn't saved and turned back into "Central topic" after editing another node (#26). Naming it now adds a top-level heading at the top of the block to hold it, moving the existing headings one level down; if the headings are already six levels deep, a notice says it can't be saved.
 - When the central topic is the note's file name (the note has several top-level headings or none), renaming it was silently undone (#27). Renaming it now renames the note, and links to it update as usual; names with characters a file name can't contain, or that clash with an existing file, show a notice instead. Renaming the note elsewhere also updates the central topic right away.
+- After dragging a relationship's label, ⌘Z and Delete didn't act on the map until you clicked it: clicking or dragging a line, its label or its handles now gives the map keyboard focus.
 
 ## [0.53.1] - 2026-11-08
 

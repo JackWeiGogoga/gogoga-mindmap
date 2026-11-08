@@ -1081,8 +1081,14 @@ export interface Pt {
 }
 
 export interface RelGeometry {
-  /** 线：二次曲线，从起点节点边上出发、到终点节点边上（箭头尖前面一点）结束 */
+  /** 线：从起点节点边上出发、到终点节点边上（箭头尖前面一点）结束；一个控制点时是二次曲线，两个时三次 */
   d: string;
+  /** 线的两头（节点边外一点；终点是箭头尖） */
+  s: Pt;
+  e: Pt;
+  /** 两个控制点手柄的位置；一个控制点的线给的是画出同一条线的三次曲线控制点（拖手柄时从这里接着拖） */
+  h1: Pt;
+  h2: Pt;
   /** 箭头：填色的三角形 */
   arrow: string;
   /** 弧顶：曲线 t=0.5 处，线上的文字和拖弯曲的手柄都在这里 */
@@ -1130,9 +1136,15 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * 两个节点之间的关联线。c 是弧顶相对两中心连线中点的偏移，没有就用默认弯法。
  * 两端从节点中心朝弧顶的方向出发，落在节点边框外一点；二次曲线的控制点取成让 t=0.5 正好经过弧顶
  */
-export function relGeometry(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, c?: Pt): RelGeometry {
+export function relGeometry(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+  c?: Pt,
+  cubic?: { c1: Pt; c2: Pt },
+): RelGeometry {
   const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
   const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  if (cubic) return cubicRel(a, b, ca, cb, cubic.c1, cubic.c2);
   const off = c ?? defaultRelOffset(ca, cb);
   const top = { x: (ca.x + cb.x) / 2 + off.x, y: (ca.y + cb.y) / 2 + off.y };
   const s = rectExit(a, top);
@@ -1154,5 +1166,46 @@ export function relGeometry(a: { x: number; y: number; w: number; h: number }, b
   const end = { x: e.x - ux * (ARROW_LEN - 1), y: e.y - uy * (ARROW_LEN - 1) };
   const d = `M${r2(s.x)},${r2(s.y)} Q${r2(q.x)},${r2(q.y)} ${r2(end.x)},${r2(end.y)}`;
   const arrow = `M${r2(e.x)},${r2(e.y)} L${r2(base.x - uy * ARROW_HALF)},${r2(base.y + ux * ARROW_HALF)} L${r2(base.x + uy * ARROW_HALF)},${r2(base.y - ux * ARROW_HALF)} Z`;
-  return { d, arrow, top, c: off };
+  // 同一条线的三次曲线控制点（二次升三次：各取到控制点的 2/3）
+  const h1 = { x: s.x + ((q.x - s.x) * 2) / 3, y: s.y + ((q.y - s.y) * 2) / 3 };
+  const h2 = { x: e.x + ((q.x - e.x) * 2) / 3, y: e.y + ((q.y - e.y) * 2) / 3 };
+  return { d, arrow, top, c: off, s, e, h1, h2 };
+}
+
+/** 箭头：尖在 e，方向是 u（单位向量）；线停在箭头底边上 */
+function arrowAt(e: Pt, ux: number, uy: number): { arrow: string; end: Pt } {
+  const base = { x: e.x - ux * ARROW_LEN, y: e.y - uy * ARROW_LEN };
+  const end = { x: e.x - ux * (ARROW_LEN - 1), y: e.y - uy * (ARROW_LEN - 1) };
+  const arrow = `M${r2(e.x)},${r2(e.y)} L${r2(base.x - uy * ARROW_HALF)},${r2(base.y + ux * ARROW_HALF)} L${r2(base.x + uy * ARROW_HALF)},${r2(base.y - ux * ARROW_HALF)} Z`;
+  return { arrow, end };
+}
+
+/**
+ * 两个控制点的关联线（#28）：控制点各自相对起点、终点节点中心；两头从节点中心朝各自的控制点出发。
+ * 文字在曲线 t=0.5 处，不会挡住靠近两头的手柄
+ */
+function cubicRel(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, ca: Pt, cb: Pt, c1: Pt, c2: Pt): RelGeometry {
+  const h1 = { x: ca.x + c1.x, y: ca.y + c1.y };
+  const h2 = { x: cb.x + c2.x, y: cb.y + c2.y };
+  const s = rectExit(a, h1);
+  const e = rectExit(b, h2);
+  // 箭头方向：曲线在终点的切线（终点 - 第二个控制点）；控制点和终点重合时退到第一个控制点、起点
+  let ux = e.x - h2.x;
+  let uy = e.y - h2.y;
+  if (Math.hypot(ux, uy) < 1e-6) {
+    ux = e.x - h1.x;
+    uy = e.y - h1.y;
+  }
+  if (Math.hypot(ux, uy) < 1e-6) {
+    ux = e.x - s.x;
+    uy = e.y - s.y;
+  }
+  const ul = Math.hypot(ux, uy) || 1;
+  ux /= ul;
+  uy /= ul;
+  const { arrow, end } = arrowAt(e, ux, uy);
+  const d = `M${r2(s.x)},${r2(s.y)} C${r2(h1.x)},${r2(h1.y)} ${r2(h2.x)},${r2(h2.y)} ${r2(end.x)},${r2(end.y)}`;
+  const top = { x: (s.x + 3 * h1.x + 3 * h2.x + e.x) / 8, y: (s.y + 3 * h1.y + 3 * h2.y + e.y) / 8 };
+  const c = { x: top.x - (ca.x + cb.x) / 2, y: top.y - (ca.y + cb.y) / 2 };
+  return { d, arrow, top, c, s, e, h1, h2 };
 }
