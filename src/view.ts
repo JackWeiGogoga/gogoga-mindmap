@@ -1,4 +1,4 @@
-import { HoverPopover, Menu, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { HoverPopover, Menu, normalizePath, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { buildSvg, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
 import { blankBeforeNodeTables } from "./node-table";
@@ -292,6 +292,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       editable: true,
       host: this.plugin.canvasHost(() => this.file?.path ?? "", this, this),
       onChange: (doc) => this.onDocChange(doc),
+      fallbackTitle: () => this.file?.basename ?? "",
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onStructureChange: (s) => this.persistStructure(s),
@@ -584,6 +585,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   private lastFolds: string | null = null;
 
   private onDocChange(doc: MindDoc): void {
+    // 中心主题是文件名（不是一级标题）时，改它就是给笔记改名（#27）；它本身不写进文件
+    if (this.file && !doc.rootFromHeading && doc.root.text !== this.file.basename) this.renameFromRoot(doc, this.file);
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
     const next = blankBeforeNodeTables(preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text))));
     // 标题的标记从行末挪到下一行后，标题文字变了：别的笔记里指向旧标题（带着 %%标记%%）的链接跟着改
@@ -599,6 +602,32 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       return;
     }
     this.requestSave();
+  }
+
+  private renameFromRoot(doc: MindDoc, file: TFile): void {
+    const name = doc.root.text.trim();
+    const revert = (msg?: string) => {
+      if (msg) new Notice(msg);
+      doc.root.text = file.basename;
+      this.contentEl.win.setTimeout(() => this.canvas?.render(), 0);
+    };
+    if (!name || name === file.basename) return revert();
+    if (/[\\/:*?"<>|#^[\]]/.test(name)) return revert(t("notice.rootBadName"));
+    const dir = file.parent && file.parent.path !== "/" ? `${file.parent.path}/` : "";
+    const path = normalizePath(`${dir}${name}.${file.extension}`);
+    const taken = this.app.vault.getAbstractFileByPath(path);
+    if (taken && taken !== file) return revert(t("notice.rootNameTaken", { name }));
+    doc.root.text = name;
+    this.app.fileManager.renameFile(file, path).catch((e: unknown) => revert(String(e)));
+  }
+
+  /** 笔记改名了（在哪改的都算）：中心主题是文件名时跟着变 */
+  async onRename(file: TFile): Promise<void> {
+    await super.onRename(file);
+    if (this.doc && !this.doc.rootFromHeading && this.doc.root.text !== file.basename) {
+      this.doc.root.text = file.basename;
+      this.canvas?.render();
+    }
   }
 
   private persistTheme(theme: ThemeId): void {

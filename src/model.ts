@@ -563,6 +563,26 @@ export function addChild(parent: MindNode, style: DocStyle, text = "", index?: n
   return node;
 }
 
+/**
+ * 中心主题是笔记里唯一的一级标题时，给它加一个同级（#27）：它降成第一级分支，中心主题换成 title（文件名），
+ * 新的一级标题排在它前面或后面。有自由主题（只能挂在中心主题下）时做不了，返回 null
+ */
+export function addRootSibling(doc: MindDoc, title: string, after = true): MindNode | null {
+  const old = doc.root;
+  if (!doc.rootFromHeading || old.children.some((c) => c.float)) return null;
+  const root = createNode({ parent: null, kind: "heading", level: 0, text: title });
+  old.parent = root;
+  old.level = 1;
+  const sibling = createNode({ parent: root, kind: "heading", level: 1 });
+  root.children = after ? [old, sibling] : [sibling, old];
+  walkMap(old, (d) => {
+    d.depth = d.parent ? d.parent.depth + 1 : 0;
+  });
+  doc.root = root;
+  doc.rootFromHeading = false;
+  return sibling;
+}
+
 export function addSibling(node: MindNode, text = "", after = true): MindNode | null {
   const parent = node.parent;
   // 概要主题不在兄弟里，没有「前后」

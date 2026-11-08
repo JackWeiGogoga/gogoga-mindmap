@@ -6,6 +6,7 @@
 import {
   addChild,
   addSibling,
+  addRootSibling,
   attachSubtree,
   createNode,
   findByPath,
@@ -194,6 +195,8 @@ export interface CanvasOptions {
   host?: CanvasHost;
   /** 树被编辑后调用（折叠、改文字、增删移节点、颜色、备注） */
   onChange?: (doc: MindDoc) => void;
+  /** 中心主题不是来自一级标题时显示什么（笔记视图是文件名；代码块里是空串） */
+  fallbackTitle?: () => string;
   onUndo?: () => void;
   onRedo?: () => void;
   onStructureChange?: (structure: Structure) => void;
@@ -5535,6 +5538,11 @@ export class MindMapCanvas {
     this.followSelection(node);
   }
 
+  /** 中心主题能不能加同级：它是唯一的一级标题、下面没有自由主题、能编辑（#27） */
+  private canAddRootSibling(node: MindNode): boolean {
+    return !!this.doc && node === this.doc.root && this.doc.rootFromHeading && !node.children.some((c) => c.float);
+  }
+
   private addSiblingToSelected(before: boolean): void {
     const sel = this.primary;
     if (!sel || !this.doc) return;
@@ -5542,7 +5550,8 @@ export class MindMapCanvas {
       this.addFloatNear(sel, before ? -1 : 1);
       return;
     }
-    const node = addSibling(sel, "", !before);
+    // 中心主题是唯一的一级标题：加同级 = 再加一个一级标题，中心主题换成文件名（#27）
+    const node = sel === this.doc.root ? addRootSibling(this.doc, this.opts.fallbackTitle?.() ?? "", !before) : addSibling(sel, "", !before);
     if (!node) return;
     if (sel.side) node.side = sel.side;
     this.select(node);
@@ -6475,14 +6484,14 @@ export class MindMapCanvas {
       entries.push(
         { title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
         { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
-        { title: `${t("menu.addSibling")}  ${sc("Enter")}`, icon: "list-plus", disabled: !node.parent || topic, run: () => this.addSiblingToSelected(false) },
+        { title: node.parent ? `${t("menu.addSibling")}  ${sc("Enter")}` : t("menu.addSibling"), icon: "list-plus", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(false) },
         {
           title: t("menu.insertGroup"),
           icon: "between-horizontal-start",
           // 概要主题跟着括住的范围走，前后插不了，也不放表格
           disabled: topic,
           submenu: [
-            { title: `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}`, icon: "list-start", disabled: !node.parent || topic, run: () => this.addSiblingToSelected(true) },
+            { title: node.parent ? `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}` : t("menu.insertBefore"), icon: "list-start", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(true) },
             { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent || topic, run: () => this.insertParentForSelected() },
             // 节点里的表格：没有就插入一张，备注里有表就放进节点（第一层菜单放不下了，归到「插入」里）
             ...(this.nodeTable(node) ? [] : [this.tableMenuEntry(node)]),
