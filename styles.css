@@ -2387,13 +2387,11 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt thead { position: relative; z-index: 3; }
 .ggt.is-stuck thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); box-shadow: 0 1px 0 var(--ggt-line); }
 
-/* 横向能滚时，两边出一道淡淡的阴影提示还有内容 */
-.ggt::before, .ggt::after { content: ""; position: absolute; top: 10px; bottom: 26px; width: 14px; pointer-events: none; z-index: 4; opacity: 0; transition: opacity 0.15s; }
-.ggt::before { left: 14px; background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent); }
-.ggt::after { right: 26px; background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent); }
-.ggt.can-left::before, .ggt.can-right::after { opacity: 1; }
-.theme-dark .ggt::before { background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent); }
-.theme-dark .ggt::after { background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent); }
+/* 横向能滚时，被截断的那一边淡出，提示还有内容（遮罩直接作用在滚动区的可见边缘上，不会和截断的位置错开） */
+.ggt { --ggt-fade: 40px; }
+.ggt.can-right .ggt-scroll { -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--ggt-fade)); mask-image: linear-gradient(to left, transparent, #000 var(--ggt-fade)); }
+.ggt.can-left:not(.is-freeze) .ggt-scroll { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade)); mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade)); }
+.ggt.can-left.can-right:not(.is-freeze) .ggt-scroll { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade), #000 calc(100% - var(--ggt-fade)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade), #000 calc(100% - var(--ggt-fade)), transparent); }
 .ggt button.ggt-handle { touch-action: none; }
 
 /* 实时预览里包表格的那层默认带 contain: paint，会把伸到表格外面的行手柄、加号裁掉一半 */
@@ -2424,7 +2422,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 导出 PDF、打印：只留表格本身，手柄、加号、按钮、选区都不要 */
 @media print {
   .ggt-handle, .ggt-add, .ggt-corner, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-input { display: none !important; }
-  .ggt::before, .ggt::after { display: none !important; }
+  .ggt .ggt-scroll { -webkit-mask-image: none !important; mask-image: none !important; }
   .ggt .ggt-cell.is-selected { box-shadow: none !important; }
   .ggt-scroll { overflow: visible !important; }
 }
@@ -2511,8 +2509,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt.is-freeze .ggt-table thead .ggt-cell.is-frozen { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
 .ggt.is-freeze[data-preset="minimal"] .ggt-table thead .ggt-cell.is-frozen, .ggt.is-freeze[data-preset="academic"] .ggt-table thead .ggt-cell.is-frozen { background-image: none; }
 .ggt.is-freeze .ggt-table .ggt-cell.is-frozen[data-bg] { background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
-/* 滚动过后：阴影画在冻结列的右边，表格左边那道就不要了 */
-.ggt.is-freeze.can-left::before { opacity: 0; }
+/* 滚动过后：冻结列右边出一道阴影，表示后面的格子从它底下滑过 */
 .ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.18); }
 .theme-dark .ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.5); }
 
