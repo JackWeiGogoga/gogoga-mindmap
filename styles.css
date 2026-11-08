@@ -2181,7 +2181,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 悬停、选中 */
 .ggt:not(.is-readonly) .ggt-cell:hover { box-shadow: inset 0 0 0 999px var(--ggt-hover); }
-.ggt .ggt-cell.is-selected { box-shadow: inset 0 0 0 2px var(--ggt-sel) !important; z-index: 1; }
+/* 不加 z-index：大表格里改一格的层级要整张表重排（2 万格约 15ms），选中框画在格子里面，也用不着它 */
+.ggt .ggt-cell.is-selected { box-shadow: inset 0 0 0 2px var(--ggt-sel) !important; }
 .ggt .ggt-cell.is-sel-head { background-image: linear-gradient(var(--ggt-sel-soft), var(--ggt-sel-soft)); }
 
 /* 选中时藏在格子里的输入框；编辑时变成这一格的编辑框 */
@@ -2421,7 +2422,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 导出 PDF、打印：只留表格本身，手柄、加号、按钮、选区都不要 */
 @media print {
-  .ggt-handle, .ggt-add, .ggt-corner, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-input { display: none !important; }
+  .ggt-handle, .ggt-add, .ggt-corner, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-cross-band, .ggt-input { display: none !important; }
   .ggt .ggt-scroll { -webkit-mask-image: none !important; mask-image: none !important; }
   .ggt .ggt-cell.is-selected { box-shadow: none !important; }
   .ggt-scroll { overflow: visible !important; }
@@ -2515,5 +2516,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 十字高亮（设置里开）：选中格子所在的整行、整列铺一层淡色 */
 .ggt { --ggt-cross: color-mix(in srgb, var(--interactive-accent) 9%, transparent); }
+/* 盖在表格上的四条色带（在格子文字上面，颜色很淡）；冻结列的格子在色带上面，它们自己加 is-cross */
+.ggt-cross-band { position: absolute; display: none; z-index: 1; background: var(--ggt-cross); pointer-events: none; }
+.ggt-cross-band.is-shown { display: block; }
 .ggt .ggt-cell.is-cross { box-shadow: inset 0 0 0 999px var(--ggt-cross); }
 /* ==== gogoga-table 同步结束 ==== */

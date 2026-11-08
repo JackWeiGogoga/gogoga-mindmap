@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- Big tables in nodes render faster (plain-text and number cells skip Markdown rendering, and selection only updates the cells that changed), same as the gogoga Table plugin.
+
 ## [0.53.0] - 2026-11-08
 
 ### Added

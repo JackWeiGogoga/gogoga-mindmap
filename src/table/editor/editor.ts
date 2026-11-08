@@ -62,6 +62,19 @@ export function sameTable(a: Table, b: Table): boolean {
 }
 
 
+/**
+ * 不用走 Markdown 渲染的格子：只有文字、数字和不会触发任何写法的标点（没有链接、加粗、标签、公式、HTML、换行……），
+ * 也不以列表、引用、标题的记号开头。拿不准的一律交给渲染，宁可慢不能显示错
+ */
+const PLAIN_RE = /^[\p{L}\p{N}\p{Zs},.;:!?'"()%+\-/@，。、；：！？“”‘’（）《》【】…—·]*$/u;
+export function isPlainText(md: string): boolean {
+  if (!PLAIN_RE.test(md)) return false;
+  // 列表（- 、+ 、1. 、1) ）开头；网址会被自动变成链接；%% 是注释
+  if (/^\s*([-+]\s|\d+[.)](\s|$))/.test(md)) return false;
+  if (/:\/\/|www\.|%%|^\s*-+\s*$/i.test(md)) return false;
+  return true;
+}
+
 /** 最近一次选中格子的那张表：命令（命令面板、快捷键）作用在它上面 */
 let lastActive: TableEditor | null = null;
 function markActive(e: TableEditor): void {
@@ -105,6 +118,8 @@ export class TableEditor {
   private readonly cornerBtn: HTMLElement;
   /** 选了一片时框住整片的蓝框（放在滚动容器里，横向滚动时跟着表格走） */
   private readonly rangeBox: HTMLElement;
+  /** 十字高亮：盖在表格上的四条淡色带（左、右、上、下，选中那格自己留空）。逐格加样式在大表格里很慢（每改一格整张表重排） */
+  private readonly crossBands: HTMLElement[];
   /** 选区右下角的填充柄（往下 / 往右拖，按规律接着填） */
   private readonly fillHandle: HTMLElement;
   /** 拖填充柄时，要填的那一片的虚线框 */
@@ -121,6 +136,11 @@ export class TableEditor {
   /** 编辑时宿主送来的新表：等这一格改完再换上 */
   private pending: Table | null = null;
   private hover: Pos | null = null;
+  /** 每个位置 → 显示它的格子元素（被合并盖住的位置指向左上角那格）。render 时建，大表格里不用每次 querySelector 全表 */
+  private grid: HTMLElement[][] = [];
+  /** 上一次加了选中样式、十字高亮的格子：下次只清这些，不扫全表 */
+  private marked: HTMLElement[] = [];
+  private crossed: HTMLElement[] = [];
   private popover: HTMLElement | null = null;
   /** 编辑时的补全列表（[[ 链接、# 标签） */
   private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement } | null = null;
@@ -145,6 +165,11 @@ export class TableEditor {
     this.tableEl.className = "ggt-table";
     this.rangeBox = this.scroller.appendChild(doc.createElement("div"));
     this.rangeBox.className = "ggt-range-box";
+    this.crossBands = [0, 1, 2, 3].map(() => {
+      const band = this.scroller.appendChild(doc.createElement("div"));
+      band.className = "ggt-cross-band";
+      return band;
+    });
     this.fillPreview = this.scroller.appendChild(doc.createElement("div"));
     this.fillPreview.className = "ggt-fill-preview";
     this.fillHandle = this.scroller.appendChild(doc.createElement("div"));
@@ -338,6 +363,8 @@ export class TableEditor {
       this.stickHeader();
       // 手柄、左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
       this.placeHandles();
+      // 冻结标题列时，十字高亮竖的色带不能伸进冻结列底下：横向滚动后重新摆
+      if (this.root.classList.contains("is-freeze") && this.crossBands.some((b) => b.classList.contains("is-shown"))) this.markCross();
     };
     const onScroll = () => win.requestAnimationFrame(update);
     this.on(this.scroller, "scroll", onScroll, { passive: true });
@@ -410,6 +437,9 @@ export class TableEditor {
     const ms = merges(tb);
     this.applyLook();
     this.tableEl.replaceChildren();
+    this.grid = Array.from({ length: rows }, () => new Array<HTMLElement>(cols));
+    this.marked = [];
+    this.crossed = [];
     const colgroup = this.tableEl.appendChild(doc.createElement("colgroup"));
     for (let c = 0; c < cols; c++) {
       const col = colgroup.appendChild(doc.createElement("col"));
@@ -434,7 +464,8 @@ export class TableEditor {
           cell.colSpan = m.c2 - m.c1 + 1;
           cell.rowSpan = m.r2 - m.r1 + 1;
           cell.classList.add("is-merged");
-        }
+          for (let i = m.r1; i <= m.r2; i++) for (let j = m.c1; j <= m.c2; j++) this.grid[i][j] = cell;
+        } else this.grid[r][c] = cell;
         cell.dataset.r = String(r);
         cell.dataset.c = String(c);
         const a = tb.align[c];
@@ -479,6 +510,7 @@ export class TableEditor {
 
   private fill(el: HTMLElement, md: string): void {
     el.replaceChildren();
+    el.removeAttribute("dir");
     if (!md.trim()) {
       el.classList.add("is-empty");
       return;
@@ -501,14 +533,18 @@ export class TableEditor {
       else span.textContent = rest;
       return;
     }
-    if (this.host.renderMarkdown) this.host.renderMarkdown(el, md);
-    else el.textContent = md;
+    // 纯文字、数字直接放进去：渲染出来和走 Markdown 一样，大表格里能省掉几万次渲染
+    if (this.host.renderMarkdown && !isPlainText(md)) this.host.renderMarkdown(el, md);
+    else {
+      el.textContent = md;
+      // 渲染出来的段落带 dir="auto"（阿拉伯文、希伯来文靠右），直接放的文字也一样
+      if (this.host.renderMarkdown) el.dir = "auto";
+    }
   }
 
   /** 格子元素；落在合并区域里的取左上角那格 */
   private cellEl(p: Pos): HTMLElement | null {
-    const q = this.canon(p);
-    return this.tableEl.querySelector<HTMLElement>(`.ggt-cell[data-r="${q.r}"][data-c="${q.c}"]`);
+    return this.grid[p.r]?.[p.c] ?? null;
   }
 
   /** 落在合并区域里的位置换成左上角 */
@@ -596,64 +632,108 @@ export class TableEditor {
    * 合并格按它占的范围算；那一格自己不铺（它有选中框）
    */
   private markCross(): void {
-    for (const el of Array.from(this.tableEl.querySelectorAll(".is-cross"))) el.classList.remove("is-cross");
+    for (const el of this.crossed) el.classList.remove("is-cross");
+    this.crossed = [];
+    const hide = () => {
+      for (const b of this.crossBands) b.classList.remove("is-shown");
+    };
     const mode = this.root.dataset.cross;
-    if (mode !== "select" && mode !== "hover") return;
+    if (mode !== "select" && mode !== "hover") return hide();
     const p = (mode === "hover" ? this.crossAt : null) ?? this.sel;
-    if (!p) return;
+    if (!p || !this.grid[p.r]?.[p.c]) return hide();
     const m = mergeAt(this.table, p.r, p.c);
     const r1 = m?.r1 ?? p.r;
     const r2 = m?.r2 ?? p.r;
     const c1 = m?.c1 ?? p.c;
     const c2 = m?.c2 ?? p.c;
-    for (const cell of Array.from(this.tableEl.querySelectorAll<HTMLTableCellElement>(".ggt-cell"))) {
-      const r = Number(cell.dataset.r);
-      const c = Number(cell.dataset.c);
-      if (r === r1 && c === c1) continue;
-      const inRow = r <= r2 && r + cell.rowSpan - 1 >= r1;
-      const inCol = c <= c2 && c + cell.colSpan - 1 >= c1;
-      if (inRow || inCol) cell.classList.add("is-cross");
+    // 位置都按滚动容器里的坐标算（和选区框一样），横向滚动时跟着表格走
+    const base = this.scroller.getBoundingClientRect();
+    const k = this.scale();
+    const tb = this.tableEl.getBoundingClientRect();
+    const x = (v: number) => (v - base.left) / k + this.scroller.scrollLeft;
+    const y = (v: number) => (v - base.top) / k + this.scroller.scrollTop;
+    const top = y(this.lineBox(r1, true).a);
+    const bottom = y(this.lineBox(r2, true).b);
+    const left = x(this.lineBox(c1, false).a);
+    const right = x(this.lineBox(c2, false).b);
+    const tl = x(tb.left);
+    const tr = x(tb.right);
+    const tt = y(tb.top);
+    const tbm = y(tb.bottom);
+    // 冻结标题列：色带在冻结的格子底下（不盖住吸顶的表头、滚过来的格子），冻结那几格自己加样式；
+    // 竖的色带不伸进冻结列底下
+    const frozen = this.root.classList.contains("is-freeze");
+    let colLeft = left;
+    if (frozen) {
+      const f = this.grid[0]?.[0];
+      const fw = f?.classList.contains("is-frozen") ? f.getBoundingClientRect().width / k : 0;
+      colLeft = Math.max(left, this.scroller.scrollLeft + fw);
+      const own = this.grid[r1]?.[c1];
+      const add = (el: HTMLElement | undefined) => {
+        if (!el || el === own || !el.classList.contains("is-frozen") || this.crossed.includes(el)) return;
+        el.classList.add("is-cross");
+        this.crossed.push(el);
+      };
+      for (let r = r1; r <= r2; r++) add(this.grid[r]?.[0]);
+      // 高亮的正是冻结的那一列：竖的整列只能逐格加（少见）
+      if (c1 === 0) for (let r = 0; r < this.grid.length; r++) add(this.grid[r]?.[0]);
     }
+    const rects: [number, number, number, number][] = [
+      [tl, top, left - tl, bottom - top],
+      [right, top, tr - right, bottom - top],
+      [colLeft, tt, right - colLeft, top - tt],
+      [colLeft, bottom, right - colLeft, tbm - bottom],
+    ];
+    rects.forEach(([bx, by, bw, bh], i) => {
+      const band = this.crossBands[i];
+      const show = bw > 0.5 && bh > 0.5;
+      band.classList.toggle("is-shown", show);
+      if (show) band.setAttribute("style", `left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px`);
+    });
   }
 
   private markSel(): void {
-    for (const el of Array.from(this.tableEl.querySelectorAll(".is-selected, .is-sel-head, .is-in-range"))) el.classList.remove("is-selected", "is-sel-head", "is-in-range");
-    this.root.classList.toggle("has-range", this.isMulti());
-    this.rangeBox.classList.remove("is-shown");
-    if (this.isMulti()) {
-      const r = this.rangeRect();
-      if (r) {
-        // 整片的外框：选区里所有格子的外接矩形
-        let box: { l: number; t: number; r: number; b: number } | null = null;
-        for (const el of Array.from(this.tableEl.querySelectorAll<HTMLElement>(".ggt-cell"))) {
-          const er = Number(el.dataset.r);
-          const ec = Number(el.dataset.c);
-          if (er < r.r1 || er > r.r2 || ec < r.c1 || ec > r.c2) continue;
+    // 先把格子上的样式全改完、输入框挪好，再统一读位置摆浮层：大表格里每次「改了再读」都要整张表重排一遍
+    for (const el of this.marked) el.classList.remove("is-selected", "is-sel-head", "is-in-range");
+    this.marked = [];
+    const multi = this.isMulti();
+    this.root.classList.toggle("has-range", multi);
+    const r = multi ? this.rangeRect() : null;
+    // 选区里的格子都标上（合并格只标一次）：只走选区这一片，不扫全表
+    let any = false;
+    if (r) {
+      const seen = new Set<HTMLElement>();
+      for (let i = r.r1; i <= r.r2; i++)
+        for (let j = r.c1; j <= r.c2; j++) {
+          const el = this.grid[i]?.[j];
+          if (!el || seen.has(el)) continue;
+          seen.add(el);
+          // 整行 / 整列选中时选区不往外扩：左上角不在选区里的合并格不算
+          if (Number(el.dataset.r) < r.r1 || Number(el.dataset.c) < r.c1) continue;
           el.classList.add("is-in-range");
-          const b = el.getBoundingClientRect();
-          box = box ? { l: Math.min(box.l, b.left), t: Math.min(box.t, b.top), r: Math.max(box.r, b.right), b: Math.max(box.b, b.bottom) } : { l: b.left, t: b.top, r: b.right, b: b.bottom };
+          this.marked.push(el);
+          any = true;
         }
-        const sb = this.selBox();
-        if (box && sb) {
-          this.rangeBox.setAttribute("style", `left:${sb.x}px;top:${sb.y}px;width:${sb.w}px;height:${sb.h}px`);
-          this.rangeBox.classList.add("is-shown");
-        }
-      }
     }
     const cell = this.sel && this.cellEl(this.sel);
-    if (!cell || !this.sel) {
-      this.input.remove();
-      this.placeHandles();
-      this.markCross();
-      return;
-    }
-    cell.classList.add("is-selected");
-    const head = headRows(this.table);
-    if (this.sel.r >= head) this.cellEl({ r: head - 1, c: this.sel.c })?.classList.add("is-sel-head");
+    if (cell && this.sel) {
+      cell.classList.add("is-selected");
+      this.marked.push(cell);
+      const head = headRows(this.table);
+      const headCell = this.sel.r >= head ? this.cellEl({ r: head - 1, c: this.sel.c }) : null;
+      if (headCell) {
+        headCell.classList.add("is-sel-head");
+        this.marked.push(headCell);
+      }
+      // 看不见的输入框放进选中的格子里：打字、组字从这里开始
+      if (this.input.parentElement !== cell) cell.appendChild(this.input);
+    } else this.input.remove();
+    // ---- 下面只读位置、摆浮层
+    const sb = any ? this.selBox() : null;
+    this.rangeBox.classList.toggle("is-shown", !!sb);
+    if (sb) this.rangeBox.setAttribute("style", `left:${sb.x}px;top:${sb.y}px;width:${sb.w}px;height:${sb.h}px`);
     this.markCross();
-    this.placeFill();
-    // 看不见的输入框放进选中的格子里：打字、组字从这里开始
-    if (this.input.parentElement !== cell) cell.appendChild(this.input);
+    if (cell) this.placeFill();
     this.placeHandles();
   }
 
