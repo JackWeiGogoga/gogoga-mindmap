@@ -276,8 +276,20 @@ export function widthOf(t: Table, c: number): number | null {
 
 // ---------- 合并 ----------
 
+/** 解析好的合并区按 meta.merge 数组缓存：画表时每格都要问一次（2 万格就是 2 万次），每次都重新解析字符串太慢 */
+const mergeCache = new WeakMap<string[], { sig: string; rows: number; cols: number; rects: Rect[] }>();
+
 export function merges(t: Table): Rect[] {
-  return (t.meta.merge ?? []).map(parseRange).filter((r): r is Rect => r !== null && r.r2 < rowCount(t) && r.c2 < colCount(t));
+  const list = t.meta.merge;
+  if (!list || list.length === 0) return [];
+  const rows = rowCount(t);
+  const cols = colCount(t);
+  const sig = list.join(",");
+  const hit = mergeCache.get(list);
+  if (hit && hit.sig === sig && hit.rows === rows && hit.cols === cols) return hit.rects.slice();
+  const rects = list.map(parseRange).filter((r): r is Rect => r !== null && r.r2 < rows && r.c2 < cols);
+  mergeCache.set(list, { sig, rows, cols, rects });
+  return rects.slice();
 }
 
 /** (r, c) 所在的合并区域 */
