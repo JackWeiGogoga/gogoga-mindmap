@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-11-08
+
 ### Added
 - When the central topic is the note's only top-level heading, you can now add a sibling to it from the right-click menu or the toolbar's **Add sibling** button: a second top-level heading is added, the note's file name becomes the central topic, and both headings become its branches (#27). Pressing Enter on the central topic still adds a child.
 - Relationship lines get two control handles (#28): select a line and a handle appears near each end, linked to it by a thin guide; drag them to shape the start and end of the curve separately. The label stays in the middle, so it no longer covers the handle, and each handle moves with its node. Lines you haven't touched keep their current shape and file text; once a handle is dragged the line is stored as `c1=… c2=…` instead of `c=…`. Older versions of the plugin don't understand that and show the marker as text on the node.
@@ -642,7 +644,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...HEAD
+[0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1
 [0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0
 [0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0

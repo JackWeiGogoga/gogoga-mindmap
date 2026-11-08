@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-11-08
+
 ### 新增
 - 中心主题是笔记里唯一的一级标题时，可以在右键菜单或工具栏的「添加兄弟节点」给它加同级了：会再加一个一级标题，中心主题换成笔记的文件名，两个一级标题成为它的分支（#27）。在中心主题上按 Enter 仍是加子节点。
 - 关联线有两个控制点了（#28）：选中线后两头各出现一个手柄，用细线连着线头，分别拖它们调起点、终点那一段的弧度；文字留在线中间，不会再挡住手柄，节点挪动时手柄跟着各自的节点走。没动过的线样子和文件里的写法都不变；拖过手柄的线改存成 `c1=… c2=…`（代替 `c=…`），旧版插件不认识这个写法，会把这段标记当成节点文字显示出来。
@@ -642,7 +644,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...HEAD
+[0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1
 [0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0
 [0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0
