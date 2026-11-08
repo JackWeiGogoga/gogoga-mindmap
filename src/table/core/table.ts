@@ -40,6 +40,10 @@ export interface TableMeta {
   opts?: (Record<string, CellColor> | null)[];
   /** 第一列当标题列（加底色、加粗） */
   headerCol?: boolean;
+  /** 冻结标题列：左右滚动时第一列固定在左边（只在 headerCol 开着时有用） */
+  freeze?: 1;
+  /** 表头行数（2、3）：Markdown 只认第一行是表头，往下几行也画成表头、一起吸顶，排序合计不算它们。不写就是 1 */
+  head?: number;
   /** 这张表自己的样式、行距（不写就跟着设置走） */
   style?: TableStyle;
   density?: TableDensity;
@@ -160,6 +164,8 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
     else delete meta.w;
   }
   if (raw.headerCol !== undefined && raw.headerCol !== true) delete meta.headerCol;
+  if (raw.freeze !== undefined && raw.freeze !== 1) delete meta.freeze;
+  if (raw.head !== undefined && !(raw.head === 2 || raw.head === 3)) delete meta.head;
   if (raw.calc !== undefined) {
     const calc = Array.isArray(raw.calc) ? raw.calc.map((x) => ((CALCS as readonly unknown[]).includes(x) ? (x as Calc) : null)) : [];
     if (calc.some(Boolean)) meta.calc = calc;

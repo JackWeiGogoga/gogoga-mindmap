@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Tables in nodes can also have multi-row headers (top-left menu → **Header rows**) and a frozen header column (shown once **First column as header** is on), matching the gogoga Table plugin.
+
 ## [0.52.0] - 2026-11-07
 
 ### Added

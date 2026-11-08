@@ -14,7 +14,7 @@
  */
 
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle } from "../core/table";
-import { alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, unmergeAt, widthOf } from "../core/ops";
+import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, unmergeAt, widthOf } from "../core/ops";
 import { fromTSV, toHTML, toTSV } from "../core/clipboard";
 import { t } from "./i18n";
 
@@ -257,6 +257,7 @@ export class TableEditor {
         return true;
       case "delete-row": {
         if (r.r1 === 0 || rowCount(tb) - rows < 2) return false;
+        if (deleteRow(tb, r.r2) === tb) return false;
         let n = tb;
         for (let i = r.r2; i >= r.r1; i--) n = deleteRow(n, i);
         this.apply(n, { r: Math.min(r.r1, rowCount(n) - 1), c: p.c });
@@ -417,13 +418,17 @@ export class TableEditor {
     }
     const thead = this.tableEl.appendChild(doc.createElement("thead"));
     const tbody = this.tableEl.appendChild(doc.createElement("tbody"));
+    // 表头可以有几行（注释里的 head）：都放进 thead，一起吸顶
+    const head = headRows(tb);
+    const freeze = !!tb.meta.headerCol && tb.meta.freeze === 1;
+    this.root.classList.toggle("is-freeze", freeze);
     for (let r = 0; r < rows; r++) {
-      const tr = (r === 0 ? thead : tbody).appendChild(doc.createElement("tr"));
+      const tr = (r < head ? thead : tbody).appendChild(doc.createElement("tr"));
       for (let c = 0; c < cols; c++) {
         // 合并的格子：左上角那格跨行跨列，其余不画
         const m = ms.find((x) => r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2);
         if (m && (m.r1 !== r || m.c1 !== c)) continue;
-        const cell = tr.appendChild(doc.createElement(r === 0 ? "th" : "td"));
+        const cell = tr.appendChild(doc.createElement(r < head ? "th" : "td"));
         cell.className = "ggt-cell";
         if (m) {
           cell.colSpan = m.c2 - m.c1 + 1;
@@ -438,12 +443,14 @@ export class TableEditor {
         if (bg) cell.dataset.bg = bg;
         const fg = fgOf(tb, r, c);
         if (fg) cell.dataset.fg = fg;
-        if (tb.meta.headerCol && c === 0 && r > 0) cell.classList.add("is-head-col");
+        if (tb.meta.headerCol && c === 0 && r >= head) cell.classList.add("is-head-col");
+        // 冻结标题列：第一列（横跨到第二列的合并格不冻，不然盖住第二列）左右滚动时固定在左边
+        if (freeze && c === 0 && (!m || m.c2 === 0)) cell.classList.add("is-frozen");
         // 没拖过宽度的列：宿主可以给它设个最宽（脑图节点里最宽 240，超出换行）
         if (!m && !widthOf(tb, c)) cell.classList.add("is-auto-width");
         const content = cell.appendChild(doc.createElement("div"));
         content.className = "ggt-content";
-        if (r === rows - 1 && r > 0 && hasTotal(tb)) cell.classList.add("is-total-row");
+        if (r === rows - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
       }
     }
@@ -457,7 +464,7 @@ export class TableEditor {
   /** 状态列的数据格画成彩色标签，别的照常 */
   private fillCell(el: HTMLElement, r: number, c: number, md: string): void {
     const opts = this.table.meta.opts?.[c];
-    const isData = r > 0 && !(hasTotal(this.table) && r === rowCount(this.table) - 1);
+    const isData = r >= headRows(this.table) && !(hasTotal(this.table) && r === rowCount(this.table) - 1);
     if (opts && isData && md.trim()) {
       el.replaceChildren();
       el.classList.remove("is-empty");
@@ -581,6 +588,34 @@ export class TableEditor {
     if (box) this.fillHandle.setAttribute("style", `left:${box.x + box.w - 4}px;top:${box.y + box.h - 4}px`);
   }
 
+  /** 十字高亮：悬停模式下鼠标所在的格子，否则（或鼠标不在表格上）选中的格子 */
+  private crossAt: Pos | null = null;
+
+  /**
+   * 十字高亮（设置里开，data-cross = select / hover）：把那一格所在的整行、整列铺一层淡色，看大表不串行。
+   * 合并格按它占的范围算；那一格自己不铺（它有选中框）
+   */
+  private markCross(): void {
+    for (const el of Array.from(this.tableEl.querySelectorAll(".is-cross"))) el.classList.remove("is-cross");
+    const mode = this.root.dataset.cross;
+    if (mode !== "select" && mode !== "hover") return;
+    const p = (mode === "hover" ? this.crossAt : null) ?? this.sel;
+    if (!p) return;
+    const m = mergeAt(this.table, p.r, p.c);
+    const r1 = m?.r1 ?? p.r;
+    const r2 = m?.r2 ?? p.r;
+    const c1 = m?.c1 ?? p.c;
+    const c2 = m?.c2 ?? p.c;
+    for (const cell of Array.from(this.tableEl.querySelectorAll<HTMLTableCellElement>(".ggt-cell"))) {
+      const r = Number(cell.dataset.r);
+      const c = Number(cell.dataset.c);
+      if (r === r1 && c === c1) continue;
+      const inRow = r <= r2 && r + cell.rowSpan - 1 >= r1;
+      const inCol = c <= c2 && c + cell.colSpan - 1 >= c1;
+      if (inRow || inCol) cell.classList.add("is-cross");
+    }
+  }
+
   private markSel(): void {
     for (const el of Array.from(this.tableEl.querySelectorAll(".is-selected, .is-sel-head, .is-in-range"))) el.classList.remove("is-selected", "is-sel-head", "is-in-range");
     this.root.classList.toggle("has-range", this.isMulti());
@@ -609,10 +644,13 @@ export class TableEditor {
     if (!cell || !this.sel) {
       this.input.remove();
       this.placeHandles();
+      this.markCross();
       return;
     }
     cell.classList.add("is-selected");
-    if (this.sel.r > 0) this.cellEl({ r: 0, c: this.sel.c })?.classList.add("is-sel-head");
+    const head = headRows(this.table);
+    if (this.sel.r >= head) this.cellEl({ r: head - 1, c: this.sel.c })?.classList.add("is-sel-head");
+    this.markCross();
     this.placeFill();
     // 看不见的输入框放进选中的格子里：打字、组字从这里开始
     if (this.input.parentElement !== cell) cell.appendChild(this.input);
@@ -844,7 +882,24 @@ export class TableEditor {
     this.on(this.resizeBar, "pointerdown", (ev) => this.startResize(ev, this.resizeBar));
     this.on(this.fillHandle, "pointerdown", (ev) => this.fillDrag(ev));
     // 宿主改了默认样式（设置变了）
-    this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => this.applyLook());
+    this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => {
+      this.applyLook();
+      this.markCross();
+    });
+    // 十字高亮（悬停模式）：鼠标在哪格，就高亮那一格所在的行和列
+    this.on(this.tableEl, "pointermove", (ev) => {
+      if (this.root.dataset.cross !== "hover") return;
+      const cell = (ev.target as HTMLElement).closest<HTMLElement>(".ggt-cell");
+      const pos = cell ? { r: Number(cell.dataset.r), c: Number(cell.dataset.c) } : null;
+      if (pos?.r === this.crossAt?.r && pos?.c === this.crossAt?.c) return;
+      this.crossAt = pos;
+      this.markCross();
+    });
+    this.on(this.tableEl, "pointerleave", () => {
+      if (!this.crossAt) return;
+      this.crossAt = null;
+      this.markCross();
+    });
     this.on(this.cornerBtn, "pointerdown", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -1127,7 +1182,7 @@ export class TableEditor {
       start = before.length - tag[1].length;
     }
     // 状态列：编辑时列出这一列已有的状态，按输入过滤
-    const opts = this.sel && this.sel.r > 0 ? this.table.meta.opts?.[this.sel.c] : null;
+    const opts = this.sel && this.sel.r >= headRows(this.table) ? this.table.meta.opts?.[this.sel.c] : null;
     if (!kind && opts) {
       kind = "option";
       query = el.value.trim();
@@ -1401,7 +1456,7 @@ export class TableEditor {
           });
           inner = clone.innerHTML;
         }
-        const tag = r === 0 ? "th" : "td";
+        const tag = r < headRows(this.table) ? "th" : "td";
         html += `<${tag}${span} style="${styles.join(";")}">${inner}</${tag}>`;
       }
       html += "</tr>";
@@ -1739,7 +1794,7 @@ export class TableEditor {
     this.rowHandle.style.top = `${(rowMid - base.top) / k}px`;
     this.rowHandle.style.left = `${(Math.max(fr.left, vis.left) - base.left) / k}px`;
     this.rowHandle.dataset.r = String(p.r);
-    this.rowHandle.classList.toggle("is-fixed", p.r === 0);
+    this.rowHandle.classList.toggle("is-fixed", p.r < headRows(this.table));
     this.rowHandle.dataset.c = String(p.c);
     this.colHandle.style.left = `${(colMid - base.left) / k}px`;
     this.colHandle.style.top = `${(Math.max(hr.top, vis.top) - base.top) / k}px`;
@@ -1782,7 +1837,17 @@ export class TableEditor {
       align("center", t("alignAllCenter"), "align-center"),
       align("right", t("alignAllRight"), "align-right"),
       { separator: true },
+      { title: t("headerRows") },
+      ...Array.from({ length: MAX_HEAD_ROWS }, (_, i): MenuItem => ({
+        title: t("headerRowsN").replace("{n}", String(i + 1)),
+        checked: headRows(tb) === i + 1,
+        disabled: headRows(tb) !== i + 1 && !canSetHead(tb, i + 1),
+        run: () => keep(setTableLook(this.table, { head: i + 1 })),
+      })),
+      { separator: true },
       { title: t("headerColumn"), icon: "panel-left", checked: !!tb.meta.headerCol, run: () => keep(setTableLook(this.table, { headerCol: !this.table.meta.headerCol })) },
+      // 冻结是标题列的选项：标题列开着才出现
+      ...(tb.meta.headerCol ? [{ title: t("freezeHeaderCol"), icon: "pin", checked: tb.meta.freeze === 1, run: () => keep(setTableLook(this.table, { freeze: this.table.meta.freeze !== 1 })) }] : []),
       { separator: true },
       { title: t("distributeCols"), icon: "columns-3", run: () => keep(setWidths(this.table, this.colWidths().map((_, _i, all) => all.reduce((a, b) => a + b, 0) / all.length))) },
       { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWidths(this.table, this.fitWidths())) },
@@ -1823,17 +1888,17 @@ export class TableEditor {
 
   private rowMenu(p: Pos): MenuItem[] {
     const tb = this.table;
-    const head = p.r === 0;
+    const head = p.r < headRows(tb);
     return [
       ...this.insertRowItems(p),
-      { title: t("duplicateRow"), icon: "copy-plus", disabled: head, run: () => this.apply(duplicateRow(tb, p.r), { r: p.r + 1, c: p.c }) },
+      { title: t("duplicateRow"), icon: "copy-plus", disabled: p.r === 0, run: () => this.apply(duplicateRow(tb, p.r), { r: p.r + 1, c: p.c }) },
       { separator: true },
-      { title: t("moveRowUp"), icon: "arrow-up", disabled: p.r <= 1, run: () => this.apply(moveRow(tb, p.r, p.r - 1), { r: p.r - 1, c: p.c }) },
-      { title: t("moveRowDown"), icon: "arrow-down", disabled: head || p.r >= rowCount(tb) - 1, run: () => this.apply(moveRow(tb, p.r, p.r + 1), { r: p.r + 1, c: p.c }) },
+      { title: t("moveRowUp"), icon: "arrow-up", disabled: head || moveRow(tb, p.r, p.r - 1) === tb, run: () => this.apply(moveRow(tb, p.r, p.r - 1), { r: p.r - 1, c: p.c }) },
+      { title: t("moveRowDown"), icon: "arrow-down", disabled: head || moveRow(tb, p.r, p.r + 1) === tb, run: () => this.apply(moveRow(tb, p.r, p.r + 1), { r: p.r + 1, c: p.c }) },
       { separator: true },
       ...this.colorItems(Array.from({ length: colCount(tb) }, (_, c) => ({ r: p.r, c }))),
       { separator: true },
-      { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: head || rowCount(tb) <= 2, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
+      { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: deleteRow(tb, p.r) === tb, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
     ];
   }
 
@@ -1867,7 +1932,7 @@ export class TableEditor {
     const rect = this.rangeRect();
     const merged = mergeAt(tb, p.r, p.c);
     const mergeItems: MenuItem[] = [];
-    if (multi && rect) mergeItems.push({ title: t("mergeCells"), icon: "combine", run: () => this.apply(mergeCells(tb, rect), { r: rect.r1, c: rect.c1 }) });
+    if (multi && rect) mergeItems.push({ title: t("mergeCells"), icon: "combine", disabled: crossesHead(tb, rect), run: () => this.apply(mergeCells(tb, rect), { r: rect.r1, c: rect.c1 }) });
     if (merged) mergeItems.push({ title: t("unmergeCells"), icon: "split", run: () => this.apply(unmergeAt(tb, p.r, p.c), { r: merged.r1, c: merged.c1 }) });
     const cells = multi ? this.rangeCells() : [p];
     const cols = multi && rect ? Array.from({ length: rect.c2 - rect.c1 + 1 }, (_, i) => rect.c1 + i) : [p.c];
@@ -1921,7 +1986,7 @@ export class TableEditor {
   private statusColorItems(p: Pos): MenuItem[] {
     const v = this.table.cells[p.r][p.c].trim();
     const opts = this.table.meta.opts?.[p.c];
-    if (!opts || !v || p.r === 0) return [];
+    if (!opts || !v || p.r < headRows(this.table)) return [];
     return [
       { title: t("statusColor").replace("{v}", v) },
       ...CELL_COLORS.map((color): MenuItem => ({ swatch: color, title: t(color), checked: opts[v] === color, run: () => this.applyKeepRange(setOptionColor(this.table, p.c, v, color)) })),

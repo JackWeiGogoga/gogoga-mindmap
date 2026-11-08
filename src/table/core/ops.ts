@@ -27,6 +27,26 @@ function cloneMeta(m: TableMeta): TableMeta {
 }
 
 export const rowCount = (t: Table) => t.cells.length;
+
+/** 表头最多几行 */
+export const MAX_HEAD_ROWS = 3;
+
+/** 表头占几行（注释里的 head，没写是 1）；至少留一行数据 */
+export function headRows(t: Table): number {
+  const h = t.meta.head;
+  return typeof h === "number" && h > 1 ? Math.max(1, Math.min(h, MAX_HEAD_ROWS, t.cells.length - 1)) : 1;
+}
+
+/** 表头设成 h 行：要有足够的数据行，也不能有合并区域横跨表头和正文的分界线 */
+export function canSetHead(t: Table, h: number): boolean {
+  if (h < 1 || h > MAX_HEAD_ROWS || t.cells.length - h < 1) return false;
+  return !merges(t).some((m) => m.r1 < h && m.r2 >= h);
+}
+
+function withHead(n: Table, h: number): void {
+  if (h > 1) n.meta.head = h;
+  else delete n.meta.head;
+}
 export const colCount = (t: Table) => t.align.length;
 
 /** 按坐标记的设置换位置：map 返回新的 (行, 列)，null 表示这格没了 */
@@ -108,16 +128,21 @@ export function insertRow(t: Table, at: number): Table {
   // 合计行一直在最后：往最后加的行加在它前面
   if (hasTotal(t) && i === rowCount(t)) i = rowCount(t) - 1;
   const n = cloneTable(t);
+  const h = headRows(t);
   n.cells.splice(i, 0, Array.from({ length: colCount(t) }, () => ""));
   remapCells(n.meta, (r, c) => [r >= i ? r + 1 : r, c]);
   remapMerges(n.meta, (r) => (r >= i ? r + 1 : r), (c) => c, true);
+  // 插在表头区里：表头跟着多一行
+  if (i < h) withHead(n, h + 1);
   return n;
 }
 
-/** 删第 r 行；表头和最后一行数据删不掉（至少留一行数据） */
+/** 删第 r 行；第一行表头和最后一行数据删不掉（至少留一行数据）。删的是表头区的行，表头跟着少一行 */
 export function deleteRow(t: Table, r: number): Table {
-  if (r < 1 || r >= rowCount(t) || rowCount(t) <= 2) return t;
+  const h = headRows(t);
+  if (r < 1 || r >= rowCount(t) || (r >= h && rowCount(t) - h <= 1)) return t;
   const n = cloneTable(t);
+  if (r < h) withHead(n, h - 1);
   if (hasTotal(t) && r === rowCount(t) - 1) delete n.meta.calc;
   n.cells.splice(r, 1);
   remapCells(n.meta, (rr, c) => (rr === r ? null : [rr > r ? rr - 1 : rr, c]));
@@ -151,8 +176,9 @@ export function deleteCol(t: Table, c: number): Table {
 /** 把第 from 行挪到第 to 的位置（都是数据行，表头不动） */
 export function moveRow(t: Table, from: number, to: number): Table {
   const last = rowCount(t) - 1 - (hasTotal(t) ? 1 : 0);
-  if (from < 1 || from > last) return t;
-  const dest = Math.max(1, Math.min(to, last));
+  const h = headRows(t);
+  if (from < h || from > last) return t;
+  const dest = Math.max(h, Math.min(to, last));
   if (dest === from) return t;
   const n = cloneTable(t);
   const [row] = n.cells.splice(from, 1);
@@ -278,9 +304,17 @@ export function mergeCells(t: Table, rect: Rect): Table {
   }
   r = { r1: Math.max(0, r.r1), c1: Math.max(0, r.c1), r2: Math.min(rowCount(t) - 1, r.r2), c2: Math.min(colCount(t) - 1, r.c2) };
   if (r.r1 === r.r2 && r.c1 === r.c2) return t;
+  // 不跨表头和正文的分界线（表头吸顶时会被拆开）
+  if (crossesHead(t, r)) return t;
   const n = cloneTable(t);
   n.meta.merge = [...merges(t).filter((m) => !overlaps(m, r)).map(rangeRef), rangeRef(r)];
   return n;
+}
+
+/** 这片格子横跨表头和正文 */
+export function crossesHead(t: Table, r: Rect): boolean {
+  const h = headRows(t);
+  return r.r1 < h && r.r2 >= h;
 }
 
 /** (r, c) 是不是被合并盖住的格子（在合并区域里、但不是左上角） */
@@ -336,7 +370,7 @@ export function fillRange(t: Table, src: Rect, dir: FillDir, count: number, copy
   let n = cloneTable(t);
   const vertical = dir === "down" || dir === "up";
   let cnt = count;
-  if (dir === "up") cnt = Math.min(count, src.r1 - (src.r1 > 0 ? 1 : 0));
+  if (dir === "up") cnt = Math.min(count, src.r1 - (src.r1 >= headRows(t) ? headRows(t) : 0));
   if (dir === "left") cnt = Math.min(count, src.c1);
   if (cnt <= 0) return { table: t, filled: src };
   // 有合计行时数据只填到它上面：不够就在它前面加行
@@ -365,12 +399,22 @@ export function fillRange(t: Table, src: Rect, dir: FillDir, count: number, copy
 // ---------- 整张表 ----------
 
 /** 这张表自己的样式 / 行距；null 是跟着设置走 */
-export function setTableLook(t: Table, look: { style?: TableStyle | null; density?: TableDensity | null; headerCol?: boolean }): Table {
+export function setTableLook(t: Table, look: { style?: TableStyle | null; density?: TableDensity | null; headerCol?: boolean; freeze?: boolean; head?: number }): Table {
+  if (look.head !== undefined && !canSetHead(t, look.head)) return t;
   const n = cloneTable(t);
   if (look.headerCol !== undefined) {
     if (look.headerCol) n.meta.headerCol = true;
-    else delete n.meta.headerCol;
+    else {
+      delete n.meta.headerCol;
+      // 冻结是标题列的一个选项：标题列关了，冻结也去掉
+      delete n.meta.freeze;
+    }
   }
+  if (look.freeze !== undefined) {
+    if (look.freeze && n.meta.headerCol) n.meta.freeze = 1;
+    else delete n.meta.freeze;
+  }
+  if (look.head !== undefined) withHead(n, look.head);
   if (look.style !== undefined) {
     if (look.style) n.meta.style = look.style;
     else delete n.meta.style;
@@ -461,7 +505,7 @@ function compareCells(a: string, b: string): number {
 
 /** 有跨行的合并时不能排序（排完合并区域就散了） */
 export function canSortRows(t: Table): boolean {
-  return !merges(t).some((m) => m.r2 > m.r1 && m.r2 >= 1);
+  return !merges(t).some((m) => m.r2 > m.r1 && m.r2 >= headRows(t));
 }
 
 /**
@@ -471,7 +515,8 @@ export function canSortRows(t: Table): boolean {
 export function sortRows(t: Table, c: number, desc: boolean, lastFixed = false): Table {
   if (!canSortRows(t)) return t;
   const last = rowCount(t) - (lastFixed ? 1 : 0);
-  const idx = Array.from({ length: Math.max(0, last - 1) }, (_, i) => i + 1);
+  const h = headRows(t);
+  const idx = Array.from({ length: Math.max(0, last - h) }, (_, i) => i + h);
   const sorted = [...idx].sort((x, y) => {
     const d = compareCells(t.cells[x][c], t.cells[y][c]);
     const empty = !t.cells[x][c].trim() || !t.cells[y][c].trim();
@@ -481,8 +526,8 @@ export function sortRows(t: Table, c: number, desc: boolean, lastFixed = false):
   const n = cloneTable(t);
   const pos = new Map<number, number>();
   sorted.forEach((from, i) => {
-    n.cells[i + 1] = t.cells[from].slice();
-    pos.set(from, i + 1);
+    n.cells[i + h] = t.cells[from].slice();
+    pos.set(from, i + h);
   });
   remapCells(n.meta, (r, cc) => [pos.get(r) ?? r, cc]);
   return n;
@@ -579,7 +624,7 @@ function fmt(v: number, places: number, pct: boolean): string {
 /** 一列的合计：数据行里能读成数的格子（计数算不空的格子） */
 export function calcColumn(t: Table, c: number, how: Calc): string {
   const last = rowCount(t) - 1;
-  const cells = t.cells.slice(1, last).map((r) => r[c] ?? "");
+  const cells = t.cells.slice(headRows(t), last).map((r) => r[c] ?? "");
   if (how === "count") return String(cells.filter((x) => x.trim()).length);
   const nums = cells.map(parseNum).filter((x): x is NonNullable<ReturnType<typeof parseNum>> => !!x);
   if (!nums.length) return "";
@@ -637,7 +682,7 @@ const OPT_COLORS: CellColor[] = ["blue", "green", "orange", "purple", "red", "ye
 function optionValues(t: Table, c: number): string[] {
   const end = rowCount(t) - (hasTotal(t) ? 1 : 0);
   const out: string[] = [];
-  for (let r = 1; r < end; r++) {
+  for (let r = headRows(t); r < end; r++) {
     const v = (t.cells[r]?.[c] ?? "").trim();
     if (v && !out.includes(v)) out.push(v);
   }

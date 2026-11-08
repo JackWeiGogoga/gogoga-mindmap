@@ -2503,4 +2503,20 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
  */
 .ggt .ggt-table .ggt-cell[data-bg] { background-color: var(--ggt-cell-bg); }
 .ggt.is-stuck .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+
+/* 冻结标题列：左右滚动时第一列贴在左边。底下要不透明，先铺页面底色，再叠标题列（或格子）的颜色 */
+.ggt { --ggt-frozen-tint: var(--ggt-head-bg); }
+.ggt[data-preset="minimal"], .ggt[data-preset="academic"] { --ggt-frozen-tint: transparent; }
+.ggt.is-freeze .ggt-table .ggt-cell.is-frozen { position: sticky; left: 0; z-index: 2; background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-frozen-tint), var(--ggt-frozen-tint)); }
+.ggt.is-freeze .ggt-table thead .ggt-cell.is-frozen { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
+.ggt.is-freeze[data-preset="minimal"] .ggt-table thead .ggt-cell.is-frozen, .ggt.is-freeze[data-preset="academic"] .ggt-table thead .ggt-cell.is-frozen { background-image: none; }
+.ggt.is-freeze .ggt-table .ggt-cell.is-frozen[data-bg] { background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+/* 滚动过后：阴影画在冻结列的右边，表格左边那道就不要了 */
+.ggt.is-freeze.can-left::before { opacity: 0; }
+.ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.18); }
+.theme-dark .ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.5); }
+
+/* 十字高亮（设置里开）：选中格子所在的整行、整列铺一层淡色 */
+.ggt { --ggt-cross: color-mix(in srgb, var(--interactive-accent) 9%, transparent); }
+.ggt .ggt-cell.is-cross { box-shadow: inset 0 0 0 999px var(--ggt-cross); }
 /* ==== gogoga-table 同步结束 ==== */
