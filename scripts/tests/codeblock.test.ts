@@ -62,3 +62,55 @@ test("```gogoga-mindmap 也算脑图代码块，能定位和写回", () => {
   assert.ok(range);
   assert.equal(replaceBlock(text, range, "# 根\n- B"), "前文\n\n```gogoga-mindmap\n# 根\n- B\n```\n\n```mindmap-other\n# 不算\n```\n");
 });
+
+// #26：代码块里补出来的中心主题被起了名字，要升格成一级标题写回，不然重画后变回「中心主题」
+import { parseMarkdown, promoteRoot, serializeMarkdown } from "../../src/markdown";
+const rename = (src: string, name: string) => {
+  const d = parseMarkdown(src, { fallbackTitle: "" });
+  d.root.text = name;
+  const r = promoteRoot(d);
+  return { r, out: serializeMarkdown(d) };
+};
+
+test("#26 只有列表：顶上补一行一级标题，列表不动", () => {
+  const { r, out } = rename("- 甲\n- 乙\n", "我的主题");
+  assert.equal(r, "ok");
+  // 原文列表前没空行，写回沿用这个习惯
+  assert.equal(out, "# 我的主题\n- 甲\n- 乙\n");
+  assert.equal(parseMarkdown(out, { fallbackTitle: "" }).root.text, "我的主题");
+});
+
+test("#26 好几个一级标题：补上中心主题，原来的标题各降一级", () => {
+  const { r, out } = rename("# 甲\n\n## 甲1\n\n# 乙\n\n- 乙1\n", "根");
+  assert.equal(r, "ok");
+  assert.equal(out, "# 根\n\n## 甲\n\n### 甲1\n\n## 乙\n\n- 乙1\n");
+});
+
+test("#26 都是二级标题：中心主题补成一级，二级的不用动", () => {
+  const { r, out } = rename("## 甲\n\n## 乙\n", "根");
+  assert.equal(r, "ok");
+  assert.equal(out, "# 根\n\n## 甲\n\n## 乙\n");
+});
+
+test("#26 没起名字、本来就有一级标题：不动", () => {
+  assert.equal(rename("- 甲\n", "").r, "noop");
+  assert.equal(rename("- 甲\n", "  ").r, "noop");
+  const { r, out } = rename("# 根\n\n- 甲\n", "新根");
+  assert.equal(r, "noop");
+  assert.equal(out, "# 新根\n\n- 甲\n");
+});
+
+test("#26 已经用到六级标题：存不下，不改", () => {
+  const src = "# a\n\n## b\n\n### c\n\n#### d\n\n##### e\n\n###### f\n\n# g\n";
+  const d = parseMarkdown(src, { fallbackTitle: "" });
+  d.root.text = "根";
+  assert.equal(promoteRoot(d), "full");
+  assert.equal(d.rootFromHeading, false);
+  d.root.text = "";
+  assert.equal(serializeMarkdown(d), src);
+});
+
+test("#26 前面有 frontmatter：一级标题写在 frontmatter 后面", () => {
+  const { out } = rename("---\nmindmap-structure: logic-right\n---\n- 甲\n", "根");
+  assert.equal(out, "---\nmindmap-structure: logic-right\n---\n\n# 根\n- 甲\n");
+});

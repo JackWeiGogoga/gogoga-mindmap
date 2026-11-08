@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- In a code-block mind map without a single top-level heading (only a list, or several top-level headings), a name given to the central topic wasn't saved and turned back into "Central topic" after editing another node (#26). Naming it now adds a top-level heading at the top of the block to hold it, moving the existing headings one level down; if the headings are already six levels deep, a notice says it can't be saved.
+
 ## [0.53.1] - 2026-11-08
 
 ### Changed

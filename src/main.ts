@@ -44,7 +44,7 @@ import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
-import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
+import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
@@ -1258,7 +1258,16 @@ export default class MindMapPlugin extends Plugin {
         notesExpanded: () => this.settings.notesExpanded,
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
-        onChange: (d) => writeBack(keepFormat(serializeMarkdown(d))),
+        onChange: (d) => {
+          // 代码块没有文件名可用：补出来的中心主题被起了名字，就升格成一级标题写进去，不然重画后名字丢了（#26）
+          // 存不下时只撤掉中心主题的名字，同一次里别的改动照常写回
+          if (promoteRoot(d) === "full") {
+            new Notice(t("notice.rootNoRoom"));
+            d.root.text = "";
+            wrap.win.setTimeout(() => canvas.render(), 0);
+          }
+          writeBack(keepFormat(serializeMarkdown(d)));
+        },
         onUndo: () => {
           const prev = state.history.undo(current);
           if (prev !== null) writeBack(prev, false);

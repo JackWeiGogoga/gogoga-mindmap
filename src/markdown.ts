@@ -941,6 +941,29 @@ export function normalizeKinds(doc: MindDoc): void {
   for (const c of fileChildren(doc.root)) fix(c, rootLevel, true);
 }
 
+/**
+ * 中心主题是补出来的（内容里没有唯一的一级标题），又给它起了名字时，把它升格成一级标题写出去，
+ * 原来的标题跟着各降一级。没有文件名可用的地方（代码块）要靠这个，否则名字写不回去，下次重画就丢了（#26）。
+ * "noop"：本来就有一级标题、或者没起名字；"full"：已经用到六级标题，降一级会超过上限，不改
+ */
+export function promoteRoot(doc: MindDoc): "ok" | "noop" | "full" {
+  if (doc.rootFromHeading || !doc.root.text.trim()) return "noop";
+  let full = false;
+  // 升格后中心主题是 1 级；原来的标题按它们在树里的深度往下排。原来就因为太深而写成列表的不算
+  const kidsLevel = (node: MindNode, oldLevel: number, newLevel: number) => {
+    for (const c of fileChildren(node)) {
+      if (c.kind !== "heading" || oldLevel >= 6) continue;
+      if (newLevel + 1 > 6) full = true;
+      kidsLevel(c, oldLevel + 1, newLevel + 1);
+    }
+  };
+  kidsLevel(doc.root, doc.root.level, 1);
+  if (full) return "full";
+  doc.rootFromHeading = true;
+  doc.root.level = 1;
+  return "ok";
+}
+
 /** 把某个节点的整层兄弟统一改成标题或列表；返回是否可行 */
 export function convertLevelKind(node: MindNode, kind: NodeKind, style: DocStyle): boolean {
   const parent = node.parent;
