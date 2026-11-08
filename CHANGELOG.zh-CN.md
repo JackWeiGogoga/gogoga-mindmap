@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-11-08
+
 ### 新增
 - 节点里的表格也能设多行表头（左上角菜单 →「表头行数」）和冻结标题列（打开「第一列作为标题列」后出现），和 gogoga Table 插件一致。
 
@@ -626,7 +628,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...HEAD
+[0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0
 [0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0
 [0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0

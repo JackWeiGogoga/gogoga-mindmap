@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-11-08
+
 ### Added
 - Tables in nodes can also have multi-row headers (top-left menu → **Header rows**) and a frozen header column (shown once **First column as header** is on), matching the gogoga Table plugin.
 
@@ -626,7 +628,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...HEAD
+[0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0
 [0.52.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.51.0...0.52.0
 [0.51.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.50.0...0.51.0
 [0.50.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.49.0...0.50.0
