@@ -128,3 +128,12 @@ test("删除线：加上、紧挨着 ~~ 时去掉、连 ~~ 选中也去掉、多
   // 选区为空：整段
   assert.equal(applyInlineFormat("全部", 1, 1, { kind: "strike" }).text, "~~全部~~");
 });
+
+test("下划线：加上、去掉（选里面的字或连标签一起选）、多行各包各的", () => {
+  assert.deepEqual(applyInlineFormat("学校与教科书", 0, 2, { kind: "underline" }), { text: "<u>学校</u>与教科书", start: 3, end: 5 });
+  assert.deepEqual(applyInlineFormat("<u>学校</u>与教科书", 3, 5, { kind: "underline" }), { text: "学校与教科书", start: 0, end: 2 });
+  assert.deepEqual(applyInlineFormat("<u>学校</u>与教科书", 0, 9, { kind: "underline" }), { text: "学校与教科书", start: 0, end: 2 });
+  assert.equal(applyInlineFormat("甲\n乙", 0, 3, { kind: "underline" }).text, "<u>甲</u>\n<u>乙</u>");
+  // 选区为空：整段
+  assert.equal(applyInlineFormat("学校", 1, 1, { kind: "underline" }).text, "<u>学校</u>");
+});

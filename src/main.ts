@@ -50,6 +50,8 @@ import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
+import type { Extension } from "@codemirror/state";
+import { noteTagsExtension } from "./note-tags";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -141,6 +143,8 @@ export default class MindMapPlugin extends Plugin {
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();
     this.applyDisplayScale(false);
+    this.registerEditorExtension(this.noteTagExt);
+    this.applyNoteTags(false);
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.applyEmbedToolbar(win.doc)));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.setFontScale(win.doc)));
@@ -324,6 +328,14 @@ export default class MindMapPlugin extends Plugin {
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
   rootRule(): RootRule {
     return { rootFromH1: !this.settings.fileNameAsRoot, headingsOnly: this.settings.headingsOnly, showHidden: this.showHidden };
+  }
+
+  /** 「在笔记里隐藏格式标签」：开关时换掉注册给编辑器的扩展，updateOptions 让打开着的笔记立刻生效 */
+  private readonly noteTagExt: Extension[] = [];
+  applyNoteTags(refresh = true): void {
+    this.noteTagExt.length = 0;
+    if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());
+    if (refresh) this.app.workspace.updateOptions();
   }
 
   /** 「显示隐藏的节点」：只在这次运行里有效，所有脑图一起切换 */
@@ -1096,6 +1108,7 @@ export default class MindMapPlugin extends Plugin {
     for (const [id, cmd, name] of nodeCommands) exportCommand(id, t(name), async (v) => v.runNodeCommand(cmd));
     exportCommand("format-bold", t("command.formatBold"), async (v) => v.formatText({ kind: "bold" }));
     exportCommand("format-italic", t("command.formatItalic"), async (v) => v.formatText({ kind: "italic" }));
+    exportCommand("format-underline", t("command.formatUnderline"), async (v) => v.formatText({ kind: "underline" }));
     exportCommand("format-highlight", t("command.formatHighlight"), async (v) => v.formatText({ kind: "highlight" }));
     for (const n of [1, 2, 3, 4, 5]) {
       exportCommand(`format-text-color-${n}`, t("command.formatTextColor", { n }), async (v) => v.formatColor("color", n - 1));

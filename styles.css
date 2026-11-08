@@ -460,6 +460,7 @@
 .mm-has-editor .mm-ed-strong { font-weight: 700; }
 .mm-has-editor .mm-ed-em { font-style: italic; }
 .mm-has-editor .mm-ed-del { text-decoration: line-through; }
+.mm-has-editor .mm-ed-u { text-decoration: underline; }
 .mm-has-editor .mm-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
 .mm-has-editor .mm-ed-mark { background: rgba(255, 210, 0, 0.45); border-radius: 2px; }
 .mm-has-editor .mm-ed-syntax { opacity: 0.45; }
@@ -520,6 +521,7 @@
 .gg-mm-root .mm-format-btn.is-bold { font-weight: 700; }
 .gg-mm-root .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
 .gg-mm-root .mm-format-btn.is-strike { text-decoration: line-through; }
+.gg-mm-root .mm-format-btn.is-underline { text-decoration: underline; }
 .gg-mm-root .mm-format-btn.is-color { font-weight: 700; }
 .gg-mm-root .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
 .gg-mm-root .mm-format-btn .mm-icon { font-size: 15px; }
@@ -2543,3 +2545,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-cross-band.is-shown { display: block; }
 .ggt .ggt-cell.is-cross { box-shadow: inset 0 0 0 999px var(--ggt-cross); }
 /* ==== gogoga-table 同步结束 ==== */
+
+/* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */
+.markdown-source-view .mm-note-u { text-decoration: underline; }
+.markdown-source-view .mm-note-mark { background-color: var(--text-highlight-bg); color: var(--text-normal); border-radius: 2px; }

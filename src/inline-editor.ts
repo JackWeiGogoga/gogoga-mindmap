@@ -88,6 +88,7 @@ const KIND_MARKS = {
   mark: Decoration.mark({ class: "mm-ed-mark" }),
   del: Decoration.mark({ class: "mm-ed-del" }),
   code: Decoration.mark({ class: "mm-ed-code" }),
+  u: Decoration.mark({ class: "mm-ed-u" }),
 };
 
 /** 颜色值来自 COLOR_OPEN_SRC 的匹配（十六进制、颜色名、rgba(数字)），放进 style 是安全的 */

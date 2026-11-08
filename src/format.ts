@@ -10,6 +10,8 @@ export type InlineFormat =
   | { kind: "bold" }
   | { kind: "italic" }
   | { kind: "strike" }
+  /** 下划线：<u>文字</u> */
+  | { kind: "underline" }
   /** color：Obsidian 的彩色高亮 ==🔴文字==；不给就是普通的 ==高亮== */
   | { kind: "highlight"; color?: HighlightColor }
   | { kind: "color"; color: string }
@@ -134,6 +136,19 @@ function toggleStrike(text: string, s: number, e: number): FormatResult {
   }
   const wrapped = wrapLines(sel, "~~", "~~");
   return { text: text.slice(0, s) + wrapped + text.slice(e), start: s + 2, end: s + wrapped.length - 2 };
+}
+
+/** 下划线开关：选区两边正好是 <u> </u>（编辑框里标签藏着，选的是里面的字），或连标签一起选中，就去掉；不然每行包起来 */
+function toggleUnderline(text: string, s: number, e: number): FormatResult {
+  if (text.slice(s - 3, s) === "<u>" && text.slice(e, e + 4) === "</u>") {
+    return { text: text.slice(0, s - 3) + text.slice(s, e) + text.slice(e + 4), start: s - 3, end: e - 3 };
+  }
+  const sel = text.slice(s, e);
+  if (sel.length > 7 && sel.startsWith("<u>") && sel.endsWith("</u>") && !sel.slice(3, -4).includes("<u>")) {
+    return { text: text.slice(0, s) + sel.slice(3, -4) + text.slice(e), start: s, end: e - 7 };
+  }
+  const wrapped = wrapLines(sel, "<u>", "</u>");
+  return { text: text.slice(0, s) + wrapped + text.slice(e), start: s + 3, end: s + wrapped.length - 4 };
 }
 
 /** 选区前后有几个连续的 * */
@@ -332,6 +347,8 @@ export function applyInlineFormat(text: string, start: number, end: number, fmt:
       return toggleMark(text, s, e, fmt.kind);
     case "strike":
       return toggleStrike(text, s, e);
+    case "underline":
+      return toggleUnderline(text, s, e);
     case "highlight":
       return toggleHighlight(text, s, e, fmt.color);
     case "color":

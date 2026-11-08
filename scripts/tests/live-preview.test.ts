@@ -175,3 +175,10 @@ test("选中段里的字整个打字替换：字留在原来的格式里", () =>
   // 从段里第一个字拖到段外再打字：字落在段里
   assert.equal(edit(t, { from: a, to: t.length, insert: "z" }, null, true), '前<span style="color: red">z</span>');
 });
+
+test("下划线 <u>：认成 u，标签藏着，里面还能套格式", () => {
+  const spans = formatSpans("前<u>**学校**</u>后");
+  const u = spans.find((s) => s.kind === "u")!;
+  assert.deepEqual([u.from, u.innerFrom, u.innerTo, u.to, u.html], [1, 4, 10, 14, true]);
+  assert.ok(spans.some((s) => s.kind === "strong" && s.innerFrom === 6 && s.innerTo === 8));
+});

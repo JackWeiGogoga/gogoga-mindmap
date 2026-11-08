@@ -7,7 +7,7 @@
 import { highlightColor, type HighlightColor } from "./format";
 import { TOKEN_RE } from "./inline";
 
-export type SpanKind = "strong" | "em" | "mark" | "del" | "code" | "color" | "bg";
+export type SpanKind = "strong" | "em" | "mark" | "del" | "code" | "color" | "bg" | "u";
 
 export interface FormatSpan {
   kind: SpanKind;
@@ -21,7 +21,7 @@ export interface FormatSpan {
   color?: string;
   /** ==🔴文字== 的高亮颜色（emoji 算在开头的标记符里） */
   highlight?: HighlightColor;
-  /** 标记是 HTML 标签（颜色、<mark>）：很长，露出来会把排版整个挤开，编辑时始终藏着 */
+  /** 标记是 HTML 标签（颜色、<mark>、<u>）：很长，露出来会把排版整个挤开，编辑时始终藏着 */
   html?: boolean;
 }
 
@@ -37,6 +37,7 @@ const GROUPS: { group: number; kind: SpanKind; close: number; nested: boolean; c
   { group: 22, kind: "color", close: "</span>".length, nested: true, colorGroup: 21, html: true },
   { group: 24, kind: "bg", close: "</mark>".length, nested: true, colorGroup: 23, html: true },
   { group: 25, kind: "mark", close: "</mark>".length, nested: true, html: true },
+  { group: 26, kind: "u", close: "</u>".length, nested: true, html: true },
 ];
 
 /** 编辑框文字（换行是 \n）里所有带格式的段落，外层在前 */

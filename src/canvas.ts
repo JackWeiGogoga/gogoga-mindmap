@@ -4547,10 +4547,11 @@ export class MindMapCanvas {
         ev.preventDefault();
         this.commitEdit();
         this.addChildToSelected();
-      } else if (mod && !ev.shiftKey && !ev.altKey && (ev.key.toLowerCase() === "b" || ev.key.toLowerCase() === "i")) {
-        // 编辑中 ⌘B / ⌘I 作用于选中的那段文字
+      } else if (mod && !ev.shiftKey && !ev.altKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
+        // 编辑中 ⌘B / ⌘I / ⌘U 作用于选中的那段文字
         ev.preventDefault();
-        this.formatText({ kind: ev.key.toLowerCase() === "b" ? "bold" : "italic" });
+        const k = ev.key.toLowerCase();
+        this.formatText({ kind: k === "b" ? "bold" : k === "i" ? "italic" : "underline" });
       }
       return;
     }
@@ -4599,10 +4600,11 @@ export class MindMapCanvas {
       }
       return;
     }
-    if (mod && (ev.key.toLowerCase() === "b" || ev.key.toLowerCase() === "i")) {
+    if (mod && !ev.shiftKey && !ev.altKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
       if (this.opts.editable && this.selected.size) {
         ev.preventDefault();
-        this.formatText({ kind: ev.key.toLowerCase() === "b" ? "bold" : "italic" });
+        const k = ev.key.toLowerCase();
+        this.formatText({ kind: k === "b" ? "bold" : k === "i" ? "italic" : "underline" });
       }
       return;
     }
@@ -6838,6 +6840,7 @@ export class MindMapCanvas {
     btn("is-bold", t("format.bold"), { kind: "bold" }, (b) => (b.textContent = "B"));
     btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
     btn("is-strike", t("format.strike"), { kind: "strike" }, (b) => (b.textContent = "S"));
+    btn("is-underline", t("format.underline", { key: sc("Mod", "U") }), { kind: "underline" }, (b) => (b.textContent = "U"));
     btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(icon("highlighter")));
     const sep = () => bar.append(createSpan({ cls: "mm-format-sep" }));
     const colors = this.opts.textColors?.() ?? [];
