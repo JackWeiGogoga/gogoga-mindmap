@@ -370,14 +370,30 @@ export class TableEditor {
     this.on(this.scroller, "scroll", onScroll, { passive: true });
     // 外面的滚动容器要等挂到文档上才找得到
     win.requestAnimationFrame(() => {
+      // 找上下滚的那层：overflow-y 是 auto/scroll、而且真能上下滚的最近一层；都滚不动（笔记很短）就用最近的一层。
+      // 只横向滚的包装跳过——阅读视图里 Obsidian 的 .el-table 是 overflow-x: auto，算出来 overflow-y 也是 auto，以前表头吸顶在阅读视图里因此没生效
+      let first: HTMLElement | null = null;
+      let found: HTMLElement | null = null;
       for (let el = this.root.parentElement; el; el = el.parentElement) {
         const oy = win.getComputedStyle(el).overflowY;
-        if (oy === "auto" || oy === "scroll") {
-          this.outer = el;
-          el.addEventListener("scroll", onScroll, { passive: true });
-          this.cleanups.push(() => el.removeEventListener("scroll", onScroll));
+        if ((oy !== "auto" && oy !== "scroll") || el.classList.contains("el-table")) continue;
+        first ??= el;
+        if (el.scrollHeight > el.clientHeight + 1) {
+          found = el;
           break;
         }
+      }
+      const el = found ?? first;
+      if (el) {
+        this.outer = el;
+        // 浏览器支持滚动驱动动画时，表头位置交给浏览器按滚动位置算（和滚动同一帧画，不会慢一拍抖动，#2）。
+        // 时间线名挂在这个滚动容器上；同一容器里的几张表共用
+        if (win.CSS?.supports?.("animation-timeline: scroll()")) {
+          el.classList.add("ggt-y-host");
+          this.scrollDriven = true;
+        }
+        el.addEventListener("scroll", onScroll, { passive: true });
+        this.cleanups.push(() => el.removeEventListener("scroll", onScroll));
       }
       update();
     });
@@ -387,6 +403,9 @@ export class TableEditor {
   }
 
   private outer: HTMLElement | null = null;
+  /** 表头吸顶用滚动驱动动画（否则每次滚动后用 JS 挪，旧环境、被缩放的脑图画布里走这条） */
+  private scrollDriven = false;
+  private stickKey = "";
 
   /**
    * 编辑器被整体缩放了多少（脑图画布用 transform: scale 缩放，getBoundingClientRect 量到的是屏幕像素）。
@@ -413,8 +432,36 @@ export class TableEditor {
     }
     const stuck = offset > 0;
     this.root.classList.toggle("is-stuck", stuck);
+    if (outer && this.scrollDriven && Math.abs(this.scale() - 1) < 0.01) {
+      this.stickRange(outer, head);
+      head.removeAttribute("style");
+      return;
+    }
+    this.root.classList.remove("is-sd");
     if (stuck) head.setAttribute("style", `transform: translateY(${Math.round(offset / this.scale())}px)`);
     else head.removeAttribute("style");
+  }
+
+  /**
+   * 滚动驱动的吸顶：外面容器滚到「表格顶端碰到容器顶端」(a) 时表头开始跟着往下挪，挪到「表格只剩两行表头高」为止。
+   * a 和长度不随滚动变，只在布局变了时更新；滚动过程中表头位置全由浏览器算
+   */
+  private stickRange(outer: HTMLElement, head: HTMLTableSectionElement): void {
+    const t = this.tableEl.getBoundingClientRect();
+    const len = Math.round(t.height - head.offsetHeight * 2);
+    if (len <= 0) {
+      this.root.classList.remove("is-sd");
+      return;
+    }
+    const a = Math.round(outer.scrollTop + t.top - outer.getBoundingClientRect().top - outer.clientTop);
+    const key = `${a}|${len}`;
+    if (key !== this.stickKey) {
+      this.stickKey = key;
+      this.root.style.setProperty("--ggt-stick-a", `${a}px`);
+      this.root.style.setProperty("--ggt-stick-b", `${a + len}px`);
+      this.root.style.setProperty("--ggt-stick-len", `${len}px`);
+    }
+    this.root.classList.add("is-sd");
   }
 
   /** 样式、行距：这张表自己定了就用它的，否则用宿主给的默认（data-def-*） */
