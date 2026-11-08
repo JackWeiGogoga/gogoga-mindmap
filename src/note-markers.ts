@@ -1,4 +1,4 @@
-/** 「在笔记里隐藏脑图节点标记」的显示部分：藏着的标记画成一个小灰点，悬停看原文，点一下露出原文（规则见 note-markers-core） */
+/** 「笔记里的脑图节点标记」的显示部分：藏着的标记画成一个小灰点（悬停看原文，点一下露出原文），或者什么都不画（规则见 note-markers-core） */
 
 import { type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, WidgetType } from "@codemirror/view";
@@ -34,7 +34,21 @@ class MarkerDot extends WidgetType {
   }
 }
 
-function build(view: EditorView, active: (s: EditorState) => boolean): { deco: DecorationSet; atomic: DecorationSet } {
+/** 完全隐藏时也留一个看不见的零宽元素：标记那里什么 DOM 都没有时，输入法在行尾组字会把拼音留在正文里 */
+class HiddenMarker extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+  toDOM(): HTMLElement {
+    return createSpan({ cls: "mm-note-marker-hidden" });
+  }
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+const NOTHING = Decoration.replace({ widget: new HiddenMarker() });
+
+function build(view: EditorView, mode: "dot" | "hide", active: (s: EditorState) => boolean): { deco: DecorationSet; atomic: DecorationSet } {
   const deco: Range<Decoration>[] = [];
   const st = view.state;
   if (active(st)) {
@@ -49,7 +63,7 @@ function build(view: EditorView, active: (s: EditorState) => boolean): { deco: D
         const r = markerInLine(line.text, line.from);
         if (!r || revealedMarker(r, st.selection)) continue;
         const raw = doc.sliceString(r.from, r.to);
-        deco.push(Decoration.replace({ widget: new MarkerDot(raw, r.inner - r.from) }).range(r.from, r.to));
+        deco.push((mode === "hide" ? NOTHING : Decoration.replace({ widget: new MarkerDot(raw, r.inner - r.from) })).range(r.from, r.to));
       }
     }
   }
@@ -57,16 +71,17 @@ function build(view: EditorView, active: (s: EditorState) => boolean): { deco: D
   return { deco: set, atomic: set };
 }
 
-export function noteMarkersExtension(active: (s: EditorState) => boolean): Extension {
+/** mode：dot 画成小圆点（点一下露出原文）；hide 什么都不画。两种都一样防改坏 */
+export function noteMarkersExtension(mode: "dot" | "hide", active: (s: EditorState) => boolean): Extension {
   const plugin = ViewPlugin.fromClass(
     class {
       deco: DecorationSet;
       atomic: DecorationSet;
       constructor(view: EditorView) {
-        ({ deco: this.deco, atomic: this.atomic } = build(view, active));
+        ({ deco: this.deco, atomic: this.atomic } = build(view, mode, active));
       }
       update(u: ViewUpdate) {
-        if (u.docChanged || u.viewportChanged || u.selectionSet || active(u.state) !== active(u.startState)) ({ deco: this.deco, atomic: this.atomic } = build(u.view, active));
+        if (u.docChanged || u.viewportChanged || u.selectionSet || active(u.state) !== active(u.startState)) ({ deco: this.deco, atomic: this.atomic } = build(u.view, mode, active));
       }
     },
     {

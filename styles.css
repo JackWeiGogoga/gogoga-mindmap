@@ -2552,3 +2552,4 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 「在笔记里隐藏脑图节点标记」：行尾的 %%…%% 缩成的小灰点，悬停看原文，点一下露出来 */
 .markdown-source-view .mm-note-marker { display: inline-block; width: 6px; height: 6px; margin: 0 0 0.15em 0.4em; border-radius: 50%; background: var(--text-faint); opacity: 0.6; vertical-align: middle; cursor: pointer; }
 .markdown-source-view .mm-note-marker:hover { opacity: 1; background: var(--text-muted); }
+.markdown-source-view .mm-note-marker-hidden { display: inline-block; width: 0; height: 1em; overflow: hidden; vertical-align: text-bottom; }

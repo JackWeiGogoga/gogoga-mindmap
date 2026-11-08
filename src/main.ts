@@ -338,10 +338,10 @@ export default class MindMapPlugin extends Plugin {
   applyNoteTags(refresh = true): void {
     this.noteTagExt.length = 0;
     if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());
-    if (this.settings.hideMarkersInNotes) {
+    if (this.settings.markersInNotes !== "show") {
       // 只在实时预览、只在脑图笔记（frontmatter 有 mindmap）里
       this.noteTagExt.push(
-        noteMarkersExtension((s) => {
+        noteMarkersExtension(this.settings.markersInNotes, (s) => {
           if (!s.field(editorLivePreviewField, false)) return false;
           const path = s.field(editorInfoField, false)?.file?.path;
           return !!path && this.isMindMapFile(path);
