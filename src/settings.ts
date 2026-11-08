@@ -342,14 +342,6 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
         toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
-        toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),
-        dropdown(
-          "markersInNotes",
-          t("settings.markersInNotes.name"),
-          t("settings.markersInNotes.desc"),
-          { show: t("settings.markersInNotes.show"), dot: t("settings.markersInNotes.dot"), hide: t("settings.markersInNotes.hide") },
-          ["%%", "marker", "comment", "标记", "注释", "隐藏"],
-        ),
         toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
         toggle("newNodeName", t("settings.newNodeName.name"), t("settings.newNodeName.desc"), ["new node", "新建", "默认名字", "主题1"]),
         toggle("autoNumber", t("settings.autoNumber.name"), t("settings.autoNumber.desc"), ["number", "编号", "序号", "有序列表"]),
@@ -394,6 +386,16 @@ export class MindMapSettingTab extends PluginSettingTab {
           toggle("foldFollow", t("settings.foldFollow.name"), t("settings.foldFollow.desc"), ["fold", "折叠"]),
           toggle("followActiveNote", t("settings.followActive.name"), t("settings.followActive.desc"), ["sidebar", "侧边栏"]),
           toggle("outlineWrap", t("settings.outlineWrap.name"), t("settings.outlineWrap.desc"), ["outline", "大纲"]),
+        ]),
+        group(t("settings.group.noteDisplay"), [
+          toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),
+          dropdown(
+            "markersInNotes",
+            t("settings.markersInNotes.name"),
+            t("settings.markersInNotes.desc"),
+            { show: t("settings.markersInNotes.show"), dot: t("settings.markersInNotes.dot"), hide: t("settings.markersInNotes.hide") },
+            ["%%", "marker", "comment", "标记", "注释", "隐藏"],
+          ),
         ]),
         group(t("settings.group.embed"), [
           toggle("claimMindmapBlock", t("settings.claimBlock.name"), t("settings.claimBlock.desc"), ["code block", "代码块"]),
