@@ -365,6 +365,7 @@ export class TableEditor {
     const win = this.root.ownerDocument.defaultView ?? window;
     const update = () => {
       if (this.destroyed) return;
+      if (!this.outer) this.findOuter?.();
       const sc = this.scroller;
       this.root.classList.toggle("can-left", sc.scrollLeft > 1);
       this.root.classList.toggle("can-right", sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1);
@@ -381,8 +382,11 @@ export class TableEditor {
       onScroll();
     };
     this.on(this.scroller, "scroll", onScrollEv, { passive: true });
-    // 外面的滚动容器要等挂到文档上才找得到
-    win.requestAnimationFrame(() => {
+    // 外面的滚动容器要等挂到文档上才找得到。阅读视图会先把表格画好、过一会儿才挂到页面上：
+    // 下一帧还没挂上就先不找，等挂上以后（ResizeObserver 报尺寸变化 → update）再找
+    const findOuter = (): boolean => {
+      if (this.outer) return true;
+      if (!this.root.isConnected) return false;
       // 找上下滚的那层：overflow-y 是 auto/scroll、而且真能上下滚的最近一层；都滚不动（笔记很短）就用最近的一层。
       // 只横向滚的包装跳过——阅读视图里 Obsidian 的 .el-table 是 overflow-x: auto，算出来 overflow-y 也是 auto，以前表头吸顶在阅读视图里因此没生效
       let first: HTMLElement | null = null;
@@ -397,17 +401,21 @@ export class TableEditor {
         }
       }
       const el = found ?? first;
-      if (el) {
-        this.outer = el;
-        // 浏览器支持滚动驱动动画时，表头位置交给浏览器按滚动位置算（和滚动同一帧画，不会慢一拍抖动，#2）。
-        // 时间线名挂在这个滚动容器上；同一容器里的几张表共用
-        if (win.CSS?.supports?.("animation-timeline: scroll()")) {
-          el.classList.add("ggt-y-host");
-          this.scrollDriven = true;
-        }
-        el.addEventListener("scroll", onScrollEv, { passive: true });
-        this.cleanups.push(() => el.removeEventListener("scroll", onScrollEv));
+      if (!el) return false;
+      this.outer = el;
+      // 浏览器支持滚动驱动动画时，表头位置交给浏览器按滚动位置算（和滚动同一帧画，不会慢一拍抖动，#2）。
+      // 时间线名挂在这个滚动容器上；同一容器里的几张表共用
+      if (win.CSS?.supports?.("animation-timeline: scroll()")) {
+        el.classList.add("ggt-y-host");
+        this.scrollDriven = true;
       }
+      el.addEventListener("scroll", onScrollEv, { passive: true });
+      this.cleanups.push(() => el.removeEventListener("scroll", onScrollEv));
+      return true;
+    };
+    this.findOuter = findOuter;
+    win.requestAnimationFrame(() => {
+      findOuter();
       update();
     });
     const ro = new win.ResizeObserver(onScroll);
@@ -416,6 +424,8 @@ export class TableEditor {
   }
 
   private outer: HTMLElement | null = null;
+  /** 找外面的滚动区（watchScroll 里定义；挂到页面上以前找不到，之后再试） */
+  private findOuter: (() => boolean) | null = null;
   /** 表头吸顶用滚动驱动动画（否则每次滚动后用 JS 挪，旧环境、被缩放的脑图画布里走这条） */
   private scrollDriven = false;
   private stickKey = "";
