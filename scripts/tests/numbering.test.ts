@@ -55,3 +55,18 @@ test("取消编号后列表写回普通项目符号", () => {
   for (const c of doc.root.children) c.bullet = "";
   assert.equal(serializeMarkdown(doc), "# T\n\n- 一\n- 二\n");
 });
+
+test("开编号时去掉这组手打的序号：全都带才去，有一个不带就不碰", async () => {
+  const { stripTypedNumbers } = await import("../../src/model");
+  const doc = parse("# T\n\n- 1. 一\n- 2) 二\n- 3、三\n");
+  assert.equal(stripTypedNumbers(doc.root), true);
+  assert.deepEqual(doc.root.children.map((c) => c.text), ["一", "二", "三"]);
+  doc.root.numbered = true;
+  assert.equal(serializeMarkdown(doc), "# T\n\n1. 一\n2. 二\n3. 三\n");
+  const mixed = parse("# T\n\n- 1. 一\n- 二\n");
+  assert.equal(stripTypedNumbers(mixed.root), false);
+  assert.deepEqual(mixed.root.children.map((c) => c.text), ["1. 一", "二"]);
+  // 「2024. 年」「1.5 倍」不算序号
+  const year = parse("# T\n\n- 2024. 年\n- 1.5 倍\n");
+  assert.equal(stripTypedNumbers(year.root), false);
+});

@@ -920,6 +920,20 @@ export function orderedBullet(bullet: string): { n: number; delim: string; pad: 
   return m ? { n: Number(m[1]), delim: m[2], pad: m[1].startsWith("0") ? m[1].length : 0 } : null;
 }
 
+/** 节点开头手打的序号：「1. 」「2) 」「3、」 */
+export const TYPED_NUMBER_RE = /^\d{1,3}(?:[.)．]\s+|、\s*)(?=\S)/;
+
+/**
+ * 开编号时去掉这组同级手打的序号：每个都以「数字. 」开头才去，只有几个带数字的多半是正文，不碰。
+ * 返回有没有改
+ */
+export function stripTypedNumbers(parent: MindNode): boolean {
+  const kids = parent.children.filter((c) => !c.topicOf && !c.float);
+  if (!kids.length || !kids.every((c) => TYPED_NUMBER_RE.test(c.text))) return false;
+  for (const c of kids) c.text = c.text.replace(TYPED_NUMBER_RE, "");
+  return true;
+}
+
 /** 编号从几开始：第一个列表子节点是有序列表就用它的数字（Markdown 也是这样），否则从 1 */
 export function numberStart(parent: MindNode): number {
   const first = fileChildren(parent).find((c) => c.kind === "list");

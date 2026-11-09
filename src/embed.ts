@@ -127,7 +127,7 @@ class MindMapEmbed extends Component {
         hideSyntax: () => settings.hideSyntax,
         widthHandleOnHover: () => settings.widthHandleOnHover,
         newNodeName: () => settings.newNodeName,
-        autoNumber: () => settings.autoNumber,
+        autoNumber: () => settings.numberByTyping,
         copyPlain: () => settings.copyPlain,
         showNodebar: () => settings.showNodebar,
         nodeColors: () => parseNodeColors(settings.nodeColors),

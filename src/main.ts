@@ -267,6 +267,11 @@ export default class MindMapPlugin extends Plugin {
       await this.saveSettings();
     }
     this.settings.customThemes = this.settings.customThemes.map(normalizeCustomTheme);
+    // 0.56 以前的「打 1. 开始编号」叫 autoNumber、默认关；改名后按新默认（开）来，旧键删掉
+    if ("autoNumber" in raw) {
+      delete (this.settings as MindMapSettings & { autoNumber?: boolean }).autoNumber;
+      await this.saveSettings();
+    }
     // 0.3.x 用的是借来的 lucide:git-fork；裸的 mindmap-tree 又不被文件列表插件认，统一迁到带前缀的值
     if (this.settings.listIcon === "lucide:git-fork" || this.settings.listIcon === MINDMAP_ICON) {
       this.settings.listIcon = MINDMAP_LIST_ICON;
@@ -1272,7 +1277,7 @@ export default class MindMapPlugin extends Plugin {
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,
         newNodeName: () => this.settings.newNodeName,
-        autoNumber: () => this.settings.autoNumber,
+        autoNumber: () => this.settings.numberByTyping,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodeColors: () => parseNodeColors(this.settings.nodeColors),

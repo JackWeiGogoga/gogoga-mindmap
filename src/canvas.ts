@@ -39,6 +39,8 @@ import {
   countHidden,
   numberLabel,
   orderedBullet,
+  stripTypedNumbers,
+  TYPED_NUMBER_RE,
   allChildren,
 } from "./model";
 import {
@@ -3233,7 +3235,11 @@ export class MindMapCanvas {
     if (!parents.size) return;
     const next = on ?? [...parents].some((p) => !p.numbered);
     let changed = false;
-    for (const p of parents) changed = this.setNumbered(p, next) || changed;
+    for (const p of parents) {
+      // 已经编号了、但每项还带着手打的序号（「1. 1. 一」）：这次点击先把手打的去掉，编号留着
+      if (!next && p.numbered && stripTypedNumbers(p)) changed = true;
+      else changed = this.setNumbered(p, next) || changed;
+    }
     if (!changed) return;
     this.render();
     this.reflow();
@@ -3243,6 +3249,8 @@ export class MindMapCanvas {
   private setNumbered(parent: MindNode, on: boolean): boolean {
     if (!!parent.numbered === on) return false;
     parent.numbered = on || undefined;
+    // 已经手打了「1. 2. 3.」的一组，打开编号顺手把手打的去掉，不然会变成「1. 1. 一」
+    if (on) stripTypedNumbers(parent);
     if (!on) for (const c of allChildren(parent)) if (c.kind === "list" && orderedBullet(c.bullet)) c.bullet = "";
     return true;
   }
@@ -5870,10 +5878,10 @@ export class MindMapCanvas {
     node.text = text;
     // 快捷编号（设置打开时）：开头打了「1.」「1、」，这组同级开始编号，打的数字去掉
     if (!cancel && this.opts.autoNumber?.() && node.parent && !isSummaryTopic(node) && this.canNumber(node.parent)) {
-      const m = /^\d{1,3}(?:[.)．]\s+|、\s*)(?=\S)/.exec(text);
-      if (m) {
-        node.text = text.slice(m[0].length);
+      if (TYPED_NUMBER_RE.test(text)) {
+        // 先开编号（同级都手打了序号的会一起去掉），再去掉这个节点自己打的
         this.setNumbered(node.parent, true);
+        node.text = node.text.replace(TYPED_NUMBER_RE, "");
         changed = true;
       }
     }
@@ -6642,6 +6650,10 @@ export class MindMapCanvas {
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
+      if (node.parent && !topic) {
+        const on = !!node.parent.numbered;
+        entries.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
+      }
       if (node.width) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidth(node) });
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
@@ -6683,10 +6695,6 @@ export class MindMapCanvas {
       if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
       else if (node.parent && !topic && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       more.push(sep);
-    }
-    if (editable && node.parent && !topic) {
-      const on = !!node.parent.numbered;
-      more.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) }, sep);
     }
     if (editable && this.nodeTable(node)) {
       more.push(
