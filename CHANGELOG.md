@@ -6,6 +6,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Changed
 - Tables in nodes: editing a cell now uses the same editor as node text — colors, highlights, bold and underline show while editing, with their tags hidden and kept paired.
+- Tables in nodes: drag handles appear only on the first column (row handle) and header row (column handle), like native tables, and hide while scrolling.
 
 ## [0.59.0] - 2026-11-09
 

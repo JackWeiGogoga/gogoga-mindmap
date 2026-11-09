@@ -142,6 +142,10 @@ export class TableEditor {
   /** 编辑时宿主送来的新表：等这一格改完再换上 */
   private pending: Table | null = null;
   private hover: Pos | null = null;
+  /** 上一次滚动的时间：滚动中（和刚停下的一小会儿）不显示手柄，鼠标再动才出来（#2） */
+  private scrolledAt = 0;
+  /** 最近一次是用手指点的：触屏没有悬停，手柄跟着选中的格子显示 */
+  private touched = false;
   /** 每个位置 → 显示它的格子元素（被合并盖住的位置指向左上角那格）。render 时建，大表格里不用每次 querySelector 全表 */
   private grid: HTMLElement[][] = [];
   /** 上一次加了选中样式、十字高亮的格子：下次只清这些，不扫全表 */
@@ -365,13 +369,18 @@ export class TableEditor {
       this.root.classList.toggle("can-left", sc.scrollLeft > 1);
       this.root.classList.toggle("can-right", sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1);
       this.stickHeader();
-      // 手柄、左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
+      // 左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
       this.placeHandles();
       // 冻结标题列时，十字高亮竖的色带不能伸进冻结列底下：横向滚动后重新摆
       if (this.root.classList.contains("is-freeze") && this.crossBands.some((b) => b.classList.contains("is-shown"))) this.markCross();
     };
     const onScroll = () => win.requestAnimationFrame(update);
-    this.on(this.scroller, "scroll", onScroll, { passive: true });
+    // 滚动时手柄先藏起来：鼠标没动、底下的格子在动，悬停的那格已经不对了；列手柄也跟不上吸顶的表头（#2）
+    const onScrollEv = () => {
+      this.hideHandlesForScroll();
+      onScroll();
+    };
+    this.on(this.scroller, "scroll", onScrollEv, { passive: true });
     // 外面的滚动容器要等挂到文档上才找得到
     win.requestAnimationFrame(() => {
       // 找上下滚的那层：overflow-y 是 auto/scroll、而且真能上下滚的最近一层；都滚不动（笔记很短）就用最近的一层。
@@ -396,8 +405,8 @@ export class TableEditor {
           el.classList.add("ggt-y-host");
           this.scrollDriven = true;
         }
-        el.addEventListener("scroll", onScroll, { passive: true });
-        this.cleanups.push(() => el.removeEventListener("scroll", onScroll));
+        el.addEventListener("scroll", onScrollEv, { passive: true });
+        this.cleanups.push(() => el.removeEventListener("scroll", onScrollEv));
       }
       update();
     });
@@ -1022,7 +1031,10 @@ export class TableEditor {
       // 点链接、标签：照常打开，不选中
       if (target.closest("a, .tag, input[type=checkbox]")) return;
       const p = { r: Number(cell.dataset.r), c: Number(cell.dataset.c) };
-      if (ev.pointerType === "touch") return this.touchStart(ev, p);
+      if (ev.pointerType === "touch") {
+        this.touched = true;
+        return this.touchStart(ev, p);
+      }
       ev.preventDefault();
       if (ev.button !== 0) return;
       if (ev.shiftKey && this.sel) {
@@ -1103,6 +1115,9 @@ export class TableEditor {
     this.on(this.root, "pointermove", (ev) => {
       if (!this.resize && ev.pointerType !== "touch" && !this.host.readonly) this.placeResizeBar(ev.clientX, ev.clientY);
       if (this.resize || ev.pointerType === "touch" || this.root.classList.contains("is-dragging")) return;
+      this.touched = false;
+      // 刚滚过：浏览器在滚动后补发的鼠标移动不算，等鼠标真的再动
+      if (performance.now() - this.scrolledAt < 150) return;
       const cell = (ev.target as HTMLElement).closest<HTMLElement>(".ggt-cell");
       if (!cell || !this.tableEl.contains(cell)) return;
       const p = { r: Number(cell.dataset.r), c: Number(cell.dataset.c) };
@@ -2056,33 +2071,71 @@ export class TableEditor {
       const y = Math.max(tr.top, vis.top);
       this.cornerBtn.setAttribute("style", `left:${(x - base.left) / k}px;top:${(y - base.top) / k}px`);
     }
-    const p = this.hover ?? this.sel;
-    const show = !!p && !this.host.readonly && !this.resize;
-    this.rowHandle.classList.toggle("is-shown", show);
-    this.colHandle.classList.toggle("is-shown", show);
-    if (!show || !p) return;
+    const off = () => {
+      this.rowHandle.classList.remove("is-shown");
+      this.colHandle.classList.remove("is-shown");
+    };
+    if (this.host.readonly || this.resize) return off();
+    // 和原生表格一样：鼠标在第一列（横向滚过时是看得见的最左一列）才有这一行的行手柄，在表头行才有这一列的列手柄（#2）。
+    // 用手柄选了整行 / 整列（菜单开着）时，那个手柄留着；触屏没有悬停，跟着选中的格子显示
+    const head = Math.max(1, headRows(this.table));
+    const h = this.hover;
+    const line = this.lineSel && this.anchor && this.sel ? { a: this.anchor, b: this.sel } : null;
+    const lineRow = line && line.a.r === line.b.r ? { r: line.a.r, c: 0 } : null;
+    const lineCol = line && line.a.c === line.b.c ? { r: 0, c: line.a.c } : null;
+    const touchSel = this.touched && !h ? this.sel : null;
+    // 第一列横向滚出去了：看得见的最左边那一格也算行首；左边的格子都被合并占了也算
+    const atRowStart = (q: Pos) => {
+      if (q.c === 0) return true;
+      // 第一列是从上一行合并下来的（这一行左边没有自己的格子）：这一行最左边画出来的那格就是行首
+      let covered = true;
+      for (let c = 0; c < q.c && covered; c++) covered = isCovered(this.table, q.r, c);
+      if (covered) return true;
+      const el = this.cellEl(q);
+      return !!el && el.getBoundingClientRect().left <= vis.left + 1;
+    };
+    const rowP = (h && atRowStart(h) ? h : null) ?? lineRow ?? touchSel;
+    const colP = (h && h.r < head ? h : null) ?? lineCol ?? touchSel;
+    this.rowHandle.classList.toggle("is-shown", !!rowP);
+    this.colHandle.classList.toggle("is-shown", !!colP);
     const base = this.root.getBoundingClientRect();
-    const cell = this.cellEl(p);
-    const first = this.cellEl({ r: p.r, c: 0 });
-    const head = this.cellEl({ r: 0, c: p.c });
-    if (!cell || !first || !head) return;
-    const fr = first.getBoundingClientRect();
-    const hr = head.getBoundingClientRect();
     const k = this.scale();
-    // 行手柄贴在看得见的左边；这一行上下滚出去了就藏起来。列手柄：这一列左右滚出去了就藏起来
-    const rowMid = fr.top + fr.height / 2;
-    const colMid = hr.left + hr.width / 2;
-    if (rowMid < vis.top || rowMid > vis.bottom) this.rowHandle.classList.remove("is-shown");
-    if (colMid < vis.left || colMid > vis.right) this.colHandle.classList.remove("is-shown");
-    this.rowHandle.style.top = `${(rowMid - base.top) / k}px`;
-    this.rowHandle.style.left = `${(Math.max(fr.left, vis.left) - base.left) / k}px`;
-    this.rowHandle.dataset.r = String(p.r);
-    this.rowHandle.classList.toggle("is-fixed", p.r < headRows(this.table));
-    this.rowHandle.dataset.c = String(p.c);
-    this.colHandle.style.left = `${(colMid - base.left) / k}px`;
-    this.colHandle.style.top = `${(Math.max(hr.top, vis.top) - base.top) / k}px`;
-    this.colHandle.dataset.r = String(p.r);
-    this.colHandle.dataset.c = String(p.c);
+    if (rowP) {
+      const first = this.cellEl({ r: rowP.r, c: 0 });
+      if (!first) this.rowHandle.classList.remove("is-shown");
+      else {
+        const fr = first.getBoundingClientRect();
+        // 行手柄贴在看得见的左边；这一行上下滚出去了就藏起来
+        const rowMid = fr.top + fr.height / 2;
+        if (rowMid < vis.top || rowMid > vis.bottom) this.rowHandle.classList.remove("is-shown");
+        this.rowHandle.style.top = `${(rowMid - base.top) / k}px`;
+        this.rowHandle.style.left = `${(Math.max(fr.left, vis.left) - base.left) / k}px`;
+        this.rowHandle.dataset.r = String(rowP.r);
+        this.rowHandle.classList.toggle("is-fixed", rowP.r < headRows(this.table));
+        this.rowHandle.dataset.c = String(rowP.c);
+      }
+    }
+    if (colP) {
+      const headCell = this.cellEl({ r: 0, c: colP.c });
+      if (!headCell) this.colHandle.classList.remove("is-shown");
+      else {
+        const hr = headCell.getBoundingClientRect();
+        // 列手柄：这一列左右滚出去了就藏起来
+        const colMid = hr.left + hr.width / 2;
+        if (colMid < vis.left || colMid > vis.right) this.colHandle.classList.remove("is-shown");
+        this.colHandle.style.left = `${(colMid - base.left) / k}px`;
+        this.colHandle.style.top = `${(Math.max(hr.top, vis.top) - base.top) / k}px`;
+        this.colHandle.dataset.r = String(colP.r);
+        this.colHandle.dataset.c = String(colP.c);
+      }
+    }
+  }
+
+  /** 滚动中：忘掉悬停的格子、藏起手柄（菜单开着、整行整列选着的不动） */
+  private hideHandlesForScroll(): void {
+    this.scrolledAt = performance.now();
+    if (this.popover) return;
+    this.hover = null;
   }
 
   // ---------- 菜单 ----------
