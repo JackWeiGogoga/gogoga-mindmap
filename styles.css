@@ -480,12 +480,12 @@
   border-radius: 2px;
 }
 /* Obsidian 1.15 的彩色高亮 ==🔴文字==：用主题里的高亮色，老版本 Obsidian 没有这些变量时按主题色调淡 */
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .gg-mm-root .mm-format-btn.is-bg)[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 /* 编辑时选中文字浮出的格式栏 */
 .mm-format-bar {
   position: absolute;
@@ -502,7 +502,7 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.gg-mm-root .mm-format-btn {
+.mm-format-bar .mm-format-btn {
   all: unset;
   box-sizing: border-box;
   display: flex;
@@ -517,14 +517,14 @@
   color: var(--text-normal, #1f1f1f);
   cursor: pointer;
 }
-.gg-mm-root .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
-.gg-mm-root .mm-format-btn.is-bold { font-weight: 700; }
-.gg-mm-root .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
-.gg-mm-root .mm-format-btn.is-strike { text-decoration: line-through; }
-.gg-mm-root .mm-format-btn.is-underline { text-decoration: underline; }
-.gg-mm-root .mm-format-btn.is-color { font-weight: 700; }
-.gg-mm-root .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
-.gg-mm-root .mm-format-btn .mm-icon { font-size: 15px; }
+.mm-format-bar .mm-format-btn:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
+.mm-format-bar .mm-format-btn.is-bold { font-weight: 700; }
+.mm-format-bar .mm-format-btn.is-italic { font-style: italic; font-family: Georgia, serif; }
+.mm-format-bar .mm-format-btn.is-strike { text-decoration: line-through; }
+.mm-format-bar .mm-format-btn.is-underline { text-decoration: underline; }
+.mm-format-bar .mm-format-btn.is-color { font-weight: 700; }
+.mm-format-bar .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
+.mm-format-bar .mm-format-btn .mm-icon { font-size: 15px; }
 .mm-format-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--background-modifier-border, #e3e3e3); }
 .mm-link {
   color: var(--link-color, var(--mm-selection));
@@ -2556,3 +2556,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .markdown-source-view .mm-note-marker { display: inline-block; width: 6px; height: 6px; margin: 0 0 0.15em 0.4em; border-radius: 50%; background: var(--text-faint); opacity: 0.6; vertical-align: middle; cursor: pointer; }
 .markdown-source-view .mm-note-marker:hover { opacity: 1; background: var(--text-muted); }
 .markdown-source-view .mm-note-marker-hidden { display: inline-block; width: 0; height: 1em; overflow: hidden; vertical-align: text-bottom; }
+
+/* Markdown 笔记里选中文字浮出的格式栏（「在笔记里选中文字时显示格式栏」）：挂在 body 上，按视口定位 */
+.mm-format-bar.mm-note-format-bar { position: fixed; z-index: var(--layer-popover, 30); }
+.mm-note-format-bar .mm-icon { display: flex; }
+.mm-note-format-bar .mm-icon svg { width: 15px; height: 15px; }

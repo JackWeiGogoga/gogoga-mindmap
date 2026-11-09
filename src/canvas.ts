@@ -63,7 +63,8 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { applyInlineFormat, highlightOf, type InlineFormat } from "./format";
+import { applyInlineFormat, type InlineFormat } from "./format";
+import { createFormatBar, highlightFormat } from "./format-bar";
 import { InlineEditor } from "./inline-editor";
 import {
   fromEditableText,
@@ -342,11 +343,6 @@ const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3;
 const FIT_PADDING = 48;
 
-/** 格式栏、命令里的一个颜色：荧光笔颜色表里的 🔴 之类写成 Obsidian 的 ==🔴文字==，其余照旧写颜色标签 */
-function highlightFormat(kind: "color" | "bg", color: string): InlineFormat {
-  const hl = kind === "bg" ? highlightOf(color) : null;
-  return hl ? { kind: "highlight", color: hl } : { kind, color };
-}
 const DRAG_THRESHOLD = 4;
 
 /** 设置里的「节点间距」：所有画布的间距按这个倍数放大缩小（1 = 主题原样） */
@@ -6825,51 +6821,14 @@ export class MindMapCanvas {
   }
 
   private buildFormatBar(): HTMLElement {
-    const bar = createDiv({ cls: "mm-format-bar" });
-    // 按下时不能让编辑框失焦，否则选区没了、编辑也提交了
-    bar.addEventListener("pointerdown", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+    const bar = createFormatBar(this.el.ownerDocument, {
+      textColors: this.opts.textColors?.() ?? [],
+      highlightColors: this.opts.highlightColors?.() ?? [],
+      underlineKey: sc("Mod", "U"),
+      icon,
+      tip: (el, text) => this.tip(el, text),
+      onFormat: (fmt) => this.formatText(fmt),
     });
-    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
-    const btn = (cls: string, title: string, fmt: InlineFormat, fill?: (b: HTMLButtonElement) => void) => {
-      const b = createEl("button", { cls: `mm-format-btn ${cls}` });
-      b.type = "button";
-      b.setAttribute("aria-label", title);
-      this.tip(b, title);
-      fill?.(b);
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        this.formatText(fmt);
-      });
-      bar.append(b);
-      return b;
-    };
-    btn("is-bold", t("format.bold"), { kind: "bold" }, (b) => (b.textContent = "B"));
-    btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
-    btn("is-strike", t("format.strike"), { kind: "strike" }, (b) => (b.textContent = "S"));
-    btn("is-underline", t("format.underline", { key: sc("Mod", "U") }), { kind: "underline" }, (b) => (b.textContent = "U"));
-    btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(icon("highlighter")));
-    const sep = () => bar.append(createSpan({ cls: "mm-format-sep" }));
-    const colors = this.opts.textColors?.() ?? [];
-    if (colors.length) sep();
-    for (const c of colors)
-      btn("is-color", t("format.textColor", { color: c }), { kind: "color", color: c }, (b) => {
-        b.textContent = "A";
-        b.style.color = c;
-      });
-    const bgs = this.opts.highlightColors?.() ?? [];
-    if (bgs.length) sep();
-    for (const c of bgs)
-      btn("is-bg", t("format.highlightColor", { color: c }), highlightFormat("bg", c), (b) => {
-        b.textContent = "A";
-        // Obsidian 的彩色高亮用主题里的颜色，样式表按 data-highlight 上色
-        const hl = highlightOf(c);
-        if (hl) b.dataset.highlight = hl;
-        else b.style.background = c;
-      });
-    sep();
-    btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(icon("eraser")));
     this.el.append(bar);
     return bar;
   }

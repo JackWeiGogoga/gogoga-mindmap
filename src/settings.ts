@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
+import { AbstractInputSuggest, App, Platform, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
 import { STRUCTURES, Structure } from "./layout";
 import { COLOR_NAMES, parseNodeColors } from "./markdown";
 import { MINDMAP_LIST_ICON } from "./icon";
@@ -40,6 +40,8 @@ export interface MindMapSettings {
   hideSyntax: boolean;
   /** Markdown 笔记的实时预览里藏起颜色、荧光笔、下划线的 HTML 标签，直接显示效果（默认关） */
   hideTagsInNotes: boolean;
+  /** Markdown 笔记的实时预览里选中文字浮出格式栏（默认关，只在电脑上） */
+  formatBarInNotes: boolean;
   /** 脑图笔记的实时预览里，行尾的 %%…%% 节点标记怎么显示：原样、缩成小圆点、完全隐藏（默认原样） */
   markersInNotes: "show" | "dot" | "hide";
   /** 悬停在节点右边缘就能调宽度（默认关） */
@@ -188,6 +190,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   centerOnSelect: false,
   hideSyntax: false,
   hideTagsInNotes: false,
+  formatBarInNotes: false,
   markersInNotes: "show",
   widthHandleOnHover: false,
   newNodeName: false,
@@ -283,6 +286,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "strikeDoneTasks":
         return p.applyDisplayScale(false);
       case "hideTagsInNotes":
+      case "formatBarInNotes":
       case "markersInNotes":
         return p.applyNoteTags();
       case "foldFollow":
@@ -389,6 +393,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         ]),
         group(t("settings.group.noteDisplay"), [
           toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),
+          ...(Platform.isMobile ? [] : [toggle("formatBarInNotes", t("settings.formatBarInNotes.name"), t("settings.formatBarInNotes.desc"), ["format", "toolbar", "格式栏", "工具栏", "颜色", "荧光笔", "加粗"])]),
           dropdown(
             "markersInNotes",
             t("settings.markersInNotes.name"),

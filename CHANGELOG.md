@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- **Format bar when selecting text in notes** setting (off by default, desktop only): in the Live Preview of any Markdown note, selecting text shows the same bar as in the mind map — bold, italic, strikethrough, underline, highlight, text colors, highlighter colors and clear. It writes the same formatting as the mind map, so what you mark in a note shows in the mind map and the other way round. A selection over several lines is formatted line by line, leaving list bullets, heading marks, task boxes, `%%…%%` node markers and block IDs alone. It doesn't appear in source mode, code blocks, math or frontmatter. Find it in Settings → Markdown and embeds.
+
 ## [0.56.0] - 2026-11-09
 
 ### Changed

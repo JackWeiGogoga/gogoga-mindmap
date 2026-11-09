@@ -15,6 +15,7 @@ import {
   MenuItem,
   moment,
   Notice,
+  Platform,
   setIcon,
   setTooltip,
   Plugin,
@@ -55,6 +56,7 @@ import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline
 import type { Extension } from "@codemirror/state";
 import { noteTagsExtension } from "./note-tags";
 import { noteMarkersExtension } from "./note-markers";
+import { noteFormatBarExtension } from "./note-format-bar";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -343,6 +345,23 @@ export default class MindMapPlugin extends Plugin {
   applyNoteTags(refresh = true): void {
     this.noteTagExt.length = 0;
     if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());
+    if (this.settings.formatBarInNotes && !Platform.isMobile) {
+      this.noteTagExt.push(
+        noteFormatBarExtension({
+          bar: () => ({
+            textColors: parseColorList(this.settings.textColors),
+            highlightColors: parseColorList(this.settings.highlightColors, true),
+            underlineKey: Platform.isMacOS ? "⌘U" : "Ctrl+U",
+            icon: (name) => {
+              const span = createSpan({ cls: "mm-icon" });
+              setIcon(span, name);
+              return span;
+            },
+            tip: (el, text) => setTooltip(el, text, { placement: "top" }),
+          }),
+        }),
+      );
+    }
     if (this.settings.markersInNotes !== "show") {
       // 只在实时预览、只在脑图笔记（frontmatter 有 mindmap）里
       this.noteTagExt.push(
