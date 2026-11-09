@@ -16,6 +16,7 @@
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle } from "../core/table";
 import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, unmergeAt, widthOf } from "../core/ops";
 import { fromTSV, toHTML, toTSV } from "../core/clipboard";
+import { applyInlineFormat, highlightOf, type InlineFormat } from "../core/format";
 import { t } from "./i18n";
 
 export interface MenuItem {
@@ -51,6 +52,8 @@ export interface EditorHost {
   onDeleteTable?(): void;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
+  /** 编辑格子时选中文字浮出的格式栏用哪些颜色；返回 null（或不给）就不显示格式栏 */
+  formatColors?(): { text: string[]; highlight: string[] } | null;
   readonly?: boolean;
 }
 
@@ -342,6 +345,7 @@ export class TableEditor {
   }
 
   destroy(): void {
+    this.hideFormatBar();
     if (lastActive === this) lastActive = null;
     this.destroyed = true;
     this.closePopover();
@@ -847,6 +851,7 @@ export class TableEditor {
   /** 编辑完：内容变了就交给宿主 */
   private commit(): void {
     this.closeSuggest();
+    this.hideFormatBar();
     if (!this.editing || !this.sel) return;
     const p = this.sel;
     this.editing = false;
@@ -871,6 +876,7 @@ export class TableEditor {
 
   private cancel(): void {
     this.closeSuggest();
+    this.hideFormatBar();
     if (!this.editing || !this.sel) return;
     this.editing = false;
     this.cellEl(this.sel)?.classList.remove("is-editing");
@@ -1070,7 +1076,11 @@ export class TableEditor {
       if (!this.editing) this.startEdit(false);
       else this.autosize();
       this.updateSuggest();
+      this.updateFormatBar();
     });
+    // 编辑时选中文字：浮出格式栏
+    for (const type of ["select", "keyup", "mouseup"] as const) this.on(this.input, type, () => this.updateFormatBar());
+    this.on(doc, "scroll", () => this.formatBar && this.updateFormatBar(), { capture: true, passive: true });
     this.on(this.input, "compositionstart", () => {
       if (!this.editing) this.startEdit(false);
     });
@@ -1084,6 +1094,8 @@ export class TableEditor {
     });
     this.on(doc, "pointerdown", (ev) => {
       const target = ev.target as Node;
+      // 点格式栏的按钮：还在编辑这一格
+      if (this.formatBar?.contains(target)) return;
       if (this.popover && !this.popover.contains(target)) this.closePopover();
       // 点到表格外面：取消选中
       if (this.sel && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
@@ -1242,6 +1254,11 @@ export class TableEditor {
     const k = ev.key.toLowerCase();
     const mark = !ev.shiftKey && k === "b" ? "**" : !ev.shiftKey && k === "i" ? "*" : ev.shiftKey && k === "x" ? "~~" : ev.shiftKey && k === "h" ? "==" : null;
     const link = !ev.shiftKey && k === "k";
+    // ⌘U 下划线：只在编辑时，给选中的字加 <u>
+    if (!ev.shiftKey && k === "u" && this.editing) {
+      this.applyFormat({ kind: "underline" });
+      return true;
+    }
     if (!mark && !link) return false;
     if (this.editing) {
       if (mark) this.wrapSelection(mark);
@@ -1276,6 +1293,109 @@ export class TableEditor {
       el.setSelectionRange(a + mark.length, b + mark.length);
     }
     this.autosize();
+  }
+
+  // ---------- 格式栏 ----------
+
+  private formatBar: HTMLElement | null = null;
+  private formatBarKey = "";
+
+  /** 编辑中选中了文字、宿主给了颜色：在这一格上方显示格式栏；否则收起 */
+  private updateFormatBar(): void {
+    const el = this.input;
+    const colors = this.editing && !this.host.readonly && this.sel && el.selectionStart !== el.selectionEnd ? this.host.formatColors?.() : null;
+    const cell = colors && this.sel ? this.cellEl(this.sel) : null;
+    if (!colors || !cell) return this.hideFormatBar();
+    const key = JSON.stringify(colors);
+    if (!this.formatBar || this.formatBarKey !== key) {
+      this.hideFormatBar();
+      this.formatBar = this.buildFormatBar(colors);
+      this.formatBarKey = key;
+    }
+    const bar = this.formatBar;
+    const win = this.root.ownerDocument.defaultView ?? window;
+    const r = cell.getBoundingClientRect();
+    const w = bar.offsetWidth;
+    const h = bar.offsetHeight;
+    const left = Math.max(8, Math.min(win.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    const top = r.top - h - 6 >= 8 ? r.top - h - 6 : r.bottom + 6;
+    bar.style.left = `${Math.round(left)}px`;
+    bar.style.top = `${Math.round(top)}px`;
+  }
+
+  private hideFormatBar(): void {
+    this.formatBar?.remove();
+    this.formatBar = null;
+  }
+
+  /** 给编辑框里选中的字加格式（和脑图节点的格式栏同一套写法：**、*、~~、<u>、==、<span style>、<mark style>） */
+  private applyFormat(fmt: InlineFormat): void {
+    const el = this.input;
+    const r = applyInlineFormat(el.value, el.selectionStart, el.selectionEnd, fmt);
+    if (r.text !== el.value) {
+      el.value = r.text;
+      el.setSelectionRange(r.start, r.end);
+      this.autosize();
+    }
+    this.updateFormatBar();
+  }
+
+  private buildFormatBar(colors: { text: string[]; highlight: string[] }): HTMLElement {
+    const doc = this.root.ownerDocument;
+    const bar = doc.createElement("div");
+    bar.className = "ggt-format-bar";
+    // 按下按钮不能让编辑框失焦（失焦就保存退出编辑了）
+    bar.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
+    const btn = (cls: string, title: string, fmt: InlineFormat, fill: (b: HTMLButtonElement) => void) => {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = `ggt-format-btn ${cls}`;
+      b.setAttribute("aria-label", title);
+      b.title = title;
+      fill(b);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.applyFormat(fmt);
+      });
+      bar.append(b);
+    };
+    const sep = () => {
+      const s = doc.createElement("span");
+      s.className = "ggt-format-sep";
+      bar.append(s);
+    };
+    const iconBtn = (name: string, fallback: string) => (b: HTMLButtonElement) => {
+      if (this.host.setIcon) this.host.setIcon(b, name);
+      else b.textContent = fallback;
+    };
+    btn("is-bold", t("fmtBold"), { kind: "bold" }, (b) => (b.textContent = "B"));
+    btn("is-italic", t("fmtItalic"), { kind: "italic" }, (b) => (b.textContent = "I"));
+    btn("is-strike", t("fmtStrike"), { kind: "strike" }, (b) => (b.textContent = "S"));
+    btn("is-underline", t("fmtUnderline"), { kind: "underline" }, (b) => (b.textContent = "U"));
+    btn("is-highlight", t("fmtHighlight"), { kind: "highlight" }, iconBtn("highlighter", "H"));
+    if (colors.text.length) sep();
+    for (const c of colors.text)
+      btn("is-color", `${t("fmtTextColor")} ${c}`, { kind: "color", color: c }, (b) => {
+        b.textContent = "A";
+        b.style.color = c;
+      });
+    if (colors.highlight.length) sep();
+    for (const c of colors.highlight) {
+      const hl = highlightOf(c);
+      btn("is-bg", `${t("fmtHighlightColor")} ${c}`, hl ? { kind: "highlight", color: hl } : { kind: "bg", color: c }, (b) => {
+        b.textContent = "A";
+        if (hl) b.dataset.highlight = hl;
+        else b.style.background = c;
+      });
+    }
+    sep();
+    btn("is-clear", t("fmtClear"), { kind: "clear" }, iconBtn("eraser", "⌫"));
+    doc.body.append(bar);
+    return bar;
   }
 
   /** ⌘K：选中的文字变成 [文字]()，光标放进括号里填网址 */
@@ -2025,7 +2145,8 @@ export class TableEditor {
       { separator: true },
       ...this.colorItems(Array.from({ length: colCount(tb) }, (_, c) => ({ r: p.r, c }))),
       { separator: true },
-      { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: deleteRow(tb, p.r) === tb, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
+      // 选中了好几行时和插入一样按选区来
+      this.isMulti() ? this.deleteItems(p)[0] : { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: deleteRow(tb, p.r) === tb, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
     ];
   }
 
@@ -2049,7 +2170,7 @@ export class TableEditor {
       { separator: true },
       ...this.colorItems(Array.from({ length: rowCount(tb) }, (_, r) => ({ r, c: p.c }))),
       { separator: true },
-      { title: t("deleteCol"), icon: "trash-2", danger: true, disabled: colCount(tb) <= 1, run: () => this.apply(deleteCol(tb, p.c), { r: p.r, c: Math.min(p.c, colCount(tb) - 2) }) },
+      this.isMulti() ? this.deleteItems(p)[1] : { title: t("deleteCol"), icon: "trash-2", danger: true, disabled: colCount(tb) <= 1, run: () => this.apply(deleteCol(tb, p.c), { r: p.r, c: Math.min(p.c, colCount(tb) - 2) }) },
     ];
   }
 
@@ -2076,8 +2197,31 @@ export class TableEditor {
       { separator: true },
       { title: CHECK_RE.test(tb.cells[p.r][p.c]) ? t("removeCheckbox") : t("addCheckbox"), icon: "square-check", disabled: multi, run: () => this.apply(setCell(tb, p.r, p.c, CHECK_RE.test(tb.cells[p.r][p.c]) ? tb.cells[p.r][p.c].replace(CHECK_RE, "").trimStart() : `[ ] ${tb.cells[p.r][p.c]}`.trimEnd()), p) },
       { title: t("clearCell"), icon: "eraser", disabled: !cells.some((c) => tb.cells[c.r][c.c]), run: () => this.apply(clearCells(tb, cells), this.sel ?? p) },
-      { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: p.r === 0 || rowCount(tb) <= 2 || multi, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
-      { title: t("deleteCol"), icon: "trash-2", danger: true, disabled: colCount(tb) <= 1 || multi, run: () => this.apply(deleteCol(tb, p.c), { r: p.r, c: Math.min(p.c, colCount(tb) - 2) }) },
+      ...this.deleteItems(p),
+    ];
+  }
+
+  /** 删除行 / 列：选区跨了几行（几列）就一次删几行（#4）；表头行不能删，至少留下表头和一行、一列 */
+  private deleteItems(p: Pos): MenuItem[] {
+    const tb = this.table;
+    const r = (this.isMulti() && this.rangeRect()) || { r1: p.r, c1: p.c, r2: p.r, c2: p.c };
+    const rows = r.r2 - r.r1 + 1;
+    const cols = r.c2 - r.c1 + 1;
+    return [
+      {
+        title: rows > 1 ? t("deleteRows").replace("{n}", String(rows)) : t("deleteRow"),
+        icon: "trash-2",
+        danger: true,
+        disabled: r.r1 === 0 || rowCount(tb) - rows < 2 || deleteRow(tb, r.r2) === tb,
+        run: () => this.runCommand("delete-row"),
+      },
+      {
+        title: cols > 1 ? t("deleteCols").replace("{n}", String(cols)) : t("deleteCol"),
+        icon: "trash-2",
+        danger: true,
+        disabled: colCount(tb) - cols < 1,
+        run: () => this.runCommand("delete-col"),
+      },
     ];
   }
 

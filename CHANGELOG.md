@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Tables in nodes get the format bar too: with **Format bar when selecting text** on, selecting text while editing a cell shows the same bar with your text and highlighter colors; Mod+U underlines.
+
+### Changed
+- Tables in nodes: after selecting several cells, the right-click menu offers **Delete 2 rows** / **Delete 3 columns** and so on instead of greying out Delete row and Delete column.
+
 ## [0.58.0] - 2026-11-09
 
 ### Added

@@ -1,4 +1,5 @@
 /**
+ * （和 gogoga-mindmap 的 src/format.ts 是同一份，两边改了要一起改）
  * 节点文字里的局部格式：粗体、斜体、高亮、文字颜色、荧光笔颜色。
  * 颜色用 Obsidian 里通行的 HTML 写法存（Highlightr 插件也是这样），Markdown 里照样显示：
  *   文字颜色 <span style="color:#e03e3e">文字</span>

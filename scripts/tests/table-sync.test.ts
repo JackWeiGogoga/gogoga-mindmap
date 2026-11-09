@@ -16,3 +16,7 @@ test("节点表格的代码和 gogoga-table 同步（改了表格插件要跑 no
   const css = (tableCss as (s: string) => string)(readFileSync(path.join(TABLE_SRC as string, "styles.css"), "utf8"));
   assert.ok(readFileSync("styles.css", "utf8").includes(css), "styles.css 里的表格样式没同步");
 });
+
+test("脑图的 src/format.ts 和表格插件那份（同步到 src/table/core/format.ts）一字不差", () => {
+  assert.equal(readFileSync("src/table/core/format.ts", "utf8"), readFileSync("src/format.ts", "utf8"));
+});
