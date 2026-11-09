@@ -7448,6 +7448,8 @@ export class MindMapCanvas {
       onChange: (next) => this.onTableEdit(live(), next),
       undo: () => this.opts.onUndo?.(),
       redo: () => this.opts.onRedo?.(),
+      // 格子编辑框和节点编辑框一样用 CodeMirror：颜色、荧光笔、加粗直接显示，标签藏起来
+      richEdit: () => true,
       // 编辑格子时的格式栏：跟着脑图的「选中文字时显示格式栏」开关和常用颜色
       formatColors: () => (this.opts.formatBar?.() ? { text: this.opts.textColors?.() ?? [], highlight: this.opts.highlightColors?.() ?? [] } : null),
       // Esc、从第一行往上、最后一行往下：回到画布，节点还选着，方向键接着在节点之间走

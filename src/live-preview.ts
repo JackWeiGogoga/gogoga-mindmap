@@ -5,7 +5,7 @@
  */
 
 import { highlightColor, type HighlightColor } from "./format";
-import { TOKEN_RE } from "./inline";
+import { TOKEN_RE } from "./tokens";
 
 export type SpanKind = "strong" | "em" | "mark" | "del" | "code" | "color" | "bg" | "u";
 

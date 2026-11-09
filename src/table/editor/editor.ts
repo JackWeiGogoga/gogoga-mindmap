@@ -17,6 +17,7 @@ import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterR
 import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, unmergeAt, widthOf } from "../core/ops";
 import { fromTSV, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, highlightOf, type InlineFormat } from "../core/format";
+import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
 import { t } from "./i18n";
 
 export interface MenuItem {
@@ -52,6 +53,8 @@ export interface EditorHost {
   onDeleteTable?(): void;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
+  /** 格子的编辑框用 CodeMirror：加粗、颜色、荧光笔直接显示效果，标签藏起来（建编辑器时问一次） */
+  richEdit?(): boolean;
   /** 编辑格子时选中文字浮出的格式栏用哪些颜色；返回 null（或不给）就不显示格式栏 */
   formatColors?(): { text: string[]; highlight: string[] } | null;
   readonly?: boolean;
@@ -115,7 +118,7 @@ export class TableEditor {
   private table: Table;
   private readonly scroller: HTMLElement;
   private readonly tableEl: HTMLTableElement;
-  private readonly input: HTMLTextAreaElement;
+  private input: CellInput;
   private readonly rowHandle: HTMLElement;
   /** 表格左上角的按钮：这张表的样式、行距、整表对齐…… */
   private readonly cornerBtn: HTMLElement;
@@ -178,11 +181,8 @@ export class TableEditor {
     this.fillHandle = this.scroller.appendChild(doc.createElement("div"));
     this.fillHandle.className = "ggt-fill";
     this.fillHandle.setAttribute("aria-label", t("fill"));
-    this.input = doc.createElement("textarea");
-    this.input.className = "ggt-input";
-    this.input.rows = 1;
-    this.input.spellcheck = false;
-    this.input.setAttribute("autocapitalize", "off");
+    // 宿主要「所见即所得」就用 CodeMirror（格式直接显示、标签藏起来），否则普通 textarea
+    this.input = host.richEdit?.() ? new CodeMirrorInput(doc) : new TextareaInput(doc);
     this.resizeBar = this.root.appendChild(doc.createElement("div"));
     this.resizeBar.className = "ggt-resize";
     this.resizeBar.setAttribute("aria-label", t("resize"));
@@ -479,7 +479,7 @@ export class TableEditor {
 
   private render(): void {
     const doc = this.root.ownerDocument;
-    const hadFocus = doc.activeElement === this.input;
+    const hadFocus = this.input.hasFocus();
     const tb = this.table;
     const rows = rowCount(tb);
     const cols = colCount(tb);
@@ -537,7 +537,7 @@ export class TableEditor {
       }
     }
     this.markSel();
-    if (hadFocus && this.sel) this.input.focus({ preventScroll: true });
+    if (hadFocus && this.sel) this.input.focus();
     this.stickHeader();
     // 列宽变了，线的位置就不对了：先收起来，鼠标再动时按新的边线放
     if (!this.resize) this.resizeBar.classList.remove("is-shown", "is-active");
@@ -777,8 +777,8 @@ export class TableEditor {
         this.marked.push(headCell);
       }
       // 看不见的输入框放进选中的格子里：打字、组字从这里开始
-      if (this.input.parentElement !== cell) cell.appendChild(this.input);
-    } else this.input.remove();
+      if (this.input.el.parentElement !== cell) cell.appendChild(this.input.el);
+    } else this.input.detach();
     // ---- 下面只读位置、摆浮层
     const sb = any ? this.selBox() : null;
     this.rangeBox.classList.toggle("is-shown", !!sb);
@@ -801,8 +801,8 @@ export class TableEditor {
     if (this.anchor && this.sel && this.anchor.r === this.sel.r && this.anchor.c === this.sel.c) this.anchor = null;
     this.markSel();
     if (p && focus && !this.host.readonly) {
-      this.input.value = "";
-      this.input.focus({ preventScroll: true });
+      this.input.reset("");
+      this.input.focus();
       this.cellEl(p)?.scrollIntoView({ block: "nearest", inline: "nearest" });
       this.host.onFocus?.();
     }
@@ -821,11 +821,11 @@ export class TableEditor {
     cell.classList.add("is-editing");
     this.fillHandle.classList.remove("is-shown");
     if (keep) {
-      this.input.value = shownText(this.table, this.sel.r, this.sel.c);
+      this.input.reset(shownText(this.table, this.sel.r, this.sel.c));
       const end = this.input.value.length;
       this.input.setSelectionRange(end, end);
     }
-    if (this.root.ownerDocument.activeElement !== this.input) this.input.focus({ preventScroll: true });
+    if (!this.input.hasFocus()) this.input.focus();
     this.autosize();
     this.updateSuggest();
     this.host.onFocus?.();
@@ -839,7 +839,7 @@ export class TableEditor {
     const content = this.sel && this.cellEl(this.sel)?.querySelector<HTMLElement>(".ggt-content");
     if (!content) return;
     content.classList.remove("is-empty");
-    content.textContent = this.input.value + "\u200b";
+    content.textContent = this.input.sizingText() + "\u200b";
     // 折行了行就变高：十字高亮的那条跟着重算，不然只盖住第一行
     this.refreshCross();
   }
@@ -864,7 +864,7 @@ export class TableEditor {
     this.editing = false;
     this.cellEl(p)?.classList.remove("is-editing");
     const text = this.input.value.replace(/\r\n?/g, "\n");
-    this.input.value = "";
+    this.input.reset("");
     const edited = editCell(this.table, p.r, p.c, text.replace(/^\s+|\s+$/g, ""));
     const next = edited === this.table ? edited : normalize(edited);
     const pending = this.pending;
@@ -887,7 +887,7 @@ export class TableEditor {
     if (!this.editing || !this.sel) return;
     this.editing = false;
     this.cellEl(this.sel)?.classList.remove("is-editing");
-    this.input.value = "";
+    this.input.reset("");
     if (this.pending) {
       this.table = this.pending;
       this.pending = null;
@@ -969,11 +969,54 @@ export class TableEditor {
     this.cleanups.push(() => el.removeEventListener(type, fn as EventListener, opts));
   }
 
+  /** 输入框的事件交给编辑器（换输入框以后也要重新接） */
+  private bindInput(): void {
+    const doc = this.root.ownerDocument;
+    this.input.bind({
+      keydown: (ev) => this.onKey(ev),
+      copy: (ev) => this.onCopy(ev, false),
+      cut: (ev) => this.onCopy(ev, true),
+      paste: (ev) => this.onPaste(ev),
+      input: () => {
+        if (!this.editing) this.startEdit(false);
+        else this.autosize();
+        this.updateSuggest();
+        this.updateFormatBar();
+      },
+      // 编辑时选中文字：浮出格式栏
+      select: () => this.updateFormatBar(),
+      compositionstart: () => {
+        if (!this.editing) this.startEdit(false);
+      },
+      blur: () => {
+        // 焦点去了别处（不是去开菜单）：编辑中的这一格就此保存
+        window.setTimeout(() => {
+          if (this.destroyed || this.input.hasFocus()) return;
+          if (this.popover && this.popover.contains(doc.activeElement)) return;
+          if (this.editing) this.commit();
+        }, 0);
+      },
+    });
+  }
+
+  /** 设置改了「所见即所得」：换一种输入框（正在编辑的这一格先保存） */
+  private refreshInput(): void {
+    const rich = !!this.host.richEdit?.();
+    if (rich === this.input instanceof CodeMirrorInput) return;
+    const hadFocus = this.input.hasFocus();
+    if (this.editing) this.commit();
+    this.input.destroy();
+    this.input = rich ? new CodeMirrorInput(this.root.ownerDocument) : new TextareaInput(this.root.ownerDocument);
+    this.bindInput();
+    this.markSel();
+    if (hadFocus && this.sel) this.input.focus();
+  }
+
   private bind(): void {
     const doc = this.root.ownerDocument;
     this.on(this.tableEl, "pointerdown", (ev) => {
       const target = ev.target as HTMLElement;
-      if (target === this.input) return;
+      if (this.input.contains(target)) return;
       const cell = target.closest<HTMLElement>(".ggt-cell");
       if (!cell || this.host.readonly) return;
       // 点链接、标签：照常打开，不选中
@@ -1006,7 +1049,7 @@ export class TableEditor {
     });
     this.on(this.tableEl, "contextmenu", (ev) => {
       const cell = (ev.target as HTMLElement).closest<HTMLElement>(".ggt-cell");
-      if (!cell || this.host.readonly || (this.editing && ev.target === this.input)) return;
+      if (!cell || this.host.readonly || (this.editing && this.input.contains(ev.target as Node))) return;
       ev.preventDefault();
       ev.stopPropagation();
       // 安卓长按会再来一次右键事件：长按已经开过菜单了
@@ -1016,13 +1059,14 @@ export class TableEditor {
       const r = this.rangeRect();
       const inRange = this.isMulti() && r && p.r >= r.r1 && p.r <= r.r2 && p.c >= r.c1 && p.c <= r.c2;
       if (!inRange) this.setSel(p, true);
-      else this.input.focus({ preventScroll: true });
+      else this.input.focus();
       this.openMenu(this.cellMenu(inRange && this.sel ? this.sel : p), ev.clientX, ev.clientY);
     });
     this.on(this.resizeBar, "pointerdown", (ev) => this.startResize(ev, this.resizeBar));
     this.on(this.fillHandle, "pointerdown", (ev) => this.fillDrag(ev));
     // 宿主改了默认样式（设置变了）
     this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => {
+      this.refreshInput();
       this.applyLook();
       this.markCross();
     });
@@ -1075,30 +1119,9 @@ export class TableEditor {
     });
     this.on(this.scroller, "scroll", () => this.placeHandles(), { passive: true });
 
-    this.on(this.input, "keydown", (ev) => this.onKey(ev));
-    this.on(this.input, "copy", (ev) => this.onCopy(ev, false));
-    this.on(this.input, "cut", (ev) => this.onCopy(ev, true));
-    this.on(this.input, "paste", (ev) => this.onPaste(ev));
-    this.on(this.input, "input", () => {
-      if (!this.editing) this.startEdit(false);
-      else this.autosize();
-      this.updateSuggest();
-      this.updateFormatBar();
-    });
-    // 编辑时选中文字：浮出格式栏
-    for (const type of ["select", "keyup", "mouseup"] as const) this.on(this.input, type, () => this.updateFormatBar());
+    this.bindInput();
+    this.cleanups.push(() => this.input.destroy());
     this.on(doc, "scroll", () => this.formatBar && this.updateFormatBar(), { capture: true, passive: true });
-    this.on(this.input, "compositionstart", () => {
-      if (!this.editing) this.startEdit(false);
-    });
-    this.on(this.input, "blur", () => {
-      // 焦点去了别处（不是去开菜单）：编辑中的这一格就此保存
-      window.setTimeout(() => {
-        if (this.destroyed || doc.activeElement === this.input) return;
-        if (this.popover && this.popover.contains(doc.activeElement)) return;
-        if (this.editing) this.commit();
-      }, 0);
-    });
     this.on(doc, "pointerdown", (ev) => {
       const target = ev.target as Node;
       // 点格式栏的按钮：还在编辑这一格
@@ -1268,7 +1291,10 @@ export class TableEditor {
     }
     if (!mark && !link) return false;
     if (this.editing) {
-      if (mark) this.wrapSelection(mark);
+      // 所见即所得的编辑框选了字：和格式栏一样按看得见的字加（标签藏着，不能直接在两头插记号）
+      const kinds: Record<string, InlineFormat> = { "**": { kind: "bold" }, "*": { kind: "italic" }, "~~": { kind: "strike" }, "==": { kind: "highlight" } };
+      if (mark && this.input instanceof CodeMirrorInput && this.input.selectionStart !== this.input.selectionEnd) this.applyFormat(kinds[mark]);
+      else if (mark) this.wrapSelection(mark);
       else this.insertLink();
       return true;
     }
@@ -1338,7 +1364,10 @@ export class TableEditor {
   /** 给编辑框里选中的字加格式（和脑图节点的格式栏同一套写法：**、*、~~、<u>、==、<span style>、<mark style>） */
   private applyFormat(fmt: InlineFormat): void {
     const el = this.input;
-    const r = applyInlineFormat(el.value, el.selectionStart, el.selectionEnd, fmt);
+    // 选中的只是藏起来的标记、一个看得见的字都没有：不动（不然会当成没选，整段都上格式）
+    const { from, to } = el.visibleSelection();
+    if (from === to) return;
+    const r = applyInlineFormat(el.value, from, to, fmt);
     if (r.text !== el.value) {
       el.value = r.text;
       el.setSelectionRange(r.start, r.end);
@@ -1469,7 +1498,7 @@ export class TableEditor {
       });
     });
     const cell = this.sel && this.cellEl(this.sel);
-    const r = (cell ?? this.input).getBoundingClientRect();
+    const r = (cell ?? this.input.el).getBoundingClientRect();
     box.setAttribute("style", `left:${Math.round(r.left)}px;top:${Math.round(r.bottom + 4)}px`);
     this.suggest = { kind, start, items, index: 0, el: box };
   }
@@ -1961,7 +1990,7 @@ export class TableEditor {
         this.sel = row ? { r: p.r, c: colCount(this.table) - 1 } : { r: rowCount(this.table) - 1, c: p.c };
         this.lineSel = true;
         this.markSel();
-        this.input.focus({ preventScroll: true });
+        this.input.focus();
         const rect = handle.getBoundingClientRect();
         this.openMenu(row ? this.rowMenu(p) : this.colMenu(p), rect.left, rect.bottom + 4);
         return;
@@ -2401,7 +2430,7 @@ export class TableEditor {
       if (ev.key === "Escape") {
         ev.stopPropagation();
         this.closePopover();
-        this.input.focus({ preventScroll: true });
+        this.input.focus();
       }
     });
     this.popover = pop;

@@ -9,6 +9,8 @@ import path from "node:path";
 
 export const TABLE_SRC = path.resolve("../gogoga-table");
 export const PARTS = ["core", "editor"];
+/** 两个插件共用、源头在脑图的文件：先从脑图 src/ 复制到表格的 src/core/，再随表格同步回 src/table/core/ */
+export const SHARED = ["format.ts", "tokens.ts", "live-preview.ts", "cm-format.ts"];
 export const CSS_BEGIN = "/* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */";
 export const CSS_END = "/* ==== gogoga-table 同步结束 ==== */";
 
@@ -26,6 +28,7 @@ export function withTableCss(styles, css) {
 }
 
 function main() {
+  for (const f of SHARED) copyFileSync(path.join("src", f), path.join(TABLE_SRC, "src", "core", f));
   for (const part of PARTS) {
     const from = path.join(TABLE_SRC, "src", part);
     const to = path.join("src/table", part);
@@ -35,7 +38,7 @@ function main() {
   }
   const css = tableCss(readFileSync(path.join(TABLE_SRC, "styles.css"), "utf8"));
   writeFileSync("styles.css", withTableCss(readFileSync("styles.css", "utf8"), css));
-  console.log("synced gogoga-table → src/table, styles.css");
+  console.log(`shared ${SHARED.join(", ")} → gogoga-table/src/core; synced gogoga-table → src/table, styles.css`);
 }
 
 // 只在 `node scripts/sync-table.mjs` 直接运行时同步（测试会把本文件打包进去，那时不能动文件）

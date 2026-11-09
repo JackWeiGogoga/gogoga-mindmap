@@ -2593,6 +2593,31 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-format-bar .ggt-format-btn.is-bg[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
 .ggt-format-bar .ggt-format-btn.is-bg[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 .ggt-format-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--background-modifier-border, #e3e3e3); }
+
+/* 「编辑格子时直接显示格式」：编辑框是 CodeMirror，外观和 textarea 一样（Obsidian 编辑器的样式也会套到这个嵌套的编辑器上，要压回去） */
+/* CodeMirror 自带的样式把根元素设成 position: relative !important，要压回绝对定位（盖在格子上、不占位置） */
+.ggt .ggt-cell .ggt-input.ggt-input-cm { position: absolute !important; display: flex; flex-direction: column; contain: strict; }
+/* contain：编辑框里的变化（CodeMirror 量尺寸、改样式）不让整张表重新排版，大表格点格子不卡 */
+.ggt .ggt-input.ggt-input-cm .cm-scroller { overflow: hidden !important; font-family: inherit !important; line-height: inherit !important; padding: 0 !important; }
+.ggt .ggt-input.ggt-input-cm .cm-content { padding: 0 !important; min-height: 0 !important; caret-color: var(--ggt-sel); font: inherit !important; color: inherit !important; max-width: none !important; white-space: pre-wrap; }
+.ggt .ggt-input.ggt-input-cm .cm-line { padding: 0 !important; text-indent: 0 !important; }
+.ggt .ggt-input.ggt-input-cm.cm-focused { outline: none !important; }
+.ggt .ggt-input.ggt-input-cm .cm-gutters { display: none !important; }
+.ggt .ggt-input.ggt-input-cm .cm-cursor { border-left-color: var(--ggt-sel); }
+.ggt .ggt-input.ggt-input-cm .cm-selectionBackground { background: var(--text-selection) !important; }
+.ggt .ggt-input-cm .ggt-ed-strong { font-weight: 700; }
+.ggt .ggt-input-cm .ggt-ed-em { font-style: italic; }
+.ggt .ggt-input-cm .ggt-ed-del { text-decoration: line-through; }
+.ggt .ggt-input-cm .ggt-ed-u { text-decoration: underline; }
+.ggt .ggt-input-cm .ggt-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
+.ggt .ggt-input-cm .ggt-ed-mark { background: var(--text-highlight-bg, rgba(255, 210, 0, 0.45)); border-radius: 2px; color: inherit; }
+.ggt .ggt-input-cm .ggt-ed-syntax { opacity: 0.45; }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
+.ggt .ggt-input-cm .ggt-ed-mark[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */
