@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-11-09
+
 ### 新增
 - 设置「在笔记里选中文字时显示格式栏」（默认关，只在电脑上）：任何 Markdown 笔记的实时预览里选中一段文字，上方浮出和脑图里一样的格式栏：加粗、斜体、删除线、下划线、高亮、文字颜色、荧光笔和清除。写进文件的格式和脑图一样，笔记里标的重点脑图里照样显示，反过来也一样。跨几行选中时每行分别加，列表符号、标题的 #、任务框、`%%…%%` 节点标记和块编号不动。源码模式、代码块、公式、frontmatter 里不出现。在 设置 → Markdown 与嵌入 里打开。
 
@@ -664,7 +666,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...HEAD
+[0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0

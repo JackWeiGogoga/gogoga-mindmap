@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-11-09
+
 ### Added
 - **Format bar when selecting text in notes** setting (off by default, desktop only): in the Live Preview of any Markdown note, selecting text shows the same bar as in the mind map — bold, italic, strikethrough, underline, highlight, text colors, highlighter colors and clear. It writes the same formatting as the mind map, so what you mark in a note shows in the mind map and the other way round. A selection over several lines is formatted line by line, leaving list bullets, heading marks, task boxes, `%%…%%` node markers and block IDs alone. It doesn't appear in source mode, code blocks, math or frontmatter. Find it in Settings → Markdown and embeds.
 
@@ -664,7 +666,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...HEAD
+[0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
