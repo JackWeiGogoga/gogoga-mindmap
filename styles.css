@@ -2422,6 +2422,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 实时预览里包表格的那层默认带 contain: paint，会把伸到表格外面的行手柄、加号裁掉一半 */
 /* Obsidian 的规则是 .markdown-source-view.mod-cm6 .cm-content > [contenteditable="false"] { contain: paint !important }，要比它更具体才盖得住 */
 .markdown-source-view.mod-cm6 .cm-content > .ggt-lp[contenteditable="false"] { contain: none !important; }
+/* 表格上下的外边距要包在这层里：不然边距透到外面，编辑器量块高度时量不到，
+   每张表格让后面所有行的位置少算 18px，几张表之后点段落会落到下一行（点标题上面的段落选中了标题） */
+.markdown-source-view.mod-cm6 .cm-content > .ggt-lp { display: flow-root; }
 
 /* 表头的行手柄拖不动，只能点开菜单 */
 .ggt button.ggt-row-handle.is-fixed { cursor: pointer; }
