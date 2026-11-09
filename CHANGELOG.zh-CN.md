@@ -4,11 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-11-09
+
 ### 新增
 - 节点里的表格也有格式栏：打开「选中文字时显示格式栏」后，编辑格子时选中文字会出现同样的格式栏，颜色用设置里的常用颜色；⌘U 加下划线。
 
 ### 改进
 - 节点里的表格：框选几格后右键，会出现「删除 2 行」「删除 3 列」这样的选项，不再是灰的「删除行」「删除列」。
+
+### 修复
+- 节点里的表格：十字高亮时，编辑格子文字折行后整行高亮跟着变高。
 
 ## [0.58.0] - 2026-11-09
 
@@ -680,7 +685,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...HEAD
+[0.59.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...0.59.0
 [0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0
 [0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0

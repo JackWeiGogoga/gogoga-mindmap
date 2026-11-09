@@ -4,11 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-11-09
+
 ### Added
 - Tables in nodes get the format bar too: with **Format bar when selecting text** on, selecting text while editing a cell shows the same bar with your text and highlighter colors; Mod+U underlines.
 
 ### Changed
 - Tables in nodes: after selecting several cells, the right-click menu offers **Delete 2 rows** / **Delete 3 columns** and so on instead of greying out Delete row and Delete column.
+
+### Fixed
+- Tables in nodes: with crosshair highlight, the row highlight grows with a cell whose text wraps while editing.
 
 ## [0.58.0] - 2026-11-09
 
@@ -680,7 +685,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...HEAD
+[0.59.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...0.59.0
 [0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0
 [0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
