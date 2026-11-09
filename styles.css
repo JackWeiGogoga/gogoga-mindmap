@@ -2561,3 +2561,34 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .mm-format-bar.mm-note-format-bar { position: fixed; z-index: var(--layer-popover, 30); }
 .mm-note-format-bar .mm-icon { display: flex; }
 .mm-note-format-bar .mm-icon svg { width: 15px; height: 15px; }
+
+/* 「在笔记里显示节点颜色」：带颜色的节点文字铺一层同色淡底，颜色和脑图里的命名颜色一致 */
+.mm-note-node-color {
+  --mm-note-color: #dcdce2;
+  background: color-mix(in srgb, var(--mm-note-color) 55%, transparent);
+  border-radius: 4px;
+  padding: 1px 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.mm-note-node-color[data-color="red"] { --mm-note-color: #f9a3a3; }
+.mm-note-node-color[data-color="orange"] { --mm-note-color: #fbc98d; }
+.mm-note-node-color[data-color="yellow"] { --mm-note-color: #f7e48e; }
+.mm-note-node-color[data-color="green"] { --mm-note-color: #a3e5a2; }
+.mm-note-node-color[data-color="teal"] { --mm-note-color: #93e3d6; }
+.mm-note-node-color[data-color="blue"] { --mm-note-color: #8edbf7; }
+.mm-note-node-color[data-color="purple"] { --mm-note-color: #d4b5f5; }
+.mm-note-node-color[data-color="pink"] { --mm-note-color: #f8b8da; }
+.mm-note-node-color[data-color="gray"] { --mm-note-color: #dcdce2; }
+.theme-dark .mm-note-node-color { background: color-mix(in srgb, var(--mm-note-color) 75%, transparent); }
+.theme-dark .mm-note-node-color[data-color="red"] { --mm-note-color: #8c3b3b; }
+.theme-dark .mm-note-node-color[data-color="orange"] { --mm-note-color: #8c5a2b; }
+.theme-dark .mm-note-node-color[data-color="yellow"] { --mm-note-color: #7a6a22; }
+.theme-dark .mm-note-node-color[data-color="green"] { --mm-note-color: #2f6b3a; }
+.theme-dark .mm-note-node-color[data-color="teal"] { --mm-note-color: #23615a; }
+.theme-dark .mm-note-node-color[data-color="blue"] { --mm-note-color: #2a5a78; }
+.theme-dark .mm-note-node-color[data-color="purple"] { --mm-note-color: #5a3e82; }
+.theme-dark .mm-note-node-color[data-color="pink"] { --mm-note-color: #7a3860; }
+.theme-dark .mm-note-node-color[data-color="gray"] { --mm-note-color: #45454e; }
+/* 自定义色（#hex）深色模式下淡一些，字还看得清 */
+.theme-dark .mm-note-node-color:not([data-color]) { background: color-mix(in srgb, var(--mm-note-color) 40%, transparent); }

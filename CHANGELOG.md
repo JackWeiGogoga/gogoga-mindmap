@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- **Node colors in notes** setting (off by default): when a mind map note is opened as Markdown, the text of colored headings and list items gets a light background in the node's color, in both Live Preview and reading view (so PDF export too). Named colors match the mind map's palette, including dark mode; custom `#hex` colors are shown semi-transparent. Child items aren't colored with their parent, the file isn't changed, and colors are still edited in the mind map. Find it in Settings → Markdown and embeds.
+
+### Fixed
+- **Node markers in notes** (dot / hide) now also works in a mind map note that was just created or just got `mindmap: true`, instead of waiting for Obsidian to finish indexing it.
+
 ## [0.57.0] - 2026-11-09
 
 ### Added

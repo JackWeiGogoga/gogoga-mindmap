@@ -42,6 +42,8 @@ export interface MindMapSettings {
   hideTagsInNotes: boolean;
   /** Markdown 笔记的实时预览里选中文字浮出格式栏（默认关，只在电脑上） */
   formatBarInNotes: boolean;
+  /** 脑图笔记的实时预览、阅读视图里，带颜色的节点文字铺一层同色淡底（默认关） */
+  colorsInNotes: boolean;
   /** 脑图笔记的实时预览里，行尾的 %%…%% 节点标记怎么显示：原样、缩成小圆点、完全隐藏（默认原样） */
   markersInNotes: "show" | "dot" | "hide";
   /** 悬停在节点右边缘就能调宽度（默认关） */
@@ -191,6 +193,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   hideSyntax: false,
   hideTagsInNotes: false,
   formatBarInNotes: false,
+  colorsInNotes: false,
   markersInNotes: "show",
   widthHandleOnHover: false,
   newNodeName: false,
@@ -287,6 +290,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         return p.applyDisplayScale(false);
       case "hideTagsInNotes":
       case "formatBarInNotes":
+      case "colorsInNotes":
       case "markersInNotes":
         return p.applyNoteTags();
       case "foldFollow":
@@ -393,6 +397,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         ]),
         group(t("settings.group.noteDisplay"), [
           toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),
+          toggle("colorsInNotes", t("settings.colorsInNotes.name"), t("settings.colorsInNotes.desc"), ["color", "颜色", "背景", "底色", "节点颜色"]),
           ...(Platform.isMobile ? [] : [toggle("formatBarInNotes", t("settings.formatBarInNotes.name"), t("settings.formatBarInNotes.desc"), ["format", "toolbar", "格式栏", "工具栏", "颜色", "荧光笔", "加粗"])]),
           dropdown(
             "markersInNotes",

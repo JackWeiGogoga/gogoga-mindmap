@@ -57,6 +57,8 @@ import type { Extension } from "@codemirror/state";
 import { noteTagsExtension } from "./note-tags";
 import { noteMarkersExtension } from "./note-markers";
 import { noteFormatBarExtension } from "./note-format-bar";
+import { noteColorsExtension, paintNoteColors } from "./note-colors";
+import { textIsMindMap } from "./note-colors-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -179,6 +181,10 @@ export default class MindMapPlugin extends Plugin {
     this.patchSetViewState();
     this.registerCodeBlock();
     registerMindMapEmbeds(this);
+    // 阅读视图里的节点颜色（设置「在笔记里显示节点颜色」）
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      if (this.settings.colorsInNotes) paintNoteColors(el, ctx, (text) => this.isMindMapFile(ctx.sourcePath) || textIsMindMap(text));
+    });
     this.registerCommands();
 
     this.registerEvent(
@@ -345,6 +351,16 @@ export default class MindMapPlugin extends Plugin {
   applyNoteTags(refresh = true): void {
     this.noteTagExt.length = 0;
     if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());
+    if (this.settings.colorsInNotes) {
+      this.noteTagExt.push(
+        noteColorsExtension((view) => {
+          if (!view.state.field(editorLivePreviewField, false)) return false;
+          const path = view.state.field(editorInfoField, false)?.file?.path;
+          return (!!path && this.isMindMapFile(path)) || textIsMindMap(view.state.sliceDoc(0, 2000));
+        }),
+      );
+    }
+    if (refresh) this.rerenderReadingViews();
     if (this.settings.formatBarInNotes && !Platform.isMobile) {
       this.noteTagExt.push(
         noteFormatBarExtension({
@@ -368,11 +384,18 @@ export default class MindMapPlugin extends Plugin {
         noteMarkersExtension(this.settings.markersInNotes, (s) => {
           if (!s.field(editorLivePreviewField, false)) return false;
           const path = s.field(editorInfoField, false)?.file?.path;
-          return !!path && this.isMindMapFile(path);
+          return (!!path && this.isMindMapFile(path)) || textIsMindMap(s.sliceDoc(0, 2000));
         }),
       );
     }
     if (refresh) this.app.workspace.updateOptions();
+  }
+
+  /** 设置改了以后，打开着的阅读视图重新渲染（节点颜色是渲染时加上去的） */
+  private rerenderReadingViews(): void {
+    this.app.workspace.iterateAllLeaves((l) => {
+      if (l.view instanceof MarkdownView && l.view.getMode() === "preview") l.view.previewMode.rerender(true);
+    });
   }
 
   /** 「显示隐藏的节点」：只在这次运行里有效，所有脑图一起切换 */
