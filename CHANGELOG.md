@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-11-09
+
 ### Added
 - **Node colors in notes** setting (off by default): when a mind map note is opened as Markdown, the text of colored headings and list items gets a light background in the node's color, in both Live Preview and reading view (so PDF export too). Named colors match the mind map's palette, including dark mode; custom `#hex` colors are shown semi-transparent. Child items aren't colored with their parent, the file isn't changed, and colors are still edited in the mind map. Find it in Settings → Markdown and embeds.
 
@@ -672,7 +674,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...HEAD
+[0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0
 [0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0

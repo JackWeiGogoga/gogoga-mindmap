@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-11-09
+
 ### 新增
 - 设置「在笔记里显示节点颜色」（默认关）：脑图笔记用 Markdown 打开时，带颜色的标题、列表项的文字铺一层同色的淡底，实时预览和阅读视图都有（导出 PDF 也带上）。颜色名和脑图里的配色一致，深色模式自动换深色版；自定义的 `#hex` 颜色显示成半透明。子项不跟着上色，文件不改，改颜色还是在脑图里改。在 设置 → Markdown 与嵌入 里打开。
 
@@ -672,7 +674,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...HEAD
+[0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0
 [0.57.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...0.57.0
 [0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
