@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-11-09
+
 ### 新增
 - 下划线：编辑节点时或选中节点后按 ⌘U（Windows 上 Ctrl+U），或点格式栏的 U，也有命令「给选中的文字加下划线」。存成 `<u>文字</u>`，节点里现在会显示成下划线。
 - 设置「在笔记里隐藏格式标签」（默认关）：Markdown 笔记的实时预览里，点进彩色的字、荧光笔、下划线时不再露出整串 `<span style=…>`、`<mark style=…>`、`<u>` 标签，一直显示效果，和编辑节点时一样；在旁边删字、打字时标签保持成对。源码模式、代码块、公式、frontmatter 里不动。
@@ -649,7 +651,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...HEAD
+[0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1
 [0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0

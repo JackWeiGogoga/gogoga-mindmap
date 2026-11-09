@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-11-09
+
 ### Added
 - Underline: press ⌘U (Ctrl+U) while editing a node or with nodes selected, click U in the format bar, or use the command "Underline the selected text". Saved as `<u>text</u>`, which nodes now display as underlined text.
 - **Hide format tags in notes** setting (off by default): in a Markdown note's Live Preview, clicking into colored, highlighted or underlined text no longer reveals the whole `<span style=…>`, `<mark style=…>` or `<u>` tag; the formatting keeps showing, as in the node editor, and deleting or typing next to it keeps the tags paired. Source mode, code blocks, math and frontmatter are left alone.
@@ -649,7 +651,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...HEAD
+[0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1
 [0.53.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.52.0...0.53.0

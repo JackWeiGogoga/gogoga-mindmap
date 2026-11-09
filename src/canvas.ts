@@ -1855,7 +1855,7 @@ export class MindMapCanvas {
         r.g.classList.toggle("has-handles", handles);
         r.guides.setAttribute("d", handles ? `M${round2(geo.s.x)},${round2(geo.s.y)} L${round2(geo.h1.x)},${round2(geo.h1.y)} M${round2(geo.e.x)},${round2(geo.e.y)} L${round2(geo.h2.x)},${round2(geo.h2.y)}` : "");
         [geo.h1, geo.h2].forEach((h, j) => {
-          const el = r!.handles[j];
+          const el = r.handles[j];
           el.classList.toggle("is-shown", handles);
           el.style.left = `${round2(h.x)}px`;
           el.style.top = `${round2(h.y)}px`;
