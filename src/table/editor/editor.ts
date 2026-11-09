@@ -840,12 +840,19 @@ export class TableEditor {
     if (!content) return;
     content.classList.remove("is-empty");
     content.textContent = this.input.value + "\u200b";
+    // 折行了行就变高：十字高亮的那条跟着重算，不然只盖住第一行
+    this.refreshCross();
+  }
+
+  private refreshCross(): void {
+    if (this.crossBands.some((b) => b.classList.contains("is-shown"))) this.markCross();
   }
 
   /** 编辑结束：内容区换回渲染好的样子 */
   private restoreContent(p: Pos): void {
     const content = this.cellEl(p)?.querySelector<HTMLElement>(".ggt-content");
     if (content) this.fillCell(content, p.r, p.c, shownText(this.table, p.r, p.c));
+    this.refreshCross();
   }
 
   /** 编辑完：内容变了就交给宿主 */
