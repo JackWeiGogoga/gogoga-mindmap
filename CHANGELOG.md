@@ -4,6 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-11-09
+
+### Changed
+- Typing "1. " or "1、" at the start of a node now numbers its sibling group by default, and the typed number is removed. Before, the number stayed as text and was saved as `- 1. text`, which Markdown reads as a list inside a bullet, so many themes showed every item as "1.". Existing settings are reset to the new default once; you can turn **Start numbering by typing 1.** off again in Settings → Editing and interaction.
+- **Number siblings** moved from **More** to the first level of the node's right-click menu.
+- Turning numbering on for a group where every node already starts with a typed number ("1. ", "2) ", "3、") removes those numbers, so notes numbered by hand can be fixed in one step instead of showing "1. 1. text". If the group is already numbered and shows "1. 1. text", clicking **Number siblings** removes the typed numbers and keeps the numbering.
+
+### Fixed
+- In Markdown notes with tables, clicking or selecting a paragraph just above a heading no longer selects the heading instead: the table's margins are now counted in the line positions.
+
 ## [0.55.0] - 2026-11-09
 
 ### Added
@@ -651,7 +661,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...HEAD
+[0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1

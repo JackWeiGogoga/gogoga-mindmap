@@ -4,6 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-11-09
+
+### 变更
+- 在节点开头打「1. 」或「1、」，现在默认就给这一组同级编号，打的数字自动去掉。以前数字会留在文字里，存成 `- 1. 文字`，Markdown 把它当成圆点列表里又套了一个有序列表，很多主题会全显示成「1.」。旧的设置会按新的默认值重置一次，不想要可以在 设置 → 编辑与操作 里关掉「打「1.」开始编号」。
+- 「同级编号」从右键菜单的「更多」里挪到了第一层。
+- 给一组同级打开编号时，如果每个节点开头都手打了序号（「1. 」「2) 」「3、」），会顺手去掉。手打过序号的笔记开一下编号就能修好，不会变成「1. 1. 文字」。已经开了编号、显示成「1. 1. 文字」的一组，点一下「同级编号」会去掉手打的序号，编号保留。
+
+### 修复
+- 带表格的 Markdown 笔记里，点或选标题上面的段落不再选中下面的标题：表格的上下边距现在算进了行的位置。
+
 ## [0.55.0] - 2026-11-09
 
 ### 新增
@@ -651,7 +661,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.56.0...HEAD
+[0.56.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.55.0...0.56.0
 [0.55.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.54.0...0.55.0
 [0.54.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.1...0.54.0
 [0.53.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.53.0...0.53.1
