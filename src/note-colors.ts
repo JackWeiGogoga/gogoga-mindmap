@@ -73,10 +73,13 @@ function paint(el: HTMLElement, c: NodeColor): void {
 }
 
 /** 阅读视图：按这一段在原文里的行，找出带颜色的标题、列表项，按顺序对上渲染出来的元素 */
-export function paintNoteColors(el: HTMLElement, ctx: MarkdownPostProcessorContext, isMindMap: (text: string) => boolean): void {
+export function paintNoteColors(el: HTMLElement, ctx: MarkdownPostProcessorContext, isMindMap: (text: string) => boolean, fallbackText: () => string): void {
   const info = ctx.getSectionInfo(el);
-  if (!info || !isMindMap(info.text)) return;
-  const { headings, items } = sectionColors(info.text, info.lineStart, info.lineEnd);
+  if (!info) return;
+  // Obsidian 给的原文偶尔是空字符串：从打开着这篇笔记的视图里取
+  const text = info.text || fallbackText();
+  if (!text || !isMindMap(text)) return;
+  const { headings, items } = sectionColors(text, info.lineStart, info.lineEnd);
   if (!headings.size && !items.size) return;
   if (headings.size) {
     const hs = el.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6");

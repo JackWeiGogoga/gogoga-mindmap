@@ -183,7 +183,18 @@ export default class MindMapPlugin extends Plugin {
     registerMindMapEmbeds(this);
     // 阅读视图里的节点颜色（设置「在笔记里显示节点颜色」）
     this.registerMarkdownPostProcessor((el, ctx) => {
-      if (this.settings.colorsInNotes) paintNoteColors(el, ctx, (text) => this.isMindMapFile(ctx.sourcePath) || textIsMindMap(text));
+      if (this.settings.colorsInNotes) paintNoteColors(
+          el,
+          ctx,
+          (text) => this.isMindMapFile(ctx.sourcePath) || textIsMindMap(text),
+          () => {
+            let found = "";
+            this.app.workspace.iterateAllLeaves((leaf) => {
+              if (!found && leaf.view instanceof MarkdownView && leaf.view.file?.path === ctx.sourcePath) found = leaf.view.data;
+            });
+            return found;
+          },
+        );
     });
     this.registerCommands();
 
