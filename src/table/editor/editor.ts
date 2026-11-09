@@ -445,6 +445,18 @@ export class TableEditor {
     }
     const stuck = offset > 0;
     this.root.classList.toggle("is-stuck", stuck);
+    // 不用横向滚动的表格：表头直接用浏览器原生的吸顶（position: sticky），由浏览器在滚动线程上处理，
+    // 编辑器在滚动中增删内容也不会让它慢一帧（滚动驱动动画在快速滑动、编辑器边滚边重画时会落后一帧，#2）
+    const native = !!outer && Math.abs(this.scale() - 1) < 0.01 && this.canStickNatively(outer);
+    this.root.classList.toggle("is-native-stick", native);
+    if (native && outer) {
+      this.root.classList.remove("is-sd");
+      const pad = parseFloat((outer.ownerDocument.defaultView ?? window).getComputedStyle(outer).paddingTop) || 0;
+      // 原生吸顶贴的是滚动区内边距的下沿：往上挪回去，贴着滚动区顶端
+      this.root.style.setProperty("--ggt-sticky-top", `${-pad}px`);
+      head.removeAttribute("style");
+      return;
+    }
     if (outer && this.scrollDriven && Math.abs(this.scale() - 1) < 0.01) {
       this.stickRange(outer, head);
       head.removeAttribute("style");
@@ -453,6 +465,22 @@ export class TableEditor {
     this.root.classList.remove("is-sd");
     if (stuck) head.setAttribute("style", `transform: translateY(${Math.round(offset / this.scale())}px)`);
     else head.removeAttribute("style");
+  }
+
+  /**
+   * 能不能用原生吸顶：表格不用横向滚动，而且表格到外面滚动区之间没有别的会滚动、会裁切的容器
+   * （阅读视图里 Obsidian 给表格套的 .el-table 是 overflow-x: auto，原生吸顶会贴到它上面去）
+   */
+  private canStickNatively(outer: HTMLElement): boolean {
+    const sc = this.scroller;
+    // 原生吸顶时 .ggt-scroll 是 overflow: visible，宽度照样能比出来有没有超出
+    if (sc.scrollWidth > sc.clientWidth + 1) return false;
+    const win = this.root.ownerDocument.defaultView ?? window;
+    for (let el = this.root.parentElement; el && el !== outer; el = el.parentElement) {
+      const cs = win.getComputedStyle(el);
+      if (cs.overflowX !== "visible" || cs.overflowY !== "visible") return false;
+    }
+    return true;
   }
 
   /**

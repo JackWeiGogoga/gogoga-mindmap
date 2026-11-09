@@ -2410,6 +2410,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-y-host { scroll-timeline: --ggt-y block; }
 @keyframes ggt-stick { from { transform: translateY(0); } to { transform: translateY(var(--ggt-stick-len)); } }
 .ggt.is-sd .ggt-table thead { animation: ggt-stick linear both; animation-timing-function: steps(var(--ggt-stick-steps, 1000), end); animation-timeline: --ggt-y; animation-range: var(--ggt-stick-a) var(--ggt-stick-b); }
+/* 原生吸顶（不用横向滚动的表格）：表头 position: sticky，贴着外面滚动区的顶端；横向滚动的容器换成不滚动，免得表头贴到它上面 */
+.ggt.is-native-stick .ggt-scroll { overflow: visible; }
+.ggt.is-native-stick .ggt-table thead { position: sticky; top: var(--ggt-sticky-top, 0px); z-index: 3; }
 .ggt.is-stuck thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); box-shadow: 0 1px 0 var(--ggt-line); }
 
 /* 横向能滚时，被截断的那一边淡出，提示还有内容（遮罩直接作用在滚动区的可见边缘上，不会和截断的位置错开） */
