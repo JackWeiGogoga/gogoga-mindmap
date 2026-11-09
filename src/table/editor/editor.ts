@@ -2124,7 +2124,12 @@ export class TableEditor {
         const colMid = hr.left + hr.width / 2;
         if (colMid < vis.left || colMid > vis.right) this.colHandle.classList.remove("is-shown");
         this.colHandle.style.left = `${(colMid - base.left) / k}px`;
-        this.colHandle.style.top = `${(Math.max(hr.top, vis.top) - base.top) / k}px`;
+        // 手柄骑在表头上边线上（一半在外面）。吸顶时上边线贴着外面滚动区的顶端，露在外面的半截会被裁掉：
+        // 最高放到顶端往下半个手柄的地方，整个落在表头里
+        const outerTop = this.outer ? this.outer.getBoundingClientRect().top : -Infinity;
+        const half = (this.colHandle.offsetHeight * k) / 2 + 1;
+        const top = Math.max(hr.top, vis.top, outerTop + half);
+        this.colHandle.style.top = `${(top - base.top) / k}px`;
         this.colHandle.dataset.r = String(colP.r);
         this.colHandle.dataset.c = String(colP.c);
       }
