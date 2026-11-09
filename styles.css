@@ -2409,7 +2409,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 表头吸顶：滚动驱动动画，位置由浏览器按外面容器的滚动位置算（范围由 JS 在布局变化时写进变量） */
 .ggt-y-host { scroll-timeline: --ggt-y block; }
 @keyframes ggt-stick { from { transform: translateY(0); } to { transform: translateY(var(--ggt-stick-len)); } }
-.ggt.is-sd .ggt-table thead { animation: ggt-stick linear both; animation-timeline: --ggt-y; animation-range: var(--ggt-stick-a) var(--ggt-stick-b); }
+.ggt.is-sd .ggt-table thead { animation: ggt-stick linear both; animation-timing-function: steps(var(--ggt-stick-steps, 1000), end); animation-timeline: --ggt-y; animation-range: var(--ggt-stick-a) var(--ggt-stick-b); }
 .ggt.is-stuck thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); box-shadow: 0 1px 0 var(--ggt-line); }
 
 /* 横向能滚时，被截断的那一边淡出，提示还有内容（遮罩直接作用在滚动区的可见边缘上，不会和截断的位置错开） */

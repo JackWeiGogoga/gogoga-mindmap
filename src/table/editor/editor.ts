@@ -467,12 +467,17 @@ export class TableEditor {
       return;
     }
     const a = Math.round(outer.scrollTop + t.top - outer.getBoundingClientRect().top - outer.clientTop);
-    const key = `${a}|${len}`;
+    const dpr = (this.root.ownerDocument.defaultView ?? window).devicePixelRatio || 1;
+    const key = `${a}|${len}|${dpr}`;
     if (key !== this.stickKey) {
       this.stickKey = key;
-      this.root.style.setProperty("--ggt-stick-a", `${a}px`);
-      this.root.style.setProperty("--ggt-stick-b", `${a + len}px`);
+      // 表头一个物理像素一格地挪，起点提前半格：触控板滚动的距离带小数，浏览器滚正文时按四舍五入对齐到物理像素，
+      // 表头连续挪（或分步时向下取整）就会和正文差一个像素、来回跳（看起来在抖，#2）。分步 + 提前半格 = 也是四舍五入
+      const half = 0.5 / dpr;
+      this.root.style.setProperty("--ggt-stick-a", `${a - half}px`);
+      this.root.style.setProperty("--ggt-stick-b", `${a + len - half}px`);
       this.root.style.setProperty("--ggt-stick-len", `${len}px`);
+      this.root.style.setProperty("--ggt-stick-steps", String(Math.max(1, Math.round(len * dpr))));
     }
     this.root.classList.add("is-sd");
   }
