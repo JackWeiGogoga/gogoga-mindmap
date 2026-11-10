@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.2] - 2026-11-10
+
+### 修复
+- 双击节点进入编辑、分屏联动滚动 Markdown（实时预览和阅读模式）、跳到 Markdown 对应行时，只滚笔记和脑图自己，不再连带滚动 Obsidian 外层的容器。以前用 Border 等主题的卡片布局时，外层容器会被往上滚一截，顶部标签栏被裁掉（#29）。
+
 ## [0.61.1] - 2026-11-10
 
 ### 修复
@@ -732,7 +737,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...HEAD
+[0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
 [0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
 [0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
 [0.60.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...0.60.1
