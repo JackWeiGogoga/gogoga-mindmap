@@ -51,6 +51,9 @@ export interface EditorHost {
   suggestTags?(query: string): string[];
   /** 删掉整张表（连同下面的注释）：给了才在表格菜单里出现「删除表格」 */
   onDeleteTable?(): void;
+  /** 整张表往里缩（挂到上面最近的列表项下）/ 移出列表：给了才在表格菜单里出现；canIndentTable 决定是不是灰的 */
+  indentTable?(dir: 1 | -1): void;
+  canIndentTable?(dir: 1 | -1): boolean;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
   /** 格子的编辑框用 CodeMirror：加粗、颜色、荧光笔直接显示效果，标签藏起来（建编辑器时问一次） */
@@ -2237,6 +2240,20 @@ export class TableEditor {
       { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWidths(this.table, this.fitWidths())) },
       { title: t("autoWidthAll"), icon: "move-horizontal", disabled: !tb.meta.w?.some((x) => x != null), run: () => keep(autoWidthAll(this.table)) },
       { title: t("clearAllBg"), icon: "paintbrush", disabled: !Object.keys(tb.meta.bg ?? {}).length && !Object.keys(tb.meta.fg ?? {}).length, run: () => keep(clearAllBg(this.table)) },
+      ...(this.host.indentTable
+        ? [
+            { separator: true },
+            ...([1, -1] as const).map((dir): MenuItem => ({
+              title: t(dir > 0 ? "indentTable" : "outdentTable"),
+              icon: dir > 0 ? "indent-increase" : "indent-decrease",
+              disabled: !this.host.canIndentTable?.(dir),
+              run: () => {
+                if (this.editing) this.commit();
+                this.host.indentTable?.(dir);
+              },
+            })),
+          ]
+        : []),
       ...(this.host.onDeleteTable
         ? [
             { separator: true },
