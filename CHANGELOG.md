@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-11-10
+
+### Fixed
+- Pasting a single web address onto a selected node now also fetches the page title when **Fetch page titles when pasting links** is on: the new child node first shows the address, then turns into `[title](address)`. Before, the title was only fetched when pasting while editing a node's text.
+- Jumping back from PDF++ (clicking a highlight that a mind map note links to) now selects the node on that line in the mind map, unfolding its branch if needed, and centers it. Before, the map opened but didn't move to the node; this works for anything that opens a note at a line.
+
 ## [0.61.0] - 2026-11-10
 
 ### Added
@@ -726,7 +732,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...HEAD
+[0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
 [0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
 [0.60.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...0.60.1
 [0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0

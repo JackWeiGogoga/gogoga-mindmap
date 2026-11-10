@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-11-10
+
+### 修复
+- 设置里开着「粘贴网址时抓取网页标题」时，选中节点直接粘贴一个网址，也会抓网页标题：新的子节点先显示网址，抓到后变成 `[标题](网址)`。以前只有在编辑节点文字时粘贴才抓。
+- 从 PDF++ 跳回脑图（点 PDF 里被脑图笔记引用的标注）时，脑图会选中那一行对应的节点，折叠着的分支先展开，再把节点移到画面中间。以前只打开了脑图，不会定位到节点；其他按行号打开笔记的地方也一样。
+
 ## [0.61.0] - 2026-11-10
 
 ### 新增
@@ -726,7 +732,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...HEAD
+[0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
 [0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
 [0.60.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...0.60.1
 [0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0
