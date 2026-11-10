@@ -15,6 +15,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - **Link to note** no longer strips colors, bold and other formatting from the node. The formatting stays; colored parts are written as Markdown links, so they show as links in their own color (underlined) in the mind map and reading view, and keep their color in Live Preview. **Unlink** restores the original text.
 - Colored text with a line break (Shift+Enter) no longer shows as `<span style=…>` source in the node, with the color value turned into a tag; a line break inside colored text now stores each line as its own complete colored text.
 - Copying part of a colored text while editing a node no longer pastes as a half `<span …>` tag; the copied text is a complete piece of colored text.
+- Tables in nodes: after a node's width was dragged, the table kept a faded right edge and scrolled sideways a little even when the node was wider than the table. It now shows in full when it fits and only scrolls when the node is narrower.
 
 ## [0.59.1] - 2026-11-10
 
