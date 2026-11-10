@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-11-10
+
+### Added
+- New **Toolbar of embedded maps** page under Settings → Toolbars and colors, for mind maps embedded in notes and canvas cards (`mindmap` code blocks and `![[note]]` embeds): **Full** (default, the same as an opened mind map), **Custom** or **Auto-hide**. Custom lists every button to turn on or off and reorder, like the main toolbar page; by default it keeps only the open / edit button (“Open this mind map” for embedded notes, “Edit / Done” for code blocks), for a clean embed. If every button is off, the toolbar isn't shown at all. Opened mind maps are not affected.
+
+### Changed
+- The **Hide the toolbar of embedded maps** switch under Markdown and embeds is now the **Auto-hide** option on the page above; if you had it on, it's switched over automatically.
+
 ## [0.60.1] - 2026-11-10
 
 ### Fixed
@@ -718,7 +726,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...HEAD
+[0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
 [0.60.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...0.60.1
 [0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0
 [0.59.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...0.59.1

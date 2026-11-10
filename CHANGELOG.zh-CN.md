@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-11-10
+
+### 新增
+- 设置 →「工具栏与颜色」里新增「嵌入的脑图的工具栏」，管笔记和白板卡片里嵌入的脑图（`mindmap` 代码块和 `![[笔记]]` 嵌入）：「完整」（默认，和打开的脑图一样）、「自定义」、「自动隐藏」。选「自定义」后，和主工具栏那页一样列出全部按钮，可以开关、调顺序；默认只留「打开 / 编辑」一个按钮（嵌入的笔记是「打开这张脑图」，代码块是「编辑 / 完成」），嵌入的图更清爽。按钮全关时整条工具栏不显示。单独打开的脑图不受影响。
+
+### 改进
+- 原来「Markdown 与嵌入」里的「嵌入的脑图隐藏工具栏」开关，改成上面那页的「自动隐藏」选项；开过这个开关的，升级后自动换成「自动隐藏」。
+
 ## [0.60.1] - 2026-11-10
 
 ### 修复
@@ -718,7 +726,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...HEAD
+[0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
 [0.60.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...0.60.1
 [0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0
 [0.59.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...0.59.1
