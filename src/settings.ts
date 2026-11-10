@@ -856,14 +856,14 @@ function dragRow(ev: PointerEvent, row: HTMLElement, key: string, total: number,
   const place = () => {
     const ds = (scroller?.scrollTop ?? 0) - startScroll;
     // 拖着的这一行跟着指针（滚动时内容往上走，它要补回来）
-    row.style.transform = `translateY(${lastY - startY + ds}px)`;
+    row.setCssStyles({ transform: `translateY(${lastY - startY + ds}px)` });
     const mid = mids[from] + lastY - startY;
     // 新位置 = 别的行里中线在它上面的有几行
     to = mids.filter((m, j) => j !== from && m - ds < mid).length;
     rows.forEach((r, j) => {
       if (j === from) return;
       const shift = from < to && j > from && j <= to ? -h : to < from && j >= to && j < from ? h : 0;
-      r.style.transform = shift ? `translateY(${shift}px)` : "";
+      r.setCssStyles({ transform: shift ? `translateY(${shift}px)` : "" });
     });
   };
   const tick = () => {
@@ -888,7 +888,7 @@ function dragRow(ev: PointerEvent, row: HTMLElement, key: string, total: number,
     grip.removeEventListener("pointercancel", end);
     if (raf) win.cancelAnimationFrame(raf);
     for (const r of rows) {
-      r.style.transform = "";
+      r.setCssStyles({ transform: "" });
       r.removeClass("is-dragging", "is-drag-sibling");
     }
     // 交出去的是 id：拖到的位置上原来是哪一项

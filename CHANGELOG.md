@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- Dragging toolbar buttons in settings now sets styles the way Obsidian's plugin review rules require (no direct `style` assignment).
+
 ## [0.60.0] - 2026-11-10
 
 ### Added
