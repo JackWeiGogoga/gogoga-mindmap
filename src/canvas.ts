@@ -3673,9 +3673,11 @@ export class MindMapCanvas {
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
-    // 按设置里的顺序摆。嵌入的脑图的「编辑 / 完成」「打开」按钮不能关，放在「结构」那一格前面
+    // 按设置里的顺序摆。嵌入的脑图的「编辑 / 完成」「打开」按钮：清单里有它（嵌入的选了自定义）就按清单，
+    // 否则不能关，放在「结构」那一格前面
     const layout = this.opts.toolbarLayout?.() ?? mergeLayout(undefined, TOOLBAR_DEFAULT);
-    const embed = pool.get("embed");
+    const listed = layout.some((x) => x.id === "embed");
+    const embed = listed ? undefined : pool.get("embed");
     for (const item of layout) {
       if (item.id === "structure" && embed) bar.append(embed);
       if (!item.on) continue;
@@ -3696,6 +3698,9 @@ export class MindMapCanvas {
       kids.forEach((k, i) => {
         if (k.classList.contains("mm-tool-sep") && k.classList.contains("is-hidden") === show[i]) k.classList.toggle("is-hidden", !show[i]);
       });
+      // 一个看得见的按钮都没有（嵌入的自定义里全关了）：整条工具栏不显示，免得留一个空框
+      const empty = !kids.some((k) => !k.classList.contains("mm-tool-sep") && !k.classList.contains("is-hidden"));
+      if (bar.classList.contains("is-empty") !== empty) bar.classList.toggle("is-empty", empty);
     };
     tidy();
     new MutationObserver(tidy).observe(bar, { subtree: true, attributes: true, attributeFilter: ["class"] });

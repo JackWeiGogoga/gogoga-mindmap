@@ -34,7 +34,7 @@ import {
 } from "obsidian";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
-import { mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT } from "./bar-layout";
+import { mergeLayout, NODEBAR_DEFAULT } from "./bar-layout";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables } from "./node-table";
 import { preserveFormat } from "./merge";
@@ -51,7 +51,7 @@ import { isStructure } from "./layout";
 import { History } from "./history";
 import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
 import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
-import { DEFAULT_SETTINGS, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
+import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
@@ -296,6 +296,13 @@ export default class MindMapPlugin extends Plugin {
       await this.saveSettings();
     }
     this.settings.customThemes = this.settings.customThemes.map(normalizeCustomTheme);
+    // 0.60 以前「嵌入的脑图隐藏工具栏」是个开关：开着的迁到「自动隐藏」，旧键删掉
+    if ("embedToolbarAutoHide" in raw) {
+      const s = this.settings as MindMapSettings & { embedToolbarAutoHide?: boolean };
+      if (!("embedToolbar" in raw) && s.embedToolbarAutoHide) this.settings.embedToolbar = "autohide";
+      delete s.embedToolbarAutoHide;
+      await this.saveSettings();
+    }
     // 0.56 以前的「打 1. 开始编号」叫 autoNumber、默认关；改名后按新默认（开）来，旧键删掉
     if ("autoNumber" in raw) {
       delete (this.settings as MindMapSettings & { autoNumber?: boolean }).autoNumber;
@@ -314,7 +321,7 @@ export default class MindMapPlugin extends Plugin {
    */
   applyEmbedToolbar(doc?: Document, on = true): void {
     for (const d of doc ? [doc] : this.allDocs()) {
-      d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on && this.settings.embedToolbarAutoHide);
+      d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on && this.settings.embedToolbar === "autohide");
       // 大纲面板显示完整标题（换行），默认一行放不下就省略
       d.body.classList.toggle("gg-mm-outline-wrap", on && this.settings.outlineWrap);
     }
@@ -1353,7 +1360,7 @@ export default class MindMapPlugin extends Plugin {
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
         nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, NODEBAR_DEFAULT),
-        toolbarLayout: () => mergeLayout(this.settings.toolbarLayout, TOOLBAR_DEFAULT),
+        toolbarLayout: () => embedToolbarLayout(this.settings),
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors, true),

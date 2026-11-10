@@ -11,7 +11,12 @@ import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-mo
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import { refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
-import { type BarItem, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
+import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
+
+/** 嵌入的脑图选了「自定义」就用自己那份按钮清单，否则和打开的脑图一样 */
+export function embedToolbarLayout(s: MindMapSettings): BarItem[] {
+  return s.embedToolbar === "custom" ? mergeLayout(s.embedToolbarLayout, EMBED_TOOLBAR_DEFAULT) : mergeLayout(s.toolbarLayout, TOOLBAR_DEFAULT);
+}
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
@@ -128,8 +133,13 @@ export interface MindMapSettings {
   fileNameAsRoot: boolean;
   /** 笔记的脑图只把标题当节点，列表都算标题的备注（代码块里的脑图不受影响） */
   headingsOnly: boolean;
-  /** 嵌入的脑图隐藏工具栏：阅读模式一直不显示，编辑模式鼠标移上去才显示（默认关） */
-  embedToolbarAutoHide: boolean;
+  /**
+   * 嵌入的脑图的工具栏：full 和打开的脑图一样；custom 按 embedToolbarLayout 摆；
+   * autohide 阅读模式一直不显示，编辑模式鼠标移上去才显示（0.60 以前的 embedToolbarAutoHide 开关迁过来）
+   */
+  embedToolbar: "full" | "custom" | "autohide";
+  /** 嵌入的脑图选「自定义」时显示哪些按钮、什么顺序（空数组 = 默认：只留「打开 / 编辑」） */
+  embedToolbarLayout: string[];
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -187,7 +197,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   customMarkersExclusive: false,
   rememberView: true,
   newFileTemplate: "",
-  embedToolbarAutoHide: false,
+  embedToolbar: "full",
+  embedToolbarLayout: [],
   fileNameAsRoot: false,
   headingsOnly: false,
   followActiveNote: false,
@@ -287,7 +298,12 @@ export class MindMapSettingTab extends PluginSettingTab {
         return syncNotesExpandedAll();
       case "toolbarPosition":
         return p.applyToolbarPosition();
-      case "embedToolbarAutoHide":
+      case "embedToolbar":
+        p.applyEmbedToolbar();
+        refreshAllBars();
+        // 选不选「自定义」决定这一页下面列不列按钮
+        this.refresh();
+        return;
       case "outlineWrap":
         return p.applyEmbedToolbar();
       case "customMarkers":
@@ -380,6 +396,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           toggle("showNodebar", t("settings.showNodebar.name"), t("settings.showNodebar.desc")),
           this.barLayoutPage("nodebarLayout"),
           this.barLayoutPage("toolbarLayout"),
+          this.barLayoutPage("embedToolbarLayout"),
           text("nodeColors", t("settings.nodeColors.name"), t("settings.nodeColors.desc"), DEFAULT_NODE_COLORS, ["palette", "色块", "调色板"]),
           toggle("formatBar", t("settings.formatBar.name"), t("settings.formatBar.desc")),
           text("textColors", t("settings.textColors.name"), t("settings.textColors.desc"), DEFAULT_TEXT_COLORS, ["font color", "字体颜色"]),
@@ -426,7 +443,6 @@ export class MindMapSettingTab extends PluginSettingTab {
             desc: t("settings.codeBlockHeight.desc"),
             control: { type: "number", key: "codeBlockMaxHeight", min: 120, validate: (v) => (Number.isFinite(v) && v >= 120 ? undefined : "≥ 120") },
           },
-          toggle("embedToolbarAutoHide", t("settings.embedToolbar.name"), t("settings.embedToolbar.desc")),
         ]),
       ]),
       page(t("settings.group.newMap"), t("settings.page.newMap"), [
@@ -459,9 +475,10 @@ export class MindMapSettingTab extends PluginSettingTab {
    * 浮动工具栏 / 主工具栏的按钮：一个子页面，一行一个按钮（图标、名字、开关、上移下移），最上面「恢复默认」。
    * 改了马上存、所有打开着的脑图重建工具栏
    */
-  private barLayoutPage(key: "nodebarLayout" | "toolbarLayout"): SettingDefinitionItem {
+  private barLayoutPage(key: "nodebarLayout" | "toolbarLayout" | "embedToolbarLayout"): SettingDefinitionItem {
     const plugin = this.plugin;
-    const defaults = key === "nodebarLayout" ? NODEBAR_DEFAULT : TOOLBAR_DEFAULT;
+    const defaults = key === "nodebarLayout" ? NODEBAR_DEFAULT : key === "toolbarLayout" ? TOOLBAR_DEFAULT : EMBED_TOOLBAR_DEFAULT;
+    const embed = key === "embedToolbarLayout";
     const items = () => mergeLayout(plugin.settings[key], defaults);
     const save = async (next: BarItem[]) => {
       plugin.settings[key] = sameAsDefault(next, defaults) ? [] : encodeLayout(next);
@@ -469,12 +486,12 @@ export class MindMapSettingTab extends PluginSettingTab {
       refreshAllBars();
       this.refresh();
     };
-    const ICON: Record<string, string> = { colors: "palette", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
+    const ICON: Record<string, string> = { embed: "open", colors: "palette", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
     const list = items();
     const at = (id: string) => items().findIndex((x) => x.id === id);
     const rows: SettingDefinition[] = list.map((item, i) => ({
       name: isSep(item.id) ? t("bar.sep") : t(`bar.${item.id}` as Parameters<typeof t>[0]),
-      desc: isSep(item.id) ? t("bar.sepDesc") : "",
+      desc: isSep(item.id) ? t("bar.sepDesc") : item.id === "embed" ? t("bar.embedDesc") : "",
       aliases: ["toolbar", "button", "工具栏", "按钮"],
       render: (setting) => {
         const name = ICON[item.id] ?? item.id;
@@ -526,7 +543,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           );
       },
     }));
-    rows.unshift({
+    const reset: SettingDefinition = {
       name: t("bar.reset"),
       desc: t(key === "nodebarLayout" ? "bar.nodebarDesc" : "bar.toolbarDesc"),
       render: (setting) => {
@@ -537,16 +554,34 @@ export class MindMapSettingTab extends PluginSettingTab {
             .onClick(() => void save(mergeLayout(undefined, defaults))),
         );
       },
-    });
+    };
+    const count = () => {
+      const all = items().filter((x) => !isSep(x.id));
+      return t("bar.count", { n: all.filter((x) => x.on).length, total: all.length });
+    };
+    if (!embed) {
+      return {
+        type: "page",
+        name: t(key === "nodebarLayout" ? "bar.nodebarPage" : "bar.toolbarPage"),
+        desc: t(key === "nodebarLayout" ? "bar.nodebarPageDesc" : "bar.toolbarPageDesc"),
+        displayValue: count,
+        items: [reset, ...rows],
+      };
+    }
+    // 嵌入的脑图：最上面先选完整 / 自定义 / 自动隐藏，选了自定义才列按钮
+    const modes = { full: t("settings.embedToolbar.full"), custom: t("settings.embedToolbar.custom"), autohide: t("settings.embedToolbar.autohide") };
+    const mode: SettingDefinition = {
+      name: t("settings.embedToolbar.name"),
+      desc: t("settings.embedToolbar.desc"),
+      aliases: ["embed", "嵌入", "简洁", "隐藏", "toolbar", "工具栏"],
+      control: { type: "dropdown", key: "embedToolbar", options: modes },
+    };
     return {
       type: "page",
-      name: t(key === "nodebarLayout" ? "bar.nodebarPage" : "bar.toolbarPage"),
-      desc: t(key === "nodebarLayout" ? "bar.nodebarPageDesc" : "bar.toolbarPageDesc"),
-      displayValue: () => {
-        const all = items().filter((x) => !isSep(x.id));
-        return t("bar.count", { n: all.filter((x) => x.on).length, total: all.length });
-      },
-      items: rows,
+      name: t("bar.embedPage"),
+      desc: t("bar.embedPageDesc"),
+      displayValue: () => (plugin.settings.embedToolbar === "custom" ? `${modes.custom} · ${count()}` : modes[plugin.settings.embedToolbar]),
+      items: plugin.settings.embedToolbar === "custom" ? [mode, reset, ...rows] : [mode],
     };
   }
 

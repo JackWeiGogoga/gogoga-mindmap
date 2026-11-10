@@ -1883,6 +1883,7 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
   .mm-theme-preview-canvas { height: 280px; flex: none; }
 }
 .mm-theme-preview .mm-toolbar { display: none; }
+.mm-toolbar.is-empty { display: none; }
 
 /* 右键菜单开着时藏起节点浮动工具栏，关掉菜单再回来 */
 .gg-mm-root.is-menu-open .mm-nodebar { visibility: hidden; }
