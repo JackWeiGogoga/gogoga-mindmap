@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-11-10
+
 ### Added
 - New **Floating toolbar buttons** and **Main toolbar buttons** pages under Settings → Toolbars and colors: turn each button on or off and reorder them by dragging the handle or with the arrows (colors count as one item on the floating toolbar; the main toolbar's dividers can be moved or hidden too). Changes apply to open mind maps right away, and **Restore defaults** puts everything back. The floating toolbar also has five optional buttons, off by default: Add relationship, Insert table, Collapse / expand, Move up and Move down. The default toolbars look the same as before.
 - New **Open note links in** setting under Settings → Editing: Current tab (default, as before), New tab or Right split. With Right split the mind map stays on the left and keeps focus, and the next link opens in the same split instead of adding more. ⌘⌥-click (Ctrl+Alt-click) on a link now always opens it in the right split; ⌘-click still opens a new tab.
@@ -19,6 +21,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Resizing a PDF++ crop image in a node no longer leaves the node frame stuck at 300 px wide with the image sticking out; the frame grows with the image.
 - The mouse wheel sometimes seemed to stop working until you clicked a few times: if the mouse release was missed (for example after switching windows while holding the button), the canvas still thought it was being dragged and snapped back after every wheel scroll. A move with no button pressed now counts as a release.
 - With the pointer on a scrollable table node that is already scrolled to the end, the wheel no longer does nothing: a new scroll gesture pans the canvas instead. Reaching the end in the middle of a gesture still stops there, so the map isn't flung away.
+- Tables in nodes: copying part of a colored text while editing a cell no longer pastes as a half `<span …>` tag, and Shift+Enter inside colored text keeps each line complete.
 
 ## [0.59.1] - 2026-11-10
 
@@ -710,7 +713,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...HEAD
+[0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0
 [0.59.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...0.59.1
 [0.59.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...0.59.0
 [0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0

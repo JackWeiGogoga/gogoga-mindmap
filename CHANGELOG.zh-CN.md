@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-11-10
+
 ### 新增
 - 设置 →「工具栏与颜色」新增「浮动工具栏的按钮」「主工具栏的按钮」：每个按钮都能单独开关，按住把手拖动或用箭头调顺序（颜色在浮动工具栏里算一整项，主工具栏的分隔线也能挪、能关），改完打开着的脑图马上生效，「恢复默认」一键还原。浮动工具栏另有五个默认不显示的可选按钮：添加关联线、插入表格、折叠 / 展开、上移、下移。默认的样子不变。
 - 设置 →「编辑与操作」新增「点链接时打开在」：当前标签页（默认，和以前一样）、新标签页、右侧分屏。选右侧分屏时脑图留在左边，焦点也留在脑图上，下一个链接还在同一个分屏里打开，不会越分越多。另外 ⌘⌥ 点（Ctrl+Alt 点）链接总是在右侧分屏打开，⌘ 点照旧是新标签页。
@@ -19,6 +21,7 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - PDF++ 截区的图拖角上的手柄拉大后，节点框不再停在 300 宽、图片伸出框外，跟着图片一起变大。
 - 滚轮偶尔像失效一样、点几下才恢复：按下鼠标后松手没被收到（比如按住时切走了窗口），画布一直以为还在拖，鼠标一动就把滚轮滚出的位置拉回去。现在鼠标其实没按着时就当已经松手。
 - 鼠标停在能滚动的表格节点上、表格已经滚到底时，滚轮不再什么都不动：新的一次滑动交给画布平移；同一次滑动中途滚到底照旧停住，不会把图甩出去。
+- 节点里的表格：编辑格子时复制一段带颜色的文字，粘到别处不再变成半截 `<span …>` 源码；在带颜色的文字中间按 Shift+Enter 换行，每一行各自完整地存好。
 
 ## [0.59.1] - 2026-11-10
 
@@ -710,7 +713,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.0...HEAD
+[0.60.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.1...0.60.0
 [0.59.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.59.0...0.59.1
 [0.59.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.58.0...0.59.0
 [0.58.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.57.0...0.58.0
