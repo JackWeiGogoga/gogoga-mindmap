@@ -2532,6 +2532,18 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
  */
 .ggt .ggt-table .ggt-cell[data-bg] { background-color: var(--ggt-cell-bg); }
 .ggt.is-stuck .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+/*
+ * 能吸顶的表格（原生吸顶 / 滚动驱动）：表头格子一直先铺页面底色，再叠表头的浅灰，看起来和不铺一样。
+ * is-stuck 是滚动之后 JS 才加的，快速滑动时表头已经贴到顶上、类还没加，半透明的表头会透出底下正文的笔画
+ */
+.ggt { --ggt-head-tint: var(--ggt-head-bg); }
+.ggt[data-preset="minimal"], .ggt[data-preset="academic"] { --ggt-head-tint: transparent; }
+.ggt.is-native-stick .ggt-table thead .ggt-cell, .ggt.is-sd .ggt-table thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-tint), var(--ggt-head-tint)); }
+.ggt.is-stuck.is-native-stick .ggt-table thead .ggt-cell, .ggt.is-stuck.is-sd .ggt-table thead .ggt-cell { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
+.ggt.is-native-stick .ggt-table thead .ggt-cell[data-bg], .ggt.is-sd .ggt-table thead .ggt-cell[data-bg] { background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+/* 表格位置带小数时（阅读视图常见），格子各自对齐到像素，两行表头之间、表头顶边会留一条一像素的缝透出正文：整个表头底下再垫一层；吸顶时往上多垫一点 */
+.ggt.is-native-stick .ggt-table thead::before, .ggt.is-sd .ggt-table thead::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--background-primary); pointer-events: none; }
+.ggt.is-stuck.is-native-stick .ggt-table thead::before, .ggt.is-stuck.is-sd .ggt-table thead::before { top: -2px; }
 
 /* 冻结标题列：左右滚动时第一列贴在左边。底下要不透明，先铺页面底色，再叠标题列（或格子）的颜色 */
 .ggt { --ggt-frozen-tint: var(--ggt-head-bg); }
