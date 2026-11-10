@@ -16,6 +16,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Colored text with a line break (Shift+Enter) no longer shows as `<span style=…>` source in the node, with the color value turned into a tag; a line break inside colored text now stores each line as its own complete colored text.
 - Copying part of a colored text while editing a node no longer pastes as a half `<span …>` tag; the copied text is a complete piece of colored text.
 - Tables in nodes: after a node's width was dragged, the table kept a faded right edge and scrolled sideways a little even when the node was wider than the table. It now shows in full when it fits and only scrolls when the node is narrower.
+- Resizing a PDF++ crop image in a node no longer leaves the node frame stuck at 300 px wide with the image sticking out; the frame grows with the image.
 
 ## [0.59.1] - 2026-11-10
 

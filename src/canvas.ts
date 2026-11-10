@@ -1562,7 +1562,8 @@ export class MindMapCanvas {
       // 只放了表格、没有标题的节点：不显示空的标题行（编辑时照常出现）
       if (nt && !node.text.trim()) el.classList.add("no-title");
       if (num) el.classList.add("has-num");
-      if (el.querySelector(".mm-label img")) el.classList.add("has-image");
+      // PDF 截区的图是 PDF++ 之后才异步画进来的：排版这时还没有 <img>，看截区的外框也算图片节点（不然节点最宽 300，拖大了图片伸出框外）
+      if (el.querySelector(".mm-label img, .mm-label .mm-pdf-crop")) el.classList.add("has-image");
       if (this.frames.has(node.id)) {
         el.classList.add("has-frame");
         if (this.liveFrame === node.id) el.classList.add("is-frame-live");
