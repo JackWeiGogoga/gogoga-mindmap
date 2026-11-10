@@ -94,6 +94,7 @@ import { alignedTiers, tierOf } from "./custom-theme";
 import type { NoteCards, NoteCardState } from "./state";
 import { TableEditor, type EditorHost } from "./table/editor/editor";
 import type { Table } from "./table/core/table";
+import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { addTable, noteOnlyTable, noteRest, noteTable, tableSource, withoutTable, withTable } from "./node-table";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, splitByPunctuation, subtreeToList, unescapeNote } from "./markdown";
 
@@ -234,6 +235,9 @@ export interface CanvasOptions {
   copyPlain?: () => boolean;
   /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
   showNodebar?: () => boolean;
+  /** 浮动工具栏、主工具栏的按钮：显示哪些、什么顺序（见 bar-layout.ts）；每次建工具栏时读 */
+  nodebarLayout?: () => BarItem[];
+  toolbarLayout?: () => BarItem[];
   /** 浮动工具栏和标注颜色菜单里列出的节点颜色（颜色名或 #色值），见 parseNodeColors */
   nodeColors?: () => string[];
   /** 编辑节点文字时选中一段文字弹出格式栏 */
@@ -377,6 +381,11 @@ export function noteKey(node: MindNode): string {
 /** 拖备注卡片时的最小尺寸（画布像素） */
 const NOTE_CARD_MIN = { w: 80, h: 40 };
 
+/** 设置里改了浮动工具栏、主工具栏的按钮：所有打开着的画布照新的清单重建工具栏 */
+export function refreshAllBars(): void {
+  for (const c of liveCanvases) c.refreshBars();
+}
+
 export function syncNotesExpandedAll(): void {
   for (const c of liveCanvases) c.syncNotesExpanded();
 }
@@ -422,6 +431,10 @@ const ICONS: Record<string, string> = {
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
   edge: '<svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c6 0 4-12 10-12" stroke-dasharray="0"/></svg>',
   callout: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>',
+  // 浮动工具栏的可选按钮：关联线（带箭头的虚线弧）、表格、折叠
+  rel: '<svg viewBox="0 0 24 24"><path d="M4 18C4 9 11 5 19 6" stroke-dasharray="3 3"/><path d="m15 3 4 3-3 4"/></svg>',
+  table: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
+  fold: '<svg viewBox="0 0 24 24"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>',
   box: '<svg viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg>',
 };
 
@@ -459,6 +472,11 @@ function colorLabel(color: string): string {
 
 /** 最近一次复制的节点：剪贴板里放的版本和带标记的完整版（各个脑图共用，跨图粘贴也能还原） */
 let lastCopy: { plain: string; full: string } | null = null;
+
+/** 设置页里画工具栏按钮的图标用 */
+export function toolIcon(name: string): HTMLElement {
+  return icon(name);
+}
 
 function icon(name: string): HTMLElement {
   const span = createSpan({ cls: "mm-icon" });
@@ -545,7 +563,6 @@ export class MindMapCanvas {
   private toolbarTips: HTMLElement[] = [];
   private positionMenu: HTMLElement | null = null;
   private structureButton: HTMLButtonElement | null = null;
-  private structureSep: HTMLElement | null = null;
   private structureMenu: HTMLElement | null = null;
   private themeButton: HTMLButtonElement | null = null;
   private themeMenu: HTMLElement | null = null;
@@ -1050,6 +1067,17 @@ export class MindMapCanvas {
     this.render();
   }
 
+  /** 设置里改了工具栏的按钮：主工具栏重建，浮动工具栏下次显示时按新的清单建 */
+  refreshBars(): void {
+    this.toolbar?.remove();
+    this.positionMenu?.remove();
+    this.positionMenu = null;
+    this.buildToolbar();
+    this.nodebar?.remove();
+    this.nodebar = null;
+    this.render();
+  }
+
   getViewState(): ViewState {
     const cw = this.el.clientWidth;
     const ch = this.el.clientHeight;
@@ -1159,7 +1187,6 @@ export class MindMapCanvas {
     this.structureButton?.classList.toggle("is-hidden", !editable);
     this.themeButton?.classList.toggle("is-hidden", !editable);
     this.edgeButton?.classList.toggle("is-hidden", !editable);
-    this.structureSep?.classList.toggle("is-hidden", !editable);
     if (this.editToggle) {
       this.editToggle.replaceChildren(icon(editable ? "check" : "pencil"));
       this.tip(this.editToggle, editable ? t("canvas.doneEditing") : t("canvas.editEmbedded"), "toolbar");
@@ -3552,6 +3579,9 @@ export class MindMapCanvas {
         );
       });
     }
+    // 先把按钮都建好放进 pool（按设置里的 id），最后按设置里的顺序摆上去
+    const pool = new Map<string, HTMLElement>();
+    const ID_OF: Record<string, string> = { unlock: "lock", minus: "zoomOut", plus: "zoomIn", note: "notes", hiddenNodes: "hidden", check: "embed", pencil: "embed", open: "embed" };
     const btn = (name: string, title: string, onClick: () => void) => {
       const b = createEl("button");
       b.type = "button";
@@ -3564,7 +3594,7 @@ export class MindMapCanvas {
         ev.stopPropagation();
         onClick();
       });
-      bar.append(b);
+      pool.set(ID_OF[name] ?? name, b);
       return b;
     };
     if (this.opts.onToggleOutline) {
@@ -3588,11 +3618,6 @@ export class MindMapCanvas {
       this.splitSyncButton.classList.add("is-hidden");
       this.updateSplitSyncButton();
     }
-    if (this.opts.onToggleOutline || this.opts.onLockChange) {
-      const sep0 = createSpan();
-      sep0.className = "mm-tool-sep";
-      bar.append(sep0);
-    }
     if (this.opts.embedded && this.opts.onOpenFile) {
       const open = this.opts.onOpenFile;
       btn("open", t("canvas.openEmbeddedFile"), () => open());
@@ -3615,11 +3640,6 @@ export class MindMapCanvas {
       this.tip(eb, this.edgeTipText(), "toolbar");
       eb.classList.toggle("is-hidden", !this.opts.editable);
       this.edgeButton = eb;
-      const sep = createSpan();
-      sep.className = "mm-tool-sep";
-      sep.classList.toggle("is-hidden", !this.opts.editable);
-      bar.append(sep);
-      this.structureSep = sep;
     }
     btn("minus", t("canvas.zoomOut", { key: sc("Mod", "-") }), () => this.zoomBy(1 / 1.2));
     this.zoomLabel = createEl("button");
@@ -3629,19 +3649,13 @@ export class MindMapCanvas {
     this.tip(this.zoomLabel, t("canvas.zoomLevel"), "toolbar");
     this.zoomLabel.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     this.zoomLabel.addEventListener("click", () => this.zoomBy(1 / this.k));
-    bar.append(this.zoomLabel);
+    pool.set("zoom", this.zoomLabel);
     btn("plus", t("canvas.zoomIn", { key: sc("Mod", "+") }), () => this.zoomBy(1.2));
     btn("fit", t("canvas.fit", { key: sc("Mod", "0") }), () => this.fit());
     btn("center", t("canvas.center"), () => this.center());
-    const sep2 = createSpan();
-    sep2.className = "mm-tool-sep";
-    bar.append(sep2);
     if (this.opts.onUndo) {
       btn("undo", t("canvas.undo", { key: sc("Mod", "Z") }), () => this.opts.onUndo?.());
       btn("redo", t("canvas.redo", { key: sc("Mod", "Shift", "Z") }), () => this.opts.onRedo?.());
-      const sep3 = createSpan();
-      sep3.className = "mm-tool-sep";
-      bar.append(sep3);
     }
     btn("search", t("canvas.search", { key: sc("Mod", "F") }), () => this.openSearch());
     // 只在图里有标注时出现
@@ -3653,6 +3667,32 @@ export class MindMapCanvas {
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
+    // 按设置里的顺序摆。嵌入的脑图的「编辑 / 完成」「打开」按钮不能关，放在「结构」那一格前面
+    const layout = this.opts.toolbarLayout?.() ?? mergeLayout(undefined, TOOLBAR_DEFAULT);
+    const embed = pool.get("embed");
+    for (const item of layout) {
+      if (item.id === "structure" && embed) bar.append(embed);
+      if (!item.on) continue;
+      if (isSep(item.id)) {
+        const sep = createSpan();
+        sep.className = "mm-tool-sep";
+        bar.append(sep);
+      } else {
+        const b = pool.get(item.id);
+        if (b) bar.append(b);
+      }
+    }
+    if (embed && !embed.isConnected) bar.prepend(embed);
+    // 分隔线：前后没有看得见的按钮就藏起来。按钮会随情况显示 / 隐藏（有标注才出现标注按钮这类），类名一变就重新整理
+    const tidy = () => {
+      const kids = [...bar.children] as HTMLElement[];
+      const show = visibleSeps(kids.map((k) => (k.classList.contains("mm-tool-sep") ? "sep" : k.classList.contains("is-hidden") ? "gone" : "tool")));
+      kids.forEach((k, i) => {
+        if (k.classList.contains("mm-tool-sep") && k.classList.contains("is-hidden") === show[i]) k.classList.toggle("is-hidden", !show[i]);
+      });
+    };
+    tidy();
+    new MutationObserver(tidy).observe(bar, { subtree: true, attributes: true, attributeFilter: ["class"] });
     this.el.append(bar);
     this.updateZoomLabel();
   }
@@ -3866,8 +3906,6 @@ export class MindMapCanvas {
     // 颜色、按钮各成一组：窄屏折行时整组换行，不会从按钮中间断开
     const colors = createDiv();
     colors.className = "mm-nodebar-group";
-    const tools = createDiv();
-    tools.className = "mm-nodebar-group";
     const swatch = (color: string | null) => {
       const b = createEl("button");
       b.type = "button";
@@ -3883,33 +3921,71 @@ export class MindMapCanvas {
     };
     swatch(null);
     for (const c of this.nodeColors()) swatch(c);
-    const sep = createSpan();
-    sep.className = "mm-tool-sep";
-    bar.append(colors, sep, tools);
-    const tool = (name: string, title: string, onClick: (ev: MouseEvent) => void) => {
+    const tools = new Map<string, HTMLElement>();
+    const tool = (id: string, iconName: string, title: string, onClick: (ev: MouseEvent) => void) => {
       const b = createEl("button");
       b.type = "button";
       b.className = "mm-tool";
-      b.dataset.tool = name;
+      b.dataset.tool = id;
       this.tip(b, title);
-      b.append(icon(name));
+      b.append(icon(iconName));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
         onClick(ev);
       });
-      tools.append(b);
+      tools.set(id, b);
     };
-    tool("child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
-    tool("sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
-    tool("marker", t("canvas.markersTip"), () => this.toggleMarkerPicker());
-    tool("note", t("canvas.noteTip"), () => {
+    tool("child", "child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
+    tool("sibling", "sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
+    tool("marker", "marker", t("canvas.markersTip"), () => this.toggleMarkerPicker());
+    tool("note", "note", t("canvas.noteTip"), () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
-    tool("box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), (ev) => this.boxButton(ev));
-    if (this.opts.host?.pickNote) tool("link", t("canvas.linkTip", { key: sc("Mod", "K") }), () => void this.linkSelectedToNote());
-    tool("copy", t("canvas.copyTip", { key: sc("Mod", "C") }), () => this.copySelection());
-    tool("paste", t("canvas.pasteTip", { key: sc("Mod", "V") }), () => void this.pasteFromClipboard());
-    tool("trash", t("canvas.deleteTip", { key: "Delete" }), () => this.deleteSelected());
+    tool("box", "box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), (ev) => this.boxButton(ev));
+    if (this.opts.host?.pickNote) tool("link", "link", t("canvas.linkTip", { key: sc("Mod", "K") }), () => void this.linkSelectedToNote());
+    tool("copy", "copy", t("canvas.copyTip", { key: sc("Mod", "C") }), () => this.copySelection());
+    tool("paste", "paste", t("canvas.pasteTip", { key: sc("Mod", "V") }), () => void this.pasteFromClipboard());
+    tool("trash", "trash", t("canvas.deleteTip", { key: "Delete" }), () => this.deleteSelected());
+    // 可选按钮（设置里打开才显示）
+    tool("rel", "rel", t("menu.addRel"), () => {
+      if (this.primary) this.startRel(this.primary);
+    });
+    tool("table", "table", t("menu.insertTable"), () => {
+      if (this.primary) this.tableMenuEntry(this.primary).run?.();
+    });
+    tool("fold", "fold", t("canvas.foldTip", { key: "/" }), () => {
+      if (this.primary?.children.length) this.toggleFold(this.primary);
+    });
+    tool("moveUp", "up", t("canvas.moveUpTip", { key: sc("Alt", "↑") }), () => this.moveSelection("up"));
+    tool("moveDown", "down", t("canvas.moveDownTip", { key: sc("Alt", "↓") }), () => this.moveSelection("down"));
+    // 按设置里的顺序摆：颜色自成一组，相邻的按钮合成一组，组和组之间一条分隔线
+    const layout = this.opts.nodebarLayout?.() ?? mergeLayout(undefined, NODEBAR_DEFAULT);
+    const groups: HTMLElement[] = [];
+    let run: HTMLElement | null = null;
+    for (const item of layout) {
+      if (!item.on) continue;
+      if (item.id === "colors") {
+        groups.push(colors);
+        run = null;
+        continue;
+      }
+      const b = tools.get(item.id);
+      if (!b) continue;
+      if (!run) {
+        run = createDiv();
+        run.className = "mm-nodebar-group";
+        groups.push(run);
+      }
+      run.append(b);
+    }
+    groups.forEach((g, i) => {
+      if (i > 0) {
+        const sep = createSpan();
+        sep.className = "mm-tool-sep";
+        bar.append(sep);
+      }
+      bar.append(g);
+    });
     return bar;
   }
 

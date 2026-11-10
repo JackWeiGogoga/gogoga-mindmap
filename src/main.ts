@@ -32,6 +32,7 @@ import {
 } from "obsidian";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
+import { mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT } from "./bar-layout";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables } from "./node-table";
 import { preserveFormat } from "./merge";
@@ -1333,6 +1334,8 @@ export default class MindMapPlugin extends Plugin {
         autoNumber: () => this.settings.numberByTyping,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
+        nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, NODEBAR_DEFAULT),
+        toolbarLayout: () => mergeLayout(this.settings.toolbarLayout, TOOLBAR_DEFAULT),
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors, true),

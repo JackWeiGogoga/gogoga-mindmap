@@ -2689,3 +2689,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .theme-dark .mm-note-node-color[data-color="gray"] { --mm-note-color: #45454e; }
 /* 自定义色（#hex）深色模式下淡一些，字还看得清 */
 .theme-dark .mm-note-node-color:not([data-color]) { background: color-mix(in srgb, var(--mm-note-color) 40%, transparent); }
+
+/* 设置页：工具栏按钮的清单（图标 + 名字，关掉的行变浅） */
+.mm-setting-bar-icon { display: inline-flex; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--text-muted); }
+.mm-setting-bar-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mm-setting-bar-off .setting-item-name { color: var(--text-faint); }

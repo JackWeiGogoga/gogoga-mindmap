@@ -10,7 +10,8 @@ import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
-import { syncNotesExpandedAll } from "./canvas";
+import { refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
+import { type BarItem, encodeLayout, isSep, mergeLayout, moveItem, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
@@ -88,6 +89,9 @@ export interface MindMapSettings {
   toolbarPosition: ToolbarPosition;
   /** 选中节点时显示浮动工具栏 */
   showNodebar: boolean;
+  /** 浮动工具栏、主工具栏的按钮顺序和显示（bar-layout.ts）；空数组 = 默认 */
+  nodebarLayout: string[];
+  toolbarLayout: string[];
   /** 浮动工具栏里的节点颜色（逗号隔开的颜色名或 #色值） */
   nodeColors: string;
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
@@ -165,6 +169,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineWrap: false,
   toolbarPosition: "bottom",
   showNodebar: true,
+  nodebarLayout: [],
+  toolbarLayout: [],
   nodeColors: DEFAULT_NODE_COLORS,
   wheelAction: "pan",
   leftDrag: "pan",
@@ -368,6 +374,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         [
           dropdown("toolbarPosition", t("settings.toolbar.name"), t("settings.toolbar.desc"), Object.fromEntries(TOOLBAR_POSITIONS.map((x) => [x.id, x.label]))),
           toggle("showNodebar", t("settings.showNodebar.name"), t("settings.showNodebar.desc")),
+          this.barLayoutPage("nodebarLayout"),
+          this.barLayoutPage("toolbarLayout"),
           text("nodeColors", t("settings.nodeColors.name"), t("settings.nodeColors.desc"), DEFAULT_NODE_COLORS, ["palette", "色块", "调色板"]),
           toggle("formatBar", t("settings.formatBar.name"), t("settings.formatBar.desc")),
           text("textColors", t("settings.textColors.name"), t("settings.textColors.desc"), DEFAULT_TEXT_COLORS, ["font color", "字体颜色"]),
@@ -441,6 +449,82 @@ export class MindMapSettingTab extends PluginSettingTab {
   /** 节点间距、字号：滑块加一个恢复 100% 的按钮（声明式的滑块没有按钮，自己画） */
   private scaleSetting(key: "spacingScale" | "fontScale", name: string, desc: string, min: number, max: number): SettingDefinition {
     return this.sliderWithReset(key, name, desc, min, max, 5, 100, t("settings.reset"), () => this.plugin.applyDisplayScale());
+  }
+
+  /**
+   * 浮动工具栏 / 主工具栏的按钮：一个子页面，一行一个按钮（图标、名字、开关、上移下移），最上面「恢复默认」。
+   * 改了马上存、所有打开着的脑图重建工具栏
+   */
+  private barLayoutPage(key: "nodebarLayout" | "toolbarLayout"): SettingDefinitionItem {
+    const plugin = this.plugin;
+    const defaults = key === "nodebarLayout" ? NODEBAR_DEFAULT : TOOLBAR_DEFAULT;
+    const items = () => mergeLayout(plugin.settings[key], defaults);
+    const save = async (next: BarItem[]) => {
+      plugin.settings[key] = sameAsDefault(next, defaults) ? [] : encodeLayout(next);
+      await plugin.saveSettings();
+      refreshAllBars();
+      this.refresh();
+    };
+    const ICON: Record<string, string> = { colors: "palette", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
+    const list = items();
+    const rows: SettingDefinition[] = list.map((item, i) => ({
+      name: isSep(item.id) ? t("bar.sep") : t(`bar.${item.id}` as Parameters<typeof t>[0]),
+      desc: isSep(item.id) ? t("bar.sepDesc") : "",
+      aliases: ["toolbar", "button", "工具栏", "按钮"],
+      render: (setting) => {
+        const name = ICON[item.id] ?? item.id;
+        if (!isSep(item.id) && item.id !== "zoom") {
+          const ic = toolIcon(name);
+          ic.addClass("mm-setting-bar-icon");
+          setting.nameEl.prepend(ic);
+        }
+        setting.settingEl.toggleClass("mm-setting-bar-off", !item.on);
+        setting
+          .addExtraButton((b) =>
+            b
+              .setIcon("arrow-up")
+              .setTooltip(t("bar.moveUp"))
+              .setDisabled(i === 0)
+              .onClick(() => void save(moveItem(items(), i, -1))),
+          )
+          .addExtraButton((b) =>
+            b
+              .setIcon("arrow-down")
+              .setTooltip(t("bar.moveDown"))
+              .setDisabled(i === list.length - 1)
+              .onClick(() => void save(moveItem(items(), i, 1))),
+          )
+          .addToggle((tg) =>
+            tg.setValue(item.on).onChange((v) => {
+              const next = items();
+              next[i] = { ...next[i], on: v };
+              void save(next);
+            }),
+          );
+      },
+    }));
+    rows.unshift({
+      name: t("bar.reset"),
+      desc: t(key === "nodebarLayout" ? "bar.nodebarDesc" : "bar.toolbarDesc"),
+      render: (setting) => {
+        setting.addButton((b) =>
+          b
+            .setButtonText(t("bar.resetButton"))
+            .setDisabled(!plugin.settings[key].length)
+            .onClick(() => void save(mergeLayout(undefined, defaults))),
+        );
+      },
+    });
+    return {
+      type: "page",
+      name: t(key === "nodebarLayout" ? "bar.nodebarPage" : "bar.toolbarPage"),
+      desc: t(key === "nodebarLayout" ? "bar.nodebarPageDesc" : "bar.toolbarPageDesc"),
+      displayValue: () => {
+        const all = items().filter((x) => !isSep(x.id));
+        return t("bar.count", { n: all.filter((x) => x.on).length, total: all.length });
+      },
+      items: rows,
+    };
   }
 
   private sizeSetting(key: "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth", name: string, desc: string, min: number, max: number, resetTip: string): SettingDefinition {
