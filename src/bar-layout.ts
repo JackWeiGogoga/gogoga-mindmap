@@ -92,6 +92,15 @@ export function moveItem(items: readonly BarItem[], index: number, dir: -1 | 1):
   return out;
 }
 
+/** 拖动：from 那一项挪到 to 的位置 */
+export function moveTo(items: readonly BarItem[], from: number, to: number): BarItem[] {
+  const out = [...items];
+  if (from < 0 || from >= out.length) return out;
+  const [it] = out.splice(from, 1);
+  out.splice(Math.max(0, Math.min(out.length, to)), 0, it);
+  return out;
+}
+
 /** 分隔线该不该显示：前面（到上一条显示的分隔线为止）和后面（到下一条分隔线为止）都得有看得见的按钮 */
 export function visibleSeps(kinds: readonly ("sep" | "tool" | "gone")[]): boolean[] {
   const show = kinds.map(() => false);

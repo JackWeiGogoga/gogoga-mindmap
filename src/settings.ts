@@ -11,7 +11,7 @@ import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-mo
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import { refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
-import { type BarItem, encodeLayout, isSep, mergeLayout, moveItem, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
+import { type BarItem, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 
 const FUNDING_URL = "https://afdian.com/a/jackweigogoga";
 
@@ -467,6 +467,7 @@ export class MindMapSettingTab extends PluginSettingTab {
     };
     const ICON: Record<string, string> = { colors: "palette", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
     const list = items();
+    const at = (id: string) => items().findIndex((x) => x.id === id);
     const rows: SettingDefinition[] = list.map((item, i) => ({
       name: isSep(item.id) ? t("bar.sep") : t(`bar.${item.id}` as Parameters<typeof t>[0]),
       desc: isSep(item.id) ? t("bar.sepDesc") : "",
@@ -479,25 +480,41 @@ export class MindMapSettingTab extends PluginSettingTab {
           setting.nameEl.prepend(ic);
         }
         setting.settingEl.toggleClass("mm-setting-bar-off", !item.on);
+        // 拖动把手：按住拖到别的位置。只在这一页里（整张清单都在同一个容器里）能拖，设置搜索结果里只留箭头
+        setting.settingEl.addClass("mm-setting-bar-row");
+        setting.settingEl.dataset.mmBar = key;
+        setting.settingEl.dataset.mmId = item.id;
+        const grip = setting.settingEl.createDiv({ cls: "mm-setting-bar-grip" });
+        setIcon(grip, "grip-vertical");
+        grip.setAttr("aria-label", t("bar.drag"));
+        setting.settingEl.prepend(grip);
+        // 画完挂上去以后看一眼：清单不全（设置搜索结果里）就不显示把手
+        window.requestAnimationFrame(() => {
+          const sib = setting.settingEl.parentElement?.querySelectorAll(`:scope > .mm-setting-bar-row[data-mm-bar="${key}"]`).length ?? 0;
+          grip.toggleClass("is-hidden", sib !== list.length);
+        });
+        grip.addEventListener("pointerdown", (ev) => dragRow(ev, setting.settingEl, key, list.length, (fromId, toId) => void save(moveTo(items(), at(fromId), at(toId)))));
         setting
           .addExtraButton((b) =>
             b
               .setIcon("arrow-up")
               .setTooltip(t("bar.moveUp"))
               .setDisabled(i === 0)
-              .onClick(() => void save(moveItem(items(), i, -1))),
+              .onClick(() => void save(moveItem(items(), at(item.id), -1))),
           )
           .addExtraButton((b) =>
             b
               .setIcon("arrow-down")
               .setTooltip(t("bar.moveDown"))
               .setDisabled(i === list.length - 1)
-              .onClick(() => void save(moveItem(items(), i, 1))),
+              .onClick(() => void save(moveItem(items(), at(item.id), 1))),
           )
           .addToggle((tg) =>
             tg.setValue(item.on).onChange((v) => {
+              // 按 id 在最新的设置里找（页面刷新后各行的回调可能还是旧的）
               const next = items();
-              next[i] = { ...next[i], on: v };
+              const j = at(item.id);
+              if (j >= 0) next[j] = { ...next[j], on: v };
               void save(next);
             }),
           );
@@ -797,4 +814,81 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
     this.input.dispatchEvent(new Event("input"));
     this.close();
   }
+}
+
+/**
+ * 拖动工具栏按钮那几行：按住把手，这一行跟着指针走，别的行让位；松手按新位置存。
+ * 用指针事件自己做（手机上手指也能拖）；拖到设置窗口上下边缘时自动滚动
+ */
+function dragRow(ev: PointerEvent, row: HTMLElement, key: string, total: number, done: (fromId: string, toId: string) => void): void {
+  const parent = row.parentElement;
+  if (!parent || ev.button !== 0) return;
+  const rows = [...parent.querySelectorAll<HTMLElement>(`:scope > .mm-setting-bar-row[data-mm-bar="${key}"]`)];
+  // 设置搜索结果里清单不全：不拖
+  if (rows.length !== total) return;
+  ev.preventDefault();
+  const from = rows.indexOf(row);
+  if (from < 0) return;
+  const grip = ev.currentTarget as HTMLElement;
+  grip.setPointerCapture(ev.pointerId);
+  const win = row.win;
+  let scroller: HTMLElement | null = parent;
+  while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /(auto|scroll)/.test(win.getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+  // 开始拖时每行中线的位置（视口坐标）；滚动了多少另算
+  const mids = rows.map((r) => {
+    const b = r.getBoundingClientRect();
+    return b.top + b.height / 2;
+  });
+  const startY = ev.clientY;
+  const startScroll = scroller?.scrollTop ?? 0;
+  const h = row.getBoundingClientRect().height;
+  let to = from;
+  let lastY = ev.clientY;
+  let raf = 0;
+  row.addClass("is-dragging");
+  for (const r of rows) if (r !== row) r.addClass("is-drag-sibling");
+  const place = () => {
+    const ds = (scroller?.scrollTop ?? 0) - startScroll;
+    // 拖着的这一行跟着指针（滚动时内容往上走，它要补回来）
+    row.style.transform = `translateY(${lastY - startY + ds}px)`;
+    const mid = mids[from] + lastY - startY;
+    // 新位置 = 别的行里中线在它上面的有几行
+    to = mids.filter((m, j) => j !== from && m - ds < mid).length;
+    rows.forEach((r, j) => {
+      if (j === from) return;
+      const shift = from < to && j > from && j <= to ? -h : to < from && j >= to && j < from ? h : 0;
+      r.style.transform = shift ? `translateY(${shift}px)` : "";
+    });
+  };
+  const tick = () => {
+    raf = 0;
+    if (!scroller) return;
+    const b = scroller.getBoundingClientRect();
+    const edge = 40;
+    const v = lastY < b.top + edge ? -(b.top + edge - lastY) / 3 : lastY > b.bottom - edge ? (lastY - (b.bottom - edge)) / 3 : 0;
+    if (!v) return;
+    scroller.scrollTop += v;
+    place();
+    raf = win.requestAnimationFrame(tick);
+  };
+  const move = (e: PointerEvent) => {
+    lastY = e.clientY;
+    place();
+    if (!raf) raf = win.requestAnimationFrame(tick);
+  };
+  const end = () => {
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", end);
+    grip.removeEventListener("pointercancel", end);
+    if (raf) win.cancelAnimationFrame(raf);
+    for (const r of rows) {
+      r.style.transform = "";
+      r.removeClass("is-dragging", "is-drag-sibling");
+    }
+    // 交出去的是 id：拖到的位置上原来是哪一项
+    if (to !== from) done(rows[from].dataset.mmId ?? "", rows[to].dataset.mmId ?? "");
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
 }

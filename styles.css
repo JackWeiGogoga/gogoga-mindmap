@@ -2694,3 +2694,10 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .mm-setting-bar-icon { display: inline-flex; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--text-muted); }
 .mm-setting-bar-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mm-setting-bar-off .setting-item-name { color: var(--text-faint); }
+.mm-setting-bar-grip { display: flex; align-items: center; margin-right: 6px; color: var(--text-faint); cursor: grab; touch-action: none; }
+.mm-setting-bar-grip.is-hidden { display: none; }
+.mm-setting-bar-grip svg { width: 16px; height: 16px; }
+.mm-setting-bar-grip:hover { color: var(--text-muted); }
+.mm-setting-bar-row.is-drag-sibling { transition: transform 120ms ease; }
+.mm-setting-bar-row.is-dragging { position: relative; z-index: 2; background: var(--background-primary); box-shadow: var(--shadow-s); border-radius: var(--radius-s); cursor: grabbing; }
+.mm-setting-bar-row.is-dragging .mm-setting-bar-grip { cursor: grabbing; }

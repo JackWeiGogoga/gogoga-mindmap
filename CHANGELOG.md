@@ -5,7 +5,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Added
-- New **Floating toolbar buttons** and **Main toolbar buttons** pages under Settings → Toolbars and colors: turn each button on or off and reorder them with the arrows (colors count as one item on the floating toolbar; the main toolbar's dividers can be moved or hidden too). Changes apply to open mind maps right away, and **Restore defaults** puts everything back. The floating toolbar also has five optional buttons, off by default: Add relationship, Insert table, Collapse / expand, Move up and Move down. The default toolbars look the same as before.
+- New **Floating toolbar buttons** and **Main toolbar buttons** pages under Settings → Toolbars and colors: turn each button on or off and reorder them by dragging the handle or with the arrows (colors count as one item on the floating toolbar; the main toolbar's dividers can be moved or hidden too). Changes apply to open mind maps right away, and **Restore defaults** puts everything back. The floating toolbar also has five optional buttons, off by default: Add relationship, Insert table, Collapse / expand, Move up and Move down. The default toolbars look the same as before.
 
 ### Fixed
 - Relationship line labels: while editing, the text no longer runs down one character per line; it's laid out horizontally and wraps past a set width. Long labels now show in full on several lines, centered both while editing and when shown, instead of being cut off with an ellipsis.
