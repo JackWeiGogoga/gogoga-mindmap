@@ -5,7 +5,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Fixed
-- Relationship line labels: while editing, the text no longer runs down one character per line; it's laid out horizontally and wraps past a set width. Long labels now show in full on several lines instead of being cut off with an ellipsis.
+- Relationship line labels: while editing, the text no longer runs down one character per line; it's laid out horizontally and wraps past a set width. Long labels now show in full on several lines, centered both while editing and when shown, instead of being cut off with an ellipsis.
 
 ## [0.59.1] - 2026-11-10
 

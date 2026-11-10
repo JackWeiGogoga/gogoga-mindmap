@@ -190,10 +190,12 @@
   user-select: none;
 }
 .mm-rel-label.is-active { opacity: 1; box-shadow: 0 0 0 1.5px var(--mm-selection); }
-.mm-rel-label.is-editing { cursor: text; user-select: text; min-width: 40px; outline: none; box-shadow: 0 0 0 1.5px var(--mm-selection); text-align: left; }
+.mm-rel-label.is-editing { cursor: text; user-select: text; min-width: 40px; outline: none; box-shadow: 0 0 0 1.5px var(--mm-selection); }
 .mm-rel-label.is-empty { display: none; }
 /* 编辑框通用的 max-width: 100% 是按外层算的，关联线标签挂在一层宽度为 0 的图层上，会被压成 0（一个字一行）：按自己的最宽 240px */
 .gg-mm-root .mm-rel-label.mm-has-editor { max-width: 240px; }
+/* 编辑时和显示时一样居中，切换时文字不左右跳 */
+.gg-mm-root .mm-rel-label.mm-has-editor .cm-content { text-align: center; }
 /* 选中关联线时两头的控制点手柄（#28）：空心圆，细线连到线头；拖它改弧度 */
 .mm-rel-guide { fill: none; stroke: var(--mm-selection); stroke-width: 1; opacity: 0; pointer-events: none; }
 .mm-rel.has-handles .mm-rel-guide { opacity: 0.55; }
