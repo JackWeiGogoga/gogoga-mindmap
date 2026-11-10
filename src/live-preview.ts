@@ -190,3 +190,43 @@ export function guardHiddenMarks(
   }
   return out;
 }
+
+/**
+ * 复制、剪切选中的一段：格式标签补完整。编辑时标签是藏着的，选中颜色里的一段，选区常常带上了开头的标签、没带结尾的，
+ * 直接复制出来是半截 <span …>，粘到别处显示成源码。这里：选区开头落在格式里面就补上开头的标记，结尾落在里面就补上收尾的，
+ * 选区边缘切在标记符中间时挪到整个标记符外面
+ */
+export function balancedSlice(text: string, from: number, to: number): string {
+  if (from >= to) return "";
+  const spans = formatSpans(text);
+  for (const s of spans) {
+    // 选区边缘切在标记符中间：开头的标记要么整个带上要么整个不带
+    if (from > s.from && from < s.innerFrom) from = s.from;
+    if (from > s.innerTo && from < s.to) from = s.to;
+    if (to > s.from && to < s.innerFrom) to = s.from;
+    if (to > s.innerTo && to < s.to) to = s.to;
+  }
+  if (from >= to) return "";
+  const pre: FormatSpan[] = [];
+  const post: FormatSpan[] = [];
+  for (const s of spans) {
+    // 选中的文字和这段格式里面的字有交集
+    if (!(from < s.innerTo && to > s.innerFrom)) continue;
+    if (from > s.from) pre.push(s);
+    if (to < s.to) post.push(s);
+  }
+  pre.sort((a, b) => a.from - b.from);
+  post.sort((a, b) => b.from - a.from);
+  return pre.map((s) => text.slice(s.from, s.innerFrom)).join("") + text.slice(from, to) + post.map((s) => text.slice(s.innerTo, s.to)).join("");
+}
+
+/**
+ * 在带格式的文字中间换行：先把还开着的格式收尾，换行，再接上。每一行自己是完整的，
+ * 节点里按 <br> 分行显示、Markdown 里都认得出来。返回要插入的文字
+ */
+export function breakInsideFormats(text: string, pos: number): string {
+  const spans = formatSpans(text).filter((s) => s.innerFrom <= pos && pos <= s.innerTo && s.innerFrom < s.innerTo);
+  const outer = [...spans].sort((a, b) => a.from - b.from);
+  const inner = [...spans].sort((a, b) => b.from - a.from);
+  return inner.map((s) => text.slice(s.innerTo, s.to)).join("") + "\n" + outer.map((s) => text.slice(s.from, s.innerFrom)).join("");
+}

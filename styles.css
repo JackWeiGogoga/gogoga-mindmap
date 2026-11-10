@@ -2701,3 +2701,11 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .mm-setting-bar-row.is-drag-sibling { transition: transform 120ms ease; }
 .mm-setting-bar-row.is-dragging { position: relative; z-index: 2; background: var(--background-primary); box-shadow: var(--shadow-s); border-radius: var(--radius-s); cursor: grabbing; }
 .mm-setting-bar-row.is-dragging .mm-setting-bar-grip { cursor: grabbing; }
+
+/* 带颜色的文字做成链接：保持文字原来的颜色，下划线表示是链接（脑图画布里、脑图笔记用 Markdown 打开时） */
+.gg-mm-root .mm-color .mm-link, .gg-mm-root .mm-link:has(.mm-color) { text-decoration: underline; text-underline-offset: 2px; }
+.gg-mm-root .mm-color .mm-link { color: inherit; }
+.gg-mm-note span[style*="color"] a.internal-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* 文字颜色选单：每项前面一个带颜色的 A */
+.mm-textcolor-menu .mm-textcolor-a { display: inline-block; width: 1.2em; margin-right: 6px; font-weight: 700; text-align: center; }

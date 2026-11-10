@@ -17,9 +17,12 @@ export interface FormatBarOptions {
   highlightColors: string[];
   /** 下划线的快捷键说明，比如 ⌘U */
   underlineKey: string;
-  icon: (name: "highlighter" | "eraser") => HTMLElement;
+  icon: (name: "highlighter" | "eraser" | "link") => HTMLElement;
   tip: (el: HTMLElement, text: string) => void;
   onFormat: (fmt: InlineFormat) => void;
+  /** 选中的字做成笔记链接（给了才有这个按钮）；linkKey 是快捷键说明，比如 ⌘K */
+  onLink?: () => void;
+  linkKey?: string;
 }
 
 /** 造一个格式栏（还没挂到页面上）。按下按钮不会让编辑器失焦，选区留着 */
@@ -71,6 +74,21 @@ export function createFormatBar(doc: Document, o: FormatBarOptions): HTMLElement
       else b.style.background = c;
     });
   sep();
+  if (o.onLink) {
+    const onLink = o.onLink;
+    const b = doc.createElement("button");
+    b.className = "mm-format-btn is-link";
+    b.type = "button";
+    const title = t("format.link", { key: o.linkKey ?? "" });
+    b.setAttribute("aria-label", title);
+    o.tip(b, title);
+    b.append(o.icon("link"));
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onLink();
+    });
+    bar.append(b);
+  }
   btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(o.icon("eraser")));
   return bar;
 }

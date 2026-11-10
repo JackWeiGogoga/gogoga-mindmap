@@ -7,6 +7,7 @@
 import { highlightColor } from "./format";
 import { t } from "./i18n";
 import { TOKEN_RE } from "./tokens";
+import { formatSpans } from "./live-preview";
 
 export { TOKEN_RE };
 
@@ -133,18 +134,181 @@ export function taskState(text: string): "done" | "todo" | null {
 
 const WIKILINK_ONLY = /^\s*\[\[([^\]|]+)(?:\|([^\]]+))?\]\]\s*$/;
 
-/** 标签整个就是一个 wiki 链接时，返回目标与别名 */
+/** 格式记号：颜色、荧光笔、下划线的标签，换行，加粗、斜体、高亮、删除线的符号 */
+const MARKUP_RE = /(<\/?(?:span|mark|u)\b[^>]*>|<br\s*\/?>|\*\*|\*|==(?:🔴|🟠|🟡|🟢|🔵|🟣)?|~~)/u;
+const WIKILINK_G = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+/** Markdown 链接 [文字](地址)：文字里可以有转义的方括号 */
+const MDLINK_G = /\[((?:\\.|[^\]\\])+)\]\(([^)\s]+)\)/g;
+
+/** [文字](笔记.md) 的地址 → 笔记名（去掉 .md，还原 %20 这类转义） */
+function noteHref(href: string): string {
+  let h = href.replace(/^<|>$/g, "");
+  try {
+    h = decodeURI(h);
+  } catch {
+    // 不是合法的转义：原样
+  }
+  return h.replace(/\.md$/i, "");
+}
+
+const isUrl = (href: string) => /^[a-z][\w+.-]*:/i.test(href);
+
+/**
+ * 标签整个就是一个笔记链接时，返回目标与别名。带格式的节点做成链接后，是好几段指向同一篇的链接
+ * （[[笔记|前面]][<span style="color:…">红字</span>](笔记.md)），去掉格式记号后只剩这些链接的也算
+ */
 export function wikilinkOf(text: string): { target: string; alias?: string } | null {
   const m = WIKILINK_ONLY.exec(text);
-  return m ? { target: m[1].trim(), alias: m[2]?.trim() } : null;
+  if (m) return { target: m[1].trim(), alias: m[2]?.trim() };
+  // Markdown 写的笔记链接先换成 [[笔记]]，再按段检查
+  const t = text.replace(MDLINK_G, (all, _label: string, href: string) => (isUrl(href) ? all : `[[${noteHref(href)}]]`));
+  const parts = t.split(MARKUP_RE).filter((p, i) => i % 2 === 0 && p.trim());
+  if (!parts.length) return null;
+  let target: string | null = null;
+  for (const p of parts) {
+    // 这一段只能是挨着的几个链接，中间不能有别的字
+    if (p.replace(WIKILINK_G, "").trim()) return null;
+    for (const one of p.matchAll(WIKILINK_G)) {
+      const tg = one[1].trim();
+      if (target !== null && tg !== target) return null;
+      target = tg;
+    }
+  }
+  return target ? { target } : null;
+}
+
+/** 笔记名写进 Markdown 链接的地址：空格这类转义，加上 .md */
+function mdHref(target: string): string {
+  return `${target.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29")}.md`;
+}
+const escLabel = (s: string) => s.replace(/[[\]]/g, (c) => `\\${c}`);
+
+/** 一段不含 HTML 标签的文字做成链接：格式符号之间的每段字各自 [[笔记|字]]，已经带链接的那段不动 */
+function linkPlain(text: string, target: string): string {
+  return text
+    .split(MARKUP_RE)
+    .map((p, i) => {
+      if (i % 2 === 1 || !p.trim() || /\[\[|\]\(/.test(p)) return p;
+      const lead = /^\s*/.exec(p)![0];
+      const tail = /\s*$/.exec(p)![0];
+      const body = p.trim();
+      return `${lead}${body === target ? `[[${target}]]` : `[[${target}|${body}]]`}${tail}`;
+    })
+    .join("");
+}
+
+const HTML_TAG = /<(span|mark|u)\b[^>]*>|<\/(span|mark|u)>/gi;
+
+/**
+ * 把一段文字做成指向 target 的链接，保留格式：
+ * - 包在颜色、荧光笔、下划线这些 HTML 标签里的部分，写成 [<span …>文字</span>](笔记.md)：Obsidian 的实时预览不解析标签里面的
+ *   [[链接]]，会原样露出方括号；Markdown 链接的文字里放标签，阅读视图、实时预览、脑图里都显示成带颜色的链接
+ * - 其余部分写成 [[笔记|文字]]，加粗这些符号留在链接外面
+ * 没有格式时就是 [[笔记|文字]]（文字和笔记同名时 [[笔记]]）
+ */
+export function linkWholeText(text: string, target: string): string {
+  let out = "";
+  let last = 0;
+  let depth = 0;
+  let segStart = -1;
+  for (const m of text.matchAll(HTML_TAG)) {
+    const i = m.index ?? 0;
+    if (m[1]) {
+      if (depth === 0) {
+        out += linkPlain(text.slice(last, i), target);
+        segStart = i;
+      }
+      depth++;
+    } else if (depth > 0) {
+      depth--;
+      if (depth === 0) {
+        const end = i + m[0].length;
+        const seg = text.slice(segStart, end);
+        out += /\[\[|\]\(/.test(seg) ? seg : `[${escLabel(seg)}](${mdHref(target)})`;
+        last = end;
+      }
+    }
+  }
+  // 没配对的标签：剩下的原样当普通文字处理
+  out += depth > 0 ? text.slice(segStart) : linkPlain(text.slice(last), target);
+  return out;
+}
+
+/**
+ * 把 text 里 [from, to) 这段字做成链接（编辑时选中一段字按 ⌘K）。选区落在一段颜色（HTML 标签）中间时，
+ * 在选区两头把那段颜色断开，选中的字单独做成带颜色的链接，不把 [[链接]] 塞进标签里
+ */
+export function linkRange(text: string, from: number, to: number, target: string): string {
+  const html = formatSpans(text).filter((s) => s.html && s.innerFrom <= from && to <= s.innerTo);
+  const outer = [...html].sort((a, b) => a.from - b.from);
+  const opens = outer.map((s) => text.slice(s.from, s.innerFrom)).join("");
+  const closes = [...outer]
+    .reverse()
+    .map((s) => text.slice(s.innerTo, s.to))
+    .join("");
+  const part = text.slice(from, to);
+  const linked = html.length ? `[${escLabel(opens + part + closes)}](${mdHref(target)})` : linkWholeText(part, target);
+  const joined = text.slice(0, from) + closes + linked + opens + text.slice(to);
+  // 断开时两头可能留下空的标签对：<span …></span>
+  return joined.replace(/<(span|mark|u)\b[^>]*><\/\1>/gi, "");
+}
+
+/** 取消链接：指向 target 的 [[target|文字]] 换回文字，[[target]] 换回 target，[文字](target.md) 换回文字；格式原样留着 */
+export function unlinkText(text: string, target: string): string {
+  return text
+    .replace(WIKILINK_G, (all, tg: string, alias?: string) => (tg.trim() === target ? (alias ?? tg).trim() : all))
+    .replace(MDLINK_G, (all, label: string, href: string) => (!isUrl(href) && noteHref(href) === target ? label.replace(/\\([[\]])/g, "$1") : all));
 }
 
 const BR_RE = /<br\s*\/?>/i;
 
+const TAG_RE = /<(span|mark|u)\b[^>]*>|<\/(span|mark|u)>/gi;
+const MD_DELIMS = ["**", "==", "~~"];
+
+/**
+ * 按 <br> 切开的几行：一个格式跨了行（<span style="color:…">第一行<br>第二行</span>、**粗<br>体**），
+ * 在这一行末尾先收尾、下一行开头再接上，每一行自己就是完整的，才认得出来。只改显示，不动存的文字
+ */
+export function carryAcrossBreaks(segments: string[]): string[] {
+  if (segments.length < 2) return segments;
+  const open: { name: string; tag: string }[] = [];
+  const md = new Set<string>();
+  return segments.map((seg) => {
+    const prefix = open.map((o) => o.tag).join("") + MD_DELIMS.filter((d) => md.has(d)).join("");
+    for (const m of seg.matchAll(TAG_RE)) {
+      if (m[1]) open.push({ name: m[1].toLowerCase(), tag: m[0] });
+      else {
+        const name = m[2].toLowerCase();
+        for (let i = open.length - 1; i >= 0; i--) {
+          if (open[i].name === name) {
+            open.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+    for (const d of MD_DELIMS) {
+      if ((seg.split(d).length - 1) % 2) {
+        if (md.has(d)) md.delete(d);
+        else md.add(d);
+      }
+    }
+    const suffix =
+      MD_DELIMS.filter((d) => md.has(d))
+        .reverse()
+        .join("") +
+      [...open]
+        .reverse()
+        .map((o) => `</${o.name}>`)
+        .join("");
+    return prefix + seg + suffix;
+  });
+}
+
 /** 节点标签里的 <br> 是多行文本的存储形式（标题里放不下真正的换行） */
 export function renderInline(el: HTMLElement, text: string, opts: InlineOptions = {}): void {
   el.textContent = "";
-  const segments = text.split(BR_RE);
+  const segments = carryAcrossBreaks(text.split(BR_RE));
   segments.forEach((seg, i) => {
     if (i > 0) el.appendChild(createEl("br"));
     renderSegment(el, seg, opts);
@@ -192,7 +356,12 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
     } else if (m[6] !== undefined) {
       el.appendChild(link(m[7] ?? m[6], m[6], true, opts));
     } else if (m[8] !== undefined) {
-      el.appendChild(link(m[8], m[9], false, opts));
+      // [文字](笔记.md)：不是网址的是笔记链接；文字里能带格式（颜色做成链接时就是这样写的）
+      const internal = !/^[a-z][\w+.-]*:/i.test(m[9]);
+      const href = internal ? noteHref(m[9]) : m[9];
+      const a = link("", href, internal, opts);
+      renderSegment(a, m[8], opts, true);
+      el.appendChild(a);
     } else if (m[10] !== undefined || m[11] !== undefined) {
       el.appendChild(nest("strong", m[10] ?? m[11], opts));
     } else if (m[12] !== undefined) {
@@ -492,7 +661,8 @@ function link(label: string, href: string, internal: boolean, opts: InlineOption
 
 /** 编辑框里的换行 ⇄ 存储用的 <br> */
 export function toEditableText(text: string): string {
-  return text.replace(/<br\s*\/?>/gi, "\n");
+  // 跨行的格式在换行处收尾、下一行再接上：编辑框一行一行认格式，跨行的认不出来会露出源码
+  return carryAcrossBreaks(text.split(/<br\s*\/?>/i)).join("\n");
 }
 export function fromEditableText(text: string): string {
   return text

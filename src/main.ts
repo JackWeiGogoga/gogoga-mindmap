@@ -155,6 +155,13 @@ export default class MindMapPlugin extends Plugin {
     this.applyDisplayScale(false);
     this.registerEditorExtension(this.noteTagExt);
     this.applyNoteTags(false);
+    // 脑图笔记用 Markdown 打开时，视图上挂 gg-mm-note：只给它们用的样式（颜色里的链接保持文字颜色）认这个类
+    const markNotes = () => this.markMindMapNotes();
+    this.registerEvent(this.app.workspace.on("layout-change", markNotes));
+    this.registerEvent(this.app.workspace.on("file-open", markNotes));
+    this.registerEvent(this.app.metadataCache.on("changed", markNotes));
+    this.app.workspace.onLayoutReady(markNotes);
+    this.register(() => this.app.workspace.iterateAllLeaves((l) => l.view.containerEl.classList.remove("gg-mm-note")));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.injectCustomCss(win.doc)));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.applyEmbedToolbar(win.doc)));
     this.registerEvent(this.app.workspace.on("window-open", (win) => this.setFontScale(win.doc)));
@@ -362,6 +369,15 @@ export default class MindMapPlugin extends Plugin {
 
   /** 「在笔记里隐藏格式标签」：开关时换掉注册给编辑器的扩展，updateOptions 让打开着的笔记立刻生效 */
   private readonly noteTagExt: Extension[] = [];
+  private markMindMapNotes(): void {
+    this.app.workspace.iterateAllLeaves((l) => {
+      const v = l.view;
+      if (v.getViewType() !== "markdown") return;
+      const file = (v as { file?: TFile | null }).file;
+      v.containerEl.classList.toggle("gg-mm-note", !!file && this.isMindMapFile(file.path));
+    });
+  }
+
   applyNoteTags(refresh = true): void {
     this.noteTagExt.length = 0;
     if (this.settings.hideTagsInNotes) this.noteTagExt.push(noteTagsExtension());

@@ -7,9 +7,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Added
 - New **Floating toolbar buttons** and **Main toolbar buttons** pages under Settings → Toolbars and colors: turn each button on or off and reorder them by dragging the handle or with the arrows (colors count as one item on the floating toolbar; the main toolbar's dividers can be moved or hidden too). Changes apply to open mind maps right away, and **Restore defaults** puts everything back. The floating toolbar also has five optional buttons, off by default: Add relationship, Insert table, Collapse / expand, Move up and Move down. The default toolbars look the same as before.
 - New **Open note links in** setting under Settings → Editing: Current tab (default, as before), New tab or Right split. With Right split the mind map stays on the left and keeps focus, and the next link opens in the same split instead of adding more. ⌘⌥-click (Ctrl+Alt-click) on a link now always opens it in the right split; ⌘-click still opens a new tab.
+- New **Text color** button on the floating toolbar (also under **More** in the context menu): gives the selected nodes' whole text one color, replacing any partial text colors, or removes it with **Default**. It uses the text colors from settings, and can be hidden under **Floating toolbar buttons**.
+- While editing a node, select some text and press ⌘K (or the link button on the format bar) to link just that text to a note; the rest stays as is. With nothing selected it still links the whole node.
 
 ### Fixed
 - Relationship line labels: while editing, the text no longer runs down one character per line; it's laid out horizontally and wraps past a set width. Long labels now show in full on several lines, centered both while editing and when shown, instead of being cut off with an ellipsis.
+- **Link to note** no longer strips colors, bold and other formatting from the node. The formatting stays; colored parts are written as Markdown links, so they show as links in their own color (underlined) in the mind map and reading view, and keep their color in Live Preview. **Unlink** restores the original text.
+- Colored text with a line break (Shift+Enter) no longer shows as `<span style=…>` source in the node, with the color value turned into a tag; a line break inside colored text now stores each line as its own complete colored text.
+- Copying part of a colored text while editing a node no longer pastes as a half `<span …>` tag; the copied text is a complete piece of colored text.
 
 ## [0.59.1] - 2026-11-10
 

@@ -17,6 +17,8 @@ export type InlineFormat =
   | { kind: "highlight"; color?: HighlightColor }
   | { kind: "color"; color: string }
   | { kind: "bg"; color: string }
+  /** 去掉文字颜色（荧光笔、加粗这些不动） */
+  | { kind: "nocolor" }
   | { kind: "clear" };
 
 export interface FormatResult {
@@ -355,6 +357,8 @@ export function applyInlineFormat(text: string, start: number, end: number, fmt:
     case "color":
     case "bg":
       return applyColor(text, s, e, fmt.kind, fmt.color);
+    case "nocolor":
+      return applyColor(text, s, e, "color", null);
     case "clear": {
       const a = applyColor(text, s, e, "color", null);
       const b = applyColor(a.text, a.start, a.end, "bg", null);

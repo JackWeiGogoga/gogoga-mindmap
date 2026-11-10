@@ -87,6 +87,9 @@ import {
   toggleMarker,
   toggleTask,
   wikilinkOf,
+  linkRange,
+  linkWholeText,
+  unlinkText,
 } from "./inline";
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
@@ -431,6 +434,8 @@ const ICONS: Record<string, string> = {
   none: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
   edge: '<svg viewBox="0 0 24 24"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18c6 0 4-12 10-12" stroke-dasharray="0"/></svg>',
   callout: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>',
+  // 文字颜色：字母 A，下面一道颜色条（按钮上的条按当前颜色上色）
+  textColor: '<svg viewBox="0 0 24 24"><path d="m6 16 6-12 6 12M8.5 11h7"/><path class="mm-tc-bar" d="M4 20h16" stroke-width="3"/></svg>',
   // 浮动工具栏的可选按钮：关联线（带箭头的虚线弧）、表格、折叠
   rel: '<svg viewBox="0 0 24 24"><path d="M4 18C4 9 11 5 19 6" stroke-dasharray="3 3"/><path d="m15 3 4 3-3 4"/></svg>',
   table: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
@@ -3935,6 +3940,7 @@ export class MindMapCanvas {
       });
       tools.set(id, b);
     };
+    tool("textColor", "textColor", t("canvas.textColorTip"), () => this.toggleTextColorMenu(tools.get("textColor") ?? null));
     tool("child", "child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
     tool("sibling", "sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
     tool("marker", "marker", t("canvas.markersTip"), () => this.toggleMarkerPicker());
@@ -4627,6 +4633,10 @@ export class MindMapCanvas {
         ev.preventDefault();
         this.commitEdit();
         this.addChildToSelected();
+      } else if (mod && !ev.shiftKey && !ev.altKey && ev.key.toLowerCase() === "k" && this.opts.host?.pickNote) {
+        // 编辑中 ⌘K：选中的那段字做成笔记链接；没选中就把整个节点做成链接
+        ev.preventDefault();
+        void this.linkEditSelection();
       } else if (mod && !ev.shiftKey && !ev.altKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
         // 编辑中 ⌘B / ⌘I / ⌘U 作用于选中的那段文字
         ev.preventDefault();
@@ -5935,7 +5945,8 @@ export class MindMapCanvas {
     this.nodeEditor?.destroy();
     this.nodeEditor = null;
     this.updateFormatBar();
-    const text = cancel ? node.text : raw;
+    // 没改：进编辑时跨行的格式被拆好了（toEditableText），原样提交回来和原文写法不同但意思一样，照旧用原文，不算改动
+    const text = cancel || raw === fromEditableText(toEditableText(node.text)) ? node.text : raw;
     // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
     if (text === "" && isNew && !node.note) {
       const parent = node.parent;
@@ -6535,6 +6546,8 @@ export class MindMapCanvas {
 
   /** 已链接：弹菜单（打开 / 取消链接）；未链接：挑一篇笔记或新建，把标签变成 [[笔记|原文]] */
   async linkSelectedToNote(): Promise<void> {
+    // 正在编辑：链接选中的那段字（没选中就是整个节点）。⌘K 绑在命令上时也走这里
+    if (this.editing) return this.linkEditSelection();
     const node = this.primary;
     if (!node || !this.opts.editable || this.linkMenu || this.linking) return;
     const link = wikilinkOf(node.text);
@@ -6566,9 +6579,88 @@ export class MindMapCanvas {
     this.applyNoteLink(node, name);
   }
 
+  private textColorMenu: HTMLElement | null = null;
+
+  /** 选中节点的整段文字现在是什么颜色：都一样就返回它，没颜色返回 ""，不一样返回 null */
+  private wholeTextColor(): string | null {
+    const colors = new Set<string>();
+    for (const n of this.selected) {
+      const m = /^<span style="color:\s*([^";]+?)\s*;?\s*">([\s\S]*)<\/span>$/.exec(splitMarkers(n.text).rest.trim());
+      colors.add(m && !m[2].includes("<span") ? m[1] : /<span style="color/.test(n.text) ? "?" : "");
+    }
+    return colors.size === 1 ? [...colors][0] : null;
+  }
+
+  /** 选中的节点整段文字上色（color 为空串 = 去掉文字颜色），原来局部的文字颜色统一换掉 */
+  setTextColorOnSelected(color: string): void {
+    this.formatText(color ? { kind: "color", color } : { kind: "nocolor" });
+  }
+
+  /** 文字颜色的选单：默认 + 设置里的常用文字颜色，每项前面一个带颜色的 A */
+  private toggleTextColorMenu(anchor: HTMLElement | null): void {
+    if (this.textColorMenu) {
+      this.textColorMenu.remove();
+      this.textColorMenu = null;
+      return;
+    }
+    if (!this.opts.editable || !this.selected.size) return;
+    const now = this.wholeTextColor();
+    const colors = this.opts.textColors?.() ?? [];
+    const items = [{ label: t("canvas.defaultTextColor"), color: "" }, ...colors.map((c) => ({ label: colorLabel(c), color: c }))];
+    const menu = this.buildMenu(
+      items.map((it) => ({ label: it.label, active: now === it.color, run: () => this.setTextColorOnSelected(it.color) })),
+      anchor,
+      () => {
+        this.textColorMenu?.remove();
+        this.textColorMenu = null;
+      },
+    );
+    menu.classList.add("mm-textcolor-menu");
+    menu.querySelectorAll<HTMLElement>(".mm-menu-item").forEach((b, i) => {
+      const a = createSpan({ cls: "mm-textcolor-a", text: "A" });
+      if (items[i].color) a.style.color = items[i].color;
+      b.prepend(a);
+    });
+    this.textColorMenu = menu;
+  }
+
+  /**
+   * 编辑节点时把选中的字做成笔记链接：选笔记的对话框会让编辑框失焦（编辑先提交），所以先记下编辑框里的文字和选区，
+   * 选好了在这份文字上把选中那段包成链接（保留格式，见 linkWholeText）。没选中文字就把整个节点做成链接
+   */
+  async linkEditSelection(): Promise<void> {
+    const node = this.editing;
+    const ed = this.nodeEditor;
+    if (!node || !ed || !this.opts.host?.pickNote || this.linking) return;
+    const { from, to } = ed.visibleSelection;
+    if (from === to) {
+      this.commitEdit();
+      await this.linkSelectedToNote();
+      return;
+    }
+    const text = ed.text;
+    const part = text.slice(from, to);
+    this.commitEdit();
+    const suggested = plainText(part).replace(/[\\/:*?"<>|#^[\]]/g, " ").trim() || t("canvas.untitled");
+    this.linking = true;
+    let name: string | null | undefined;
+    try {
+      name = await this.opts.host.pickNote(suggested);
+    } finally {
+      this.linking = false;
+    }
+    if (!name || !this.doc) return;
+    const next = fromEditableText(linkRange(text, from, to, name));
+    if (next === node.text) return;
+    node.text = next;
+    this.select(node);
+    this.render();
+    this.notify();
+  }
+
   applyNoteLink(node: MindNode, basename: string): void {
-    const text = plainText(node.text).trim();
-    node.text = !text || text === basename ? `[[${basename}]]` : `[[${basename}|${text}]]`;
+    // 保留格式：颜色、加粗这些留着，每段文字各自包成链接（见 linkWholeText）
+    node.text = linkWholeText(node.text, basename);
     this.select(node);
     this.render();
     this.notify();
@@ -6577,7 +6669,7 @@ export class MindMapCanvas {
   unlinkNote(node: MindNode): void {
     const link = wikilinkOf(node.text);
     if (!link) return;
-    node.text = link.alias ?? link.target;
+    node.text = unlinkText(node.text, link.target);
     this.select(node);
     this.render();
     this.notify();
@@ -6752,6 +6844,16 @@ export class MindMapCanvas {
     if (editable) {
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
+      // 整个节点的文字颜色（浮动工具栏上也有）：第一层菜单放不下了，放在「更多」最前面
+      const now = this.wholeTextColor();
+      more.push({
+        title: t("menu.textColor"),
+        icon: "baseline",
+        submenu: [
+          { title: t("canvas.defaultTextColor"), checked: now === "", run: () => this.setTextColorOnSelected("") },
+          ...(this.opts.textColors?.() ?? []).map((c): MenuEntry => ({ title: colorLabel(c), checked: now === c, run: () => this.setTextColorOnSelected(c) })),
+        ],
+      });
       more.push(
         { title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
         { title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
@@ -6904,6 +7006,7 @@ export class MindMapCanvas {
       icon,
       tip: (el, text) => this.tip(el, text),
       onFormat: (fmt) => this.formatText(fmt),
+      ...(this.opts.host?.pickNote ? { onLink: () => void this.linkEditSelection(), linkKey: sc("Mod", "K") } : {}),
     });
     this.el.append(bar);
     return bar;

@@ -10,8 +10,8 @@
 
 import { EditorSelection, EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, insertNewline } from "@codemirror/commands";
-import { formatPreview, visibleSelection } from "../core/cm-format";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { formatPreview, insertFormatBreak, visibleSelection } from "../core/cm-format";
 
 export interface CellInputHandlers {
   keydown(ev: KeyboardEvent): void;
@@ -172,7 +172,7 @@ export class CodeMirrorInput implements CellInput {
       ),
       history(),
       // Enter、Tab、Esc 归表格（提交、走格）；格子里换行用 Shift+Enter
-      keymap.of([{ key: "Shift-Enter", run: insertNewline }, ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter" && b.key !== "Mod-Enter")]),
+      keymap.of([{ key: "Shift-Enter", run: insertFormatBreak }, ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter" && b.key !== "Mod-Enter")]),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: "false", autocapitalize: "off", autocorrect: "off" }),
       // 编辑器根元素的类名由 CodeMirror 管着，直接加会被它改回去

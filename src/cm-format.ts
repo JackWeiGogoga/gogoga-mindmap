@@ -7,7 +7,7 @@
 
 import { EditorSelection, EditorState, Facet, findClusterBreak, Transaction, type Extension, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
+import { balancedSlice, breakInsideFormats, formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
 
 /** 这个编辑框里格式标记始终藏着 */
 const hideAll = Facet.define<boolean, boolean>({ combine: (v) => v.some(Boolean) });
@@ -110,7 +110,34 @@ const livePreview = ViewPlugin.fromClass(
 
 /** prefix：装饰的类名前缀；hideAllSyntax：Markdown 记号也一直藏着（脑图设置「隐藏 Markdown 标记」） */
 export function formatPreview(prefix: string, hideAllSyntax: boolean): Extension[] {
-  return [prefixFacet.of(prefix), hideAll.of(hideAllSyntax), livePreview, keepMarksPaired];
+  return [prefixFacet.of(prefix), hideAll.of(hideAllSyntax), livePreview, keepMarksPaired, balancedCopy];
+}
+
+/** 复制、剪切：选中的那段格式补完整（见 balancedSlice），粘到别处还是一段完整的带格式文字 */
+const balancedCopy = EditorView.domEventHandlers({
+  copy: (ev, view) => copySel(ev, view, false),
+  cut: (ev, view) => copySel(ev, view, true),
+});
+
+function copySel(ev: ClipboardEvent, view: EditorView, cut: boolean): boolean {
+  const { from, to } = view.state.selection.main;
+  if (from === to || !ev.clipboardData) return false;
+  const text = view.state.doc.toString();
+  const out = balancedSlice(text, from, to);
+  if (out === text.slice(from, to)) return false;
+  ev.preventDefault();
+  ev.clipboardData.setData("text/plain", out);
+  if (cut) view.dispatch({ changes: { from, to }, userEvent: "delete.cut" });
+  return true;
+}
+
+/** 在带格式的文字里换行：先收尾、换行、再接上（见 breakInsideFormats）。Shift+Enter 用它 */
+export function insertFormatBreak(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main;
+  const text = view.state.doc.toString();
+  const ins = breakInsideFormats(text.slice(0, from) + text.slice(to), from);
+  view.dispatch({ changes: { from, to, insert: ins }, selection: { anchor: from + ins.length }, userEvent: "input" });
+  return true;
 }
 
 /**

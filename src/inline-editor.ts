@@ -7,9 +7,9 @@
 
 import { EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, insertNewline } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { dropEmptyColors } from "./format";
-import { formatPreview, visibleSelection } from "./cm-format";
+import { formatPreview, insertFormatBreak, visibleSelection } from "./cm-format";
 import { isWebUrl, linkDestination, pastedLink } from "./paste-link";
 
 export interface InlineEditorOptions {
@@ -79,7 +79,7 @@ export class InlineEditor {
           EditorView.inputHandler.of((_view, from, to, insert) => !!opts.onInput?.(from, to, insert)),
           history(),
           // 回车归宿主（提交）；能换行的用 Shift+Enter
-          keymap.of([...(opts.multiline ? [{ key: "Shift-Enter", run: insertNewline }] : []), ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),
+          keymap.of([...(opts.multiline ? [{ key: "Shift-Enter", run: insertFormatBreak }] : []), ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),
           EditorView.lineWrapping,
           ...formatPreview("mm-ed", !!opts.hideSyntax),
           ...(opts.placeholder ? [placeholder(opts.placeholder)] : []),
