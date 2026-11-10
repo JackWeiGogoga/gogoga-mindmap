@@ -57,6 +57,7 @@ import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCu
 import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
 import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
 import { noteMarkersExtension } from "./note-markers";
 import { noteFormatBarExtension } from "./note-format-bar";
@@ -64,6 +65,7 @@ import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
+import { scrollEditorLineToCenter, scrollParentWithin, scrollWithin } from "./scroll-inside";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
 
 const FRONTMATTER_KEY = "mindmap";
@@ -718,7 +720,7 @@ export default class MindMapPlugin extends Plugin {
     if (line === null) return;
     const editor = view.editor;
     editor.setCursor({ line, ch: editor.getLine(line).length });
-    editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+    scrollEditorLineToCenter((editor as unknown as { cm: EditorView }).cm, line);
     editor.focus();
   }
 
@@ -982,7 +984,8 @@ export default class MindMapPlugin extends Plugin {
       // 记成已跟随过的那一行：别的窗口里的编辑器还带着焦点，这次移光标引起的 selectionchange 不再弹回脑图
       this.lastFollowKey = `${from.file.path}\u0001${line}`;
       editor.setCursor({ line, ch: editor.getLine(line).length });
-      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+      // 只滚编辑器自己：scrollIntoView 会连外层容器一起滚（#29）
+      scrollEditorLineToCenter((editor as unknown as { cm: EditorView }).cm, line);
       this.flashLine(view, line);
     }
   }
@@ -995,16 +998,35 @@ export default class MindMapPlugin extends Plugin {
     unfoldPreviewLine(view, line);
     view.previewMode.applyScroll(line);
     const win = view.containerEl.win;
-    let frames = 0;
+    const started = win.performance.now();
     const tick = () => {
       const hit = previewElAtLine(view, line);
-      if (!hit) return;
-      if (!hit.ready && ++frames < 20) {
-        win.requestAnimationFrame(tick);
+      // 用 setTimeout 不用 requestAnimationFrame：Markdown 在被挡住的独立窗口里时动画帧不触发
+      // 那一段还没渲染出来（机器忙时 applyScroll 之后要等几帧）：接着等，最多约一秒；等不到渲染好也先滚过去
+      if (!hit?.ready && win.performance.now() - started < 1000) {
+        win.setTimeout(tick, 16);
         return;
       }
+      if (!hit) return;
       const el = hit.el;
-      el.scrollIntoView({ block: "center" });
+      // 只滚阅读视图自己：el.scrollIntoView 会连外层容器一起滚（#29）
+      // 阅读视图真正在滚的是里面的 .markdown-preview-view，不是 previewMode.containerEl：从元素往外找
+      const scroller = scrollParentWithin(el, view.containerEl);
+      if (!scroller) return;
+      scrollWithin(scroller, el, "center");
+      // 滚过去之后，上面的段落才陆续渲染、高度变了，目标会被挤出画面：半秒内被挤出去就再居中（元素被重画了就重新找）
+      const settleFrom = win.performance.now();
+      const recheck = () => {
+        if (win.performance.now() - settleFrom > 600) return;
+        const cur = el.isConnected ? el : previewElAtLine(view, line)?.el;
+        if (cur) {
+          const s = scroller.getBoundingClientRect();
+          const r = cur.getBoundingClientRect();
+          if (r.top < s.top || r.bottom > s.bottom) scrollWithin(scroller, cur, "center");
+        }
+        win.setTimeout(recheck, 16);
+      };
+      win.setTimeout(recheck, 16);
       if (!el.animate) return;
       const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
       el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });

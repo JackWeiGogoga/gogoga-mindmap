@@ -11,6 +11,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { dropEmptyColors } from "./format";
 import { formatPreview, insertFormatBreak, visibleSelection } from "./cm-format";
 import { isWebUrl, linkDestination, pastedLink } from "./paste-link";
+import { scrollInsideEditor } from "./scroll-inside";
 
 export interface InlineEditorOptions {
   text: string;
@@ -81,6 +82,7 @@ export class InlineEditor {
           // 回车归宿主（提交）；能换行的用 Shift+Enter
           keymap.of([...(opts.multiline ? [{ key: "Shift-Enter", run: insertFormatBreak }] : []), ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),
           EditorView.lineWrapping,
+          scrollInsideEditor(),
           ...formatPreview("mm-ed", !!opts.hideSyntax),
           ...(opts.placeholder ? [placeholder(opts.placeholder)] : []),
           EditorView.updateListener.of((update) => {
