@@ -374,10 +374,25 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   setEphemeralState(state: unknown): void {
     super.setEphemeralState(state);
-    const sub = (state as { subpath?: unknown } | null)?.subpath;
-    if (typeof sub !== "string" || !sub.replace(/^#/, "")) return;
-    if (this.doc && this.canvas) this.canvas.revealSubpath(sub);
-    else this.pendingSubpath = sub;
+    const st = state as { subpath?: unknown; line?: unknown } | null;
+    const sub = st?.subpath;
+    if (typeof sub === "string" && sub.replace(/^#/, "")) {
+      if (this.doc && this.canvas) this.canvas.revealSubpath(sub);
+      else this.pendingSubpath = sub;
+      return;
+    }
+    // 按行号跳过来的（PDF++ 点标注回到笔记里引用它的那一行、反向链接、搜索结果）：选中这一行所在的节点
+    if (typeof st?.line === "number" && st.line >= 0) {
+      if (this.doc && this.canvas) this.revealLine(st.line);
+      else this.pendingLine = st.line;
+    }
+  }
+
+  private pendingLine: number | null = null;
+
+  private revealLine(line: number): boolean {
+    const path = pathAtLine(this.data, line, this.plugin.rootRule());
+    return path !== null && !!this.canvas?.revealPathFlash(path);
   }
 
   /** 选中路径对应的节点并移到中间（从 Markdown 切回来时） */
@@ -536,8 +551,11 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.canvas?.setDoc(this.doc);
     const sub = this.pendingSubpath;
     this.pendingSubpath = null;
+    const line = this.pendingLine;
+    this.pendingLine = null;
     // 从链接点进来的，定位到链接指的节点；不然恢复上次的选中
     if (sub && this.canvas?.revealSubpath(sub)) return;
+    if (line !== null && this.revealLine(line)) return;
     if (saved?.sel != null) this.canvas?.selectPath(saved.sel);
   }
 

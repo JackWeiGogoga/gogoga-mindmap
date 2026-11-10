@@ -98,6 +98,7 @@ import type { NoteCards, NoteCardState } from "./state";
 import { TableEditor, type EditorHost } from "./table/editor/editor";
 import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
+import { isWebUrl, linkDestination } from "./paste-link";
 import { addTable, noteOnlyTable, noteRest, noteTable, tableSource, withoutTable, withTable } from "./node-table";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, splitByPunctuation, subtreeToList, unescapeNote } from "./markdown";
 
@@ -1011,7 +1012,16 @@ export class MindMapCanvas {
    */
   revealSubpath(subpath: string): boolean {
     const node = this.doc && findSubpathNode(this.doc.root, subpath);
-    if (!node) return false;
+    return !!node && this.revealNode(node);
+  }
+
+  /** 按路径找节点再 revealNode（PDF++ 这类按行号跳回来的） */
+  revealPathFlash(path: string): boolean {
+    const node = this.doc && findByPath(this.doc.root, path);
+    return !!node && this.revealNode(node);
+  }
+
+  private revealNode(node: MindNode): boolean {
     if (this.focusRoot && node !== this.focusRoot && !isAncestor(this.focusRoot, node)) this.exitFocus(false);
     let unfolded = false;
     for (let p = node.parent; p; p = p.parent) {
@@ -6552,7 +6562,32 @@ export class MindMapCanvas {
     this.render();
     if (!select) this.ensureVisible(nodes[nodes.length - 1]);
     this.notify();
+    // 只粘了一个网页地址：和编辑时粘贴一样，设置里开着就去抓标题，抓到后把节点换成 [标题](网址)
+    if (select && nodes.length === 1 && !nodes[0].children.length && isWebUrl(text) && nodes[0].text === text.trim()) this.titlePastedUrl(nodes[0]);
     return true;
+  }
+
+  /** 节点还挂在当前这张图上（没被删、文件没整个重新载入） */
+  private inDoc(node: MindNode): boolean {
+    let n = node;
+    while (n.parent) {
+      if (!n.parent.children.includes(n)) return false;
+      n = n.parent;
+    }
+    return n === this.doc?.root;
+  }
+
+  private titlePastedUrl(node: MindNode): void {
+    const url = node.text;
+    const pending = this.linkTitle(url);
+    if (!pending) return;
+    void pending.then((title) => {
+      // 等标题的这一会儿节点可能被删了、改过字或正在编辑：那就不动
+      if (!title || !this.doc || node.text !== url || !this.inDoc(node) || this.editing === node) return;
+      node.text = `[${title.replace(/[[\]]/g, "")}](${linkDestination(url) ?? url})`;
+      this.render();
+      this.notify();
+    });
   }
 
   // ---------- 节点 ⇄ 笔记 ----------
