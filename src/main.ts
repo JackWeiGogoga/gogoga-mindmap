@@ -18,6 +18,8 @@ import {
   Platform,
   setIcon,
   setTooltip,
+  Keymap,
+  parseLinktext,
   Plugin,
   renderMath,
   requestUrl,
@@ -1758,10 +1760,15 @@ export default class MindMapPlugin extends Plugin {
       setIcon: (el, name) => setIcon(el, name),
       listTags: () => Object.keys((this.app.metadataCache as unknown as { getTags?: () => Record<string, number> }).getTags?.() ?? {}).map((x) => x.replace(/^#/, "")),
       openLink: (href, internal, ev) => {
-        const newTab = ev.metaKey || ev.ctrlKey;
-        if (internal && !newTab && this.revealInOpenPdf(href, sourcePath())) return;
-        if (internal) void this.app.workspace.openLinkText(href, sourcePath(), newTab);
-        else window.open(href, "_blank");
+        if (!internal) {
+          window.open(href, "_blank");
+          return;
+        }
+        // ⌘ 点新标签页、⌘⌥ 点右侧分屏……照 Obsidian 的习惯；不按修饰键时按设置
+        const mod = Keymap.isModEvent(ev);
+        if (!mod && this.revealInOpenPdf(href, sourcePath())) return;
+        if (mod === "split" || (!mod && this.settings.linkOpen === "split")) void this.openInLinkSplit(href, sourcePath());
+        else void this.app.workspace.openLinkText(href, sourcePath(), mod || (this.settings.linkOpen === "tab" ? "tab" : false));
       },
       hoverLink: hoverParent
         ? (event, linktext, targetEl) => {
@@ -1804,11 +1811,39 @@ export default class MindMapPlugin extends Plugin {
     }
     if (!(file instanceof TFile)) return null;
     const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
-    const leaf = this.app.workspace.getLeaf("split", "vertical");
+    const leaf = this.linkSplit(origin);
     await leaf.openFile(file, { active: false });
     // 新笔记在右侧打开，焦点留在脑图上，方便继续加节点
     if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
     return file;
+  }
+
+  /** 上次从脑图打开链接用的右侧分屏：还开着就接着用，免得每点一个链接多分一屏 */
+  private linkLeaf: WorkspaceLeaf | null = null;
+
+  private linkSplit(origin?: WorkspaceLeaf): WorkspaceLeaf {
+    let alive = false;
+    const prev = this.linkLeaf;
+    if (prev && prev !== origin) this.app.workspace.iterateAllLeaves((l) => (alive ||= l === prev));
+    if (alive && prev) return prev;
+    const leaf = this.app.workspace.getLeaf("split", "vertical");
+    this.linkLeaf = leaf;
+    return leaf;
+  }
+
+  /** 在右侧分屏里打开链接，焦点留在脑图上 */
+  private async openInLinkSplit(href: string, sourcePath: string): Promise<void> {
+    const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
+    const { path, subpath } = parseLinktext(href);
+    const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath);
+    // 还没建的笔记：交给 Obsidian 照常处理（它会新建），在新分屏里打开
+    if (!file) {
+      await this.app.workspace.openLinkText(href, sourcePath, "split");
+      return;
+    }
+    const leaf = this.linkSplit(origin);
+    await leaf.openFile(file, { active: false, eState: subpath ? { subpath } : undefined });
+    if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
   }
 }
 

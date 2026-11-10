@@ -6,6 +6,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Added
 - New **Floating toolbar buttons** and **Main toolbar buttons** pages under Settings → Toolbars and colors: turn each button on or off and reorder them by dragging the handle or with the arrows (colors count as one item on the floating toolbar; the main toolbar's dividers can be moved or hidden too). Changes apply to open mind maps right away, and **Restore defaults** puts everything back. The floating toolbar also has five optional buttons, off by default: Add relationship, Insert table, Collapse / expand, Move up and Move down. The default toolbars look the same as before.
+- New **Open note links in** setting under Settings → Editing: Current tab (default, as before), New tab or Right split. With Right split the mind map stays on the left and keeps focus, and the next link opens in the same split instead of adding more. ⌘⌥-click (Ctrl+Alt-click) on a link now always opens it in the right split; ⌘-click still opens a new tab.
 
 ### Fixed
 - Relationship line labels: while editing, the text no longer runs down one character per line; it's laid out horizontally and wraps past a set width. Long labels now show in full on several lines, centered both while editing and when shown, instead of being cut off with an ellipsis.

@@ -100,6 +100,8 @@ export interface MindMapSettings {
   leftDrag: "pan" | "select";
   /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
   editCaret: "select" | "end";
+  /** 点节点、备注里的笔记链接时在哪里打开（⌘ / ⌘⌥ 点照 Obsidian 的习惯，不看这个） */
+  linkOpen: "current" | "tab" | "split";
   /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
   dragToFloat: boolean;
   /** 没有记住的视口时打开脑图：fit 适应画布，center 中心主题 100% */
@@ -175,6 +177,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
+  linkOpen: "current",
   dragToFloat: false,
   openView: "fit",
   syncSplit: false,
@@ -351,6 +354,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       ),
       page(t("settings.group.edit"), t("settings.page.edit"), [
         dropdown("editCaret", t("settings.editCaret.name"), t("settings.editCaret.desc"), { select: t("settings.editCaret.select"), end: t("settings.editCaret.end") }, ["cursor", "光标"]),
+        dropdown("linkOpen", t("settings.linkOpen.name"), t("settings.linkOpen.desc"), { current: t("settings.linkOpen.current"), tab: t("settings.linkOpen.tab"), split: t("settings.linkOpen.split") }, ["link", "链接", "分屏", "split", "打开"]),
         dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),
         toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
