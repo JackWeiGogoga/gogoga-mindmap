@@ -17,6 +17,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Copying part of a colored text while editing a node no longer pastes as a half `<span …>` tag; the copied text is a complete piece of colored text.
 - Tables in nodes: after a node's width was dragged, the table kept a faded right edge and scrolled sideways a little even when the node was wider than the table. It now shows in full when it fits and only scrolls when the node is narrower.
 - Resizing a PDF++ crop image in a node no longer leaves the node frame stuck at 300 px wide with the image sticking out; the frame grows with the image.
+- The mouse wheel sometimes seemed to stop working until you clicked a few times: if the mouse release was missed (for example after switching windows while holding the button), the canvas still thought it was being dragged and snapped back after every wheel scroll. A move with no button pressed now counts as a release.
+- With the pointer on a scrollable table node that is already scrolled to the end, the wheel no longer does nothing: a new scroll gesture pans the canvas instead. Reaching the end in the middle of a gesture still stops there, so the map isn't flung away.
 
 ## [0.59.1] - 2026-11-10
 

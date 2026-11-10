@@ -4212,6 +4212,13 @@ export class MindMapCanvas {
     });
 
     this.on(el, "pointermove", (ev) => {
+      // 松手事件丢了（按住时切走窗口、弹出了对话框……）：鼠标其实没按着，画布还以为在拖。
+      // 不收掉的话，之后鼠标一动就按「按下时的位置 + 移动距离」重设视口，滚轮滚的位移马上被拉回去，看起来像滚轮失效、
+      // 图还跟着鼠标走，点一下才好。只对鼠标这样判断（触屏、手写笔的 buttons 不可靠）
+      if (ev.pointerType === "mouse" && ev.buttons === 0 && (this.pan || this.drag || this.marquee || this.pendingDrag)) {
+        endPointer(ev);
+        return;
+      }
       if (this.pointers.has(ev.pointerId)) this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pinch && this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
@@ -6845,16 +6852,6 @@ export class MindMapCanvas {
     if (editable) {
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
-      // 整个节点的文字颜色（浮动工具栏上也有）：第一层菜单放不下了，放在「更多」最前面
-      const now = this.wholeTextColor();
-      more.push({
-        title: t("menu.textColor"),
-        icon: "baseline",
-        submenu: [
-          { title: t("canvas.defaultTextColor"), checked: now === "", run: () => this.setTextColorOnSelected("") },
-          ...(this.opts.textColors?.() ?? []).map((c): MenuEntry => ({ title: colorLabel(c), checked: now === c, run: () => this.setTextColorOnSelected(c) })),
-        ],
-      });
       more.push(
         { title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
         { title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
@@ -6880,6 +6877,18 @@ export class MindMapCanvas {
     }
     more.push({ title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
     if (this.opts.onRevealInMarkdown) more.push({ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() });
+    // 整个节点的文字颜色（浮动工具栏上也有）：第一层菜单放不下了，放在「更多」最后（放最前时，鼠标往二级菜单里移会先扫过它、弹出三级菜单挡住别的项）
+    if (editable) {
+      const now = this.wholeTextColor();
+      more.push({
+        title: t("menu.textColor"),
+        icon: "baseline",
+        submenu: [
+          { title: t("canvas.defaultTextColor"), checked: now === "", run: () => this.setTextColorOnSelected("") },
+          ...(this.opts.textColors?.() ?? []).map((c): MenuEntry => ({ title: colorLabel(c), checked: now === c, run: () => this.setTextColorOnSelected(c) })),
+        ],
+      });
+    }
     entries.push({ title: t("menu.more"), icon: "more-horizontal", submenu: more });
     if (editable && node.parent) {
       entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
@@ -7913,14 +7922,16 @@ export class MindMapCanvas {
 
   /**
    * 一次滑动开始时落在哪：
-   * - 节点里的表格超出了大小（能滚）：鼠标在这个节点任何地方（标题、边距也算）都滚表格，滚到头就停住，节点不动
-   * - 展开的备注卡片：还能往这个方向滚才归卡片，滚到头了这次滑动交给画布（和原来一样）
+   * - 节点里的表格超出了大小、还能往这个方向滚：鼠标在这个节点任何地方（标题、边距也算）都滚表格。
+   *   已经滚到头了，这次滑动交给画布（以前滚到头就什么都不动，鼠标停在这个节点上滚轮像失效了一样）；
+   *   一次滑动中途滚到头不会转给画布（见 wheelLatch），不会把图甩出去
+   * - 展开的备注卡片：同样，还能往这个方向滚才归卡片
    */
   private wheelTargetAt(ev: WheelEvent): HTMLElement | null {
     const target = ev.target as HTMLElement;
     const tableNode = target.closest<HTMLElement>(".gg-mm-node.has-table");
     const sc = tableNode?.querySelector<HTMLElement>(".mm-node-table .ggt-scroll");
-    if (sc && (sc.scrollHeight > sc.clientHeight + 1 || sc.scrollWidth > sc.clientWidth + 1)) return sc;
+    if (sc && MindMapCanvas.canScroll(sc, ev)) return sc;
     const body = target.closest<HTMLElement>(".mm-note-card-body");
     if (body && MindMapCanvas.canScroll(body, ev)) return body;
     return null;
