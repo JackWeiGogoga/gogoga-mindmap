@@ -474,6 +474,8 @@ export class MindMapSettingTab extends PluginSettingTab {
       aliases: ["toolbar", "button", "工具栏", "按钮"],
       render: (setting) => {
         const name = ICON[item.id] ?? item.id;
+        // Obsidian 重画设置页时会沿用同一个行元素再调一次 render：先把上次加的图标、把手去掉，免得越加越多
+        setting.settingEl.querySelectorAll(".mm-setting-bar-grip, .mm-setting-bar-icon").forEach((e) => e.remove());
         if (!isSep(item.id) && item.id !== "zoom") {
           const ic = toolIcon(name);
           ic.addClass("mm-setting-bar-icon");
@@ -486,7 +488,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         setting.settingEl.dataset.mmId = item.id;
         const grip = setting.settingEl.createDiv({ cls: "mm-setting-bar-grip" });
         setIcon(grip, "grip-vertical");
-        grip.setAttr("aria-label", t("bar.drag"));
+        // 不挂 aria-label：Obsidian 会给它弹提示，拖动时提示跟不上、还挡着；怎么拖写在这一页最上面的说明里
         setting.settingEl.prepend(grip);
         // 画完挂上去以后看一眼：清单不全（设置搜索结果里）就不显示把手
         window.requestAnimationFrame(() => {
