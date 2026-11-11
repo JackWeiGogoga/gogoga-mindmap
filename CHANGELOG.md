@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.5] - 2026-11-11
+
+### Fixed
+- With **Follow the active note** and split-view sync on, switching back and forth between a vault note and a Markdown file outside the vault (opened with Obsidian) could overwrite the vault note with the other file's content: content that arrived late from a slow read went into a map that had already switched files, or text just typed in Markdown was pushed to a map that had switched, and the next save wrote it into the wrong note. A map now reloads the current file when a read finishes after a switch, and pushes are checked against the file first (#30).
+- Switching quickly with **Follow the active note** no longer leaves the map on the previous note, out of step with the note beside it (#30).
+- Markdown files outside the vault: changes made in the mind map now show up in the Markdown view beside it, which used to stay on the old content (#30).
+- Split-view sync: clicking a node right after changing the map (moving a node, for example) now waits for Markdown to get the new content before jumping, instead of jumping to that line in the old content (#30).
+
 ## [0.61.4] - 2026-11-11
 
 ### Added
@@ -752,7 +760,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...HEAD
+[0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5
 [0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
 [0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2

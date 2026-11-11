@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.5] - 2026-11-11
+
+### 修复
+- 开着「跟随当前笔记」和分屏联动、在库内笔记和用 Obsidian 打开的库外 md 文件之间来回切换时，库内笔记可能被库外笔记的内容覆盖：上一篇读得慢、晚到的内容会填进已经换成下一篇的脑图，或者 Markdown 里刚打的字被推给了已经换了文件的脑图，随后一存盘就写进了错的笔记。现在读完发现文件已经换了会按当前文件重读，推送前也会核对是不是同一篇（#30）。
+- 「跟随当前笔记」来回切得快时，脑图不再停在上一篇、和旁边的笔记对不上（#30）。
+- 库外的 md 文件：在脑图里改了，旁边打开着的 Markdown 现在会跟上，以前一直停在旧内容（#30）。
+- 分屏联动：在脑图里刚改完（比如移动节点）马上点节点，Markdown 会先等新内容写进去再定位，不再跳到旧内容里的那一行（#30）。
+
 ## [0.61.4] - 2026-11-11
 
 ### 新增
@@ -752,7 +760,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...HEAD
+[0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5
 [0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
 [0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
