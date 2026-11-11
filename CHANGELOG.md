@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.4] - 2026-11-11
+
+### Added
+- New **Fold buttons on touch screens** setting under Settings → Opening and display. On phones and tablets the fold button after a node with children is always shown by default, as before; choose **Only when selected or folded** to show it like on desktop, on the selected node and on folded branches only, for a cleaner look on big maps. Folding an open branch then takes two taps: select the node, then tap the button.
+
 ## [0.61.3] - 2026-11-11
 
 ### Added
@@ -747,7 +752,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...HEAD
+[0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
 [0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
 [0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1

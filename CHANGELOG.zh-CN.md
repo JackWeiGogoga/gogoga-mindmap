@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.4] - 2026-11-11
+
+### 新增
+- 设置 → 打开与显示新增「触屏上的折叠按钮」：手机和平板上，带子节点的节点后面的折叠按钮默认一直显示（和以前一样）；选「只在选中和已折叠时显示」就和电脑上一样，只有选中的节点和已经折叠的分支显示，分支多的图看着更清爽。这样折叠一个展开的分支要点两下：先点节点选中，再点按钮。
+
 ## [0.61.3] - 2026-11-11
 
 ### 新增
@@ -747,7 +752,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...HEAD
+[0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
 [0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
 [0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
