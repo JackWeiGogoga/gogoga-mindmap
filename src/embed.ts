@@ -50,8 +50,9 @@ export function registerMindMapEmbeds(plugin: MindMapPlugin): void {
   const original = registry.embedByExtension.md;
   if (original) {
     registry.unregisterExtension("md");
+    // 别的插件会拿 file=null 来探测嵌入工厂（#32）：没有文件就交给原来的处理
     registry.registerExtension("md", (ctx, file, subpath) =>
-      plugin.isMindMapFile(file.path) ? create(ctx, file, subpath) : original(ctx, file, subpath),
+      file?.path && plugin.isMindMapFile(file.path) ? create(ctx, file, subpath) : original(ctx, file, subpath),
     );
     plugin.register(() => {
       registry.unregisterExtension("md");
