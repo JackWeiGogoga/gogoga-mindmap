@@ -4,6 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.3] - 2026-11-11
+
+### 新增
+- 设置 → 编辑与操作新增「删除节点时清理不再使用的图片」（默认关）：在脑图里删掉节点或节点里的图片，停手两秒后，库里已经没有别的笔记或白板用到的图片附件会移到回收站（按 Obsidian「删除文件」的设置）。撤销能把文件恢复；删了马上撤销、剪切后马上粘贴都不会动图片。只处理图片。
+
+### 修复
+- 记下的位置、缩放坏掉时（空值、文字、超大的数），打开脑图不再缩到最小、节点挤成一团，也不会跑到看不见的地方：坏记录直接丢掉，按默认位置打开。
+- 按文件记下的状态（位置、缩放、锁定、备注展开和尺寸、隐藏标注）让脑图打不开时，会重置这个文件的这些记录再打开一次，并给出提示，笔记内容不动。以前复杂的图可能点开就闪退，复制一份副本才能打开。
+- 备注卡片拖出来的尺寸限制在宽 1600、高 1200 以内，已经存下的过大尺寸打开时自动截回来。以前缩得很小再拖，会存下几万像素的尺寸，打开时整张图缩到最小。
+
 ## [0.61.2] - 2026-11-10
 
 ### 修复
@@ -737,7 +747,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...HEAD
+[0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
 [0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
 [0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0

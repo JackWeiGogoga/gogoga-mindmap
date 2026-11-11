@@ -4,6 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.3] - 2026-11-11
+
+### Added
+- New **Clean up unused images when deleting nodes** setting under Settings → Editing and interaction (off by default): two seconds after you delete a node, or an image inside a node, in the mind map, image attachments that no other note or canvas in the vault still uses are moved to the trash (following Obsidian's "Deleted files" setting). Undo brings the files back; deleting and undoing right away, or cutting and pasting right away, leaves images alone. Only images are touched.
+
+### Fixed
+- A broken saved position or zoom (empty values, text, huge numbers) no longer opens the mind map zoomed all the way out with the nodes squeezed together, or scrolled out of sight: the broken record is dropped and the map opens at its default position.
+- If a file's saved view state (position, zoom, lock, note expansion and sizes, hidden callouts) stops the mind map from opening, that state is reset and the map opens again, with a notice; the note itself is unchanged. Before, a complex map could close right after opening, and only a copy of the file would open.
+- Note cards can no longer be resized beyond 1600 × 1200; oversized sizes saved earlier are trimmed when the map opens. Before, resizing while zoomed far out could save sizes of tens of thousands of pixels, and the whole map then opened zoomed all the way out.
+
 ## [0.61.2] - 2026-11-10
 
 ### Fixed
@@ -737,7 +747,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...HEAD
+[0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
 [0.61.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.1...0.61.2
 [0.61.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.0...0.61.1
 [0.61.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.60.1...0.61.0
