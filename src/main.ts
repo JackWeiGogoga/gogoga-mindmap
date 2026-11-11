@@ -65,6 +65,7 @@ import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { registerMindMapEmbeds } from "./embed";
+import { AttachmentJanitor } from "./attachment-cleanup";
 import { scrollEditorLineToCenter, scrollParentWithin, scrollWithin } from "./scroll-inside";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
 
@@ -128,6 +129,8 @@ export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
   /** PDF 自动摘录：同一时间只有一张脑图接 PDF++ 复制的内容 */
   readonly pdfExcerpt = new PdfExcerpt(this.app);
+  /** 删除节点时清理不再使用的图片（设置项 cleanAttachments） */
+  readonly janitor = new AttachmentJanitor(this.app, (n) => new Notice(t("notice.attachmentsCleaned", { n: String(n) })));
   /** 锁定、备注展开、隐藏标注：插件目录下的 state.json，和设置分开 */
   fileState!: FileStateStore;
   /** 视口：只存本机 */
@@ -248,6 +251,7 @@ export default class MindMapPlugin extends Plugin {
       this.app.vault.on("rename", (f, oldPath) => {
         this.fileState.rename(oldPath, f.path);
         this.viewports.rename(oldPath, f.path);
+        this.janitor.rename(oldPath, f.path);
       }),
     );
     this.registerEvent(
@@ -512,6 +516,12 @@ export default class MindMapPlugin extends Plugin {
   }
 
   // ---------- 记住视口 ----------
+
+  /** 这个文件按路径记下的全部状态（视口、锁定、备注、隐藏标注）都丢掉：它们坏了让图打不开时用 */
+  forgetFileState(path: string): void {
+    this.viewports.remove(path);
+    this.fileState.remove(path);
+  }
 
   getViewport(path: string): SavedViewport | undefined {
     return this.settings.rememberViewport ? this.viewports.get(path) : undefined;

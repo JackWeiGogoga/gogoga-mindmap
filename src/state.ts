@@ -30,9 +30,50 @@ const SECTIONS: StateSection[] = ["hiddenCallouts", "locked", "notesExpanded", "
 const VIEWPORT_KEY = "gogoga-mindmap-viewports";
 const MAX_VIEWPORTS = 50;
 
+/** 记下的平移、画布宽高的绝对值上限：再大就是坏数据（正常的图远到不了） */
+const MAX_OFFSET = 1e7;
+
+/**
+ * 记下的视口是不是能用：平移、缩放得是正常的数，宽高可以没有。
+ * 坏掉的（空值、文字、无穷大、缩放为 0……）整条不要，按默认位置打开；
+ * 不然缩放停在最小、节点挤成一团，或者图跑到看不见的地方，Windows 上还会打不开（B 站 FORMORE 2026-11-11）
+ */
+export function cleanViewport(v: unknown): SavedViewport | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const r = v as Record<string, unknown>;
+  const fin = (x: unknown, max: number): x is number => typeof x === "number" && Number.isFinite(x) && Math.abs(x) <= max;
+  if (!fin(r.tx, MAX_OFFSET) || !fin(r.ty, MAX_OFFSET) || !fin(r.k, 100) || r.k <= 0) return undefined;
+  const out: SavedViewport = {
+    tx: r.tx,
+    ty: r.ty,
+    k: r.k,
+    sel: typeof r.sel === "string" ? r.sel : null,
+    at: typeof r.at === "number" && Number.isFinite(r.at) ? r.at : 0,
+  };
+  if (fin(r.cw, MAX_OFFSET) && fin(r.ch, MAX_OFFSET) && r.cw > 0 && r.ch > 0) {
+    out.cw = r.cw;
+    out.ch = r.ch;
+  }
+  return out;
+}
+
 const empty = (): StateData => ({ hiddenCallouts: {}, locked: {}, notesExpanded: {}, noteCards: {} });
 
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined);
+/**
+ * 备注卡片拖出来的尺寸上限（画布像素）。没有上限时，缩得很小再拖，换算出的尺寸会到几万像素：
+ * 打开时整张图被缩到最小、节点挤成一团，Windows 上还会把渲染进程撑崩（B 站 FORMORE 2026-11-10）
+ */
+export const NOTE_CARD_MAX = { w: 1600, h: 1200 };
+
+const num = (v: unknown, max: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.min(max, Math.round(v)) : undefined);
+
+/** 一条备注状态里的宽高截到上限（已经存下的过大尺寸，读进来就改回正常） */
+export function clampCard(c: NoteCardState): NoteCardState {
+  const out: NoteCardState = { ...c };
+  if (out.w !== undefined) out.w = Math.min(NOTE_CARD_MAX.w, out.w);
+  if (out.h !== undefined) out.h = Math.min(NOTE_CARD_MAX.h, out.h);
+  return out;
+}
 
 /** 只认得出的那部分：文件被手改坏、或是别的版本写的多余字段，都丢掉 */
 function cleanCards(v: unknown): NoteCards | undefined {
@@ -43,8 +84,8 @@ function cleanCards(v: unknown): NoteCards | undefined {
     const r = c as Record<string, unknown>;
     const card: NoteCardState = {};
     if (r.collapsed === true) card.collapsed = true;
-    const w = num(r.w);
-    const h = num(r.h);
+    const w = num(r.w, NOTE_CARD_MAX.w);
+    const h = num(r.h, NOTE_CARD_MAX.h);
     if (w) card.w = w;
     if (h) card.h = h;
     if (Object.keys(card).length) out[k] = card;
@@ -195,14 +236,18 @@ export class ViewportStore {
   }
 
   get(path: string): SavedViewport | undefined {
-    return this.all[path];
+    const vp = cleanViewport(this.all[path]);
+    if (!vp && path in this.all) this.remove(path);
+    return vp;
   }
 
   set(path: string, vp: SavedViewport): void {
-    this.all[path] = vp;
+    const ok = cleanViewport(vp);
+    if (!ok) return this.remove(path);
+    this.all[path] = ok;
     const keys = Object.keys(this.all);
     if (keys.length > MAX_VIEWPORTS) {
-      keys.sort((a, b) => this.all[a].at - this.all[b].at);
+      keys.sort((a, b) => (this.all[a]?.at ?? 0) - (this.all[b]?.at ?? 0));
       for (const k of keys.slice(0, keys.length - MAX_VIEWPORTS)) delete this.all[k];
     }
     this.save();
@@ -210,7 +255,10 @@ export class ViewportStore {
 
   /** 迁移用：只补上还没有的 */
   fill(entries: Record<string, SavedViewport>): void {
-    for (const [k, v] of Object.entries(entries)) this.all[k] ??= v;
+    for (const [k, v] of Object.entries(entries)) {
+      const ok = cleanViewport(v);
+      if (ok) this.all[k] ??= ok;
+    }
     this.save();
   }
 

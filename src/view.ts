@@ -16,7 +16,7 @@ import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import type MindMapPlugin from "./main";
 import type { ExcerptTarget } from "./pdf-excerpt";
-import { indentString, ToolbarPosition } from "./settings";
+import { indentString, type SavedViewport, ToolbarPosition } from "./settings";
 
 export const VIEW_TYPE_MINDMAP = "mindmap";
 
@@ -420,6 +420,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   async onUnloadFile(file: TFile): Promise<void> {
     this.rememberViewportNow();
     this.canvas?.flush();
+    this.flushImageSweep();
     return super.onUnloadFile(file);
   }
 
@@ -516,6 +517,33 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   setViewData(data: string, clear: boolean): void {
+    // 外面来的内容（打开文件、Markdown 那边改的、同步来的）：先把脑图里还没清理的删除处理掉，再按新内容记下用到的图片
+    this.flushImageSweep();
+    this.applyViewData(data, clear);
+    this.usedImages = this.file ? this.plugin.janitor.images(this.data, this.file.path) : null;
+  }
+
+  /** 打开文件时把按路径记下的状态放到画布上，返回记下的视口（选中节点要等图建好再用） */
+  private restoreFileState(file: TFile | null): SavedViewport | undefined {
+    if (!file || !this.canvas) return undefined;
+    const p = file.path;
+    const saved = this.plugin.getViewport(p);
+    this.canvas.setCalloutsHidden(this.plugin.isCalloutsHidden(p));
+    this.canvas.setNotesExpanded(this.plugin.isNotesExpanded(p));
+    this.canvas.setNoteCards(this.plugin.getNoteCards(p));
+    this.canvas.setLocked(this.plugin.isLocked(p));
+    if (saved) {
+      this.restoringViewport = true;
+      try {
+        this.canvas.setViewState(saved);
+      } finally {
+        this.restoringViewport = false;
+      }
+    }
+    return saved;
+  }
+
+  private applyViewData(data: string, clear: boolean): void {
     if (clear) this.history.reset();
     if (!clear && this.canvas) {
       const merged = this.mergeWithLocal(data);
@@ -538,17 +566,23 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.lastFolds = foldedSignature(this.doc);
     this.applyFrontmatterOptions(this.doc);
     // 打开文件（不是文件内容变了）时恢复上次的视口和选中
-    const saved = clear && this.file ? this.plugin.getViewport(this.file.path) : undefined;
-    if (clear && this.file) this.canvas?.setCalloutsHidden(this.plugin.isCalloutsHidden(this.file.path));
-    if (clear && this.file) this.canvas?.setNotesExpanded(this.plugin.isNotesExpanded(this.file.path));
-    if (clear && this.file) this.canvas?.setNoteCards(this.plugin.getNoteCards(this.file.path));
-    if (clear && this.file) this.canvas?.setLocked(this.plugin.isLocked(this.file.path));
-    if (saved && this.canvas) {
-      this.restoringViewport = true;
-      this.canvas.setViewState(saved);
+    const file = clear ? this.file : null;
+    let saved: SavedViewport | undefined;
+    try {
+      saved = this.restoreFileState(file);
+      this.canvas?.setDoc(this.doc);
+    } catch (e) {
+      if (!file) throw e;
+      // 按路径记下的状态（视口、锁定、备注……）坏了让图打不开：丢掉这些记录，按默认样子再打开一次。
+      // 文件内容一点不动（B 站 FORMORE 2026-11-11：复杂的图点开就闪退，建个副本就能打开）
+      console.error("gogoga-mindmap: saved view state of", file.path, "broke opening it; reset", e);
       this.restoringViewport = false;
+      this.plugin.forgetFileState(file.path);
+      this.canvas?.resetView();
+      saved = this.restoreFileState(file);
+      this.canvas?.setDoc(this.doc);
+      new Notice(t("notice.viewStateReset", { file: file.basename }));
     }
-    this.canvas?.setDoc(this.doc);
     const sub = this.pendingSubpath;
     this.pendingSubpath = null;
     const line = this.pendingLine;
@@ -602,6 +636,40 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.canvas.setEdge(edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)));
   }
 
+  /** 这张图上次清理以来用到过的图片附件（删除节点时清理不再使用的图片，见 attachment-cleanup.ts） */
+  private usedImages: Map<TFile, string[]> | null = null;
+  private sweepTimer: number | null = null;
+
+  /** 脑图里的编辑改了文本：撤销让图片链接回来的，马上写回文件；删掉的，停手两秒再清理（剪切后马上粘贴就不动） */
+  private imagesChanged(): void {
+    if (!this.file) return;
+    void this.plugin.janitor.restoreMissing(this.data, this.file.path);
+    // 两秒内出现过的图片都记着（撤销回来又删掉的也算），到时候「出现过、现在没了」的才清理
+    const seen = this.usedImages ?? new Map<TFile, string[]>();
+    for (const [f, links] of this.plugin.janitor.images(this.data, this.file.path)) seen.set(f, [...new Set([...(seen.get(f) ?? []), ...links])]);
+    this.usedImages = seen;
+    const win = this.contentEl.win;
+    if (this.sweepTimer !== null) win.clearTimeout(this.sweepTimer);
+    this.sweepTimer = win.setTimeout(() => this.flushImageSweep(), 2000);
+  }
+
+  private flushImageSweep(): void {
+    if (this.sweepTimer === null) return;
+    this.contentEl.win.clearTimeout(this.sweepTimer);
+    this.sweepTimer = null;
+    const file = this.file;
+    if (!file) return;
+    const before = this.usedImages;
+    const now = this.plugin.janitor.images(this.data, file.path);
+    this.usedImages = now;
+    if (!before || !this.plugin.settings.cleanAttachments) return;
+    const removed = new Map([...before].filter(([f]) => !now.has(f)));
+    if (!removed.size) return;
+    const path = file.path;
+    const snapshot = this.data;
+    void this.plugin.janitor.sweep(removed, path, () => (this.file?.path === path ? this.data : snapshot));
+  }
+
   /** 上次保存时折叠着的节点（路径），判断这次改动有没有改折叠 */
   private lastFolds: string | null = null;
 
@@ -615,6 +683,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (next === this.data) return;
     this.history.push(this.data);
     this.data = this.local = next;
+    this.imagesChanged();
     // 「Markdown 跟着脑图折叠」：折叠状态变了就马上存，不等 Obsidian 两秒的延迟保存，Markdown 那边才跟得上
     const folds = this.plugin.settings.foldFollow ? foldedSignature(doc) : null;
     if (folds !== null && folds !== this.lastFolds) {
@@ -683,6 +752,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (prev === null) return;
     this.data = this.local = prev;
     this.reparse();
+    this.imagesChanged();
     this.requestSave();
   }
 
@@ -692,6 +762,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (next === null) return;
     this.data = this.local = next;
     this.reparse();
+    this.imagesChanged();
     this.requestSave();
   }
 

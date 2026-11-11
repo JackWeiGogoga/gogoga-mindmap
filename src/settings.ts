@@ -62,6 +62,8 @@ export interface MindMapSettings {
   strikeDoneTasks: boolean;
   /** 编辑时粘贴网页地址，自动抓网页标题粘成 [标题](网址)（默认关） */
   pasteLinkTitle: boolean;
+  /** 删除节点 / 图片后，库里没人再用的图片附件移到回收站（默认关） */
+  cleanAttachments: boolean;
   /** 复制节点时去掉 %%…%% 标记（默认关） */
   copyPlain: boolean;
   /** 常用文字颜色、荧光笔颜色（逗号隔开） */
@@ -209,6 +211,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   formatBar: false,
   copyPlain: false,
   pasteLinkTitle: false,
+  cleanAttachments: false,
   centerOnSelect: false,
   hideSyntax: false,
   hideTagsInNotes: false,
@@ -382,6 +385,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("strikeDoneTasks", t("settings.strikeDoneTasks.name"), t("settings.strikeDoneTasks.desc"), ["task", "任务", "删除线", "strikethrough"]),
         toggle("copyPlain", t("settings.copyPlain.name"), t("settings.copyPlain.desc"), ["clipboard", "剪贴板"]),
         toggle("pasteLinkTitle", t("settings.pasteLinkTitle.name"), t("settings.pasteLinkTitle.desc"), ["link", "url", "链接", "网址"]),
+        toggle("cleanAttachments", t("settings.cleanAttachments.name"), t("settings.cleanAttachments.desc"), ["image", "attachment", "delete", "图片", "附件", "删除", "回收站"]),
         { name: t("settings.hover.name"), desc: t("settings.hover.desc", { source: t("hover.display") }), aliases: ["page preview", "页面预览"] },
         group(t("settings.group.markers"), [
           text("customMarkers", t("settings.customMarkers.name"), t("settings.customMarkers.desc"), "🎯 📎 ★ ◆", ["emoji", "icon", "图标"]),

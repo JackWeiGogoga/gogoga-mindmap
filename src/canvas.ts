@@ -94,7 +94,7 @@ import {
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
 import { Key, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
-import type { NoteCards, NoteCardState } from "./state";
+import { clampCard, NOTE_CARD_MAX, type NoteCards, type NoteCardState } from "./state";
 import { TableEditor, type EditorHost } from "./table/editor/editor";
 import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
@@ -1101,12 +1101,14 @@ export class MindMapCanvas {
 
   /** 恢复视口；之后首次渲染不再自动适应画布 */
   setViewState(state: ViewState): void {
+    // 坏掉的视口（空值、文字、无穷大）不用，免得之后的平移缩放全算错
+    if (![state.tx, state.ty, state.k].every((v) => typeof v === "number" && Number.isFinite(v)) || state.k <= 0) return;
     this.tx = state.tx;
     this.ty = state.ty;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, state.k));
     this.hasView = true;
     this.viewAnchor =
-      state.cw && state.ch ? { cx: (state.cw / 2 - this.tx) / this.k, cy: (state.ch / 2 - this.ty) / this.k, tx: this.tx, ty: this.ty } : null;
+      state.cw && state.ch && Number.isFinite(state.cw) && Number.isFinite(state.ch) ? { cx: (state.cw / 2 - this.tx) / this.k, cy: (state.ch / 2 - this.ty) / this.k, tx: this.tx, ty: this.ty } : null;
     this.applyViewAnchor();
     this.applyTransform();
   }
@@ -7162,6 +7164,12 @@ export class MindMapCanvas {
     if (rerender) this.render();
   }
 
+  /** 丢掉当前视口，下次画的时候按打开时的默认方式重新摆 */
+  resetView(): void {
+    this.hasView = false;
+    this.viewAnchor = null;
+  }
+
   getFocus(): MindNode | null {
     return this.focusRoot;
   }
@@ -7907,8 +7915,8 @@ export class MindMapCanvas {
       el.classList.add("is-resizing");
       const move = (e: PointerEvent) => {
         size = {
-          w: Math.round(Math.max(NOTE_CARD_MIN.w, start.w + (e.clientX - start.x) / k)),
-          h: Math.round(Math.max(NOTE_CARD_MIN.h, start.h + (e.clientY - start.y) / k)),
+          w: Math.round(Math.min(NOTE_CARD_MAX.w, Math.max(NOTE_CARD_MIN.w, start.w + (e.clientX - start.x) / k))),
+          h: Math.round(Math.min(NOTE_CARD_MAX.h, Math.max(NOTE_CARD_MIN.h, start.h + (e.clientY - start.y) / k))),
         };
         this.cardDrag = { id: node.id, size };
         this.applyCardSize(el, size);
@@ -8088,7 +8096,7 @@ export class MindMapCanvas {
     if (!this.doc || !Object.keys(this.cardKeys).length) return;
     walkMap(this.doc.root, (n) => {
       const c = this.cardKeys[noteKey(n)];
-      if (c) this.cardState.set(n.id, { ...c });
+      if (c) this.cardState.set(n.id, clampCard(c));
     });
   }
 
