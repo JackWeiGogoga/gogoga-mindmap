@@ -1184,7 +1184,7 @@
   .gg-mm-root button.mm-toggle { width: 22px; height: 22px; font-size: 12px; transform: translate(12px, -50%); }
   .gg-mm-node[data-side="left"] .mm-toggle { transform: translate(-12px, -50%); }
   .mm-toggle::before { width: 12px; }
-  .gg-mm-node:not(:hover) .mm-toggle { opacity: 1; }
+  body:not(.gg-mm-touch-toggle-auto) .gg-mm-node:not(:hover) .mm-toggle { opacity: 1; }
   .gg-mm-root button.mm-tool { width: 34px; height: 34px; }
   .gg-mm-root .mm-nodebar button.mm-tool { width: 30px; height: 30px; }
   .gg-mm-root button.mm-swatch { width: 24px; height: 24px; }

@@ -54,6 +54,8 @@ export interface MindMapSettings {
   markersInNotes: "show" | "dot" | "hide";
   /** 悬停在节点右边缘就能调宽度（默认关） */
   widthHandleOnHover: boolean;
+  /** 触屏上的折叠按钮：一直显示（默认）/ 只在选中和已折叠时显示 */
+  touchToggles: "always" | "selected";
   /** 新建的节点自带名字「主题1」，不写字也留着（默认关） */
   newNodeName: boolean;
   /** 编辑时开头打「1.」就给这组同级编号（默认开：关着时手打的「1.」写进文件是 `- 1. 文字`，Markdown 里显示不对） */
@@ -219,6 +221,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   colorsInNotes: false,
   markersInNotes: "show",
   widthHandleOnHover: false,
+  touchToggles: "always",
   newNodeName: false,
   numberByTyping: true,
   strikeDoneTasks: false,
@@ -308,6 +311,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         this.refresh();
         return;
       case "outlineWrap":
+      case "touchToggles":
         return p.applyEmbedToolbar();
       case "customMarkers":
       case "customMarkersExclusive":
@@ -362,6 +366,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           dropdown("openView", t("settings.openView.name"), t("settings.openView.desc"), { fit: t("settings.openView.fit"), center: t("settings.openView.center") }),
           toggle("rememberViewport", t("settings.rememberViewport.name"), t("settings.rememberViewport.desc")),
           toggle("rememberView", t("settings.rememberView.name"), t("settings.rememberView.desc")),
+          dropdown("touchToggles", t("settings.touchToggles.name"), t("settings.touchToggles.desc"), { always: t("settings.touchToggles.always"), selected: t("settings.touchToggles.selected") }, ["fold", "折叠", "按钮", "touch", "手机", "平板"]),
           dropdown("defaultStructure", t("settings.structure.name"), t("settings.structure.desc"), Object.fromEntries(STRUCTURES.map((x) => [x.id, x.label])), ["layout", "布局"]),
           dropdown("defaultTheme", t("settings.theme.name"), t("settings.theme.desc"), Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])), ["style", "风格", "配色"]),
           this.scaleSetting("spacingScale", t("settings.spacing.name"), t("settings.spacing.desc"), 50, 200),

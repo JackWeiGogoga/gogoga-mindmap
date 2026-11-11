@@ -330,6 +330,8 @@ export default class MindMapPlugin extends Plugin {
       d.body.classList.toggle("gg-mm-embed-toolbar-autohide", on && this.settings.embedToolbar === "autohide");
       // 大纲面板显示完整标题（换行），默认一行放不下就省略
       d.body.classList.toggle("gg-mm-outline-wrap", on && this.settings.outlineWrap);
+      // 触屏上的折叠按钮只在选中、已折叠时显示（和电脑上一样）；默认一直显示
+      d.body.classList.toggle("gg-mm-touch-toggle-auto", on && this.settings.touchToggles === "selected");
     }
   }
 
