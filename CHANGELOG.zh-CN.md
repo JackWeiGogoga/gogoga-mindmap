@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.7] - 2026-11-11
+
+### 修复
+- 别的插件不带文件去探测笔记的嵌入处理（比如检测是否支持嵌入）时不再报错，这类调用原样交给原来的处理（#32）。
+
 ## [0.61.6] - 2026-11-11
 
 ### 修复
@@ -765,7 +770,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...HEAD
+[0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7
 [0.61.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...0.61.6
 [0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5
 [0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
