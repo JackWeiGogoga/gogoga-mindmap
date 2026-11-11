@@ -2120,6 +2120,8 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 /* 滚动区右边、下边留了 12px（加列 / 加行按钮的位置），用负的外边距补回来；最宽也要加上这 12px，不然表格放得下时也多出 12px，一直淡出、能滚 */
 .gg-mm-node.has-width .mm-node-table .ggt-scroll { max-width: calc(100% + 12px); }
 .gg-mm-node .mm-node-table .ggt thead .ggt-cell { position: sticky; top: 0; z-index: 3; background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
+/* 冻结的标题列在表头里也要压在别的表头格上面：表头格为了吸顶各自是 z-index 3，冻结格只有 2 时左右滑动会被后面的表头格盖住 */
+.gg-mm-node .mm-node-table .ggt.is-freeze thead .ggt-cell.is-frozen { z-index: 4; }
 .gg-mm-node .mm-node-table .ggt:is([data-preset="minimal"], [data-preset="academic"]) thead .ggt-cell:not([data-bg]) { background-image: none; }
 .gg-mm-node .mm-node-table .ggt .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
 .gg-mm-node .mm-node-table .ggt button.ggt-add-col { top: 6px; bottom: 18px; right: 0; width: 16px; height: auto; }
