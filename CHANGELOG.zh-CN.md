@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.6] - 2026-11-11
+
+### 修复
+- 节点里的表格：开了「冻结标题列」又有表头时，左右滑动表格，表头里第一列的格子会被后面的表头格盖住，现在和下面的行一样固定在左边。
+
 ## [0.61.5] - 2026-11-11
 
 ### 修复
@@ -760,7 +765,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...HEAD
+[0.61.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...0.61.6
 [0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5
 [0.61.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.3...0.61.4
 [0.61.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.2...0.61.3
