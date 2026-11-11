@@ -42,6 +42,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     super(leaf);
     // 文件在外部被改动时不要 Obsidian 按字符合并（两边改同一行会拼成一团），由 setViewData 按行合并、冲突时保留脑图的
     (this as unknown as { isPlaintext: boolean }).isPlaintext = false;
+    // 读完文件时视图已经换了别的文件，晚到的内容不能留下（#30）
+    this.guardLoads();
     // 视图激活时 ⌘F 归我们，否则会被 Obsidian 的「搜索当前文件」截走
     this.scope = new Scope(this.app.scope);
     this.scope.register(["Mod"], "f", () => {
@@ -416,6 +418,26 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
   private restoringViewport = false;
 
+  /**
+   * Obsidian 读完文件就把内容填进视图，不看这时视图是不是已经换了别的文件（打开文件、文件在外面被改了都走这里）。
+   * 上一篇读得慢（库外的笔记、网盘）、中途又换到下一篇时，上一篇的内容会晚到、盖掉下一篇：
+   * 标签页是 B、脑图里是 A，一存盘 B 就被 A 覆盖（#30）。读完发现文件已经换了：先禁止写盘，再按现在的文件重读一遍
+   */
+  private guardLoads(): void {
+    const base = (TextFileView.prototype as unknown as { loadFileInternal?: (f: TFile, c: boolean) => Promise<void> }).loadFileInternal;
+    // 内部方法：哪天 Obsidian 改了名就不挂，照旧由它自己读
+    if (typeof base !== "function") return;
+    (this as unknown as { loadFileInternal: (f: TFile, c: boolean) => Promise<void> }).loadFileInternal = async (file: TFile, clear: boolean) => {
+      await base.call(this, file, clear);
+      for (let i = 0; i < 3 && this.file && this.file !== file; i++) {
+        const cur: TFile = this.file;
+        (this as unknown as { lastSavedData: string | null }).lastSavedData = null;
+        await base.call(this, cur, true);
+        file = cur;
+      }
+    };
+  }
+
   /** 卸载前把正在输入的内容提交，Obsidian 随后会 save(true) 写盘 */
   async onUnloadFile(file: TFile): Promise<void> {
     this.rememberViewportNow();
@@ -497,6 +519,11 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     }
   }
 
+  /** 有没有还没写盘的改动 */
+  hasUnsavedChanges(): boolean {
+    return (this as unknown as { dirty?: boolean }).dirty === true;
+  }
+
   getViewData(): string {
     // 自动保存可能发生在输入途中：先把正在输入的标签/备注同步进树，再交出数据
     this.canvas?.syncPending();
@@ -508,12 +535,18 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   /** 上次读入或写盘时磁盘上的文本，外部改动和本地没落盘的编辑合并时的基准 */
   private disk: string | null = null;
 
+  /**
+   * 写盘。库外的笔记（Obsidian 能直接打开库外的 md，路径是 file:/…）：写盘时 Obsidian 发的 modify 事件早于内容就绪，
+   * 旁边开着它的 Markdown 读到的还是旧内容、一直不刷新（#30）。写完再通知一次；库内的笔记不受影响
+   */
   async save(clear?: boolean): Promise<void> {
+    const file = this.file;
     const saving = super.save(clear);
     // TextFileView 在真正写盘前就同步记下了要写的文本（没变、正在写的不记）
     const saved = (this as unknown as { lastSavedData: string | null }).lastSavedData;
     if (saved !== null) this.disk = saved;
-    return saving;
+    await saving;
+    if (file && file.path.startsWith("file:") && this.app.vault.getAbstractFileByPath(file.path)) this.app.vault.trigger("modify", file);
   }
 
   setViewData(data: string, clear: boolean): void {
@@ -613,9 +646,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   /**
    * 旁边的 Markdown 编辑器正在改同一个文件：不等它落盘（约 2 秒），直接跟上。
    * 脑图这边有没提交的编辑时跳过，等落盘后走 setViewData 的正常合并。
+   * path 是那段文字所属的文件：脑图这时已经换了别的文件就不收，免得把一篇笔记的内容存进另一篇（#30）
    */
-  syncFromEditor(text: string): void {
-    if (!this.canvas || text === this.data || this.canvas.isBusy()) return;
+  syncFromEditor(text: string, path: string): void {
+    if (!this.canvas || !this.file || this.file.path !== path || text === this.data || this.canvas.isBusy()) return;
     this.data = text;
     this.setViewData(text, false);
   }

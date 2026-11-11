@@ -841,25 +841,49 @@ export default class MindMapPlugin extends Plugin {
    * 只动一个脑图标签页（最近用过的那个），钉住的不动；那篇已经有脑图在显示就不用换
    */
   private registerFollowActive(): void {
-    const follow = () => {
-      if (!this.settings.followActiveNote) return;
+    /** 换一次；换了返回 true（等切换完成） */
+    const followOnce = async (): Promise<boolean> => {
+      if (!this.settings.followActiveNote) return false;
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       const file = view?.file;
-      if (!view || !file || file.extension !== "md") return;
+      if (!view || !file || file.extension !== "md") return false;
       const maps = this.app.workspace
         .getLeavesOfType(VIEW_TYPE_MINDMAP)
         .filter((l) => l !== view.leaf && l.view instanceof MindMapView && l.view.containerEl.isShown());
-      if (!maps.length || maps.some((l) => (l.view as MindMapView).file?.path === file.path)) return;
+      if (!maps.length || maps.some((l) => (l.view as MindMapView).file?.path === file.path)) return false;
       const target = maps
         .filter((l) => !(l as WorkspaceLeaf & { pinned?: boolean }).pinned)
         .sort((a, b) => ((b as unknown as { activeTime?: number }).activeTime ?? 0) - ((a as unknown as { activeTime?: number }).activeTime ?? 0))[0];
-      if (!target) return;
+      if (!target) return false;
       const mapView = target.view as MindMapView;
       mapView.rememberViewportNow();
-      void target.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+      await target.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+      return true;
     };
-    this.registerEvent(this.app.workspace.on("file-open", follow));
-    this.registerEvent(this.app.workspace.on("active-leaf-change", follow));
+    // 一次只换一个：上一次还没换完（库外文件读得慢）又来一次时，Obsidian 可能把后一次丢掉，脑图停在上一篇，
+    // 和左边的笔记对不上（#30）。换完再对一遍，还不一致就接着换（最多几次，防止来回抖）
+    let running = false;
+    let again = false;
+    const follow = async () => {
+      if (running) {
+        again = true;
+        return;
+      }
+      running = true;
+      try {
+        for (let i = 0; i < 4; i++) {
+          again = false;
+          const switched = await followOnce();
+          if (!switched && !again) break;
+        }
+      } catch (e) {
+        console.error("gogoga-mindmap: follow active note failed", e);
+      } finally {
+        running = false;
+      }
+    };
+    this.registerEvent(this.app.workspace.on("file-open", () => void follow()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => void follow()));
   }
 
   /** Markdown 跟着脑图折叠：每个 Markdown 视图上次跟着脑图折起来的节点（路径）。按它算增减，用户自己折的不碰 */
@@ -977,6 +1001,31 @@ export default class MindMapPlugin extends Plugin {
     if (!this.settings.syncSplit || !from.file) return;
     const path = from.getSelectedPath();
     if (path === null) return;
+    // 脑图里刚改过（移动节点之类）还没写盘：Markdown 那边还是旧内容，按旧内容定位会跳到错的行（#30）。
+    // 先写盘，等旁边的 Markdown 换成新内容（最多一秒）再定位
+    const file = from.file;
+    const stale = this.app.workspace
+      .getLeavesOfType("markdown")
+      .some((l) => l.view instanceof MarkdownView && l.view.file === file && l.view.containerEl.isShown() && l.view.editor.getValue() !== from.getViewData());
+    if (stale && from.hasUnsavedChanges()) {
+      void (async () => {
+        await from.save();
+        const win = from.containerEl.win;
+        const started = win.performance.now();
+        const ready = () =>
+          this.app.workspace
+            .getLeavesOfType("markdown")
+            .every((l) => !(l.view instanceof MarkdownView) || l.view.file !== file || l.view.editor.getValue() === from.getViewData());
+        while (!ready() && win.performance.now() - started < 1000) await new Promise((r) => win.setTimeout(r, 30));
+        if (from.file === file && from.getSelectedPath() === path) this.revealSelectedInMarkdown(from, path);
+      })();
+      return;
+    }
+    this.revealSelectedInMarkdown(from, path);
+  }
+
+  private revealSelectedInMarkdown(from: MindMapView, path: string): void {
+    if (!from.file) return;
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       const view = leaf.view;
       if (!(view instanceof MarkdownView) || view.file?.path !== from.file.path || !view.containerEl.isShown()) continue;
@@ -1075,15 +1124,19 @@ export default class MindMapPlugin extends Plugin {
       this.app.workspace.on("editor-change", (editor, info) => {
         const path = info.file?.path;
         if (!path) return;
-        const views = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).map((l) => l.view).filter((v): v is MindMapView => v instanceof MindMapView && v.file?.path === path);
-        if (!views.length) return;
+        const mapsOf = () =>
+          this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).map((l) => l.view).filter((v): v is MindMapView => v instanceof MindMapView && v.file?.path === path);
+        if (!mapsOf().length) return;
         window.clearTimeout(timers.get(path));
         timers.set(
           path,
           window.setTimeout(() => {
             timers.delete(path);
+            // 等的这 150ms 里编辑器、脑图都可能换了文件（跟随当前笔记、在库内外笔记间来回切）：
+            // 编辑器已经不是这篇就不推；脑图按现在显示的文件重新找，不用当初记下的（#30：库内笔记被库外笔记的内容覆盖）
+            if (info.file?.path !== path) return;
             const text = editor.getValue();
-            for (const v of views) v.syncFromEditor(text);
+            for (const v of mapsOf()) v.syncFromEditor(text, path);
           }, 150),
         );
       }),
