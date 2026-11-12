@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.61.8] - 2026-11-12
+
+### 修复
+- 节点里的表格：**斑马纹**样式下冻结标题列时，冻结列隔一行是半透明的，往左滚到它底下的列会透出来，文字叠在一起。现在冻结列每一行都不透明；拖选的格子不包括第一列时，选框放到冻结列下面。
+
 ## [0.61.7] - 2026-11-11
 
 ### 修复
@@ -770,7 +775,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...HEAD
+[0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
 [0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7
 [0.61.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...0.61.6
 [0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5

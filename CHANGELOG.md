@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.61.8] - 2026-11-12
+
+### Fixed
+- Tables in nodes: with the first column frozen in the **Zebra** style, every other row of the frozen column was see-through, so columns scrolled underneath showed through and the text overlapped. The frozen column is now opaque in every row, and a selected range that doesn't include the first column draws its box under the frozen column.
+
 ## [0.61.7] - 2026-11-11
 
 ### Fixed
@@ -770,7 +775,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...HEAD
+[0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
 [0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7
 [0.61.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...0.61.6
 [0.61.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.4...0.61.5
