@@ -7863,6 +7863,8 @@ export class MindMapCanvas {
           }
         : undefined,
       readonly: !editable,
+      // 表格菜单「复制整张表格」「复制为 Markdown 表格」完成后的提示
+      notice: host?.notice,
       // 表格左上角菜单里的「删除表格」：只删表格，节点留着
       onDeleteTable: editable ? () => this.deleteNodeTable(live()) : undefined,
     };

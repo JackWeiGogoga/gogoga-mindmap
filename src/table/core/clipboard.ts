@@ -84,3 +84,25 @@ export function toHTML(grid: readonly (readonly string[])[], headerRow: boolean)
   });
   return `<table>${rows.join("")}</table>`;
 }
+
+/**
+ * 复制时把这片格子的 Markdown 原文（表格 + 下面那行设置注释）藏进 HTML 表格的一个属性里：
+ * 粘到 Obsidian 正文时原样还原颜色、列宽、合并；Excel、Word 不认识这个属性，照常按 HTML 粘
+ */
+export const SOURCE_ATTR = "data-ggt-src";
+
+export function sourceAttr(lines: readonly string[]): string {
+  return ` ${SOURCE_ATTR}="${encodeURIComponent(lines.join("\n"))}"`;
+}
+
+/** 从剪贴板的 HTML 里取回藏着的原文；没有、或者坏了返回 null */
+export function sourceFromHTML(html: string): string[] | null {
+  const m = new RegExp(`${SOURCE_ATTR}="([^"]*)"`).exec(html);
+  if (!m) return null;
+  try {
+    const text = decodeURIComponent(m[1]);
+    return text ? text.split("\n") : null;
+  } catch {
+    return null;
+  }
+}

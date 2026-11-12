@@ -747,3 +747,64 @@ export function optionsOf(t: Table, c: number): string[] {
 export function normalize(t: Table): Table {
   return computeTotals(syncOptions(t));
 }
+
+// ---------- 截取一块 ----------
+
+/**
+ * 把一片格子截成一张新表（复制到别的笔记时用）：列宽、对齐、状态列只取这几列，底色、文字颜色的坐标跟着平移，
+ * 合并区域裁到这片里（裁完只剩一格、或横跨新表头分界线的不要）。没包含表头时第一行当表头；
+ * 包含了原来的合计行（最后一行）才保留合计；标题列、冻结只在包含第一列时保留。样式、行距和不认识的键照抄
+ */
+export function subTable(t: Table, rect: Rect): Table {
+  const r1 = Math.max(0, rect.r1);
+  const c1 = Math.max(0, rect.c1);
+  const r2 = Math.min(rowCount(t) - 1, rect.r2);
+  const c2 = Math.min(colCount(t) - 1, rect.c2);
+  if (r1 === 0 && c1 === 0 && r2 === rowCount(t) - 1 && c2 === colCount(t) - 1) return cloneTable(t);
+  const cols = (a?: readonly unknown[]) => (a ? a.slice(c1, c2 + 1) : undefined);
+  const shift = (m?: Record<string, CellColor>) => {
+    if (!m) return undefined;
+    const out: Record<string, CellColor> = {};
+    for (const [k, v] of Object.entries(m)) {
+      const p = parseRef(k);
+      if (p && p.r >= r1 && p.r <= r2 && p.c >= c1 && p.c <= c2) out[cellRef(p.r - r1, p.c - c1)] = v;
+    }
+    return out;
+  };
+  const meta: TableMeta = { ...cloneMeta(t.meta) };
+  const oldHead = headRows(t);
+  const head = r1 < oldHead ? Math.max(1, oldHead - r1) : 1;
+  if (head > 1) meta.head = head;
+  else delete meta.head;
+  meta.w = cols(t.meta.w) as TableMeta["w"];
+  meta.opts = cols(t.meta.opts) as TableMeta["opts"];
+  meta.calc = hasTotal(t) && r2 === rowCount(t) - 1 ? (cols(t.meta.calc) as TableMeta["calc"]) : undefined;
+  meta.bg = shift(t.meta.bg);
+  meta.fg = shift(t.meta.fg);
+  if (c1 > 0) {
+    delete meta.headerCol;
+    delete meta.freeze;
+  }
+  const crosses = (m: Rect) => m.r1 < head && m.r2 >= head;
+  meta.merge = merges(t)
+    .map((m) => ({ r1: Math.max(m.r1, r1) - r1, c1: Math.max(m.c1, c1) - c1, r2: Math.min(m.r2, r2) - r1, c2: Math.min(m.c2, c2) - c1 }))
+    .filter((m) => m.r1 <= m.r2 && m.c1 <= m.c2 && (m.r1 !== m.r2 || m.c1 !== m.c2) && !crosses(m))
+    .map(rangeRef);
+  if (!meta.merge.length) delete meta.merge;
+  if (meta.bg && !Object.keys(meta.bg).length) delete meta.bg;
+  if (meta.fg && !Object.keys(meta.fg).length) delete meta.fg;
+  for (const k of Object.keys(meta)) if (meta[k] === undefined) delete meta[k];
+  const cells = t.cells.slice(r1, r2 + 1).map((row) => row.slice(c1, c2 + 1));
+  // 合并区域的左上角在这片外面：裁剪后的新左上角显示原来那块的内容（不然显示的是被盖住的那格）
+  for (const m of merges(t)) {
+    const nr = Math.max(m.r1, r1);
+    const nc = Math.max(m.c1, c1);
+    if ((nr !== m.r1 || nc !== m.c1) && nr <= Math.min(m.r2, r2) && nc <= Math.min(m.c2, c2)) cells[nr - r1][nc - c1] = t.cells[m.r1][m.c1];
+  }
+  return {
+    cells,
+    align: t.align.slice(c1, c2 + 1),
+    meta,
+    style: { ...t.style },
+  };
+}

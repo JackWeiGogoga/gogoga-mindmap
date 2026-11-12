@@ -13,9 +13,9 @@
  * 第一下输入就把它变成这一格的编辑框，组字不会被打断。
  */
 
-import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle } from "../core/table";
-import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, unmergeAt, widthOf } from "../core/ops";
-import { fromTSV, toHTML, toTSV } from "../core/clipboard";
+import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle } from "../core/table";
+import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf } from "../core/ops";
+import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, highlightOf, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
 import { t } from "./i18n";
@@ -54,6 +54,8 @@ export interface EditorHost {
   /** 整张表往里缩（挂到上面最近的列表项下）/ 移出列表：给了才在表格菜单里出现；canIndentTable 决定是不是灰的 */
   indentTable?(dir: 1 | -1): void;
   canIndentTable?(dir: 1 | -1): boolean;
+  /** 弹一条提示（复制好了之类）；不给就不提示 */
+  notice?(message: string): void;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
   /** 格子的编辑框用 CodeMirror：加粗、颜色、荧光笔直接显示效果，标签藏起来（建编辑器时问一次） */
@@ -1188,6 +1190,8 @@ export class TableEditor {
       const target = ev.target as Node;
       // 点格式栏的按钮：还在编辑这一格
       if (this.formatBar?.contains(target)) return;
+      // 点补全列表（状态、[[ 链接、# 标签）：它挂在 body 上，不能当成点到表格外面，不然先按原样退出编辑、列表也关了
+      if (this.suggest?.el.contains(target)) return;
       if (this.popover && !this.popover.contains(target)) this.closePopover();
       // 点到表格外面：取消选中
       if (this.sel && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
@@ -1741,7 +1745,7 @@ export class TableEditor {
     const grid = this.rangeGrid();
     const r = this.rangeRect();
     ev.clipboardData.setData("text/plain", toTSV(grid));
-    ev.clipboardData.setData("text/html", r ? this.styledHTML(r) : toHTML(grid, false));
+    ev.clipboardData.setData("text/html", r ? this.styledHTML(r, this.sourceOf(r)) : toHTML(grid, false));
     if (cut && !this.host.readonly) this.applyKeepRange(clearCells(this.table, this.rangeCells()));
   }
 
@@ -1749,12 +1753,39 @@ export class TableEditor {
    * 带样式的 HTML：格子实际显示的底色、文字颜色、加粗、对齐、列宽、合并都写成内联样式，
    * 粘到 Word、飞书、邮件里保留样子。标上 data-ggt，粘回我们自己的表格时用纯文本（Markdown 原文）
    */
-  private styledHTML(rect: Rect): string {
+  /** 这片格子截成的表格原文（带设置注释）：至少 2 行 2 列才算一张表，不然返回 null */
+  private sourceOf(rect: Rect): string[] | null {
+    if (rect.r2 - rect.r1 < 1 || rect.c2 - rect.c1 < 1) return null;
+    return serializeTable(subTable(this.table, rect));
+  }
+
+  /** 表格菜单里的复制：整张表带样式（粘到别的笔记原样还原），或者只要 Markdown 表格 */
+  private copyWhole(markdownOnly: boolean): void {
+    if (this.editing) this.commit();
+    const tb = this.table;
+    const lines = markdownOnly ? serializeTable({ ...tb, meta: {} }) : serializeTable(tb);
+    const text = lines.join("\n");
+    const win = this.root.ownerDocument.defaultView ?? window;
+    const clip = win.navigator.clipboard;
+    const done = () => this.host.notice?.(t(markdownOnly ? "copiedMarkdown" : "copiedTable"));
+    if (markdownOnly) {
+      void clip.writeText(text).then(done);
+      return;
+    }
+    const html = this.styledHTML({ r1: 0, c1: 0, r2: rowCount(tb) - 1, c2: colCount(tb) - 1 }, lines);
+    const item = new win.ClipboardItem({
+      "text/plain": new win.Blob([text], { type: "text/plain" }),
+      "text/html": new win.Blob([html], { type: "text/html" }),
+    });
+    void clip.write([item]).then(done);
+  }
+
+  private styledHTML(rect: Rect, source: readonly string[] | null = null): string {
     const tb = this.table;
     const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const win = this.root.ownerDocument.defaultView ?? window;
     const cols = Array.from(this.tableEl.querySelectorAll("col"));
-    let html = '<table data-ggt="1" style="border-collapse:collapse">';
+    let html = `<table data-ggt="1"${source ? sourceAttr(source) : ""} style="border-collapse:collapse">`;
     html += "<colgroup>";
     const k = this.scale();
     for (let c = rect.c1; c <= rect.c2; c++) html += `<col style="width:${Math.round((cols[c]?.getBoundingClientRect().width ?? 80 * k) / k)}px">`;
@@ -2241,6 +2272,9 @@ export class TableEditor {
       { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWidths(this.table, this.fitWidths())) },
       { title: t("autoWidthAll"), icon: "move-horizontal", disabled: !tb.meta.w?.some((x) => x != null), run: () => keep(autoWidthAll(this.table)) },
       { title: t("clearAllBg"), icon: "paintbrush", disabled: !Object.keys(tb.meta.bg ?? {}).length && !Object.keys(tb.meta.fg ?? {}).length, run: () => keep(clearAllBg(this.table)) },
+      { separator: true },
+      { title: t("copyTable"), icon: "copy", run: () => this.copyWhole(false) },
+      { title: t("copyMarkdown"), icon: "file-code", run: () => this.copyWhole(true) },
       ...(this.host.indentTable
         ? [
             { separator: true },
