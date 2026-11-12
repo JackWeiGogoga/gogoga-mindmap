@@ -838,6 +838,7 @@ export class TableEditor {
     const sb = any ? this.selBox() : null;
     this.rangeBox.classList.toggle("is-shown", !!sb);
     if (sb) this.rangeBox.setAttribute("style", `left:${sb.x}px;top:${sb.y}px;width:${sb.w}px;height:${sb.h}px`);
+    this.rangeBox.classList.toggle("is-under-frozen", !!sb && this.root.classList.contains("is-freeze") && (this.rangeRect()?.c1 ?? 0) > 0);
     this.markCross();
     if (cell) this.placeFill();
     this.placeHandles();

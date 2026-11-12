@@ -2257,7 +2257,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt .ggt-cell[data-bg="purple"] { --ggt-cell-bg: rgba(var(--color-purple-rgb), 0.13); }
 
 /* 预设：斑马纹 */
-.ggt[data-preset="zebra"] tbody tr:nth-child(even) .ggt-cell:not([data-bg]) { background: var(--ggt-zebra); }
+/* 冻结列不刷斑马纹：它要保持不透明，挡住往左滚到它底下的列（刷成半透明的浅灰会露出底下的字） */
+.ggt[data-preset="zebra"] tbody tr:nth-child(even) .ggt-cell:not([data-bg]):not(.is-frozen) { background: var(--ggt-zebra); }
 /* 预设：极简线（只有横线，表头下面一道深线） */
 .ggt[data-preset="minimal"] .ggt-cell { border-left: 0 !important; border-right: 0; }
 .ggt[data-preset="minimal"] thead .ggt-cell { background: transparent; border-top: 0; border-bottom: 1.5px solid var(--text-normal); }
@@ -2413,6 +2414,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 框里铺一层同色系的浅色（铺在框这一层，整片均匀；格子原来的底色透得出来） */
 .ggt-range-box { position: absolute; display: none; z-index: 2; border: 2px solid var(--ggt-sel); border-radius: 2px; background: color-mix(in srgb, var(--ggt-sel) 8%, transparent); pointer-events: none; box-sizing: border-box; }
 .ggt-range-box.is-shown { display: block; }
+/* 选区不含冻结列时，选框放到冻结列下面：滚到冻结列底下的那部分被挡住，不再半透明地盖在冻结列上 */
+.ggt-range-box.is-under-frozen { z-index: 1; }
 .ggt.has-range .ggt-cell.is-selected { box-shadow: none !important; }
 .ggt .ggt-cell.is-merged { vertical-align: middle; }
 
@@ -2468,6 +2471,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   .ggt .ggt-scroll { -webkit-mask-image: none !important; mask-image: none !important; }
   .ggt .ggt-cell.is-selected { box-shadow: none !important; }
   .ggt-scroll { overflow: visible !important; }
+  /* 纸宽有限：表格最宽到页面宽，不让右边被裁掉（设了列宽的表格导出时按比例换成百分比，见 reading.ts） */
+  .ggt .ggt-table { max-width: 100% !important; }
+  .ggt .ggt-cell { min-width: 0; }
 }
 
 /* 勾选框：和 Obsidian 任务列表的勾选框一个样子 */
