@@ -512,8 +512,8 @@ function contrastText(hex: string): string {
 interface DropTarget {
   parent: MindNode;
   index: number;
-  /** 落在节点上（成为末尾子节点）还是落在子节点列之间（插入到指定位置） */
-  kind: "node" | "gap";
+  /** 落在节点上（成为末尾子节点）、落在子节点列之间（插入到指定位置），还是落在概要文字上（先变成概要主题，再挂到它下面） */
+  kind: "node" | "gap" | "summary";
   /** 思维导图结构里拖到中心主题的左边还是右边 */
   side?: "left" | "right";
   /** 有 side 时：插在那一侧从上往下第几个位置（画指示线用） */
@@ -3184,6 +3184,7 @@ export class MindMapCanvas {
       return [
         { title: t("menu.editSummary"), icon: "type", run: () => this.editTopic(topic) },
         { title: t("menu.addSummaryTopic"), icon: "corner-down-right", run: () => this.addTopicChild(start) },
+        { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => this.pasteIntoSummary(start) },
         ...this.rangeMenuEntries(start, "summary"),
         { title: t("menu.summaryToText"), icon: "text", disabled: !plain, run: () => this.topicToText(start) },
         { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
@@ -3192,9 +3193,18 @@ export class MindMapCanvas {
     return [
       { title: t("menu.editSummary"), icon: "type", run: () => this.editSummary(start) },
       { title: t("menu.addSummaryTopic"), icon: "corner-down-right", run: () => this.addTopicChild(start) },
+      { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => this.pasteIntoSummary(start) },
       ...this.rangeMenuEntries(start, "summary"),
       { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
     ];
+  }
+
+  /** 概要的右键菜单（手机上长按）里的「粘贴」：粘到这个概要后面 */
+  private pasteIntoSummary(start: MindNode): void {
+    this.select(null);
+    this.activeGroup = start;
+    if (!start.summary?.topic) this.summaryLabels.get(start.id)?.classList.add("is-active");
+    void this.pasteFromClipboard();
   }
 
   private editTopic(topic: MindNode): void {
@@ -3209,12 +3219,8 @@ export class MindMapCanvas {
   addTopicChild(start: MindNode): void {
     if (!this.opts.editable || !this.doc || !start.summary) return;
     if (this.editing) this.commitEdit();
-    let topic = start.summary.topic;
-    if (!topic) {
-      topic = createNode({ parent: start.parent, text: start.summary.text || t("canvas.summaryDefault") });
-      start.summary = { span: start.summary.span, raw: start.summary.raw, text: "", topic };
-      fixTopics(this.doc.root);
-    }
+    const topic = this.ensureSummaryTopic(start);
+    if (!topic) return;
     if (topic.folded) topic.folded = false;
     const child = addChild(topic, this.doc.style, "");
     this.activateGroup(null);
@@ -3222,6 +3228,35 @@ export class MindMapCanvas {
     this.render();
     this.startEdit(child, true);
     this.followSelection(child);
+  }
+
+  /** 概要的概要主题；普通概要先把文字变成一个节点（概要主题）再给出来。往概要后面挂节点（加子主题、粘贴、拖进来）都走这里 */
+  private ensureSummaryTopic(start: MindNode): MindNode | null {
+    if (!this.doc || !start.summary) return null;
+    let topic = start.summary.topic;
+    if (!topic) {
+      topic = createNode({ parent: start.parent, text: start.summary.text || t("canvas.summaryDefault") });
+      start.summary = { span: start.summary.span, raw: start.summary.raw, text: "", topic };
+      fixTopics(this.doc.root);
+    }
+    return topic;
+  }
+
+  /**
+   * 粘贴、插图片落到哪个节点下：选中的节点；没选节点、选中的是一个概要（点了概要文字）时，落到这个概要后面
+   * （普通概要先变成概要主题）；都没有就是中心主题
+   */
+  private pasteTarget(): MindNode | null {
+    if (this.primary) return this.primary;
+    const g = this.activeGroup;
+    if (g?.summary && (g.summary.topic || this.summaryLabels.get(g.id)?.classList.contains("is-active"))) {
+      const topic = this.ensureSummaryTopic(g);
+      if (topic) {
+        this.activateGroup(null);
+        return topic;
+      }
+    }
+    return this.doc?.root ?? null;
   }
 
   /** 概要主题只剩一行字时转回普通概要（文字写进标记） */
@@ -4568,7 +4603,7 @@ export class MindMapCanvas {
       if (!files.length && !text.trim()) return;
       ev.preventDefault();
       if (this.opts.embedded) ev.stopPropagation();
-      if (files.length) void this.insertImageFiles(files, this.primary ?? this.doc?.root ?? null);
+      if (files.length) void this.insertImageFiles(files, this.pasteTarget());
       else this.pasteText(text);
     };
     this.on(el, "paste", onPaste);
@@ -5196,9 +5231,14 @@ export class MindMapCanvas {
     const target = this.findDropTarget(w.x, w.y, this.drag.subtree);
     this.drag.target = target;
     for (const el of this.els.values()) el.classList.remove("is-drop-target");
+    for (const el of this.summaryLabels.values()) el.classList.remove("is-drop-target");
     const ind = this.drag.indicator;
     ind.setCssStyles({ display: "none" });
     if (!target || !this.layout) return;
+    if (target.kind === "summary") {
+      this.summaryLabels.get(target.parent.id)?.classList.add("is-drop-target");
+      return;
+    }
     if (target.kind === "node") {
       this.els.get(target.parent.id)?.classList.add("is-drop-target");
       return;
@@ -5248,6 +5288,12 @@ export class MindMapCanvas {
   private findDropTarget(wx: number, wy: number, exclude: Set<MindNode>): DropTarget | null {
     if (!this.layout) return null;
     const placed = [...this.layout.placed.values()].filter((p) => !exclude.has(p.node));
+    // 概要文字上：挂到这个概要后面（还没有概要主题的先变成概要主题）。被括住的节点拖到自己的概要上不算
+    for (const s of this.layout.summaries) {
+      const b = s.label;
+      if (!b || s.topic || !s.start.summary || exclude.has(s.start) || s.members.some((m) => exclude.has(m))) continue;
+      if (wx >= b.x - 4 && wx <= b.x + b.w + 4 && wy >= b.y - 4 && wy <= b.y + b.h + 4) return { parent: s.start, index: 0, kind: "summary" };
+    }
     let hit: Placed | null = null;
     for (const p of placed) {
       if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h && (!hit || p.w * p.h < hit.w * hit.h)) hit = p;
@@ -5376,10 +5422,17 @@ export class MindMapCanvas {
   private endDrag(commit: boolean): void {
     this.stopAutoScroll();
     if (!this.drag) return;
-    const { node, movers, ghost, indicator, target, grab, last } = this.drag;
+    const { node, movers, ghost, indicator, grab, last } = this.drag;
+    let target = this.drag.target;
     ghost.remove();
     indicator.remove();
     for (const el of this.els.values()) el.classList.remove("is-dragging", "is-drop-target");
+    for (const el of this.summaryLabels.values()) el.classList.remove("is-drop-target");
+    // 落在概要文字上：普通概要先变成概要主题，再当作落在概要主题上（成为它的末尾子节点）
+    if (target?.kind === "summary") {
+      const topic = commit ? this.ensureSummaryTopic(target.parent) : null;
+      target = topic ? { parent: topic, index: topic.children.length, kind: "node" } : null;
+    }
     this.el.classList.remove("is-dragging-node");
     this.drag = null;
     // 放到空白处的落点（按住的节点中心）
@@ -6552,7 +6605,7 @@ export class MindMapCanvas {
     // 右键菜单、工具栏的「粘贴」不经过 paste 事件，得自己读剪贴板：有图片按图片插入，和 ⌘V 一样
     const images = await this.clipboardImages();
     if (images.length) {
-      await this.insertImageFiles(images, this.primary ?? this.doc.root);
+      await this.insertImageFiles(images, this.pasteTarget());
       return;
     }
     let text = "";
@@ -6593,7 +6646,7 @@ export class MindMapCanvas {
     if (!nodes.length) return false;
     if (this.editing) this.commitEdit();
     this.remapPastedAnchors(nodes);
-    const target = this.primary ?? this.doc.root;
+    const target = this.pasteTarget() ?? this.doc.root;
     if (target.folded) target.folded = false;
     for (const n of nodes) attachSubtree(n, target, this.doc.style);
     if (select) {
