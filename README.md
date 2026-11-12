@@ -125,7 +125,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
   In the panel: ↑↓ to move, Tab / Shift+Tab to demote / promote, Alt+↑↓ to reorder, Enter to add a sibling and rename it in place, Delete to delete, Space to fold.
   On the canvas, Alt+arrow keys likewise reorder, promote, and demote.
 - **Link nodes to notes**: press ⌘K or click the link button in the toolbar, then pick an existing note or create a new one. The label becomes `[[note|original text]]`, and a newly created note opens in a split on the right. Press ⌘K again on a linked node to open or remove the link. Hold ⌘ and hover for a page preview.
-- **Structures**: logic chart (rightward), mind map (left and right), org chart (downward), and tree chart. Switch them from the structure menu in the toolbar: **Logic chart (rightward)**, **Mind map (left and right)**, **Org chart (downward)**, **Tree chart**.
+- **Structures**: logic chart (rightward), mind map (left and right), org chart (downward), tree chart, and five timelines. Switch them from the structure menu in the toolbar: **Logic chart (rightward)**, **Mind map (left and right)**, **Org chart (downward)**, **Tree chart**, **Timeline (horizontal, one side)**, **Timeline (horizontal, alternating)**, **Timeline (vertical, rightward)**, **Timeline (vertical, leftward)**, **Timeline (vertical, alternating)**. A timeline strings the main topics in order along an arrowed axis with their content hanging beside it (an indented list on horizontal timelines, a logic chart on vertical ones); alternating puts neighboring branches on opposite sides so more fits on screen. Drag main topics to reorder them along the axis.
 - **Typing links**: while editing a node, type `[[` (or `【【` with a Chinese input method) and a list of vault files pops up; keep typing to filter, ↑↓ to pick, Enter to insert `[[note]]`. Or select some text and type `[` (or `【`) to wrap it in brackets; type it again to turn it into a `[[link]]`.
 - **Custom themes**: Settings → Custom themes → New, start from a built-in theme and adjust four levels (central topic, main topics, subtopics, level 3 and deeper): font size, bold and italic, text color, background (or underline), corner radius, border, maximum width (short text keeps its own width, longer text wraps) with an optional "align widths in this level", and the color and width of the line into that level. Overall you can set the line type, corners, dashes, one color per branch, and spacing. A live preview sits on the right, and dark-mode colors are derived automatically. Saved themes show up in the palette menu next to the built-in ones.
 - **Spacing and text size**: the "Node spacing" and "Node text size" settings scale the gaps and the node text of every theme, custom ones included (100% is the theme's own look). Smaller values fit more on screen.
@@ -168,7 +168,7 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 ```markdown
 ---
 mindmap: true
-mindmap-structure: mindmap   # optional: logic-right (default) | mindmap | org-down | tree-right
+mindmap-structure: mindmap   # optional: logic-right (default) | mindmap | org-down | tree-right | timeline-h | timeline-h-alt | timeline-v-right | timeline-v-left | timeline-v-alt
 mindmap-theme: rainbow       # optional: snow (default) | rainbow | business | warm | mono | line | forest
 ---
 
