@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-11-12
+
 ### 新增
 - 新设置「展开的备注里显示」（#31，在「备注」设置页）：全部（默认）/ 只显示列表项 / 只显示有序列表 / 只显示无序列表。开着「只把标题当节点」时，标题下的大段解释和列表结论都在备注里；选只显示列表项后，节点下面的备注框只留列表项（连同下面缩进的子项、续行），不挨着的两处有序列表各自编号。挑完没有内容的节点只留备注图标，点开弹窗看全文。只改显示：弹窗、编辑备注时和文件里都是完整内容。
 
@@ -815,7 +817,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...HEAD
+[0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0

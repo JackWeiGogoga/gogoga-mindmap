@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-11-12
+
 ### Added
 - New setting **Show in expanded notes** (#31, Notes page): Everything (default) / List items only / Ordered lists only / Bullet lists only. With **Only headings as nodes** on, long explanations and list conclusions under a heading all end up in its note; with a list-only choice the note box under the node keeps just the list items (with their indented sub-items and continuation lines), and two separate ordered lists keep their own numbering. Nodes with nothing left show only the note icon, which opens the full note. Only the display changes: the popover, editing and your file always have the full note.
 
@@ -815,7 +817,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...HEAD
+[0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
