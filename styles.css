@@ -536,10 +536,10 @@
 
 /* ---------- 颜色「按钮 + 下拉」和色板（color-palette.ts）：节点浮动工具栏、格式栏、设置页共用 ---------- */
 .mm-hl-chip:not([data-highlight]) { background: var(--text-highlight-bg, rgba(255, 208, 0, 0.4)); }
-/* A 在上、色条在下；外面一圈虚线圆角框，右边一条竖线隔开 V 形箭头（和设计图一样）。
+/* A 在上、色条在下，右边 V 形箭头。平时没有边框（和工具栏其他按钮一样），鼠标移上去才出现一圈浅色实线框和中间的竖线。
    按钮要 all: unset 去掉 Obsidian 的按钮样式，后面的规则都挂在 .mm-color-split 下面，优先级压过它 */
-.mm-color-split { display: inline-flex; align-items: stretch; height: 30px; margin: 0 2px; border: 1px dashed var(--background-modifier-border, #d5d5d5); border-radius: 6px; box-sizing: border-box; }
-.mm-color-split:hover { border-color: var(--background-modifier-border-hover, #bdbdbd); }
+.mm-color-split { display: inline-flex; align-items: stretch; height: 30px; margin: 0 2px; border: 1px solid transparent; border-radius: 6px; box-sizing: border-box; }
+.mm-color-split:hover { border-color: var(--background-modifier-border, #e3e3e3); }
 .mm-color-split > button {
   all: unset;
   box-sizing: border-box;
@@ -555,7 +555,8 @@
 .mm-color-split .mm-color-split-face .mm-icon { font-size: 15px; }
 .mm-color-split .mm-color-split-face svg { width: 15px; height: 15px; }
 .mm-color-split .mm-color-split-bar { display: block; width: 16px; height: 3px; border-radius: 2px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }
-.mm-color-split > .mm-color-split-caret { width: 16px; border-left: 1px solid var(--background-modifier-border, #e3e3e3); border-radius: 0 5px 5px 0; font-size: 0; color: var(--text-muted, #888); }
+.mm-color-split > .mm-color-split-caret { width: 16px; border-left: 1px solid transparent; border-radius: 0 5px 5px 0; font-size: 0; color: var(--text-muted, #888); }
+.mm-color-split:hover > .mm-color-split-caret { border-left-color: var(--background-modifier-border, #e3e3e3); }
 .mm-color-split > .mm-color-split-caret::before { content: ""; width: 5px; height: 5px; margin-top: -3px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
 .mm-format-bar .mm-color-split { height: 28px; }
 .mm-swatch-more { all: unset; box-sizing: border-box; height: 18px; padding: 0 3px; margin-left: 1px; border-radius: 4px; font-size: 11px; letter-spacing: 1px; line-height: 18px; color: var(--text-muted, #888); cursor: pointer; }
