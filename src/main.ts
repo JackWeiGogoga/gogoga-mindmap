@@ -50,7 +50,7 @@ import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, setSpacingScale } from "./canvas";
+import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, setSpacingScale } from "./canvas";
 import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -1317,6 +1317,22 @@ export default class MindMapPlugin extends Plugin {
       exportCommand(`format-highlight-color-${n}`, t("command.formatHighlightColor", { n }), async (v) => v.formatColor("bg", n - 1));
     }
     exportCommand("format-clear", t("command.formatClear"), async (v) => v.formatText({ kind: "clear" }));
+    // 开关型命令：按一下打开 / 关掉对应的设置（和去设置页拨开关一样，会记住），可以绑快捷键
+    const toggleSetting = (id: string, key: "showNodebar" | "formatBar" | "formatBarInNotes", name: Parameters<typeof t>[0], label: Parameters<typeof t>[0]) =>
+      this.addCommand({
+        id,
+        name: t(name),
+        callback: async () => {
+          this.settings[key] = !this.settings[key];
+          await this.saveSettings();
+          if (key === "formatBarInNotes") this.applyNoteTags();
+          else refreshAllBars();
+          new Notice(t(this.settings[key] ? "notice.toggledOn" : "notice.toggledOff", { name: t(label) }));
+        },
+      });
+    toggleSetting("toggle-nodebar", "showNodebar", "command.toggleNodebar", "settings.showNodebar.name");
+    toggleSetting("toggle-format-bar", "formatBar", "command.toggleFormatBar", "settings.formatBar.name");
+    toggleSetting("toggle-note-format-bar", "formatBarInNotes", "command.toggleNoteFormatBar", "settings.formatBarInNotes.name");
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
     exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());

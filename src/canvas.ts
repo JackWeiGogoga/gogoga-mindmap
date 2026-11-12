@@ -1094,6 +1094,10 @@ export class MindMapCanvas {
     this.nodebar?.remove();
     this.nodebar = null;
     this.render();
+    // 格式栏的开关也可能刚变（命令「切换格式栏」）：编辑中按新的设置收起或浮出来
+    this.formatBar?.remove();
+    this.formatBar = null;
+    this.updateFormatBar();
   }
 
   getViewState(): ViewState {

@@ -6,6 +6,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Added
 - **Color palette.** Text color and highlighter are now a button with a dropdown, the same in the floating toolbar (whole node) and the format bar (selected text, in mind maps and in notes): click the left part to reuse the last color in one click, click ▾ for the palette — your frequent colors, a grid of 60 colors, recent colors, an opacity slider and a custom color picker. The floating toolbar gains a highlighter button, and a ··· after the node colors opens the same palette to pick any node color.
+- Three commands to turn toolbars on and off from anywhere, so you can bind hotkeys: **Toggle the floating toolbar (selected nodes)**, **Toggle the format bar (text selected while editing a node)** and **Toggle the format bar in notes**. Each flips the matching setting (remembered) and takes effect right away.
 
 ### Fixed
 - With **Hide format tags in notes** on, Markdown inside a text color or highlighter tag now shows as formatting in Live Preview: `**bold**`, `==highlight==`, italics and links inside `<span style="color:…">` or `<mark …>` used to show their raw `**` markers, because Obsidian draws inline HTML as-is there. The plugin now draws these spans the way mind map nodes do; put the cursor in one to see and edit its source. Bold text inside colored text keeps that color. With the setting off, nothing changes.
