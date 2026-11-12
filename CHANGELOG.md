@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-11-12
+
+### Added
+- Tables in nodes: copy at least two rows and two columns and paste into a note, and the new table keeps its colors, widths, merges and status columns; pasting into Excel or Feishu works as before. The table menu (top-left corner) gains **Copy table** and **Copy as Markdown table** (plain GFM, without colors or other settings).
+
+### Fixed
+- Tables in nodes: clicking an item in the suggestion list while editing a cell (status options, `[[` links, `#` tags) now fills the cell. Before, the click ended editing and nothing was filled in.
+
 ## [0.62.0] - 2026-11-12
 
 ### Added
@@ -791,7 +799,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...HEAD
+[0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
 [0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
 [0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7

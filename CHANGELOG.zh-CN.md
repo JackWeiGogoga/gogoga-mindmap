@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-11-12
+
+### 新增
+- 节点里的表格：复制两行两列以上，粘到笔记里生成的表格颜色、列宽、合并、状态列原样还原；粘到 Excel、飞书里和以前一样。表格左上角菜单多了「复制整张表格」和「复制为 Markdown 表格」（只有 GFM 表格，不带颜色等设置）。
+
+### 修复
+- 节点里的表格：编辑格子时用鼠标点补全列表（状态列的选项、`[[` 链接、`#` 标签）能填进格子。以前一点就退出编辑，什么都没填。
+
 ## [0.62.0] - 2026-11-12
 
 ### 新增
@@ -791,7 +799,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...HEAD
+[0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
 [0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
 [0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7
