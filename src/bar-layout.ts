@@ -9,7 +9,7 @@ export interface BarItem {
 }
 
 /** 浮动工具栏：颜色一整组算一项，文字颜色是一个按钮（点开选颜色）；后面五个是可选的，默认不显示 */
-export const NODEBAR_DEFAULT = ["colors", "textColor", "child", "sibling", "marker", "note", "box", "link", "copy", "paste", "trash", "!rel", "!table", "!fold", "!moveUp", "!moveDown"];
+export const NODEBAR_DEFAULT = ["colors", "textColor", "highlight", "child", "sibling", "marker", "note", "box", "link", "copy", "paste", "trash", "!rel", "!table", "!fold", "!moveUp", "!moveDown"];
 
 /** 主工具栏：sep1…sep4 是分隔线，也能挪、能藏；两条分隔线中间没有按钮时自动不显示 */
 export const TOOLBAR_DEFAULT = [

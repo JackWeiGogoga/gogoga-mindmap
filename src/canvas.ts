@@ -64,7 +64,8 @@ import {
   STRUCTURES,
 } from "./layout";
 import { applyInlineFormat, type InlineFormat } from "./format";
-import { createFormatBar, highlightFormat } from "./format-bar";
+import { type ColorKind, type ColorMemory, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
+import { colorFormat, colorTitle, createFormatBar, highlightFormat } from "./format-bar";
 import { InlineEditor } from "./inline-editor";
 import {
   fromEditableText,
@@ -261,6 +262,8 @@ export interface CanvasOptions {
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
+  /** 颜色下拉记住的颜色（上次用的、最近使用）；不给就只记在这张图里 */
+  colorMemory?: ColorMemory;
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
@@ -471,7 +474,7 @@ const COLOR_LABEL_KEYS: Record<string, Key> = {
   gray: "color.gray",
 };
 
-function colorLabel(color: string): string {
+export function colorLabel(color: string): string {
   const key = COLOR_LABEL_KEYS[color];
   return key ? t(key) : color;
 }
@@ -3944,6 +3947,17 @@ export class MindMapCanvas {
     };
     swatch(null);
     for (const c of this.nodeColors()) swatch(c);
+    // 「···」：色板里选任意颜色（写成 %%#e5484d%% 这样的色值）
+    const more = createEl("button");
+    more.type = "button";
+    more.className = "mm-swatch-more";
+    more.textContent = "···";
+    this.tip(more, t("palette.nodeMore"));
+    more.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      this.toggleColorPalette("node", more);
+    });
+    colors.append(more);
     const tools = new Map<string, HTMLElement>();
     const tool = (id: string, iconName: string, title: string, onClick: (ev: MouseEvent) => void) => {
       const b = createEl("button");
@@ -3958,7 +3972,28 @@ export class MindMapCanvas {
       });
       tools.set(id, b);
     };
-    tool("textColor", "textColor", t("canvas.textColorTip"), () => this.toggleTextColorMenu(tools.get("textColor") ?? null));
+    // 文字颜色、荧光笔：左半边套用上次的颜色（作用于整个节点的文字），▾ 打开色板；和格式栏里的一样
+    const split = (id: string, kind: "text" | "bg") => {
+      const el = createColorSplit({
+        doc: this.el.ownerDocument,
+        cls: kind === "text" ? "is-text-color" : "is-highlighter",
+        title: kind === "text" ? t("bar.textColor") : t("bar.highlight"),
+        caretTitle: kind === "text" ? t("palette.textMore") : t("palette.bgMore"),
+        face: (f) => (kind === "text" ? (f.textContent = "A") : f.append(icon("highlighter"))),
+        current: () => this.currentColor(kind),
+        paintBar: (b, c) => paintColor(b, c, kind),
+        tip: (b, text) => this.tip(b, text),
+        onApply: () => {
+          const c = this.currentColor(kind);
+          if (c) this.formatText(colorFormat(kind, c));
+        },
+        onOpen: (anchor) => this.toggleColorPalette(kind, anchor),
+      });
+      el.dataset.tool = id;
+      tools.set(id, el);
+    };
+    split("textColor", "text");
+    split("highlight", "bg");
     tool("child", "child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
     tool("sibling", "sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
     tool("marker", "marker", t("canvas.markersTip"), () => this.toggleMarkerPicker());
@@ -6646,32 +6681,75 @@ export class MindMapCanvas {
     this.formatText(color ? { kind: "color", color } : { kind: "nocolor" });
   }
 
-  /** 文字颜色的选单：默认 + 设置里的常用文字颜色，每项前面一个带颜色的 A */
-  private toggleTextColorMenu(anchor: HTMLElement | null): void {
-    if (this.textColorMenu) {
-      this.textColorMenu.remove();
-      this.textColorMenu = null;
-      return;
-    }
-    if (!this.opts.editable || !this.selected.size) return;
-    const now = this.wholeTextColor();
-    const colors = this.opts.textColors?.() ?? [];
-    const items = [{ label: t("canvas.defaultTextColor"), color: "" }, ...colors.map((c) => ({ label: colorLabel(c), color: c }))];
-    const menu = this.buildMenu(
-      items.map((it) => ({ label: it.label, active: now === it.color, run: () => this.setTextColorOnSelected(it.color) })),
-      anchor,
-      () => {
-        this.textColorMenu?.remove();
-        this.textColorMenu = null;
-      },
+  private readonly localColors: Record<string, string> = {};
+  private readonly localRecent: Record<string, string[]> = {};
+  private colorMemory(): ColorMemory {
+    return (
+      this.opts.colorMemory ?? {
+        last: (k) => this.localColors[k] ?? null,
+        recent: (k) => this.localRecent[k] ?? [],
+        remember: (k, c) => {
+          this.localColors[k] = c;
+          this.localRecent[k] = [c, ...(this.localRecent[k] ?? []).filter((x) => x !== c)].slice(0, 8);
+        },
+      }
     );
-    menu.classList.add("mm-textcolor-menu");
-    menu.querySelectorAll<HTMLElement>(".mm-menu-item").forEach((b, i) => {
-      const a = createSpan({ cls: "mm-textcolor-a", text: "A" });
-      if (items[i].color) a.style.color = items[i].color;
-      b.prepend(a);
+  }
+
+  /** 颜色按钮色条上的颜色：上次用的，没有就是常用的第一个（荧光笔再没有就是主题高亮） */
+  private currentColor(kind: "text" | "bg"): string | null {
+    const common = (kind === "text" ? this.opts.textColors?.() : this.opts.highlightColors?.()) ?? [];
+    return this.colorMemory().last(kind) ?? common[0] ?? (kind === "bg" ? THEME_HIGHLIGHT : null);
+  }
+
+  /** 选中节点时的色板：文字颜色、荧光笔作用于整个节点的文字，节点颜色改节点的颜色 */
+  private toggleColorPalette(kind: ColorKind, anchor: HTMLElement): void {
+    const was = this.textColorMenu?.dataset.kind;
+    this.textColorMenu?.remove();
+    this.textColorMenu = null;
+    if (was === kind || !this.opts.editable || !this.selected.size) return;
+    const mem = this.colorMemory();
+    const common = kind === "node" ? this.nodeColors() : ((kind === "text" ? this.opts.textColors?.() : this.opts.highlightColors?.()) ?? []);
+    const close = () => {
+      this.textColorMenu?.remove();
+      this.textColorMenu = null;
+      cleanup();
+    };
+    const pick = (c: string | null) => {
+      close();
+      if (c !== null) mem.remember(kind, c);
+      if (kind === "node") this.applyColor(c);
+      else {
+        this.formatText(colorFormat(kind, c));
+        refreshColorSplit(anchor);
+      }
+    };
+    const pal = createPalette(this.el.ownerDocument, {
+      common,
+      recent: mem.recent(kind),
+      alpha: kind !== "node",
+      defaultAlpha: kind === "bg" ? 60 : 100,
+      paint: (b, c) => paintColor(b, c, kind),
+      label: (c) => (kind === "node" && /^[a-z]+$/i.test(c) ? colorLabel(c) : colorTitle(c)),
+      noneLabel: kind === "text" ? t("palette.noText") : kind === "bg" ? t("palette.noHighlight") : t("palette.noNodeColor"),
+      extras:
+        kind === "bg" && !common.includes(THEME_HIGHLIGHT)
+          ? [{ value: THEME_HIGHLIGHT, label: t("palette.themeHighlight"), paint: (b) => paintColor(b, THEME_HIGHLIGHT, "bg") }]
+          : [],
+      onPick: pick,
+      tip: (b, text) => this.tip(b, text),
     });
-    this.textColorMenu = menu;
+    pal.dataset.kind = kind;
+    pal.classList.add("mm-node-palette");
+    this.el.append(pal);
+    const host = this.el.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
+    const left = Math.max(4, Math.min(host.width - pal.offsetWidth - 4, r.left - host.left));
+    const above = r.top - host.top - pal.offsetHeight - 6;
+    pal.style.left = `${Math.round(left)}px`;
+    pal.style.top = `${Math.round(above >= 4 ? above : r.bottom - host.top + 6)}px`;
+    const cleanup = this.dismissOnOutside(pal, close);
+    this.textColorMenu = pal;
   }
 
   /**
@@ -7058,6 +7136,24 @@ export class MindMapCanvas {
       icon,
       tip: (el, text) => this.tip(el, text),
       onFormat: (fmt) => this.formatText(fmt),
+      memory: this.colorMemory(),
+      // 系统取色器会让编辑框失焦（编辑先提交）：记下节点和选区，选好颜色后在提交后的文字上同一段上色
+      onCustom: () => {
+        const node = this.editing;
+        const sel = this.nodeEditor?.visibleSelection ?? null;
+        return (fmt) => {
+          if (this.editing && this.editing === node) {
+            this.formatText(fmt);
+            return;
+          }
+          if (!node || !sel) return;
+          const next = fromEditableText(applyInlineFormat(toEditableText(node.text), sel.from, sel.to, fmt).text);
+          if (next === node.text) return;
+          node.text = next;
+          this.render();
+          this.notify();
+        };
+      },
       ...(this.opts.host?.pickNote ? { onLink: () => void this.linkEditSelection(), linkKey: sc("Mod", "K") } : {}),
     });
     this.el.append(bar);

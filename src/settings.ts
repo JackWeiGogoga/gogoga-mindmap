@@ -10,7 +10,9 @@ import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
-import { refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
+import { colorLabel, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
+import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
+import { colorTitle } from "./format-bar";
 import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 
 /** 嵌入的脑图选了「自定义」就用自己那份按钮清单，否则和打开的脑图一样 */
@@ -103,6 +105,8 @@ export interface MindMapSettings {
   toolbarLayout: string[];
   /** 浮动工具栏里的节点颜色（逗号隔开的颜色名或 #色值） */
   nodeColors: string;
+  /** 颜色下拉记住的：上次用的文字颜色、荧光笔（色条上那个），三种颜色各自最近使用的（color-palette.ts） */
+  colorMemory: { last: Partial<Record<"text" | "bg" | "node", string>>; recent: Partial<Record<"text" | "bg" | "node", string[]>> };
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
   /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
@@ -188,6 +192,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   nodebarLayout: [],
   toolbarLayout: [],
   nodeColors: DEFAULT_NODE_COLORS,
+  colorMemory: { last: {}, recent: {} },
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
@@ -406,10 +411,10 @@ export class MindMapSettingTab extends PluginSettingTab {
           this.barLayoutPage("nodebarLayout"),
           this.barLayoutPage("toolbarLayout"),
           this.barLayoutPage("embedToolbarLayout"),
-          text("nodeColors", t("settings.nodeColors.name"), t("settings.nodeColors.desc"), DEFAULT_NODE_COLORS, ["palette", "色块", "调色板"]),
+          this.colorListSetting("nodeColors", "node", t("settings.nodeColors.name"), t("settings.nodeColors.desc"), ["palette", "色块", "调色板"]),
           toggle("formatBar", t("settings.formatBar.name"), t("settings.formatBar.desc")),
-          text("textColors", t("settings.textColors.name"), t("settings.textColors.desc"), DEFAULT_TEXT_COLORS, ["font color", "字体颜色"]),
-          text("highlightColors", t("settings.highlightColors.name"), t("settings.highlightColors.desc"), DEFAULT_HIGHLIGHT_COLORS, ["highlight", "高亮", "背景色"]),
+          this.colorListSetting("textColors", "text", t("settings.textColors.name"), t("settings.textColors.desc"), ["font color", "字体颜色"]),
+          this.colorListSetting("highlightColors", "bg", t("settings.highlightColors.name"), t("settings.highlightColors.desc"), ["highlight", "高亮", "背景色"]),
         ],
         () => t("settings.page.colorCount", { n: parseNodeColors(settings.nodeColors).length }),
       ),
@@ -481,6 +486,136 @@ export class MindMapSettingTab extends PluginSettingTab {
   }
 
   /**
+   * 颜色清单（节点颜色、常用文字颜色、常用荧光笔颜色）：一排色块，点色块打开色板换颜色，× 删除，拖动调顺序，+ 新增；
+   * 「直接写色值」切换成原来的文本框（颜色名、🔴、rgba() 这些也能直接写）。存的还是逗号隔开的字符串，和以前一样
+   */
+  private colorListSetting(key: "nodeColors" | "textColors" | "highlightColors", kind: ColorKind, name: string, desc: string, aliases: string[]): SettingDefinition {
+    const plugin = this.plugin;
+    const fallback = key === "nodeColors" ? DEFAULT_NODE_COLORS : key === "textColors" ? DEFAULT_TEXT_COLORS : DEFAULT_HIGHLIGHT_COLORS;
+    const read = () =>
+      plugin.settings[key]
+        .split(/[,，\s]+(?![^(]*\))/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const save = async (list: string[]) => {
+      plugin.settings[key] = list.join(", ");
+      await plugin.saveSettings();
+      refreshAllBars();
+    };
+    const label = (c: string) => (kind === "node" ? colorLabel(c) : colorTitle(c));
+    let raw = false;
+    return {
+      name,
+      desc,
+      aliases,
+      render: (setting) => {
+        const ctl = setting.controlEl;
+        const draw = () => {
+          ctl.empty();
+          ctl.addClass("mm-color-list-ctl");
+          if (raw) {
+            const input = ctl.createEl("input", { type: "text", cls: "mm-color-list-raw" });
+            input.value = plugin.settings[key];
+            input.placeholder = fallback;
+            input.addEventListener("change", () => {
+              plugin.settings[key] = input.value;
+              void plugin.saveSettings().then(() => refreshAllBars());
+            });
+          } else {
+            const list = read();
+            const row = ctl.createDiv({ cls: "mm-color-list" });
+            let dragFrom = -1;
+            list.forEach((c, i) => {
+              const chip = row.createDiv({ cls: "mm-color-chip" });
+              chip.draggable = true;
+              chip.setAttr("aria-label", label(c));
+              const sw = chip.createSpan({ cls: "mm-color-chip-swatch" });
+              paintColor(sw, c, kind);
+              chip.createSpan({ cls: "mm-color-chip-name", text: label(c) });
+              const x = chip.createSpan({ cls: "mm-color-chip-x" });
+              setIcon(x, "x");
+              x.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                const next = read();
+                next.splice(i, 1);
+                void save(next).then(draw);
+              });
+              chip.addEventListener("click", () =>
+                openPalette(chip, (picked) => {
+                  const next = read();
+                  if (picked === null) next.splice(i, 1);
+                  else next[i] = picked;
+                  void save(next).then(draw);
+                }),
+              );
+              chip.addEventListener("dragstart", () => (dragFrom = i));
+              chip.addEventListener("dragover", (ev) => ev.preventDefault());
+              chip.addEventListener("drop", (ev) => {
+                ev.preventDefault();
+                if (dragFrom < 0 || dragFrom === i) return;
+                const next = read();
+                const [moved] = next.splice(dragFrom, 1);
+                next.splice(i, 0, moved);
+                dragFrom = -1;
+                void save(next).then(draw);
+              });
+            });
+            const add = row.createEl("button", { cls: "mm-color-list-add" });
+            setIcon(add, "plus");
+            add.setAttr("aria-label", t("settings.colorAdd"));
+            add.addEventListener("click", () =>
+              openPalette(add, (picked) => {
+                if (picked === null) return;
+                void save([...read(), picked]).then(draw);
+              }),
+            );
+          }
+          const toggleRaw = ctl.createEl("a", { cls: "mm-color-list-mode", text: raw ? t("settings.colorChips") : t("settings.colorRaw") });
+          toggleRaw.addEventListener("click", () => {
+            raw = !raw;
+            draw();
+          });
+        };
+        /** 设置页里的色板：挂在 body 上，点外面关掉 */
+        const openPalette = (anchor: HTMLElement, done: (c: string | null) => void) => {
+          const doc = anchor.ownerDocument;
+          doc.querySelectorAll(".mm-settings-palette").forEach((e) => e.remove());
+          const pal = createPalette(doc, {
+            common: kind === "node" ? [...COLOR_NAMES] : kind === "bg" ? ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣"] : [],
+            recent: plugin.colorMemory.recent(kind),
+            alpha: kind !== "node",
+            defaultAlpha: kind === "bg" ? 60 : 100,
+            paint: (b, c) => paintColor(b, c, kind),
+            label,
+            noneLabel: t("settings.colorRemove"),
+            extras: kind === "bg" ? [{ value: THEME_HIGHLIGHT, label: t("palette.themeHighlight"), paint: (b) => paintColor(b, THEME_HIGHLIGHT, "bg") }] : [],
+            onPick: (c) => {
+              close();
+              done(c);
+            },
+          });
+          pal.addClass("mm-settings-palette");
+          doc.body.append(pal);
+          const r = anchor.getBoundingClientRect();
+          const win = doc.defaultView ?? window;
+          pal.style.left = `${Math.max(8, Math.min(win.innerWidth - pal.offsetWidth - 8, r.left))}px`;
+          const below = r.bottom + 6;
+          pal.style.top = `${below + pal.offsetHeight < win.innerHeight - 8 ? below : Math.max(8, r.top - pal.offsetHeight - 6)}px`;
+          const onDown = (ev: PointerEvent) => {
+            if (!pal.contains(ev.target as Node)) close();
+          };
+          const close = () => {
+            pal.remove();
+            doc.removeEventListener("pointerdown", onDown, true);
+          };
+          doc.addEventListener("pointerdown", onDown, true);
+        };
+        draw();
+      },
+    };
+  }
+
+  /**
    * 浮动工具栏 / 主工具栏的按钮：一个子页面，一行一个按钮（图标、名字、开关、上移下移），最上面「恢复默认」。
    * 改了马上存、所有打开着的脑图重建工具栏
    */
@@ -495,7 +630,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       refreshAllBars();
       this.refresh();
     };
-    const ICON: Record<string, string> = { embed: "open", colors: "palette", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
+    const ICON: Record<string, string> = { embed: "open", colors: "palette", highlight: "highlighter", moveUp: "up", moveDown: "down", zoomOut: "minus", zoomIn: "plus", notes: "note", hidden: "hiddenNodes" };
     const list = items();
     const at = (id: string) => items().findIndex((x) => x.id === id);
     const rows: SettingDefinition[] = list.map((item, i) => ({

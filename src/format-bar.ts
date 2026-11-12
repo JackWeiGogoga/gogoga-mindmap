@@ -3,13 +3,26 @@
  * 脑图的节点编辑框和 Markdown 笔记的实时预览共用这一个，按钮、颜色、写进文件的格式都一样
  */
 
+import { type ColorKind, type ColorMemory, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
 import { highlightOf, type InlineFormat } from "./format";
 import { t } from "./i18n";
 
 /** 格式栏、命令里的一个颜色：荧光笔颜色表里的 🔴 之类写成 Obsidian 的 ==🔴文字==，其余照旧写颜色标签 */
 export function highlightFormat(kind: "color" | "bg", color: string): InlineFormat {
+  if (kind === "bg" && color === THEME_HIGHLIGHT) return { kind: "highlight" };
   const hl = kind === "bg" ? highlightOf(color) : null;
   return hl ? { kind: "highlight", color: hl } : { kind, color };
+}
+
+/** 颜色下拉选了一个颜色（null = 去掉）要上的格式 */
+export function colorFormat(kind: "text" | "bg", color: string | null): InlineFormat {
+  if (color === null) return { kind: kind === "text" ? "nocolor" : "nobg" };
+  return highlightFormat(kind === "text" ? "color" : "bg", color);
+}
+
+/** 颜色的说明：🔴 这些和主题高亮用文字，其余就是色值 */
+export function colorTitle(color: string): string {
+  return color === THEME_HIGHLIGHT ? t("palette.themeHighlight") : color;
 }
 
 export interface FormatBarOptions {
@@ -20,6 +33,10 @@ export interface FormatBarOptions {
   icon: (name: "highlighter" | "eraser" | "link") => HTMLElement;
   tip: (el: HTMLElement, text: string) => void;
   onFormat: (fmt: InlineFormat) => void;
+  /** 上次用的颜色、最近使用（插件存在设置里）；不给就只记在这个格式栏里 */
+  memory?: ColorMemory;
+  /** 色板里点「自定义…」：系统取色器会让编辑器失焦，宿主先记下要上色的地方，返回之后上格式用的函数 */
+  onCustom?: () => (fmt: InlineFormat) => void;
   /** 选中的字做成笔记链接（给了才有这个按钮）；linkKey 是快捷键说明，比如 ⌘K */
   onLink?: () => void;
   linkKey?: string;
@@ -57,22 +74,81 @@ export function createFormatBar(doc: Document, o: FormatBarOptions): HTMLElement
   btn("is-italic", t("format.italic"), { kind: "italic" }, (b) => (b.textContent = "I"));
   btn("is-strike", t("format.strike"), { kind: "strike" }, (b) => (b.textContent = "S"));
   btn("is-underline", t("format.underline", { key: o.underlineKey }), { kind: "underline" }, (b) => (b.textContent = "U"));
-  btn("is-highlight", t("format.highlight"), { kind: "highlight" }, (b) => b.append(o.icon("highlighter")));
-  if (o.textColors.length) sep();
-  for (const c of o.textColors)
-    btn("is-color", t("format.textColor", { color: c }), { kind: "color", color: c }, (b) => {
-      b.textContent = "A";
-      b.style.color = c;
+  sep();
+  // 文字颜色、荧光笔：左半边套用上次的颜色，▾ 打开色板（和节点浮动工具栏一样）
+  const local: Record<string, string> = {};
+  const mem: ColorMemory = o.memory ?? {
+    last: (k) => local[k] ?? null,
+    recent: () => [],
+    remember: (k, c) => (local[k] = c),
+  };
+  const common = (kind: "text" | "bg") => (kind === "text" ? o.textColors : o.highlightColors);
+  const current = (kind: "text" | "bg") => mem.last(kind) ?? common(kind)[0] ?? (kind === "bg" ? THEME_HIGHLIGHT : null);
+  let open: { kind: ColorKind; el: HTMLElement } | null = null;
+  const closePalette = () => {
+    open?.el.remove();
+    open = null;
+  };
+  const split = (kind: "text" | "bg") => {
+    const el = createColorSplit({
+      doc,
+      cls: kind === "text" ? "is-text-color" : "is-highlighter",
+      title: kind === "text" ? t("bar.textColor") : t("bar.highlight"),
+      caretTitle: kind === "text" ? t("palette.textMore") : t("palette.bgMore"),
+      face: (f) => {
+        if (kind === "text") f.textContent = "A";
+        else f.append(o.icon("highlighter"));
+      },
+      current: () => current(kind),
+      paintBar: (b, c) => paintColor(b, c, kind),
+      tip: o.tip,
+      onApply: () => {
+        const c = current(kind);
+        if (!c) return;
+        closePalette();
+        o.onFormat(colorFormat(kind, c));
+      },
+      onOpen: (anchor) => {
+        if (open?.kind === kind) {
+          closePalette();
+          return;
+        }
+        closePalette();
+        const pick = (c: string | null, apply: (fmt: InlineFormat) => void = o.onFormat) => {
+          closePalette();
+          if (c !== null) mem.remember(kind, c);
+          refreshColorSplit(anchor);
+          apply(colorFormat(kind, c));
+        };
+        const pal = createPalette(doc, {
+          common: common(kind),
+          recent: mem.recent(kind),
+          alpha: true,
+          defaultAlpha: kind === "text" ? 100 : 60,
+          paint: (b, c) => paintColor(b, c, kind),
+          label: colorTitle,
+          noneLabel: kind === "text" ? t("palette.noText") : t("palette.noHighlight"),
+          extras:
+            kind === "bg" && !common("bg").includes(THEME_HIGHLIGHT)
+              ? [{ value: THEME_HIGHLIGHT, label: t("palette.themeHighlight"), paint: (b) => paintColor(b, THEME_HIGHLIGHT, "bg") }]
+              : [],
+          onPick: (c) => pick(c),
+          onCustom: () => {
+            const apply = o.onCustom?.() ?? o.onFormat;
+            return (c) => pick(c, apply);
+          },
+          tip: o.tip,
+        });
+        pal.classList.add("mm-format-palette");
+        bar.append(pal);
+        pal.style.left = `${Math.max(0, anchor.offsetLeft)}px`;
+        open = { kind, el: pal };
+      },
     });
-  if (o.highlightColors.length) sep();
-  for (const c of o.highlightColors)
-    btn("is-bg", t("format.highlightColor", { color: c }), highlightFormat("bg", c), (b) => {
-      b.textContent = "A";
-      // Obsidian 的彩色高亮用主题里的颜色，样式表按 data-highlight 上色
-      const hl = highlightOf(c);
-      if (hl) b.dataset.highlight = hl;
-      else b.style.background = c;
-    });
+    bar.append(el);
+  };
+  split("text");
+  split("bg");
   sep();
   if (o.onLink) {
     const onLink = o.onLink;

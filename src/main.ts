@@ -35,6 +35,7 @@ import {
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
 import { mergeLayout, NODEBAR_DEFAULT } from "./bar-layout";
+import { type ColorMemory, pushRecent } from "./color-palette";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables } from "./node-table";
 import { preserveFormat } from "./merge";
@@ -286,6 +287,8 @@ export default class MindMapPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const raw = ((await this.loadData()) as (Partial<MindMapSettings> & LegacyFileState) | null) ?? {};
     this.settings = { ...DEFAULT_SETTINGS, ...raw };
+    // 嵌套的对象要自己一份，不能和默认值共用（记颜色时会改它）
+    this.settings.colorMemory = { last: { ...raw.colorMemory?.last }, recent: { ...raw.colorMemory?.recent } };
     this.fileState = new FileStateStore(this.app.vault.adapter, `${this.manifest.dir}/state.json`);
     await this.fileState.load();
     this.viewports = new ViewportStore(this.app);
@@ -412,6 +415,7 @@ export default class MindMapPlugin extends Plugin {
           bar: () => ({
             textColors: parseColorList(this.settings.textColors),
             highlightColors: parseColorList(this.settings.highlightColors, true),
+            memory: this.colorMemory,
             underlineKey: Platform.isMacOS ? "⌘U" : "Ctrl+U",
             icon: (name) => {
               const span = createSpan({ cls: "mm-icon" });
@@ -450,6 +454,20 @@ export default class MindMapPlugin extends Plugin {
     this.showHidden = !this.showHidden;
     this.reloadMaps();
   }
+
+  /** 颜色下拉记住的颜色（上次用的、最近使用），脑图、嵌入的脑图、笔记里的格式栏共用一份 */
+  readonly colorMemory: ColorMemory = {
+    last: (k) => this.settings.colorMemory?.last?.[k] ?? null,
+    recent: (k) => this.settings.colorMemory?.recent?.[k] ?? [],
+    remember: (k, c) => {
+      const m = (this.settings.colorMemory ??= { last: {}, recent: {} });
+      m.last ??= {};
+      m.recent ??= {};
+      m.last[k] = c;
+      m.recent[k] = pushRecent(m.recent[k] ?? [], c);
+      this.saveSettingsSoon();
+    },
+  };
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
@@ -1451,6 +1469,7 @@ export default class MindMapPlugin extends Plugin {
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
         highlightColors: () => parseColorList(this.settings.highlightColors, true),
+        colorMemory: this.colorMemory,
         marqueeDrag: () => this.settings.leftDrag === "select",
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,

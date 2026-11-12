@@ -342,6 +342,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),
       textColors: () => parseColorList(this.plugin.settings.textColors),
       highlightColors: () => parseColorList(this.plugin.settings.highlightColors, true),
+      colorMemory: this.plugin.colorMemory,
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
       dragToFloat: () => this.plugin.settings.dragToFloat,

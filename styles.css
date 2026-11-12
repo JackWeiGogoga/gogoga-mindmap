@@ -487,12 +487,12 @@
   border-radius: 2px;
 }
 /* Obsidian 1.15 的彩色高亮 ==🔴文字==：用主题里的高亮色，老版本 Obsidian 没有这些变量时按主题色调淡 */
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
-:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg)[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="green"] { background: var(--highlight-background-green, rgba(var(--color-green-rgb, 8, 185, 78), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="blue"] { background: var(--highlight-background-blue, rgba(var(--color-blue-rgb, 8, 109, 221), 0.3)); }
+:is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 /* 编辑时选中文字浮出的格式栏 */
 .mm-format-bar {
   position: absolute;
@@ -533,6 +533,118 @@
 .mm-format-bar .mm-format-btn.is-bg { width: 20px; min-width: 20px; height: 18px; margin: 0 2px; font-size: 11px; font-weight: 600; }
 .mm-format-bar .mm-format-btn .mm-icon { font-size: 15px; }
 .mm-format-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--background-modifier-border, #e3e3e3); }
+
+/* ---------- 颜色「按钮 + 下拉」和色板（color-palette.ts）：节点浮动工具栏、格式栏、设置页共用 ---------- */
+.mm-hl-chip:not([data-highlight]) { background: var(--text-highlight-bg, rgba(255, 208, 0, 0.4)); }
+.mm-color-split { display: inline-flex; align-items: stretch; height: 26px; border-radius: 5px; }
+.mm-color-split:hover { box-shadow: inset 0 0 0 1px var(--background-modifier-border, #e3e3e3); }
+.mm-color-split > button {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-normal, #1f1f1f);
+  border-radius: 5px;
+}
+.mm-color-split > button:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
+.mm-color-split-main { flex-direction: column; width: 24px; gap: 1px; }
+.mm-color-split-face { font-size: 13px; font-weight: 700; line-height: 1; display: flex; align-items: center; }
+.mm-color-split-face .mm-icon { font-size: 14px; }
+.mm-color-split-face svg { width: 14px; height: 14px; }
+.mm-color-split-bar { width: 14px; height: 3px; border-radius: 2px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15); }
+.mm-color-split-caret { width: 12px; font-size: 9px; color: var(--text-muted, #888) !important; }
+.mm-nodebar .mm-color-split { margin: 0 1px; }
+.mm-swatch-more { all: unset; box-sizing: border-box; height: 18px; padding: 0 3px; margin-left: 1px; border-radius: 4px; font-size: 11px; letter-spacing: 1px; line-height: 18px; color: var(--text-muted, #888); cursor: pointer; }
+.mm-swatch-more:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); color: var(--text-normal); }
+.mm-palette {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  width: 262px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  font-size: 12px;
+  color: var(--text-normal, #1f1f1f);
+}
+.mm-format-bar .mm-palette.mm-format-palette { top: calc(100% + 6px); }
+.mm-palette-title { margin: 8px 0 5px; color: var(--text-muted, #888); font-size: 11px; }
+.mm-palette-title:first-child { margin-top: 0; }
+.mm-palette-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.mm-palette-grid { display: grid; grid-template-columns: repeat(10, 20px); gap: 3px; margin-top: 10px; }
+.mm-palette-swatch {
+  all: unset;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.08s;
+}
+.mm-palette-swatch:hover { transform: scale(1.15); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+.mm-palette-swatch.is-none { position: relative; background: var(--background-primary, #fff); box-shadow: inset 0 0 0 1px var(--background-modifier-border, #ddd); overflow: hidden; }
+.mm-palette-swatch.is-none::after { content: ""; position: absolute; left: -3px; top: 9px; width: 26px; height: 1.5px; background: #e5484d; transform: rotate(-45deg); }
+.mm-palette-alpha { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--text-muted, #888); }
+.mm-palette-track { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--background-modifier-border, #e3e3e3); cursor: pointer; touch-action: none; }
+.mm-palette-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--interactive-accent, #7b6cd9); }
+.mm-palette-thumb { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--background-primary, #fff); box-shadow: 0 0 0 1px var(--interactive-accent, #7b6cd9), 0 1px 3px rgba(0, 0, 0, 0.2); }
+.mm-palette-alpha-val { min-width: 32px; text-align: right; color: var(--text-normal); }
+.mm-palette-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.mm-palette-current { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.mm-palette-preview { width: 26px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); background-image: none; }
+.mm-palette-hex { font-family: var(--font-monospace, monospace); color: var(--text-muted, #888); font-size: 11px; }
+.mm-palette-custom { all: unset; cursor: pointer; color: var(--text-accent, #7b6cd9); font-size: 12px; padding: 2px 4px; border-radius: 4px; }
+.mm-palette-custom:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
+.mm-palette-native { position: fixed; left: -100px; top: -100px; width: 1px; height: 1px; opacity: 0; }
+/* 设置页的颜色清单、色板不在脑图里面，节点颜色名（red …）的取色单独给一份，和脑图里一样 */
+.mm-color-list,
+.mm-settings-palette {
+  --mm-c-fg: #1f1f1f;
+  --mm-c-red: #f9a3a3;
+  --mm-c-orange: #fbc98d;
+  --mm-c-yellow: #f7e48e;
+  --mm-c-green: #a3e5a2;
+  --mm-c-teal: #93e3d6;
+  --mm-c-blue: #8edbf7;
+  --mm-c-purple: #d4b5f5;
+  --mm-c-pink: #f8b8da;
+  --mm-c-gray: #dcdce2;
+}
+.theme-dark .mm-color-list,
+.theme-dark .mm-settings-palette {
+  --mm-c-fg: #f2f2f2;
+  --mm-c-red: #8c3b3b;
+  --mm-c-orange: #8c5a2b;
+  --mm-c-yellow: #7a6a22;
+  --mm-c-green: #2f6b3a;
+  --mm-c-teal: #23615a;
+  --mm-c-blue: #2a5a78;
+  --mm-c-purple: #5a3e82;
+  --mm-c-pink: #7a3860;
+  --mm-c-gray: #45454e;
+}
+.mm-settings-palette { position: fixed; z-index: var(--layer-menu, 65); }
+.setting-item-control.mm-color-list-ctl { flex: 1 1 auto; max-width: 420px; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mm-color-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.mm-color-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 4px; border: 1px solid var(--background-modifier-border); border-radius: 6px; font-size: var(--font-ui-smaller, 12px); color: var(--text-muted); cursor: pointer; background: var(--background-primary); }
+.mm-color-chip:hover { border-color: var(--background-modifier-border-hover, var(--text-faint)); color: var(--text-normal); }
+.mm-color-chip-swatch { width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1); }
+.mm-color-chip-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-monospace); font-size: 11px; }
+.mm-color-chip-x { display: flex; color: var(--text-faint); border-radius: 3px; }
+.mm-color-chip-x:hover { color: var(--text-error, #e5484d); }
+.mm-color-chip-x svg { width: 12px; height: 12px; }
+.mm-color-list-add { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 24px; padding: 0; border: 1px dashed var(--background-modifier-border) !important; background: transparent !important; box-shadow: none !important; color: var(--text-muted); }
+.mm-color-list-add svg { width: 14px; height: 14px; }
+.mm-color-list-mode { font-size: var(--font-ui-smaller, 12px); color: var(--text-faint); cursor: pointer; }
+.mm-color-list-raw { width: 260px; }
 .mm-link {
   color: var(--link-color, var(--mm-selection));
   text-decoration: none;
