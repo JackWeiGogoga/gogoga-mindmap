@@ -382,7 +382,7 @@ export default class MindMapPlugin extends Plugin {
 
   /** 笔记文件（不是代码块）的中心主题规则：设置「用文件名作中心主题」打开时，一级标题不再升格 */
   rootRule(): RootRule {
-    return { rootFromH1: !this.settings.fileNameAsRoot, headingsOnly: this.settings.headingsOnly, showHidden: this.showHidden };
+    return { rootFromH1: !this.settings.fileNameAsRoot, headingsOnly: this.settings.headingsOnly, showHidden: this.showHidden, quoteListNotes: this.settings.quoteListNotes };
   }
 
   /** 「在笔记里隐藏格式标签」：开关时换掉注册给编辑器的扩展，updateOptions 让打开着的笔记立刻生效 */

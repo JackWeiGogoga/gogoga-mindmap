@@ -141,6 +141,8 @@ export interface MindMapSettings {
   fileNameAsRoot: boolean;
   /** 笔记的脑图只把标题当节点，列表都算标题的备注（代码块里的脑图不受影响） */
   headingsOnly: boolean;
+  /** 列表项下的备注写成引用块：每行前加 > 写回，读的时候去掉一层（默认关） */
+  quoteListNotes: boolean;
   /**
    * 嵌入的脑图的工具栏：full 和打开的脑图一样；custom 按 embedToolbarLayout 摆；
    * autohide 阅读模式一直不显示，编辑模式鼠标移上去才显示（0.60 以前的 embedToolbarAutoHide 开关迁过来）
@@ -210,6 +212,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   embedToolbarLayout: [],
   fileNameAsRoot: false,
   headingsOnly: false,
+  quoteListNotes: false,
   followActiveNote: false,
   spacingScale: 100,
   fontScale: 100,
@@ -304,6 +307,7 @@ export class MindMapSettingTab extends PluginSettingTab {
     switch (key) {
       case "fileNameAsRoot":
       case "headingsOnly":
+      case "quoteListNotes":
         return p.reloadMaps();
       case "notesExpanded":
         return syncNotesExpandedAll();
@@ -420,6 +424,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       ),
       page(t("settings.group.notes"), t("settings.page.notes"), [
         toggle("notesExpanded", t("settings.notesExpanded.name"), t("settings.notesExpanded.desc")),
+        toggle("quoteListNotes", t("settings.quoteListNotes.name"), t("settings.quoteListNotes.desc"), ["blockquote", "引用", ">", "首行缩进"]),
         this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
         this.sizeSetting("tableMaxWidth", t("settings.tableMaxWidth.name"), t("settings.tableMaxWidth.desc"), 320, 1600, t("settings.resetTableWidth")),

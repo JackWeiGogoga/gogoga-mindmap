@@ -10,7 +10,7 @@ import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
-import { frontmatterValue, parseMarkdown, parseNodeColors, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
+import { blankAfterQuotedNotes, frontmatterValue, parseMarkdown, parseNodeColors, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
 import { pathOf, walk, type MindDoc, adoptIds } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -712,7 +712,9 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     // 中心主题是文件名（不是一级标题）时，改它就是给笔记改名（#27）；它本身不写进文件
     if (this.file && !doc.rootFromHeading && doc.root.text !== this.file.basename) this.renameFromRoot(doc, this.file);
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
-    const next = blankBeforeNodeTables(preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text))));
+    let next = blankBeforeNodeTables(preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text))));
+    // 设置「列表项下的备注写成引用块」：这次改过的引用块备注后面补空行（合并时会被当成格式差异去掉）
+    if (this.plugin.settings.quoteListNotes) next = blankAfterQuotedNotes(next, this.data);
     // 标题的标记从行末挪到下一行后，标题文字变了：别的笔记里指向旧标题（带着 %%标记%%）的链接跟着改
     if (this.file && next !== this.data) this.plugin.fixHeadingLinks(this.file, strippedMarkerRenames(this.data, next));
     if (next === this.data) return;

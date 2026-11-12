@@ -338,6 +338,53 @@ function cannotInterrupt(tok: { bullet: string; text: string }, prev: Token | un
   return afterText && ((/^\d/.test(tok.bullet) && parseInt(tok.bullet, 10) !== 1) || tok.text.trim() === "");
 }
 
+// ---------- 列表项备注写成引用块（设置「列表项下的备注写成引用块」） ----------
+// 列表项下面紧跟的缩进行在 Obsidian 里算列表项那一段的续行，和节点文字合成一段，首行缩进之类的样式对不齐；
+// 每行前加 > 就是列表项里一个独立的引用块。整段包成 > [!note] 的（备注里有列表、标题）和节点表格不动
+
+const CALLOUT_HEAD = /^> ?\[!/;
+
+/** 备注 → 写进文件的引用块：每行前加 >（空行写成单独一个 >） */
+export function quoteListNote(note: string): string {
+  if (!note || isEscapedNote(note) || CALLOUT_HEAD.test(note)) return note;
+  return note
+    .split("\n")
+    .map((l) => (l === "" ? ">" : `> ${l}`))
+    .join("\n");
+}
+
+/** 文件里整段都是 > 开头的列表项备注 → 去掉一层 >（标注块 > [!type] 不算，原样留着） */
+export function unquoteListNote(note: string): string {
+  const lines = note.split("\n");
+  if (!lines.length || CALLOUT_HEAD.test(lines[0]) || !lines.every((l) => l.startsWith(">"))) return note;
+  return lines.map((l) => l.replace(/^> ?/, "")).join("\n");
+}
+
+/**
+ * 合并写回（preserveFormat）后补空行：引用块备注后面紧跟列表项时，实时预览会把那个列表项也画进引用块。
+ * 序列化时已经空了一行，但合并会把它当成格式差异、按原文去掉，这里补回来。
+ * 只补这次改过的：引用块里有原文没有的行，或者后面紧跟的列表项是原文没有的；没碰过的旧备注一个字不动
+ */
+export function blankAfterQuotedNotes(text: string, original: string): string {
+  const lines = text.split("\n");
+  const old = new Set(original.split("\n"));
+  const quote = (l: string | undefined) => l !== undefined && /^[ \t]+>/.test(l);
+  const out: string[] = [];
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    out.push(l);
+    if (FENCE_RE.test(l)) fence = !fence;
+    if (fence || !quote(l) || quote(lines[i + 1])) continue;
+    const next = lines[i + 1];
+    if (next === undefined || !LIST_RE.test(next)) continue;
+    let j = i;
+    while (j > 0 && quote(lines[j - 1])) j--;
+    if (lines.slice(j, i + 1).some((x) => !old.has(x)) || !old.has(next)) out.push("");
+  }
+  return out.join("\n");
+}
+
 export function isEscapedNote(note: string): boolean {
   const lines = note.split("\n");
   return lines[0]?.trim() === NOTE_CALLOUT && lines.slice(1).every((l) => l === "" || l.startsWith(">"));
@@ -540,12 +587,14 @@ export interface ParseOptions {
   rootFromH1?: boolean;
   /** 只把标题当节点：列表照原样算进它所在标题的备注（写回时一字不动） */
   headingsOnly?: boolean;
+  /** 设置「列表项下的备注写成引用块」：整段都是 > 开头的列表项备注读进来时去掉一层 >，写回时每行再加上 */
+  quoteListNotes?: boolean;
   /** 带 %%hide%% 的节点也留在树里（「显示隐藏的节点」）；默认摘出去，不显示 */
   showHidden?: boolean;
 }
 
 /** 节点路径和行号互查时要和视图用同一套规则（根节点、只认标题、隐藏节点），否则路径对不上 */
-export type RootRule = Pick<ParseOptions, "rootFromH1" | "headingsOnly" | "showHidden">;
+export type RootRule = Pick<ParseOptions, "rootFromH1" | "headingsOnly" | "showHidden" | "quoteListNotes">;
 
 export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const lines = src.replace(/\r\n?/g, "\n").split("\n");
@@ -743,6 +792,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
   const finalize = (node: MindNode) => {
     const n = noteBuf.get(node);
     if (n) node.note = joinNote(node.kind === "list" ? dedent(trimBlankLines(n)) : n);
+    if (node.note && node.kind === "list" && opts.quoteListNotes) node.note = unquoteListNote(node.note);
     // 列表项的 tail / lead 带着所在层的缩进，去掉；标题下的不缩进
     const plain = (lines: string[], inList: boolean) => joinNote(inList ? dedent(trimBlankLines(lines)) : lines);
     const t = tailBuf.get(node);
@@ -779,6 +829,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     // 一样多（或没有可比的）时保持插件原来的写法：空一行
     blankBeforeHeading: headingGaps + headingTight ? headingGaps >= headingTight : (opts.style?.blankBeforeHeading ?? DEFAULT_STYLE.blankBeforeHeading),
     headingsOnly: opts.headingsOnly || undefined,
+    quoteListNotes: opts.quoteListNotes || undefined,
   };
 
   return { root, frontmatter, preamble: joinNote(preamble), rootFromHeading, style };
@@ -893,12 +944,16 @@ export function serializeMarkdown(doc: MindDoc): string {
     lastNode = node;
     nodeEnd = out.length;
     if (node.note) {
-      const note = normalizeNote(node.note);
+      let note = normalizeNote(node.note);
+      // 设置「列表项下的备注写成引用块」：每行前加 >（节点表格不包，不然节点里认不出表格）
+      const plainNote = note;
+      if (doc.style.quoteListNotes && !(node.table && note.startsWith("|"))) note = quoteListNote(note);
+      const quoted = note !== plainNote;
       // 节点里的表格（%%table%%）：列表项和表格之间空一行，没装表格插件时 Obsidian 的阅读视图才认得出是表格
       if (node.table && note.startsWith("|")) out.push("");
       for (const l of note.split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
-      // 包成标注块的备注后面空一行：实时预览会把缩进的标注块后面紧跟的列表项（子节点、兄弟）也算进标注块
-      if (isEscapedNote(note)) out.push("");
+      // 包成标注块、引用块的备注后面空一行：实时预览会把缩进的引用块后面紧跟的列表项（子节点、兄弟）也算进引用块
+      if (isEscapedNote(note) || quoted) out.push("");
     }
     for (const c of fileChildren(node)) emitList(c, depth + 1);
     if (node.tail) emitBlock(node.tail, depth + 1);

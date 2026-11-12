@@ -145,6 +145,8 @@ export interface DocStyle {
   maxHeadingLevel: number;
   /** 这张图只把标题当节点（列表都是标题的备注）：新节点都写成标题，写回时备注里的列表不用包起来 */
   headingsOnly?: boolean;
+  /** 设置「列表项下的备注写成引用块」：列表项的备注每行前加 > 写回，读的时候去掉一层（quoteListNote / unquoteListNote） */
+  quoteListNotes?: boolean;
 }
 
 export interface MindDoc {
