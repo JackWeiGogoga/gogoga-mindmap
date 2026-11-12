@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- With **Hide format tags in notes** on, Markdown inside a text color or highlighter tag now shows as formatting in Live Preview: `**bold**`, `==highlight==`, italics and links inside `<span style="color:…">` or `<mark …>` used to show their raw `**` markers, because Obsidian draws inline HTML as-is there. The plugin now draws these spans the way mind map nodes do; put the cursor in one to see and edit its source. Bold text inside colored text keeps that color. With the setting off, nothing changes.
+
 ## [0.61.8] - 2026-11-12
 
 ### Fixed
