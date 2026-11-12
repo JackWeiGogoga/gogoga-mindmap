@@ -4,6 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.63.1] - 2026-11-12
+
+### Added
+- Tables in nodes: screenshots and copied images paste straight into a cell, saved as attachments like images pasted into nodes, with `![[image]]` inserted; images in cells are at most 320 px wide so the table doesn't blow up.
+
+### Fixed
+- With Mind Map (lynchjames), an XMind viewer plugin or Markmind installed, the plugin could fail to load (#34): those plugins use the same names — the `mindmap` view, `.xmind` files or the `mindmap` code block — and when they load first Obsidian refuses a second registration, so the whole plugin failed. Now the mind map steps aside on a clash: its view registers under another name and works as usual, `.xmind` files stay with the other plugin (with a one-time notice), and the `mindmap` code block is left to it while `gogoga-mindmap` blocks keep working.
+- Tables in nodes: `[[links]]` in cells did nothing when clicked. They now open like links in nodes, following the **Open note links in** setting, with Ctrl/Cmd-click for a new tab and hover preview.
+- Tables in nodes copied to Word: in a dark theme, colors no longer come along dark — they are always taken from the light theme; **Copy as Markdown table** now pastes into Word as a table instead of plain text.
+
 ## [0.63.0] - 2026-11-12
 
 ### Added
@@ -799,7 +809,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...HEAD
+[0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
 [0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8

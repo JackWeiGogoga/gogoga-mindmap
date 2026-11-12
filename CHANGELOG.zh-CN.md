@@ -4,6 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.63.1] - 2026-11-12
+
+### 新增
+- 节点里的表格：截图、复制的图片能直接粘进格子，和往节点里粘贴图片一样存成附件、插入 `![[图片]]`；格子里的图片最宽 320 像素，不会把表格撑开。
+
+### 修复
+- 同时装了 Mind Map（lynchjames）、XMind 查看类插件或 Markmind 时，脑图可能「插件加载失败」（#34）：这些插件也用了 `mindmap` 视图、`.xmind` 文件或 `mindmap` 代码块这几个名字，它们先加载时 Obsidian 不让重复登记，整个插件就加载不起来。现在撞名时让一步：脑图视图改用另一个名字，照常打开；`.xmind` 文件交给那个插件打开（会提示一次）；`mindmap` 代码块让给对方，`gogoga-mindmap` 代码块照常用。
+- 节点里的表格：格子里的双链点了打不开。现在和节点里的链接一样，按「点链接时打开在」设置打开，Ctrl/Cmd 点在新标签打开，悬停能预览。
+- 节点里的表格复制到 Word：暗色主题下复制，颜色不再带着深色过去，一律按浅色主题取；「复制为 Markdown 表格」粘到 Word 是表格，不再是一段文字。
+
 ## [0.63.0] - 2026-11-12
 
 ### 新增
@@ -799,7 +809,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...HEAD
+[0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
 [0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
 [0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
