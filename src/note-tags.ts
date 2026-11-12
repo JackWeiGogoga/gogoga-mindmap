@@ -164,7 +164,64 @@ const keepTagsPaired = EditorState.transactionFilter.of((tr) => {
   };
 });
 
+/**
+ * 回车（列表里接着出「- 」也算）落在藏着的标签里：光标看着在字后面，其实在 </span> 前面，直接换行会把开始、结束标签拆到两行，
+ * 两行都露出标签碎片。改成：在文字末尾就挪到结束标签后面换行，在开头就挪到开始标签前面；在中间就前一行补上结束标签、
+ * 新的一行开头补上同样的开始标签（嵌套的一层层成对），两行各自完整，后半段保持原来的格式
+ */
+const splitTagsOnNewline = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged || !tr.isUserEvent("input") || tr.isUserEvent("input.paste")) return tr;
+  const st = tr.startState;
+  const sel = st.selection;
+  if (sel.ranges.length > 1 || !sel.main.empty || !livePreview(st)) return tr;
+  const edits: TextEdit[] = [];
+  tr.changes.iterChanges((from, to, _a, _b, ins) => edits.push({ from, to, insert: ins.toString() }));
+  if (edits.length !== 1 || !edits[0].insert.includes("\n")) return tr;
+  // 真实按回车时 Obsidian 交来的常是「把前一个字换成 那个字 + 换行 + 列表符号」（input.type），先去掉两头相同的部分，还原成纯插入
+  let { from: at, to: end, insert } = edits[0];
+  const old = st.doc.sliceString(at, end);
+  let k = 0;
+  while (k < old.length && k < insert.length && old[k] === insert[k]) k++;
+  let j = 0;
+  while (j < old.length - k && j < insert.length - k && old[old.length - 1 - j] === insert[insert.length - 1 - j]) j++;
+  at += k;
+  end -= j;
+  insert = insert.slice(k, insert.length - j);
+  if (at !== end || at !== sel.main.head || !insert.includes("\n")) return tr;
+  const line = st.doc.lineAt(at);
+  if (fenced(st, line.number)[line.number - 1]) return tr;
+  const spans = lineSpans(line.from, line.text).filter((s) => s.from < at && at < s.to);
+  if (!spans.length) return tr;
+  // 落在文字的头尾：挪到标签外面（从里往外一层层看）
+  let pos = at;
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const s of spans) {
+      if (pos === s.innerTo && pos < s.to) {
+        pos = s.to;
+        moved = true;
+      } else if (pos === s.innerFrom && pos > s.from) {
+        pos = s.from;
+        moved = true;
+      }
+    }
+  }
+  // 还在里面的：在中间断开，补成两段完整的
+  const inside = spans.filter((s) => s.innerFrom < pos && pos < s.innerTo).sort((a, b) => a.from - b.from);
+  const text = (a: number, b: number) => st.doc.sliceString(a, b);
+  const close = [...inside].reverse().map((s) => text(s.innerTo, s.to)).join("");
+  const open = inside.map((s) => text(s.from, s.innerFrom)).join("");
+  const out = close + insert + open;
+  if (pos === at && !inside.length) return tr;
+  return {
+    changes: { from: pos, insert: out },
+    selection: EditorSelection.cursor(pos + out.length),
+    userEvent: tr.annotation(Transaction.userEvent),
+    scrollIntoView: true,
+  };
+});
+
 export function noteTagsExtension(): Extension {
   // 最高优先级：和 Obsidian 的行内 HTML 部件同一范围时，画的是我们的
-  return [Prec.highest(tagsPlugin), keepTagsPaired];
+  return [Prec.highest(tagsPlugin), keepTagsPaired, splitTagsOnNewline];
 }
