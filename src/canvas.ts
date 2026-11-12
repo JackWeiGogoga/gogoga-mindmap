@@ -3,6 +3,7 @@
  * 内联编辑、备注编辑、键盘操作。不依赖 obsidian 模块，浏览器调试页和代码块渲染器共用。
  */
 
+import { noteCardParts, type NoteCardFilter } from "./note-filter";
 import {
   addChild,
   addSibling,
@@ -278,6 +279,8 @@ export interface CanvasOptions {
   onCalloutsHiddenChange?: (hidden: boolean) => void;
   /** 打开时备注是否展开显示在节点下面（按文件记住）；不给就收起（点图标弹窗看） */
   notesExpanded?: () => boolean;
+  /** 展开的备注卡片里显示什么：全部，或者只显示列表项 / 有序列表 / 无序列表（#31）；不给就是全部 */
+  noteCardFilter?: () => NoteCardFilter;
   /** 用户切换了备注的展开 / 收起 */
   onNotesExpandedChange?: (expanded: boolean) => void;
   /**
@@ -1602,8 +1605,8 @@ export class MindMapCanvas {
         n.addEventListener("pointerdown", (ev) => ev.stopPropagation());
         n.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          // 展开备注时图标管这一条的收起 / 展开；收起时还是弹窗看
-          if (this.notesExpanded) this.toggleNoteCard(live());
+          // 展开备注时图标管这一条的收起 / 展开；收起时（或卡片按设置没有可显示的）还是弹窗看
+          if (this.notesExpanded && this.cardText(live())) this.toggleNoteCard(live());
           else this.toggleNotePopover(live());
         });
         el.append(n);
@@ -7410,7 +7413,7 @@ export class MindMapCanvas {
       if (link) links.push(`![[${link}]]`);
     }
     if (!links.length) return;
-    node.note = normalizeNote([unescapeNote(node.note), ...links].filter(Boolean).join("\n"), node.kind === "list");
+    node.note = this.storeNote(node, [unescapeNote(node.note), ...links].filter(Boolean).join("\n"));
     this.opts.host?.notice?.(t("notice.imageAddedToNote"));
     if (this.editing !== node) this.render();
     this.notify();
@@ -7798,6 +7801,25 @@ export class MindMapCanvas {
     return this.nodeTable(node) ? noteRest(node.note) : node.note;
   }
 
+  /**
+   * 编辑后的备注原文 → 存储形式。只把标题当节点时，标题下备注里的列表读回来还是备注，不用包成 > [!note]
+   * （和写文件时一样）；以前这里没管，开着这个设置编辑一次带列表的标题备注，整段就被改写成标注块
+   */
+  private storeNote(node: MindNode, plain: string): string {
+    return normalizeNote(plain, node.kind === "list", !!this.doc?.style.headingsOnly && node.kind !== "list");
+  }
+
+  /**
+   * 展开的卡片里显示的那部分备注：按设置只挑列表项时，原文里不挨着的几段之间插一个看不见的注释，
+   * 免得两处各自从 1 开始的有序列表被接成一个。空串表示没有可显示的（只留图标，点开弹窗看全文）
+   */
+  private cardText(node: MindNode): string {
+    const note = this.noteShown(node);
+    const mode = this.opts.noteCardFilter?.() ?? "all";
+    if (mode === "all" || !note) return note;
+    return noteCardParts(note, mode).join("\n\n<!-- -->\n\n");
+  }
+
   /** 在节点里（标题下面）挂一张表格编辑器 */
   private mountTable(first: MindNode, el: HTMLElement, table: Table): void {
     // 节点沿用编号重新解析后对象会换：事件里按编号取当前的
@@ -7975,9 +7997,10 @@ export class MindMapCanvas {
       const note = this.noteShown(n);
       if (note) {
         const card = this.cardState.get(n.id);
-        const shown = this.notesExpanded && !card?.collapsed;
+        const text = this.notesExpanded ? this.cardText(n) : "";
+        const shown = this.notesExpanded && !card?.collapsed && !!text;
         const icon = this.els.get(n.id)?.querySelector<HTMLElement>(".mm-note-icon");
-        const state = !this.notesExpanded ? "popover" : shown ? "open" : "closed";
+        const state = !this.notesExpanded || !text ? "popover" : shown ? "open" : "closed";
         if (icon && icon.dataset.state !== state) {
           icon.dataset.state = state;
           icon.classList.toggle("is-expanded", shown);
@@ -7991,12 +8014,12 @@ export class MindMapCanvas {
             this.noteEls.set(n.id, el);
           }
           this.noteNode.set(el, n);
-          if (el.dataset.raw !== note) {
-            el.dataset.raw = note;
+          if (el.dataset.raw !== text) {
+            el.dataset.raw = text;
             const body = el.querySelector<HTMLElement>(".mm-note-card-body")!;
             body.empty();
             body.scrollTop = 0;
-            this.fillNoteBody(body, note);
+            this.fillNoteBody(body, text);
           }
           this.applyCardSize(el, this.cardDrag?.id === n.id ? { ...card, ...this.cardDrag.size } : card);
         }
@@ -8363,7 +8386,7 @@ export class MindMapCanvas {
         if (preview && scope) scope.render(preview, ta.value);
       };
       const apply = () => {
-        const next = normalizeNote(ta.value.replace(/\s+$/, ""), node.kind === "list");
+        const next = this.storeNote(node, ta.value.replace(/\s+$/, ""));
         if (next === node.note) return false;
         node.note = next;
         return true;
@@ -8424,7 +8447,7 @@ export class MindMapCanvas {
           return;
         }
         // 存附件期间弹窗已经关了：直接接到备注末尾
-        node.note = normalizeNote([unescapeNote(node.note), text].filter(Boolean).join("\n"), node.kind === "list");
+        node.note = this.storeNote(node, [unescapeNote(node.note), text].filter(Boolean).join("\n"));
         this.render();
         this.notify();
       };

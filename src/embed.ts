@@ -142,6 +142,7 @@ class MindMapEmbed extends Component {
         caretAtEnd: () => settings.editCaret === "end",
         dragToFloat: () => settings.dragToFloat,
         notesExpanded: () => settings.notesExpanded,
+        noteCardFilter: () => settings.noteCardShow,
         notePopoverSize: this.plugin.notePopoverSize,
         host: this.plugin.canvasHost(() => this.ctx.sourcePath, this),
         onOpenFile: () => void this.plugin.app.workspace.openLinkText(this.file.path, this.ctx.sourcePath),

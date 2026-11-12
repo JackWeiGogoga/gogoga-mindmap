@@ -10,7 +10,7 @@ import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
-import { colorLabel, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
+import { colorLabel, redrawAllCanvases, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
 import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
 import { colorTitle } from "./format-bar";
 import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
@@ -40,6 +40,8 @@ export interface MindMapSettings {
   rememberViewport: boolean;
   /** 备注默认展开显示在节点下面（默认关：点图标弹窗看） */
   notesExpanded: boolean;
+  /** 展开的备注卡片里显示什么（#31）：全部 / 只显示列表项 / 有序列表 / 无序列表；只管显示，不改文件 */
+  noteCardShow: "all" | "list" | "ordered" | "unordered";
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
   /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
@@ -219,6 +221,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   spacingScale: 100,
   fontScale: 100,
   notesExpanded: false,
+  noteCardShow: "all",
   notePreview: false,
   formatBar: false,
   copyPlain: false,
@@ -313,6 +316,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         return p.reloadMaps();
       case "notesExpanded":
         return syncNotesExpandedAll();
+      case "noteCardShow":
+        return redrawAllCanvases();
       case "toolbarPosition":
         return p.applyToolbarPosition();
       case "embedToolbar":
@@ -426,6 +431,13 @@ export class MindMapSettingTab extends PluginSettingTab {
       ),
       page(t("settings.group.notes"), t("settings.page.notes"), [
         toggle("notesExpanded", t("settings.notesExpanded.name"), t("settings.notesExpanded.desc")),
+        dropdown(
+          "noteCardShow",
+          t("settings.noteCardShow.name"),
+          t("settings.noteCardShow.desc"),
+          { all: t("settings.noteCardShow.all"), list: t("settings.noteCardShow.list"), ordered: t("settings.noteCardShow.ordered"), unordered: t("settings.noteCardShow.unordered") },
+          ["list", "列表", "有序", "无序", "结论", "备注卡片"],
+        ),
         toggle("quoteListNotes", t("settings.quoteListNotes.name"), t("settings.quoteListNotes.desc"), ["blockquote", "引用", ">", "首行缩进"]),
         this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),

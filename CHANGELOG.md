@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- New setting **Show in expanded notes** (#31, Notes page): Everything (default) / List items only / Ordered lists only / Bullet lists only. With **Only headings as nodes** on, long explanations and list conclusions under a heading all end up in its note; with a list-only choice the note box under the node keeps just the list items (with their indented sub-items and continuation lines), and two separate ordered lists keep their own numbering. Nodes with nothing left show only the note icon, which opens the full note. Only the display changes: the popover, editing and your file always have the full note.
+
+### Fixed
+- With **Only headings as nodes** on, editing a heading note that contains a list — even just opening and closing the editor — rewrote the whole note as a `> [!note]` callout. Notes are now stored by the same rule used when writing the file: lists in heading notes are kept as they are.
+
 ## [0.63.1] - 2026-11-12
 
 ### Added

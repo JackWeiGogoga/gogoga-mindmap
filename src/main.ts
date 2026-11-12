@@ -1506,6 +1506,7 @@ export default class MindMapPlugin extends Plugin {
         caretAtEnd: () => this.settings.editCaret === "end",
         dragToFloat: () => this.settings.dragToFloat,
         notesExpanded: () => this.settings.notesExpanded,
+        noteCardFilter: () => this.settings.noteCardShow,
         notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
         onChange: (d) => {
