@@ -4,19 +4,21 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-11-12
+
 ### Added
 - **Color palette.** Text color and highlighter are now a button with a dropdown, the same in the floating toolbar (whole node) and the format bar (selected text, in mind maps and in notes): click the left part to reuse the last color in one click, click ▾ for the palette — your frequent colors, a grid of 60 colors, recent colors, an opacity slider and a custom color picker. The floating toolbar gains a highlighter button, and a ··· after the node colors opens the same palette to pick any node color.
 - Three commands to turn toolbars on and off from anywhere, so you can bind hotkeys: **Toggle the floating toolbar (selected nodes)**, **Toggle the format bar (text selected while editing a node)** and **Toggle the format bar in notes**. Each flips the matching setting (remembered) and takes effect right away.
 - Setting **Write notes under list items as blockquotes (> before each line)** (off by default, Notes page). In Obsidian, indented lines right below a list item count as part of that item's text, so styles such as a first-line indent line up badly; with this on, a list item's note is written with > before every line, making it a separate blockquote inside the item. The mind map strips one > when reading, so notes look the same in the map. Only notes you change are rewritten, and a blank line follows each rewritten note so Live Preview doesn't pull the next item into the quote.
 
+### Changed
+- Settings: node colors, frequent text colors and frequent highlighter colors are edited as swatches — click one to change it in the palette, × to remove, drag to reorder, + to add. "Edit as text" still shows the old text box.
+- The format bar's flat row of color buttons is folded into the two dropdowns; the frequent colors are the first row of each palette.
+
 ### Fixed
 - With **Hide format tags in notes** on, Markdown inside a text color or highlighter tag now shows as formatting in Live Preview: `**bold**`, `==highlight==`, italics and links inside `<span style="color:…">` or `<mark …>` used to show their raw `**` markers, because Obsidian draws inline HTML as-is there. The plugin now draws these spans the way mind map nodes do; put the cursor in one to see and edit its source. Bold text inside colored text keeps that color. With the setting off, nothing changes.
 - With **Hide format tags in notes** on, pressing Enter in colored or highlighted text no longer breaks its tag across two lines (the new line used to show a stray `>` or `</span>`). At the end of the text the new line starts plain; in the middle, both lines keep the formatting as complete tags.
 - Nodes can be pasted or dragged onto a summary: select a summary (click its text) and paste, or use **Paste** in the summary's right-click menu (long-press on phones), or drag a node onto the summary text. A plain summary becomes a summary topic and the nodes go under it. Before, pasting with a summary selected put the nodes under the central topic, and dropping on the summary text did nothing.
-
-### Changed
-- Settings: node colors, frequent text colors and frequent highlighter colors are edited as swatches — click one to change it in the palette, × to remove, drag to reorder, + to add. "Edit as text" still shows the old text box.
-- The format bar's flat row of color buttons is folded into the two dropdowns; the frequent colors are the first row of each palette.
 
 ## [0.61.8] - 2026-11-12
 
@@ -789,7 +791,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...HEAD
+[0.62.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.8...0.62.0
 [0.61.8]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.7...0.61.8
 [0.61.7]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.6...0.61.7
 [0.61.6]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.61.5...0.61.6
