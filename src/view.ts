@@ -18,7 +18,15 @@ import type MindMapPlugin from "./main";
 import type { ExcerptTarget } from "./pdf-excerpt";
 import { indentString, type SavedViewport, ToolbarPosition } from "./settings";
 
-export const VIEW_TYPE_MINDMAP = "mindmap";
+/**
+ * 脑图视图的类型名。一直用的是 "mindmap"，但 Mind Map（lynchjames）等插件也叫这个名字：
+ * 它先加载时 Obsidian 不让重复登记，整个插件会加载失败（#34）。那时改用 gogoga-mindmap（main.ts 里登记时决定）
+ */
+export let VIEW_TYPE_MINDMAP = "mindmap";
+export const VIEW_TYPE_MINDMAP_FALLBACK = "gogoga-mindmap";
+export function useFallbackViewType(): void {
+  VIEW_TYPE_MINDMAP = VIEW_TYPE_MINDMAP_FALLBACK;
+}
 
 /** 折叠着的节点路径串，比较折叠状态有没有变 */
 function foldedSignature(doc: MindDoc): string {

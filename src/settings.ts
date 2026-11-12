@@ -34,6 +34,8 @@ export interface MindMapSettings {
   codeBlockMaxHeight: number;
   /** 是否接管 ```mindmap 代码块；关掉就只认 ```gogoga-mindmap，把 mindmap 让给 Markmind 等同名插件 */
   claimMindmapBlock: boolean;
+  /** .xmind 被别的插件占了的提示已经弹过（只弹一次） */
+  xmindTakenNoticed?: boolean;
   /** 重新打开 / 切回脑图时恢复上次的视口和选中 */
   rememberViewport: boolean;
   /** 备注默认展开显示在节点下面（默认关：点图标弹窗看） */

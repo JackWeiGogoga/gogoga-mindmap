@@ -55,7 +55,7 @@ import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, pa
 import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
-import { MindMapView, VIEW_TYPE_MINDMAP } from "./view";
+import { MindMapView, useFallbackViewType, VIEW_TYPE_MINDMAP, VIEW_TYPE_MINDMAP_FALLBACK } from "./view";
 import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
@@ -190,9 +190,25 @@ export default class MindMapPlugin extends Plugin {
     void loadMathJax().then(() => (this.mathReady = true)).catch(() => undefined);
     void loadPrism().catch(() => undefined);
     this.registerHoverLinkSource(HOVER_SOURCE, { display: t("hover.display"), defaultMod: true });
-    this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
+    // 名字被别的插件先登记了，Obsidian 会直接抛错、整个插件加载失败（#34）：撞名时让一步，别的功能照常
+    try {
+      this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
+    } catch (e) {
+      console.warn(`gogoga Mind Map: view type "${VIEW_TYPE_MINDMAP}" is taken by another plugin, using "${VIEW_TYPE_MINDMAP_FALLBACK}"`, e);
+      useFallbackViewType();
+      this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
+    }
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
-    this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
+    try {
+      this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
+    } catch (e) {
+      console.warn("gogoga Mind Map: .xmind is opened by another plugin", e);
+      if (!this.settings.xmindTakenNoticed) {
+        new Notice(t("notice.xmindTaken"), 10000);
+        this.settings.xmindTakenNoticed = true;
+        void this.saveSettings();
+      }
+    }
     this.addSettingTab(new MindMapSettingTab(this.app, this));
     this.patchSetViewState();
     this.registerCodeBlock();
@@ -1569,7 +1585,13 @@ export default class MindMapPlugin extends Plugin {
     };
     // gogoga-mindmap 是专属名字，总能用；mindmap 和 Markmind 撞名，设置里可以让给它（改了重新加载插件生效）
     this.registerMarkdownCodeBlockProcessor("gogoga-mindmap", processor);
-    if (this.settings.claimMindmapBlock) this.registerMarkdownCodeBlockProcessor("mindmap", processor);
+    // mindmap 已经被别的插件（Markmind 等）登记了：让给它，不然整个插件加载失败（#34）
+    if (this.settings.claimMindmapBlock)
+      try {
+        this.registerMarkdownCodeBlockProcessor("mindmap", processor);
+      } catch (e) {
+        console.warn("gogoga Mind Map: the mindmap code block is taken by another plugin; use gogoga-mindmap", e);
+      }
   }
 
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
