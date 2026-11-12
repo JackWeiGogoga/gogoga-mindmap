@@ -56,6 +56,12 @@ export interface EditorHost {
   canIndentTable?(dir: 1 | -1): boolean;
   /** 弹一条提示（复制好了之类）；不给就不提示 */
   notice?(message: string): void;
+  /** 点格子里的双链：打开那篇笔记（ev 带着修饰键，⌘/Ctrl 点在新标签打开）；不给就不管 */
+  openLink?(href: string, ev: MouseEvent): void;
+  /** 鼠标悬停在格子里的双链上：页面预览 */
+  hoverLink?(ev: MouseEvent, href: string, el: HTMLElement): void;
+  /** 往格子里粘贴图片：存成附件，返回要插进格子的 Markdown（![[…]]）；不给就不接图片 */
+  saveImage?(file: File): Promise<string | null>;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
   onFocus?(): void;
   /** 格子的编辑框用 CodeMirror：加粗、颜色、荧光笔直接显示效果，标签藏起来（建编辑器时问一次） */
@@ -1094,6 +1100,25 @@ export class TableEditor {
       if (!same || !this.editing) this.setSel(p, true);
       this.dragSelect(ev);
     });
+    // 格子里的双链：Obsidian 不管自己渲染出来的链接，点击、悬停预览都要自己接
+    this.on(this.tableEl, "click", (ev) => {
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+      if (!link || !link.closest(".ggt-cell") || !this.host.openLink) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.host.openLink(link.dataset.href ?? link.getAttribute("href") ?? "", ev);
+    });
+    this.on(this.tableEl, "auxclick", (ev) => {
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+      if (!link || ev.button !== 1 || !this.host.openLink) return;
+      ev.preventDefault();
+      this.host.openLink(link.dataset.href ?? link.getAttribute("href") ?? "", ev);
+    });
+    this.on(this.tableEl, "mouseover", (ev) => {
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
+      const href = link?.dataset.href ?? link?.getAttribute("href");
+      if (link && href) this.host.hoverLink?.(ev, href, link);
+    });
     // 点勾选框：切换 [ ] / [x]
     this.on(this.tableEl, "click", (ev) => {
       const box = (ev.target as HTMLElement).closest<HTMLInputElement>("input.ggt-check");
@@ -1768,11 +1793,8 @@ export class TableEditor {
     const win = this.root.ownerDocument.defaultView ?? window;
     const clip = win.navigator.clipboard;
     const done = () => this.host.notice?.(t(markdownOnly ? "copiedMarkdown" : "copiedTable"));
-    if (markdownOnly) {
-      void clip.writeText(text).then(done);
-      return;
-    }
-    const html = this.styledHTML({ r1: 0, c1: 0, r2: rowCount(tb) - 1, c2: colCount(tb) - 1 }, lines);
+    // Markdown 表格也带一份不带颜色的 HTML 表格：Word、邮件认得出是表格；粘回 Obsidian 用的还是原文（不带设置注释）
+    const html = this.styledHTML({ r1: 0, c1: 0, r2: rowCount(tb) - 1, c2: colCount(tb) - 1 }, lines, markdownOnly);
     const item = new win.ClipboardItem({
       "text/plain": new win.Blob([text], { type: "text/plain" }),
       "text/html": new win.Blob([html], { type: "text/html" }),
@@ -1780,7 +1802,23 @@ export class TableEditor {
     void clip.write([item]).then(done);
   }
 
-  private styledHTML(rect: Rect, source: readonly string[] | null = null): string {
+  /**
+   * 复制出去的 HTML 表格（粘到 Word、飞书、邮件）。颜色一律按浅色主题取、半透明的叠在白底上算成实色：
+   * 暗色主题下屏幕上的表头、标签是深底浅字，原样带过去在白纸上很难看。plain：只要表格，不带任何颜色
+   */
+  private styledHTML(rect: Rect, source: readonly string[] | null = null, plain = false): string {
+    const body = this.root.ownerDocument.body;
+    const dark = body.classList.contains("theme-dark");
+    // 同一个任务里切过去、取完色马上切回来，屏幕不会闪
+    if (dark && !plain) body.classList.replace("theme-dark", "theme-light");
+    try {
+      return this.buildHTML(rect, source, plain);
+    } finally {
+      if (dark && !plain) body.classList.replace("theme-light", "theme-dark");
+    }
+  }
+
+  private buildHTML(rect: Rect, source: readonly string[] | null, plain: boolean): string {
     const tb = this.table;
     const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const win = this.root.ownerDocument.defaultView ?? window;
@@ -1802,8 +1840,9 @@ export class TableEditor {
         const a = tb.align[c];
         if (a) styles.push(`text-align:${a}`);
         if (cs) {
-          if (cs.backgroundColor && !/rgba\(\s*0,\s*0,\s*0,\s*0\s*\)|transparent/.test(cs.backgroundColor)) styles.push(`background-color:${cs.backgroundColor}`);
-          if (fgOf(tb, r, c)) styles.push(`color:${cs.color}`);
+          const bg = plain ? null : onWhite(cs.backgroundColor);
+          if (bg && bg !== "rgb(255, 255, 255)") styles.push(`background-color:${bg}`);
+          if (!plain && fgOf(tb, r, c)) styles.push(`color:${onWhite(cs.color) ?? cs.color}`);
           if (Number(cs.fontWeight) >= 600) styles.push("font-weight:600");
         }
         let span = "";
@@ -1821,8 +1860,9 @@ export class TableEditor {
           clone.querySelectorAll("input.ggt-check").forEach((b) => b.replaceWith((b as HTMLInputElement).checked ? "☑ " : "☐ "));
           clone.querySelectorAll<HTMLElement>(".ggt-pill").forEach((pill, i) => {
             const orig = content.querySelectorAll<HTMLElement>(".ggt-pill")[i];
-            const ps = orig ? win.getComputedStyle(orig) : null;
-            if (ps) pill.setAttribute("style", `background:${ps.backgroundColor};color:${ps.color};padding:0 8px;border-radius:10px`);
+            const ps = orig && !plain ? win.getComputedStyle(orig) : null;
+            if (ps) pill.setAttribute("style", `background:${onWhite(ps.backgroundColor) ?? ps.backgroundColor};color:${onWhite(ps.color) ?? ps.color};padding:0 8px;border-radius:10px`);
+            else pill.removeAttribute("style");
           });
           clone.querySelectorAll("textarea").forEach((x) => x.remove());
           // Obsidian 渲染时外面包了一层 <p>：拆掉（多段的换成 <br>），粘到 Word 里不会多出段落间距
@@ -1841,8 +1881,15 @@ export class TableEditor {
   }
 
   private onPaste(ev: ClipboardEvent): void {
-    if (this.editing || !this.sel || this.host.readonly || !ev.clipboardData) return;
-    const grid = gridFromClipboard(ev.clipboardData, this.root.ownerDocument);
+    if (!this.sel || this.host.readonly || !ev.clipboardData) return;
+    const grid = this.editing ? null : gridFromClipboard(ev.clipboardData, this.root.ownerDocument);
+    // 截图、复制的图片：存成附件，格子里插 ![[…]]（剪贴板里是一张表时还是按表粘）
+    const image = this.host.saveImage && !(grid && (grid.length > 1 || grid[0].length > 1)) ? imageFrom(ev.clipboardData) : null;
+    if (image) {
+      ev.preventDefault();
+      void this.pasteImage(image);
+      return;
+    }
     if (!grid) return;
     ev.preventDefault();
     const r = this.rangeRect() ?? { r1: this.sel.r, c1: this.sel.c, r2: this.sel.r, c2: this.sel.c };
@@ -1861,6 +1908,26 @@ export class TableEditor {
     this.apply(next, { r: r.r1, c: r.c1 });
     // 粘贴进来的那一片选中
     if (grid.length > 1 || grid[0].length > 1) this.setSel({ r: r.r1 + grid.length - 1, c: r.c1 + Math.max(...grid.map((x) => x.length)) - 1 }, true, true);
+  }
+
+  /** 图片存好以后插进格子：编辑中插在光标处；只是选中就接在格子原有内容后面（不覆盖） */
+  private async pasteImage(file: File): Promise<void> {
+    const p = this.sel;
+    const editing = this.editing;
+    const from = editing ? this.input.selectionStart : 0;
+    const to = editing ? this.input.selectionEnd : 0;
+    const md = await this.host.saveImage?.(file);
+    if (!md || this.destroyed || !p) return;
+    if (editing && this.editing && this.sel?.r === p.r && this.sel.c === p.c) {
+      const v = this.input.value;
+      this.input.value = v.slice(0, from) + md + v.slice(to);
+      this.input.setSelectionRange(from + md.length, from + md.length);
+      this.autosize();
+      return;
+    }
+    if (this.editing) this.commit();
+    const cur = shownText(this.table, p.r, p.c);
+    this.apply(editCell(this.table, p.r, p.c, cur.trim() ? `${cur} ${md}` : md), p);
   }
 
   // ---------- 触屏 ----------
@@ -2615,6 +2682,28 @@ function htmlCellText(el: Element): string {
  * 剪贴板里的表格：先看 HTML（Excel、飞书、网页复制的表格），再看 Markdown 表格源码，最后按制表符分隔的文字。
  * 普通的一段文字返回 1×1；什么都没有返回 null
  */
+/** 计算出来的颜色叠在白纸上的实色（Word 不认半透明）；透明的返回 null */
+export function onWhite(color: string): string | null {
+  const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(color);
+  if (!m) return /transparent/.test(color) ? null : color;
+  let a = m[4] === undefined ? 1 : parseFloat(m[4]);
+  if (m[4]?.endsWith("%")) a /= 100;
+  if (a <= 0) return null;
+  const mix = (v: string) => Math.round(parseFloat(v) * a + 255 * (1 - a));
+  return `rgb(${mix(m[1])}, ${mix(m[2])}, ${mix(m[3])})`;
+}
+
+/** 剪贴板里的图片文件（截图、从网页复制的图）；没有就是 null */
+export function imageFrom(data: DataTransfer): File | null {
+  for (const f of Array.from(data.files ?? [])) if (f.type.startsWith("image/")) return f;
+  for (const it of Array.from(data.items ?? [])) {
+    if (it.kind !== "file" || !it.type.startsWith("image/")) continue;
+    const f = it.getAsFile();
+    if (f) return f;
+  }
+  return null;
+}
+
 export function gridFromClipboard(data: DataTransfer, doc: Document): string[][] | null {
   const html = data.getData("text/html");
   // 从我们自己的表格复制的：纯文本里是 Markdown 原文（链接、加粗都在），用它

@@ -7865,6 +7865,16 @@ export class MindMapCanvas {
       readonly: !editable,
       // 表格菜单「复制整张表格」「复制为 Markdown 表格」完成后的提示
       notice: host?.notice,
+      // 格子里的双链：和节点里的链接一样打开（按「链接打开位置」设置，⌘/Ctrl 点新标签），悬停预览
+      openLink: host?.openLink ? (href, ev) => host.openLink!(href, true, ev) : undefined,
+      hoverLink: host?.hoverLink,
+      // 往格子里粘贴截图：和往节点里粘贴图片一样存成附件
+      saveImage: editable && host?.saveBinary
+        ? async (file) => {
+            const link = await this.saveImageFile(file);
+            return link ? `![[${link}]]` : null;
+          }
+        : undefined,
       // 表格左上角菜单里的「删除表格」：只删表格，节点留着
       onDeleteTable: editable ? () => this.deleteNodeTable(live()) : undefined,
     };

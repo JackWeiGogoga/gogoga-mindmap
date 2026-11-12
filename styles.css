@@ -2329,6 +2329,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-content > :first-child { margin-top: 0; }
 .ggt-content > :last-child { margin-bottom: 0; }
 .ggt-content p { margin: 0; }
+/* 格子里的图片：截图动辄上千像素宽，不限制会把整列撑开；列宽设得比 320 窄时跟着列宽 */
+.ggt-content .internal-embed.image-embed { display: inline-block; max-width: 320px; }
+.ggt-content img { max-width: 100%; height: auto; vertical-align: middle; }
 .ggt-content.is-empty::after { content: "\200b"; }
 
 /* 悬停、选中 */
