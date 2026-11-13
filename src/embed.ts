@@ -121,6 +121,7 @@ class MindMapEmbed extends Component {
         edge: edgeFromFrontmatter(fm),
         editable: false,
         embedded: true,
+        embedWheelLock: () => settings.embedWheel !== "always",
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
         notePreview: () => settings.notePreview,
@@ -144,6 +145,14 @@ class MindMapEmbed extends Component {
         notesExpanded: () => settings.notesExpanded,
         noteCardFilter: () => settings.noteCardShow,
         notePopoverSize: this.plugin.notePopoverSize,
+        // 用户自己缩放了（不是适应画布那一下）：记住这次的缩放，下次打开这张嵌入的图还用它（链接里写了 |80% 的以链接为准）
+        onViewChange: (state) => {
+          if (this.applyingZoom || this.zoomFromLink() !== null) return;
+          // 平移不改缩放：缩放没变的不记（不然一拖就把「适应画布」的缩放当成用户选的记住了）
+          if (Math.abs(state.k - this.shownK) < 0.001) return;
+          this.shownK = state.k;
+          this.rememberZoom(state.k);
+        },
         host: this.plugin.canvasHost(() => this.ctx.sourcePath, this),
         onOpenFile: () => void this.plugin.app.workspace.openLinkText(this.file.path, this.ctx.sourcePath),
         onLayout: (bounds) => {
@@ -192,7 +201,60 @@ class MindMapEmbed extends Component {
       this.lastHeight = h;
       wrap.setCssStyles({ height: `${h}px` });
     }
-    this.canvas?.fit();
+    this.fitAndZoom();
+  }
+
+  private applyingZoom = false;
+  /** 现在显示的缩放（适应、换缩放之后的） */
+  private shownK = 0;
+
+  /** 适应画布，再换成链接里指定的（![[脑图|80%]]）或上次记住的缩放，以图的中心为准 */
+  private fitAndZoom(): void {
+    const canvas = this.canvas;
+    if (!canvas) return;
+    this.applyingZoom = true;
+    try {
+      canvas.fit();
+      const k = this.zoomFromLink() ?? this.plugin.settings.embedZoom?.[this.zoomKey()];
+      if (k) canvas.zoomBy(k / canvas.getViewState().k);
+    } finally {
+      this.applyingZoom = false;
+      this.shownK = canvas.getViewState().k;
+    }
+  }
+
+  /** 链接里竖线后面写的缩放：![[脑图|80%]] → 0.8；没写或写的不是百分比为 null */
+  private zoomFromLink(): number | null {
+    const el = this.ctx.containerEl;
+    const alt = el.getAttribute("alt") ?? el.closest(".internal-embed")?.getAttribute("alt") ?? "";
+    const m = /^\s*(\d{1,3}(?:\.\d+)?)\s*%\s*$/.exec(alt);
+    if (!m) return null;
+    return Math.max(0.1, Math.min(4, Number(m[1]) / 100));
+  }
+
+  private zoomKey(): string {
+    return `${this.ctx.sourcePath}|${this.file.path}#${this.subpath}`;
+  }
+
+  private zoomSaveTimer: number | null = null;
+
+  private rememberZoom(k: number): void {
+    const s = this.plugin.settings;
+    const key = this.zoomKey();
+    const prev = s.embedZoom?.[key];
+    if (prev !== undefined && Math.abs(prev - k) < 0.001) return;
+    // 平移不算：只在缩放真的变了时记（攒一下再存）
+    if (this.zoomSaveTimer !== null) window.clearTimeout(this.zoomSaveTimer);
+    this.zoomSaveTimer = window.setTimeout(() => {
+      this.zoomSaveTimer = null;
+      const map = { ...(s.embedZoom ?? {}) };
+      delete map[key];
+      map[key] = Math.round(k * 1000) / 1000;
+      const keys = Object.keys(map);
+      for (const old of keys.slice(0, Math.max(0, keys.length - 300))) delete map[old];
+      s.embedZoom = map;
+      this.plugin.saveSettingsSoon();
+    }, 400);
   }
 
   /** 工具栏在上下边时，预览框要多出它占的高度，图才不会被挡住 */

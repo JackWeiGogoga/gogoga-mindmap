@@ -318,6 +318,8 @@ export interface CanvasOptions {
   onRevealInMarkdown?: () => void;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
+  /** 嵌入的脑图：先点一下脑图，滚轮才拿来平移（#35，默认这样）；没点过时滚轮交给页面滚动，⌘ / Ctrl + 滚轮照样缩放 */
+  embedWheelLock?: () => boolean;
   /** 平移缩放变化时调用，用来在重新渲染后恢复视口 */
   onViewChange?: (state: ViewState) => void;
   onEditableChange?: (editable: boolean) => void;
@@ -4499,6 +4501,11 @@ export class MindMapCanvas {
           if (this.opts.embedded) ev.stopPropagation();
           return;
         }
+        // 嵌入的脑图还没点过：滚轮交给页面（滚着看笔记时不会突然变成在滚脑图），提示一下怎么用；⌘ / Ctrl + 滚轮照样缩放
+        if (this.opts.embedded && !this.wheelActive && !(ev.ctrlKey || ev.metaKey) && this.opts.embedWheelLock?.()) {
+          this.showWheelHint();
+          return;
+        }
         // 一次滑动（连同触控板松手后的惯性）只归一样东西：开头落在哪就一直是哪，
         // 从画布开始的平移扫过表格节点不会被截住，在表格里开始的滚到头也不会把画布甩出去
         const now = performance.now();
@@ -4564,7 +4571,13 @@ export class MindMapCanvas {
         "pointerdown",
         (ev) => {
           const target = ev.target as HTMLElement;
-          if (el.contains(target) || target.closest?.(".mm-menu, .mm-popover, .menu, .modal-container, .suggestion-container, .popover")) return;
+          if (el.contains(target)) {
+            // 点了这张嵌入的脑图：滚轮开始归它（点到外面再还给页面）
+            this.wheelActive = true;
+            return;
+          }
+          if (target.closest?.(".mm-menu, .mm-popover, .menu, .modal-container, .suggestion-container, .popover")) return;
+          this.wheelActive = false;
           if (!this.selected.size) return;
           window.setTimeout(() => {
             if (!el.isConnected || this.editing || !this.selected.size) return;
@@ -6443,6 +6456,28 @@ export class MindMapCanvas {
       anchor,
       () => this.closeFoldMenu(),
     );
+  }
+
+  /** 嵌入的脑图：点过之后滚轮才归它（见 embedWheelLock） */
+  private wheelActive = false;
+  private wheelHint: HTMLElement | null = null;
+  private wheelHintTimer: number | null = null;
+
+  /** 嵌入的脑图还没点过时滚滚轮：在图上浮一行提示，一会儿自己淡掉 */
+  private showWheelHint(): void {
+    if (!this.wheelHint) {
+      const hint = createDiv();
+      hint.className = "mm-wheel-hint";
+      hint.textContent = t("canvas.wheelHint", { key: sc("Mod") });
+      this.el.append(hint);
+      this.wheelHint = hint;
+    }
+    this.wheelHint.classList.add("is-shown");
+    if (this.wheelHintTimer !== null) window.clearTimeout(this.wheelHintTimer);
+    this.wheelHintTimer = window.setTimeout(() => {
+      this.wheelHintTimer = null;
+      this.wheelHint?.classList.remove("is-shown");
+    }, 1400);
   }
 
   private quickPanel: HTMLElement | null = null;

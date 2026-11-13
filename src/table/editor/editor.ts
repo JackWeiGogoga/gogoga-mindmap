@@ -98,6 +98,23 @@ export function sameTable(a: Table, b: Table): boolean {
 /** 垂直对齐菜单项的图标 */
 const V_ICONS = { top: "align-vertical-justify-start", middle: "align-vertical-justify-center", bottom: "align-vertical-justify-end" } as const;
 
+/**
+ * 格子里 Shift+Enter 空出来的行（#13）：交给 Markdown 渲染时连着的空行会折成一处段落分隔，格子里段落没有间距，空行就看不见了。
+ * 渲染前把夹在中间的空行换成一个不换行空格，让它真的占一行（只改显示，文件里还是原来的换行）。代码块里的不动
+ */
+export function keepBlankLines(md: string): string {
+  if (!/\n[ \t]*\n/.test(md)) return md;
+  const lines = md.split("\n");
+  let fence = false;
+  return lines
+    .map((l, i) => {
+      if (/^\s*(```|~~~)/.test(l)) fence = !fence;
+      const inner = i > 0 && i < lines.length - 1;
+      return !fence && inner && !l.trim() ? "&nbsp;" : l;
+    })
+    .join("\n");
+}
+
 /** 列宽按比例缩放时每列最窄多少（再窄就宁可横向滚动） */
 const MIN_FIT_COL = 56;
 
@@ -582,6 +599,8 @@ export class TableEditor {
     d.density = this.table.meta.density ?? d.defDensity ?? "comfortable";
     // 设置「表格默认撑满页面宽度」：只管没拖过列宽的表（拖过的按设的宽度）
     this.root.classList.toggle("is-full", d.defFull === "1" && !this.table.meta.w?.some((x) => x != null));
+    // 设置「表格样式优先于主题」（#12）
+    this.root.classList.toggle("is-strict", d.defStrict === "1");
   }
 
   // ---------- 渲染 ----------
@@ -693,12 +712,12 @@ export class TableEditor {
       if (!rest) return;
       const span = el.appendChild(el.ownerDocument.createElement("span"));
       span.className = "ggt-check-text";
-      if (this.host.renderMarkdown) this.host.renderMarkdown(span, rest);
+      if (this.host.renderMarkdown) this.host.renderMarkdown(span, keepBlankLines(rest));
       else span.textContent = rest;
       return;
     }
     // 纯文字、数字直接放进去：渲染出来和走 Markdown 一样，大表格里能省掉几万次渲染
-    if (this.host.renderMarkdown && !isPlainText(md)) this.host.renderMarkdown(el, md);
+    if (this.host.renderMarkdown && !isPlainText(md)) this.host.renderMarkdown(el, keepBlankLines(md));
     else {
       el.textContent = md;
       // 渲染出来的段落带 dir="auto"（阿拉伯文、希伯来文靠右），直接放的文字也一样

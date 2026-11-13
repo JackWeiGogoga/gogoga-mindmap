@@ -384,6 +384,9 @@ export default class MindMapPlugin extends Plugin {
     else doc.body.style.setProperty("--mm-img-thumb-w", `${thumb}px`);
     // 完成的任务（[x]）显示删除线：样式表按这个类画
     doc.body.classList.toggle("mm-strike-done", this.settings.strikeDoneTasks);
+    const fsz = this.settings.noteFontSize;
+    if (fsz === DEFAULT_SETTINGS.noteFontSize) doc.body.style.removeProperty("--mm-note-size");
+    else doc.body.style.setProperty("--mm-note-size", `${fsz}px`);
     const h = this.settings.noteMaxHeight;
     if (h === DEFAULT_SETTINGS.noteMaxHeight) doc.body.style.removeProperty("--mm-note-max-h");
     else doc.body.style.setProperty("--mm-note-max-h", `${h}px`);
@@ -1577,6 +1580,7 @@ export default class MindMapPlugin extends Plugin {
         edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
         editable: state.editable,
         embedded: true,
+        embedWheelLock: () => this.settings.embedWheel !== "always",
         toolbarPosition: this.settings.toolbarPosition,
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,

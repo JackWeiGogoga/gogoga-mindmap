@@ -502,7 +502,9 @@
   gap: 2px;
   padding: 3px 4px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   cursor: default;
@@ -539,6 +541,9 @@
 .mm-swatch-more { all: unset; box-sizing: border-box; height: 18px; padding: 0 3px; margin-left: 1px; border-radius: 4px; font-size: 11px; letter-spacing: 1px; line-height: 18px; color: var(--text-muted, #888); cursor: pointer; }
 .mm-swatch-more:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); color: var(--text-normal); }
 .mm-format-bar .mm-palette.mm-format-palette { top: calc(100% + 6px); }
+/* 嵌入的脑图没点过时滚滚轮：图中间浮一行提示，一会儿淡掉 */
+.mm-wheel-hint { position: absolute; left: 50%; top: 50%; z-index: 20; transform: translate(-50%, -50%); padding: 6px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.66); color: #fff; font-size: 13px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.25s; }
+.mm-wheel-hint.is-shown { opacity: 1; }
 /* 工具栏「快捷设置」面板：一行一项，右边是开关或几选一 */
 .mm-menu.mm-quick-settings { width: 300px; padding: 8px 10px; }
 .mm-quick-title { margin: 2px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-muted, #888); }
@@ -740,7 +745,9 @@
   gap: 2px;
   padding: 4px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 12px;
@@ -789,7 +796,9 @@
   overflow: auto;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   color: var(--text-normal, #1f1f1f);
@@ -810,7 +819,7 @@
 }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) img { max-width: 100%; height: auto; cursor: zoom-in; -webkit-user-drag: none; }
 .mm-popover-body.is-plain { white-space: pre-wrap; }
-.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) { font-size: 13px; line-height: 1.55; }
+.gg-mm-root :is(.mm-popover-body, .mm-note-card-body) { font-size: var(--mm-note-size, 13px); line-height: 1.55; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :first-child { margin-top: 0; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :last-child { margin-bottom: 0; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) p { margin: 0 0 0.5em; }
@@ -914,7 +923,9 @@
   gap: 3px;
   padding: 4px 5px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: default;
@@ -1023,7 +1034,9 @@
   gap: 4px;
   padding: 4px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -1159,7 +1172,9 @@
   gap: 2px;
   padding: 4px 4px 4px 8px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: default;
@@ -1214,7 +1229,9 @@
   min-width: 140px;
   padding: 4px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
@@ -1301,7 +1318,8 @@
 .mm-picker-new { color: var(--interactive-accent, #155dff); }
 
 /* ---------- 公式与图片 ---------- */
-.mm-label .mm-math { display: inline-block; vertical-align: middle; }
+/* 公式不能折行：最宽到节点为止，超长的（B站 ReniaG）在公式里横向滚动，不撑出节点 */
+.mm-label .mm-math { display: inline-block; vertical-align: middle; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .mm-label .mm-math-fallback { opacity: 0.8; }
 .mm-label img.mm-img {
   display: block;
@@ -1592,7 +1610,9 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
   gap: 2px;
   padding: 4px 6px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 12px;
@@ -2072,7 +2092,8 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
   background: color-mix(in srgb, var(--mm-note-color, var(--mm-line)) 6%, var(--mm-bg, var(--background-primary, #fff)));
   color: var(--text-normal, #1f1f1f);
   font-family: var(--mm-font);
-  font-size: calc(12.5px * var(--mm-font-scale, 1));
+  /* 跟着设置「备注字号」走（默认 13px 时卡片是 12.5px），再乘脑图的字号缩放 */
+  font-size: calc(var(--mm-note-size, 13px) * 12.5 / 13 * var(--mm-font-scale, 1));
   line-height: 1.55;
   cursor: default;
 }
@@ -2373,7 +2394,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   gap: 2px;
   padding: 4px 6px;
   overflow-x: auto;
-  background: var(--background-primary);
+  background: var(--menu-background, var(--background-primary));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border-top: 1px solid var(--background-modifier-border);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
   user-select: none;
@@ -2444,7 +2466,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   padding: 4px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m, 8px);
-  background: var(--background-primary);
+  /* 浮出来的菜单用 Obsidian 菜单的底色（主题的半透明 / 毛玻璃也跟着），主题没给就用页面底色 */
+  background: var(--menu-background, var(--background-primary));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16));
   font-size: var(--font-ui-small, 13px);
 }
@@ -2596,7 +2620,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-check:checked + .ggt-check-text { color: var(--text-faint); text-decoration: line-through; }
 
 /* 编辑格子时的 [[ 链接、# 标签补全 */
-.ggt-suggest { position: fixed; z-index: var(--layer-menu, 65); min-width: 200px; max-width: 360px; max-height: 280px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); background: var(--background-primary); box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16)); font-size: var(--font-ui-small, 13px); }
+.ggt-suggest { position: fixed; z-index: var(--layer-menu, 65); min-width: 200px; max-width: 360px; max-height: 280px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); background: var(--menu-background, var(--background-primary)); backdrop-filter: var(--menu-backdrop-filter, none); box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16)); font-size: var(--font-ui-small, 13px); }
 .ggt-suggest-item { padding: 5px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ggt-suggest-item.is-active { background: var(--background-modifier-hover); }
 
@@ -2705,7 +2729,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   gap: 2px;
   padding: 3px 4px;
   border-radius: 8px;
-  background: var(--background-primary, #fff);
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   user-select: none;
@@ -2825,7 +2850,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   width: 262px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--background-primary, #fff);
+  background: var(--menu-background, var(--background-primary, #fff));
+  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
   cursor: default;
@@ -2871,6 +2897,43 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .mm-hl-chip[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 .ggt-format-bar .mm-palette.ggt-format-palette { top: calc(100% + 6px); }
 .ggt-format-bar .mm-color-split { height: 28px; }
+
+/*
+ * 设置「表格样式优先于主题」（默认开，#12）：OnePage、Minimal、Blue Topaz、Border、phycat 这些主题给 table / th / td 写了 !important 的
+ * 边框、表头底色、文字颜色，会把上面的样式盖掉。这里用更高的优先级 + !important 再写一遍表格自己的样子。
+ * 格子自己设的颜色（data-bg / data-fg）、吸顶表头、冻结列不在这里动，它们本身就是 !important、照常生效
+ */
+.ggt.is-strict .ggt-table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 !important; background: transparent !important; box-shadow: none !important; }
+.ggt.is-strict .ggt-table thead, .ggt.is-strict .ggt-table tbody, .ggt.is-strict .ggt-table tr { border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.ggt.is-strict .ggt-table, .ggt.is-strict .ggt-table thead, .ggt.is-strict .ggt-table tbody, .ggt.is-strict .ggt-table .ggt-cell { border-radius: 0 !important; }
+.ggt.is-strict .ggt-table .ggt-cell { border-top: 0 !important; border-left: 0 !important; border-right: 1px solid var(--ggt-line) !important; border-bottom: 1px solid var(--ggt-line) !important; text-shadow: none !important; }
+.ggt.is-strict .ggt-table .ggt-cell[data-c="0"] { border-left: 1px solid var(--ggt-line) !important; }
+.ggt.is-strict .ggt-table thead .ggt-cell { border-top: 1px solid var(--ggt-line) !important; font-weight: var(--font-semibold, 600) !important; }
+.ggt.is-strict .ggt-table .ggt-cell:not([data-fg]) { color: var(--text-normal) !important; }
+.ggt.is-strict .ggt-table .ggt-cell.is-total-row { border-top: 1.5px solid var(--ggt-line-strong, var(--text-faint)) !important; }
+.ggt.is-strict .ggt-table thead .ggt-cell:not([data-bg]) { background-color: var(--ggt-head-bg) !important; background-image: none !important; }
+/* 极简线、三线表 */
+.ggt.is-strict[data-preset="minimal"] .ggt-table .ggt-cell, .ggt.is-strict[data-preset="academic"] .ggt-table .ggt-cell { border-left: 0 !important; border-right: 0 !important; }
+.ggt.is-strict[data-preset="minimal"] .ggt-table thead .ggt-cell { border-top: 0 !important; border-bottom: 1.5px solid var(--text-normal) !important; }
+.ggt.is-strict[data-preset="academic"] .ggt-table .ggt-cell { border-bottom: 0 !important; }
+.ggt.is-strict[data-preset="academic"] .ggt-table thead .ggt-cell { border-top: 1.5px solid var(--text-normal) !important; border-bottom: 1px solid var(--text-normal) !important; }
+.ggt.is-strict[data-preset="academic"] .ggt-table tbody tr:last-child .ggt-cell { border-bottom: 1.5px solid var(--text-normal) !important; }
+.ggt.is-strict[data-preset="minimal"] .ggt-table thead .ggt-cell:not([data-bg]), .ggt.is-strict[data-preset="academic"] .ggt-table thead .ggt-cell:not([data-bg]) { background-color: transparent !important; background-image: none !important; }
+/* 能吸顶的表头底下要不透明（放在预设后面：同优先级后写的赢） */
+.ggt.is-strict.is-native-stick .ggt-table thead .ggt-cell:not([data-bg]), .ggt.is-strict.is-sd .ggt-table thead .ggt-cell:not([data-bg]) { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-head-tint), var(--ggt-head-tint)) !important; }
+.ggt.is-strict.is-stuck .ggt-table thead .ggt-cell:not([data-bg]) { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)) !important; }
+/* 正文格子：主题给行、格子加的底色（偶数行条纹之类）去掉；斑马纹、标题列、冻结列在下面按表格自己的来（优先级更高） */
+.ggt.is-strict .ggt-table tbody .ggt-cell:not([data-bg]) { background-color: transparent !important; }
+/* 斑马纹、标题列、冻结列的底色 */
+.ggt.is-strict[data-preset="zebra"] .ggt-table tbody tr:nth-child(even) .ggt-cell:not([data-bg]):not(.is-frozen) { background-color: var(--ggt-zebra) !important; }
+.ggt.is-strict .ggt-table .ggt-cell.is-head-col:not([data-bg]):not(.is-frozen) { background-color: var(--ggt-head-bg) !important; }
+.ggt.is-strict.is-freeze .ggt-table .ggt-cell.is-frozen:not([data-bg]) { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-frozen-tint), var(--ggt-frozen-tint)) !important; }
+.ggt.is-strict.is-freeze .ggt-table thead .ggt-cell.is-frozen:not([data-bg]) { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)) !important; }
+
+.ggt.is-strict.is-freeze[data-preset="minimal"] .ggt-table thead .ggt-cell.is-frozen:not([data-bg]), .ggt.is-strict.is-freeze[data-preset="academic"] .ggt-table thead .ggt-cell.is-frozen:not([data-bg]) { background-image: none !important; }
+/* 选中格所在列的表头淡色高亮（选了一片时不要） */
+.ggt.ggt.is-strict .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: linear-gradient(var(--ggt-sel-soft), var(--ggt-sel-soft)) !important; }
+.ggt.ggt.is-strict.has-range .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: none !important; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

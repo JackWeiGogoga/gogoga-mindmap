@@ -5,10 +5,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Added
+- Setting **Mouse wheel over embedded maps** (#35): by default (**Click the map first**) the wheel scrolls the note over an embedded map until you click the map (a hint says so), then it pans the map until you click outside; Ctrl / ⌘ + wheel zooms at any time. **Always pan the map** is the old behavior.
+- Embedded maps remember their zoom (#36): zoom an embed and it opens at that zoom next time (per note and map). You can also set it in the link, e.g. ![[map|80%]].
+- Setting **Note text size**: font size of the note window and expanded note cards, 13px by default.
 - Setting **Keep blank lines in topics** (off by default): when a topic has several lines (Shift+Enter), empty lines between them are kept on save instead of removed, which helps space out longer text; empty lines at the start and end are still removed. Also in the Quick settings panel.
 - Tables in nodes: a toolbar above the keyboard while editing a cell on phones and tablets, and a drag handle on the selected column's edge to resize columns on touch screens (same as gogoga Table).
 
 ### Fixed
+- A very long formula in a topic stuck out of the topic. Formulas now stop at the topic width and scroll sideways inside.
+- With themes whose page background is translucent (phycat with a wallpaper, for example), the toolbar, menus, note window and format bar were see-through. They now use Obsidian's menu background, like Obsidian's own menus.
+- Tables in nodes: empty lines in a cell (Shift+Enter) disappeared once you left the cell (same as gogoga Table).
 - Jumping back from an annotation in a PDF to the mind map that quotes it (PDF++): clicking another annotation in the same PDF opened the map again in a new tab instead of jumping within the open one. Now the open map selects the matching topic and no extra tab opens.
 
 ## [0.67.0] - 2026-11-13

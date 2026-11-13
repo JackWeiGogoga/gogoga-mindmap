@@ -81,6 +81,8 @@ export interface MindMapSettings {
   noteMaxHeight: number;
   /** 展开备注的最大宽度（像素，随节点字号缩放）；单条拖过大小的不受它限制 */
   noteMaxWidth: number;
+  /** 备注窗口、展开的备注卡片里文字的字号（像素，默认 13） */
+  noteFontSize: number;
   /** 图片拖动调整的最大宽度（像素）：文件里写了更宽的也按它显示 */
   imageMaxWidth: number;
   /** 没设宽度的图片默认显示多宽（像素，高度最多是它的 3/4；中心主题里是它的 4/3） */
@@ -90,6 +92,8 @@ export interface MindMapSettings {
   tableMaxHeight: number;
   /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
+  /** 嵌入的脑图上次的缩放（#36）：键是「所在笔记|脑图文件#子路径」，最多记 300 个 */
+  embedZoom?: Record<string, number>;
   /** 脑图视图是否显示大纲面板 */
   outlineOpen: boolean;
   /** 大纲面板里的标题换行显示全文（默认一行，放不下就省略） */
@@ -160,6 +164,8 @@ export interface MindMapSettings {
    * autohide 阅读模式一直不显示，编辑模式鼠标移上去才显示（0.60 以前的 embedToolbarAutoHide 开关迁过来）
    */
   embedToolbar: "full" | "custom" | "autohide";
+  /** 笔记里嵌入的脑图上滚动鼠标滚轮：click 先点一下脑图才拿来平移（默认，没点过时滚页面），always 直接平移脑图（原来的） */
+  embedWheel: "click" | "always";
   /** 嵌入的脑图选「自定义」时显示哪些按钮、什么顺序（空数组 = 默认：只留「打开 / 编辑」） */
   embedToolbarLayout: string[];
 }
@@ -225,6 +231,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   rememberView: true,
   newFileTemplate: "",
   embedToolbar: "full",
+  embedWheel: "click",
   embedToolbarLayout: [],
   fileNameAsRoot: false,
   headingsOnly: false,
@@ -254,6 +261,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   highlightColors: DEFAULT_HIGHLIGHT_COLORS,
   noteMaxHeight: 240,
   noteMaxWidth: 320,
+  noteFontSize: 13,
   imageMaxWidth: 800,
   imageThumbWidth: 240,
   tableMaxWidth: 640,
@@ -427,6 +435,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         },
         dropdown("linkOpen", t("settings.linkOpen.name"), t("settings.linkOpen.desc"), { current: t("settings.linkOpen.current"), tab: t("settings.linkOpen.tab"), split: t("settings.linkOpen.split") }, ["link", "链接", "分屏", "split", "打开"]),
         dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
+        dropdown("embedWheel", t("settings.embedWheel.name"), t("settings.embedWheel.desc"), { click: t("settings.embedWheel.click"), always: t("settings.embedWheel.always") }, ["embed", "嵌入", "滚轮", "scroll", "锁定"]),
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),
         toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
@@ -470,6 +479,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           ["list", "列表", "有序", "无序", "结论", "备注卡片"],
         ),
         toggle("quoteListNotes", t("settings.quoteListNotes.name"), t("settings.quoteListNotes.desc"), ["blockquote", "引用", ">", "首行缩进"]),
+        this.sliderWithReset("noteFontSize", t("settings.noteFontSize.name"), t("settings.noteFontSize.desc"), 11, 22, 1, DEFAULT_SETTINGS.noteFontSize, t("settings.resetNoteFontSize"), () => this.plugin.applyDisplayScale()),
         this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
         this.sizeSetting("tableMaxWidth", t("settings.tableMaxWidth.name"), t("settings.tableMaxWidth.desc"), 320, 1600, t("settings.resetTableWidth")),
@@ -785,7 +795,7 @@ export class MindMapSettingTab extends PluginSettingTab {
   }
 
   private sliderWithReset(
-    key: "spacingScale" | "fontScale" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth",
+    key: "spacingScale" | "fontScale" | "noteFontSize" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth",
     name: string,
     desc: string,
     min: number,

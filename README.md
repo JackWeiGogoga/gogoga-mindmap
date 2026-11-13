@@ -95,7 +95,7 @@ mindmap-theme: business
 ```
 ````
 
-To show a mind map you already have, embed the file like any other note: `![[Product launch]]` for a mind map note, or `![[Competitors.xmind]]` for an XMind file. It shows a read-only preview that follows the file as it changes; click the open button in its toolbar, or double-click a node, to open the file and edit it. Point at a node to show only that branch: `![[Product launch#Timeline]]` (a heading path like `#Team#September` works too) or a block reference `![[Product launch#^abc123]]`; a breadcrumb lets you step back up to the whole map. Dropped onto a Canvas, a mind map note fills its card and refits when you resize it. Notes without `mindmap: true` embed as usual.
+To show a mind map you already have, embed the file like any other note: `![[Product launch]]` for a mind map note, or `![[Competitors.xmind]]` for an XMind file. It shows a read-only preview that follows the file as it changes; click the open button in its toolbar, or double-click a node, to open the file and edit it. Point at a node to show only that branch: `![[Product launch#Timeline]]` (a heading path like `#Team#September` works too) or a block reference `![[Product launch#^abc123]]`; a breadcrumb lets you step back up to the whole map. Add a zoom to the link, `![[Product launch|80%]]`, to open it at 80%; otherwise an embed you zoomed opens at that zoom next time. By default the wheel scrolls the note until you click the embedded map, then pans it (Ctrl / ⌘ + wheel zooms at any time); the "Mouse wheel over embedded maps" setting switches back to always panning. Dropped onto a Canvas, a mind map note fills its card and refits when you resize it. Notes without `mindmap: true` embed as usual.
 
 ### Letting AI write mind maps
 
