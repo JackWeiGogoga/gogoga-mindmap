@@ -490,22 +490,42 @@ export default class MindMapPlugin extends Plugin {
           save();
         },
       },
-      { label: t("settings.formatBar.name"), value: s.formatBar, set: (v) => {
+      {
+        label: t("settings.formatBar.name"),
+        value: s.formatBar,
+        set: (v) => {
           s.formatBar = !!v;
           save();
         },
       },
-      { label: t("settings.widthHandleOnHover.name"), value: s.widthHandleOnHover, set: (v) => {
+      {
+        label: t("settings.widthHandleOnHover.name"),
+        value: s.widthHandleOnHover,
+        set: (v) => {
           s.widthHandleOnHover = !!v;
           save();
         },
       },
-      { label: t("settings.splitKeepOriginal.name"), value: s.splitKeepOriginal, set: (v) => {
+      {
+        label: t("settings.keepBlankLines.name"),
+        value: s.keepBlankLines,
+        set: (v) => {
+          s.keepBlankLines = !!v;
+          save();
+        },
+      },
+      {
+        label: t("settings.splitKeepOriginal.name"),
+        value: s.splitKeepOriginal,
+        set: (v) => {
           s.splitKeepOriginal = !!v;
           save();
         },
       },
-      { label: t("settings.splitKeepDelims.name"), value: s.splitKeepDelims, set: (v) => {
+      {
+        label: t("settings.splitKeepDelims.name"),
+        value: s.splitKeepDelims,
+        set: (v) => {
           s.splitKeepDelims = !!v;
           save();
         },
@@ -1537,6 +1557,7 @@ export default class MindMapPlugin extends Plugin {
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
         split: () => this.splitPrefs(),
+        keepBlankLines: () => this.settings.keepBlankLines,
         centerOnSelect: () => this.settings.centerOnSelect,
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,

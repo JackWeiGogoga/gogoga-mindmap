@@ -266,6 +266,8 @@ export interface CanvasOptions {
   formatBar?: () => boolean;
   /** 工具栏「快捷设置」面板里的几项（给了才有这个按钮）：开关或几选一，改了直接存进设置 */
   quickSettings?: () => QuickSetting[];
+  /** 设置「保留节点里的空行」：多行节点中间的空行不抹掉 */
+  keepBlankLines?: () => boolean;
   /** 拆成子节点的偏好：保留原文字、保留拆分符号、设置里自定义的拆分方式 */
   split?: () => { keepOriginal: boolean; keepDelims: boolean; custom: CustomSplit[] };
   /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
@@ -1280,7 +1282,7 @@ export class MindMapCanvas {
   syncPending(): boolean {
     let changed = false;
     if (this.editing && this.nodeEditor) {
-      const text = fromEditableText(this.nodeEditor.savedText);
+      const text = this.fromEdit(this.nodeEditor.savedText);
       if (text && text !== this.editing.text) {
         this.editing.text = text;
         changed = true;
@@ -6151,12 +6153,12 @@ export class MindMapCanvas {
     const isNew = this.editingIsNew;
     this.editing = null;
     this.editingIsNew = false;
-    const raw = fromEditableText(this.nodeEditor?.savedText ?? "");
+    const raw = this.fromEdit(this.nodeEditor?.savedText ?? "");
     this.nodeEditor?.destroy();
     this.nodeEditor = null;
     this.updateFormatBar();
     // 没改：进编辑时跨行的格式被拆好了（toEditableText），原样提交回来和原文写法不同但意思一样，照旧用原文，不算改动
-    const text = cancel || raw === fromEditableText(toEditableText(node.text)) ? node.text : raw;
+    const text = cancel || raw === this.fromEdit(toEditableText(node.text)) ? node.text : raw;
     // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
     if (text === "" && isNew && !node.note) {
       const parent = node.parent;
@@ -7004,7 +7006,7 @@ export class MindMapCanvas {
       this.linking = false;
     }
     if (!name || !this.doc) return;
-    const next = fromEditableText(linkRange(text, from, to, name));
+    const next = this.fromEdit(linkRange(text, from, to, name));
     if (next === node.text) return;
     node.text = next;
     this.select(node);
@@ -7310,7 +7312,7 @@ export class MindMapCanvas {
       const task = /^\[( |x|X)\]\s+/.exec(rest)?.[0].length ?? 0;
       const start = editable.length - toEditableText(rest).length + task;
       if (start >= editable.length) continue;
-      const next = fromEditableText(applyInlineFormat(editable, start, editable.length, fmt).text);
+      const next = this.fromEdit(applyInlineFormat(editable, start, editable.length, fmt).text);
       if (next !== n.text) {
         n.text = next;
         changed = true;
@@ -7381,7 +7383,7 @@ export class MindMapCanvas {
             return;
           }
           if (!node || !sel) return;
-          const next = fromEditableText(applyInlineFormat(toEditableText(node.text), sel.from, sel.to, fmt).text);
+          const next = this.fromEdit(applyInlineFormat(toEditableText(node.text), sel.from, sel.to, fmt).text);
           if (next === node.text) return;
           node.text = next;
           this.render();
@@ -7805,6 +7807,11 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 编辑框里的文字 → 存进节点的（按设置决定要不要留中间的空行） */
+  private fromEdit(text: string): string {
+    return fromEditableText(text, this.opts.keepBlankLines?.() ?? false);
+  }
+
   /** 拆分方式：内置的几种，加上设置里自定义的 */
   private splitRules(): { label: string; rule: SplitRule }[] {
     return [
@@ -7882,15 +7889,15 @@ export class MindMapCanvas {
     const remaining = keepOriginal ? text : text.slice(0, from) + res.lead + text.slice(to);
     // 编辑框里的文字自己定：先取消编辑（不提交、不记一步撤销），再一次改好、记一步
     this.commitEdit(true, false);
-    const parts = res.parts.map((p) => fromEditableText(p));
-    const whole = !keepOriginal && !splitMarkers(fromEditableText(remaining)).rest.trim();
+    const parts = res.parts.map((p) => this.fromEdit(p));
+    const whole = !keepOriginal && !splitMarkers(this.fromEdit(remaining)).rest.trim();
     if (whole && node.parent && !isSummaryTopic(node)) {
-      const head = fromEditableText(remaining).trim();
+      const head = this.fromEdit(remaining).trim();
       node.text = head ? `${head} ${parts[0]}` : parts[0];
       let prev = node;
       for (const p of parts.slice(1)) prev = addSibling(prev, p) ?? prev;
     } else {
-      node.text = fromEditableText(remaining).replace(/\s+$/, "");
+      node.text = this.fromEdit(remaining).replace(/\s+$/, "");
       node.folded = false;
       for (const p of parts) addChild(node, this.doc.style, p);
     }

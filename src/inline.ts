@@ -664,13 +664,16 @@ export function toEditableText(text: string): string {
   // 跨行的格式在换行处收尾、下一行再接上：编辑框一行一行认格式，跨行的认不出来会露出源码
   return carryAcrossBreaks(text.split(/<br\s*\/?>/i)).join("\n");
 }
-export function fromEditableText(text: string): string {
-  return text
+export function fromEditableText(text: string, keepBlankLines = false): string {
+  const lines = text
     .replace(/\r/g, "")
     .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .join("<br>");
+    .map((l) => l.trim());
+  if (!keepBlankLines) return lines.filter(Boolean).join("<br>");
+  // 设置「保留节点里的空行」：中间的空行原样留着（连着的 <br><br>），只去掉开头、结尾多出来的空行
+  while (lines.length && !lines[0]) lines.shift();
+  while (lines.length && !lines[lines.length - 1]) lines.pop();
+  return lines.join("<br>");
 }
 
 /** 节点标签的纯文本版本，用于测量和搜索 */
