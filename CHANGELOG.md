@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- In the note window opened from a node's note icon, double-click the text to start editing, like expanded note cards, instead of clicking Edit; the window stays put and the cursor goes to the end. Double-clicking an image doesn't count (a click on it opens the full-size view), and recite mode doesn't enter editing.
+
 ## [0.66.0] - 2026-11-13
 
 ### Added

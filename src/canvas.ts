@@ -8644,6 +8644,14 @@ export class MindMapCanvas {
         editBtn.textContent = t("menu.edit");
         editBtn.addEventListener("click", () => this.toggleNotePopover(node, true));
         pop.append(editBtn);
+        // 双击正文也进编辑（和展开的备注卡片一样）；双链、图片单击有自己的用处，双击它们不算
+        body.addEventListener("dblclick", (ev) => {
+          if ((ev.target as HTMLElement).closest("a, img")) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (this.recite) return;
+          this.toggleNotePopover(node, true);
+        });
       }
       this.el.append(pop);
       this.applyPopoverSize(pop);
