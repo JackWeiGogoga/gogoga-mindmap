@@ -783,6 +783,8 @@ export default class MindMapPlugin extends Plugin {
   private patchSetViewState(): void {
     const shouldRedirect = (file: string) => !this.markdownOverride.has(file) && this.isMindMapFile(file);
     const proto = WorkspaceLeaf.prototype;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- 下面换掉的原型方法里 this 是 leaf，插件要另外拿着
+    const plugin = this;
     // 原型上的方法要留着以后还原，取的是未绑定的函数本身，调用时再 call 回当前 leaf
     const original = Object.getOwnPropertyDescriptor(proto, "setViewState")!.value as (
       this: WorkspaceLeaf,
@@ -795,6 +797,8 @@ export default class MindMapPlugin extends Plugin {
       const current = this.view as { file?: TFile } | undefined;
       const alreadyMarkdown = this.view?.getViewType() === "markdown" && current?.file?.path === file;
       if (state?.type === "markdown" && typeof file === "string" && !alreadyMarkdown && shouldRedirect(file)) {
+        const reused = plugin.reuseOpenMindMap(this, file, eState);
+        if (reused) return reused;
         state = { ...state, type: VIEW_TYPE_MINDMAP };
       }
       return original.call(this, state, eState);
@@ -802,6 +806,27 @@ export default class MindMapPlugin extends Plugin {
     this.register(() => {
       proto.setViewState = original;
     });
+  }
+
+  /**
+   * 从 PDF 里点被引用的标注跳回笔记（PDF++）：它只在 markdown 类型的标签页里找这篇笔记，找不到就新开一个标签页。
+   * 这篇笔记已经以脑图开着时，就在那张脑图里跳到对应的行（选中节点），新开的空标签页关掉，不再多出一张脑图。
+   * 只管「从 PDF 视图发起、带行号、要打开到一个空的新标签页」这一种，别的打开方式（⌘ 点链接想再开一个）照旧
+   */
+  private reuseOpenMindMap(leaf: WorkspaceLeaf, path: string, eState: unknown): Promise<void> | null {
+    const st = eState as { line?: unknown } | undefined;
+    if (typeof st?.line !== "number" || leaf.view?.getViewType() !== "empty") return null;
+    if (this.app.workspace.getMostRecentLeaf()?.view.getViewType() !== "pdf") return null;
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => l !== leaf && (l.view as { file?: TFile }).file?.path === path);
+    if (!existing) return null;
+    existing.view.setEphemeralState(eState);
+    void this.app.workspace.revealLeaf(existing);
+    // PDF++ 打开完还会去显示它新开的那个标签页：等它做完再把这个空标签页关掉
+    window.setTimeout(() => {
+      if (leaf.view?.getViewType() === "empty") leaf.detach();
+      void this.app.workspace.revealLeaf(existing);
+    }, 300);
+    return Promise.resolve();
   }
 
   private convertOpenLeaves(): void {

@@ -8,6 +8,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Setting **Keep blank lines in topics** (off by default): when a topic has several lines (Shift+Enter), empty lines between them are kept on save instead of removed, which helps space out longer text; empty lines at the start and end are still removed. Also in the Quick settings panel.
 - Tables in nodes: a toolbar above the keyboard while editing a cell on phones and tablets, and a drag handle on the selected column's edge to resize columns on touch screens (same as gogoga Table).
 
+### Fixed
+- Jumping back from an annotation in a PDF to the mind map that quotes it (PDF++): clicking another annotation in the same PDF opened the map again in a new tab instead of jumping within the open one. Now the open map selects the matching topic and no extra tab opens.
+
 ## [0.67.0] - 2026-11-13
 
 ### Added
