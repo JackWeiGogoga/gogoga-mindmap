@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-11-14
+
 ### Added
 - Setting **Mouse wheel over embedded maps** (#35): by default (**Click the map first**) the wheel scrolls the note over an embedded map until you click the map (a hint says so), then it pans the map until you click outside; Ctrl / ⌘ + wheel zooms at any time. **Always pan the map** is the old behavior.
 - Embedded maps remember their zoom (#36): zoom an embed and it opens at that zoom next time (per note and map). You can also set it in the link, e.g. ![[map|80%]].
@@ -862,7 +864,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...HEAD
+[0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0

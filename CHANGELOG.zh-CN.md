@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-11-14
+
 ### 新增
 - 设置「嵌入的脑图上滚动鼠标滚轮」（#35）：默认「先点一下脑图」，笔记里嵌入的脑图没点过时滚轮照常滚笔记（图上浮一行提示），点一下脑图后滚轮才平移它，点到外面再还给笔记；⌘ / Ctrl + 滚轮随时都能缩放。选「直接平移脑图」是原来的样子。
 - 嵌入的脑图记住缩放（#36）：缩放过的嵌入，下次打开还是那个缩放（按所在笔记和脑图各记各的）；也可以在链接里写缩放，比如 ![[脑图|80%]]，打开就是 80%。
@@ -862,7 +864,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...HEAD
+[0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
