@@ -2298,6 +2298,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 }
 .ggt-table col { min-width: 40px; }
 /* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动 */
+.ggt.is-full { width: auto; }
 .ggt.is-full .ggt-table { width: 100%; }
 .ggt .ggt-cell {
   position: relative;
