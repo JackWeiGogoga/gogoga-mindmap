@@ -1551,6 +1551,20 @@ export class TableEditor {
   private updateSuggest(): void {
     if (!this.editing) return this.closeSuggest();
     const el = this.input;
+    if (el.composing) return;
+    // 中文输入法打出来的「【【」换成 [[、紧挨光标的「】】」换成 ]]（和 gogoga Mind Map 一样，省得切输入法）。长度不变，光标不用挪
+    {
+      const v = el.value;
+      const caret = el.selectionStart;
+      let text = v;
+      const cn = text.slice(0, caret).lastIndexOf("【【");
+      if (cn >= 0 && text.slice(0, caret).lastIndexOf("[[") < cn) text = text.slice(0, cn) + "[[" + text.slice(cn + 2);
+      if (text.slice(0, caret).endsWith("】】")) text = text.slice(0, caret - 2) + "]]" + text.slice(caret);
+      if (text !== v) {
+        el.value = text;
+        el.setSelectionRange(caret, caret);
+      }
+    }
     const before = el.value.slice(0, el.selectionStart);
     const link = /\[\[([^[\]|#^\n]*)$/.exec(before);
     const tag = /(?:^|\s)#([^\s#[\]|,.;:!?，。；：！？]*)$/.exec(before);

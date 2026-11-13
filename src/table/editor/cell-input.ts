@@ -46,6 +46,8 @@ export interface CellInput {
   contains(node: Node | null): boolean;
   /** 格子按这段文字的高度排版（编辑框盖在上面，自己不占位置） */
   sizingText(): string;
+  /** 输入法正在组字（这时不能改文字，不然打断组字） */
+  readonly composing: boolean;
   bind(h: CellInputHandlers): void;
   destroy(): void;
 }
@@ -98,6 +100,10 @@ export class TextareaInput implements CellInput {
   sizingText(): string {
     return this.el.value;
   }
+  private comp = false;
+  get composing(): boolean {
+    return this.comp;
+  }
 
   bind(h: CellInputHandlers): void {
     const on = <K extends keyof HTMLElementEventMap>(type: K, fn: (ev: HTMLElementEventMap[K]) => void) => {
@@ -110,7 +116,15 @@ export class TextareaInput implements CellInput {
     on("paste", (ev) => h.paste(ev));
     on("input", () => h.input());
     for (const type of ["select", "keyup", "mouseup"] as const) on(type, () => h.select());
-    on("compositionstart", () => h.compositionstart());
+    on("compositionstart", () => {
+      this.comp = true;
+      h.compositionstart();
+    });
+    // 组字结束：组字时的 input 没处理补全（比如输入法打出来的「【【」），结束后再看一次
+    on("compositionend", () => {
+      this.comp = false;
+      h.input();
+    });
     on("blur", () => h.blur());
   }
 
@@ -159,6 +173,10 @@ export class CodeMirrorInput implements CellInput {
             this.handlers?.compositionstart();
             return false;
           },
+          compositionend: () => {
+            later(() => this.handlers?.input());
+            return false;
+          },
           blur: () => {
             // 焦点挪到编辑框里的别处不算；挪到外面或者整个窗口失焦才算
             queueMicrotask(() => {
@@ -197,6 +215,10 @@ export class CodeMirrorInput implements CellInput {
 
   get el(): HTMLElement {
     return this.view.dom;
+  }
+
+  get composing(): boolean {
+    return !!this._view?.composing;
   }
 
   detach(): void {
