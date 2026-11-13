@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-11-13
+
 ### Added
 - With several nodes selected, drag the width handle on the primary selected node to give all of them the same width (image and video nodes excepted), undone in one step; right-click one of them and choose Reset to automatic width to reset them all. With one node selected, or when dragging an unselected node's handle with hover width handles on, only that node changes, as before.
 - Tables in nodes: vertical alignment (top / middle / bottom) from the cell right-click and column menus, same as gogoga Table.
@@ -837,7 +839,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...HEAD
+[0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1

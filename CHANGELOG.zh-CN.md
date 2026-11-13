@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-11-13
+
 ### 新增
 - 框选好几个节点后，拖其中主选中节点的宽度手柄，选中的节点一起设成同样宽度（图片、视频节点除外），一步撤销；右键选中的其中一个「恢复自动宽度」，选中的一起恢复。只选一个、或者开着「悬停调宽度」时指着没选中的节点拖，照旧只改那一个。
 - 节点里的表格：格子右键、列菜单里可以设垂直对齐（顶端 / 垂直居中 / 底端），同 gogoga Table。
@@ -837,7 +839,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...HEAD
+[0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
