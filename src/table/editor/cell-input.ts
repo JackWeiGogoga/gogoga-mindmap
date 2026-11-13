@@ -10,7 +10,7 @@
 
 import { EditorSelection, EditorState, Prec, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, redo, undo } from "@codemirror/commands";
 import { formatPreview, insertFormatBreak, visibleSelection } from "../core/cm-format";
 
 export interface CellInputHandlers {
@@ -49,6 +49,9 @@ export interface CellInput {
   /** 输入法正在组字（这时不能改文字，不然打断组字） */
   readonly composing: boolean;
   bind(h: CellInputHandlers): void;
+  /** 撤销 / 重做编辑框里的输入（手机上没有键盘快捷键，工具条上的按钮用） */
+  undo(): void;
+  redo(): void;
   destroy(): void;
 }
 
@@ -126,6 +129,16 @@ export class TextareaInput implements CellInput {
       h.input();
     });
     on("blur", () => h.blur());
+  }
+
+  undo(): void {
+    this.el.focus();
+    this.el.ownerDocument.execCommand("undo");
+  }
+
+  redo(): void {
+    this.el.focus();
+    this.el.ownerDocument.execCommand("redo");
   }
 
   destroy(): void {
@@ -271,6 +284,14 @@ export class CodeMirrorInput implements CellInput {
 
   bind(h: CellInputHandlers): void {
     this.handlers = h;
+  }
+
+  undo(): void {
+    undo(this.view);
+  }
+
+  redo(): void {
+    redo(this.view);
   }
 
   destroy(): void {

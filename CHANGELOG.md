@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Tables in nodes: a toolbar above the keyboard while editing a cell on phones and tablets, and a drag handle on the selected column's edge to resize columns on touch screens (same as gogoga Table).
+
 ## [0.67.0] - 2026-11-13
 
 ### Added

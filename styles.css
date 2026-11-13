@@ -2355,6 +2355,34 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-resize.is-shown, .ggt-resize.is-active { display: block; }
 .ggt-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 1px; background: var(--ggt-sel); opacity: 0.7; }
 .ggt-resize.is-active::after { opacity: 1; }
+/* 触屏：选中一格后这一列右边线上的把手（线淡一点，中间一个圆点好按），手指拖动不滚页面 */
+.ggt-resize.is-touch { touch-action: none; width: 24px; margin-left: -8px; }
+.ggt-resize.is-touch::after { left: 11px; opacity: 0.45; }
+.ggt-resize.is-touch::before { content: ""; position: absolute; left: 4px; top: calc(var(--ggt-grip-y, 50%) - 14px); width: 16px; height: 28px; border-radius: 8px; background: var(--ggt-sel); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+.ggt-resize.is-touch.is-active::before { top: calc(var(--ggt-grip-y, 50%) - 16px); height: 32px; }
+
+/* 手机、平板上编辑格子时贴在键盘上方的工具条 */
+.ggt-mobile-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--ggt-kb, 0px);
+  z-index: var(--layer-popover, 30);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  overflow-x: auto;
+  background: var(--background-primary);
+  border-top: 1px solid var(--background-modifier-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ggt-mobile-bar .ggt-mobile-btn { all: unset; flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 36px; border-radius: 8px; color: var(--text-normal); font-weight: 600; }
+.ggt-mobile-bar .ggt-mobile-btn:active { background: var(--background-modifier-hover); }
+.ggt-mobile-bar .ggt-mobile-btn svg { width: 20px; height: 20px; }
+.ggt-mobile-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--background-modifier-border); }
 .ggt.is-resizing, .ggt.is-resizing * { cursor: col-resize !important; user-select: none; }
 
 /* 行、列手柄：悬停时出现在边框上 */

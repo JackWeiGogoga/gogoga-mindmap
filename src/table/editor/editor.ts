@@ -383,6 +383,7 @@ export class TableEditor {
 
   destroy(): void {
     this.hideFormatBar();
+    this.hideMobileBar();
     if (lastActive === this) lastActive = null;
     this.destroyed = true;
     this.closePopover();
@@ -412,6 +413,7 @@ export class TableEditor {
       this.stickHeader();
       // 左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
       this.placeHandles();
+      if (this.resizeBar.classList.contains("is-touch")) this.placeTouchResize();
       // 冻结标题列时，十字高亮竖的色带不能伸进冻结列底下：横向滚动后重新摆
       if (this.root.classList.contains("is-freeze") && this.crossBands.some((b) => b.classList.contains("is-shown"))) this.markCross();
     };
@@ -651,6 +653,7 @@ export class TableEditor {
     this.stickHeader();
     // 列宽变了，线的位置就不对了：先收起来，鼠标再动时按新的边线放
     if (!this.resize) this.resizeBar.classList.remove("is-shown", "is-active");
+    this.placeTouchResize();
   }
 
   /** 状态列的数据格画成彩色标签，别的照常 */
@@ -897,6 +900,7 @@ export class TableEditor {
     this.markCross();
     if (cell) this.placeFill();
     this.placeHandles();
+    this.placeTouchResize();
   }
 
   // ---------- 选中、编辑 ----------
@@ -931,6 +935,7 @@ export class TableEditor {
     this.editing = true;
     cell.classList.add("is-editing");
     this.fillHandle.classList.remove("is-shown");
+    this.showMobileBar();
     if (keep) {
       this.input.reset(shownText(this.table, this.sel.r, this.sel.c));
       const end = this.input.value.length;
@@ -970,6 +975,7 @@ export class TableEditor {
   private commit(): void {
     this.closeSuggest();
     this.hideFormatBar();
+    this.hideMobileBar();
     if (!this.editing || !this.sel) return;
     const p = this.sel;
     this.editing = false;
@@ -995,6 +1001,7 @@ export class TableEditor {
   private cancel(): void {
     this.closeSuggest();
     this.hideFormatBar();
+    this.hideMobileBar();
     if (!this.editing || !this.sel) return;
     this.editing = false;
     this.cellEl(this.sel)?.classList.remove("is-editing");
@@ -1280,7 +1287,8 @@ export class TableEditor {
       }
     });
     this.on(this.root, "pointerleave", () => {
-      if (!this.resize) this.resizeBar.classList.remove("is-shown");
+      // 手指抬起也会补一个 pointerleave：触屏的把手跟着选中走，不在这里收
+      if (!this.resize && !this.resizeBar.classList.contains("is-touch")) this.resizeBar.classList.remove("is-shown");
       if (this.popover) return;
       this.hover = null;
       this.placeHandles();
@@ -1294,6 +1302,8 @@ export class TableEditor {
       const target = ev.target as Node;
       // 点格式栏的按钮：还在编辑这一格
       if (this.formatBar?.contains(target)) return;
+      // 点手机工具条的按钮：同上
+      if (this.mobileBar?.contains(target)) return;
       // 点补全列表（状态、[[ 链接、# 标签）：它挂在 body 上，不能当成点到表格外面，不然先按原样退出编辑、列表也关了
       if (this.suggest?.el.contains(target)) return;
       if (this.popover && !this.popover.contains(target)) this.closePopover();
@@ -1679,6 +1689,123 @@ export class TableEditor {
       const r = applyInlineFormat(cur, from, to, fmt);
       if (r.text !== cur) this.apply(setCell(this.table, pos.r, pos.c, r.text), pos);
     };
+  }
+
+  // ---------- 手机上的编辑工具条 ----------
+
+  private mobileBar: HTMLElement | null = null;
+  private mobileBarCleanup: (() => void) | null = null;
+
+  /**
+   * 手机、平板上编辑格子时，键盘上方的一排按钮：完成、撤销重做、加粗斜体删除线高亮、双链、勾选框、格内换行、上一格 / 下一格。
+   * Obsidian 自己的手机工具条在焦点离开笔记编辑器时会收起来（它的按钮也只管笔记正文），所以表格自己出一条
+   */
+  private showMobileBar(): void {
+    const doc = this.root.ownerDocument;
+    if (this.mobileBar || this.host.readonly || !doc.body.classList.contains("is-mobile")) return;
+    const win = doc.defaultView ?? window;
+    const bar = doc.createElement("div");
+    bar.className = "ggt-mobile-bar";
+    // 按下按钮不让编辑框失焦（失焦就保存退出编辑，键盘也收起来了）
+    bar.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
+    const btn = (icon: string, fallback: string, title: string, run: () => void) => {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "ggt-mobile-btn";
+      b.setAttribute("aria-label", title);
+      if (this.host.setIcon) this.host.setIcon(b, icon);
+      else b.textContent = fallback;
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        run();
+      });
+      bar.append(b);
+    };
+    const sep = () => {
+      const s = doc.createElement("span");
+      s.className = "ggt-mobile-sep";
+      bar.append(s);
+    };
+    btn("check", "✓", t("mbDone"), () => this.commit());
+    btn("undo-2", "↶", t("mbUndo"), () => this.input.undo());
+    btn("redo-2", "↷", t("mbRedo"), () => this.input.redo());
+    sep();
+    btn("bold", "B", t("fmtBold"), () => this.formatOrInsert({ kind: "bold" }, "**", "**"));
+    btn("italic", "I", t("fmtItalic"), () => this.formatOrInsert({ kind: "italic" }, "*", "*"));
+    btn("strikethrough", "S", t("fmtStrike"), () => this.formatOrInsert({ kind: "strike" }, "~~", "~~"));
+    btn("highlighter", "H", t("fmtHighlight"), () => this.formatOrInsert({ kind: "highlight" }, "==", "=="));
+    sep();
+    btn("link-2", "[[", t("mbLink"), () => this.insertAround("[[", "]]"));
+    btn("square-check", "☑", t("mbCheckbox"), () => this.toggleEditCheckbox());
+    btn("corner-down-left", "↵", t("mbNewline"), () => this.insertAround("\n", ""));
+    sep();
+    btn("arrow-left", "←", t("mbPrevCell"), () => this.editNext(-1));
+    btn("arrow-right", "→", t("mbNextCell"), () => this.editNext(1));
+    doc.body.append(bar);
+    // 贴在键盘上方：键盘弹出时可见区域变矮（visualViewport），工具条的底边跟着它
+    const vv = win.visualViewport;
+    const place = () => {
+      const bottom = vv ? Math.max(0, win.innerHeight - (vv.offsetTop + vv.height)) : 0;
+      bar.style.setProperty("--ggt-kb", `${Math.round(bottom)}px`);
+    };
+    place();
+    vv?.addEventListener("resize", place);
+    vv?.addEventListener("scroll", place);
+    this.mobileBarCleanup = () => {
+      vv?.removeEventListener("resize", place);
+      vv?.removeEventListener("scroll", place);
+    };
+    this.mobileBar = bar;
+  }
+
+  private hideMobileBar(): void {
+    this.mobileBarCleanup?.();
+    this.mobileBarCleanup = null;
+    this.mobileBar?.remove();
+    this.mobileBar = null;
+  }
+
+  /** 选了字就给选中的字上格式；没选就插一对标记、光标放中间，接着打的字就是这个格式 */
+  private formatOrInsert(fmt: InlineFormat, open: string, close: string): void {
+    const { from, to } = this.input.visibleSelection();
+    if (from !== to) this.applyFormat(fmt);
+    else this.insertAround(open, close);
+  }
+
+  /** 在光标（选区）两边插入 open、close，光标留在中间；插 [[ ]] 时接着弹出笔记补全 */
+  private insertAround(open: string, close: string): void {
+    if (!this.editing) return;
+    const el = this.input;
+    const a = el.selectionStart;
+    const b = el.selectionEnd;
+    const v = el.value;
+    el.value = v.slice(0, a) + open + v.slice(a, b) + close + v.slice(b);
+    el.setSelectionRange(a + open.length, b + open.length);
+    this.autosize();
+    this.updateSuggest();
+  }
+
+  /** 格子开头加上 / 去掉勾选框 */
+  private toggleEditCheckbox(): void {
+    if (!this.editing) return;
+    const el = this.input;
+    const v = el.value;
+    const next = CHECK_RE.test(v) ? v.replace(CHECK_RE, "").trimStart() : `[ ] ${v}`;
+    el.value = next;
+    el.setSelectionRange(next.length, next.length);
+    this.autosize();
+  }
+
+  /** 保存这一格，接着编辑上一格 / 下一格（行尾接下一行开头，和 Tab 一样） */
+  private editNext(dir: 1 | -1): void {
+    if (!this.editing) return;
+    this.commit();
+    this.move(0, dir, true);
+    this.startEdit(true);
   }
 
   /** ⌘K：选中的文字变成 [文字]()，光标放进括号里填网址 */
@@ -2176,6 +2303,7 @@ export class TableEditor {
   /** 指针离哪条列边线（每列的右边）不到 4 像素，就把调列宽的线放到那里；不在附近就藏起来 */
   private placeResizeBar(x: number, y: number): void {
     const bar = this.resizeBar;
+    bar.classList.remove("is-touch");
     const t = this.tableEl.getBoundingClientRect();
     let hit = -1;
     let at = 0;
@@ -2211,16 +2339,47 @@ export class TableEditor {
     bar.classList.add("is-shown");
   }
 
+  /**
+   * 触屏上没有「鼠标移到列边线」：点选一格后，在这一列的右边线上放一个能拖的把手（同一根调列宽的线，带个圆点），
+   * 拖动改列宽、双击恢复自动列宽。只在最近一次是用手指点的、选着一格时出现（轻点进了编辑也在，拖之前先保存这一格）
+   */
+  private placeTouchResize(): void {
+    const bar = this.resizeBar;
+    if (this.resize) return;
+    const cell = this.touched && this.sel && !this.isMulti() && !this.host.readonly ? this.cellEl(this.sel) : null;
+    if (!cell || !cell.isConnected) {
+      if (bar.classList.contains("is-touch")) bar.classList.remove("is-shown", "is-touch");
+      return;
+    }
+    const c = Number(cell.dataset.c) + ((cell as HTMLTableCellElement).colSpan || 1) - 1;
+    const col = this.tableEl.querySelectorAll("col")[c];
+    if (!col) return;
+    const t = this.tableEl.getBoundingClientRect();
+    const base = this.root.getBoundingClientRect();
+    const k = this.scale();
+    const at = col.getBoundingClientRect().right;
+    bar.dataset.c = String(c);
+    bar.setAttribute("style", `left:${(at - base.left) / k - 4}px;top:${(t.top - base.top) / k}px;height:${t.height / k}px`);
+    // 把手的圆点放在选中那一格的高度上，手指好找
+    const cb = cell.getBoundingClientRect();
+    bar.style.setProperty("--ggt-grip-y", `${(cb.top + cb.height / 2 - t.top) / k}px`);
+    bar.classList.add("is-shown", "is-touch");
+  }
+
   private startResize(ev: PointerEvent, handle: HTMLElement): void {
     if (this.host.readonly) return;
     ev.preventDefault();
     ev.stopPropagation();
+    // 触屏上编辑着就拖把手：先把这一格存了，改完列宽重画时不丢字
+    if (this.editing) this.commit();
     const c = Number(handle.dataset.c);
     const col = this.tableEl.querySelectorAll("col")[c];
     if (!col || Number.isNaN(c)) return;
     const k = this.scale();
     this.resize = { c, startX: ev.clientX, startW: col.getBoundingClientRect().width / k, col, fitW: this.root.classList.contains("is-fit") ? parseFloat(this.tableEl.style.width) || 0 : 0, scale: this.fitScale };
     const startLeft = parseFloat(handle.style.left) || 0;
+    // 触屏把手的圆点高度（重写 style 时别丢了）
+    const grip = handle.style.getPropertyValue("--ggt-grip-y");
     handle.classList.add("is-active");
     this.root.classList.add("is-resizing");
     try {
@@ -2239,6 +2398,7 @@ export class TableEditor {
       const tr = this.tableEl.getBoundingClientRect();
       const base = this.root.getBoundingClientRect();
       handle.setAttribute("style", `left:${startLeft + (w - r.startW)}px;top:${(tr.top - base.top) / k}px;height:${tr.height / k}px`);
+      if (grip) handle.style.setProperty("--ggt-grip-y", grip);
       this.placeHandles();
     };
     const up = () => {
