@@ -3,22 +3,11 @@
  * 脑图的节点编辑框和 Markdown 笔记的实时预览共用这一个，按钮、颜色、写进文件的格式都一样
  */
 
-import { type ColorKind, type ColorMemory, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
-import { highlightOf, type InlineFormat } from "./format";
-import { t } from "./i18n";
+import { type ColorKind, type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
 
-/** 格式栏、命令里的一个颜色：荧光笔颜色表里的 🔴 之类写成 Obsidian 的 ==🔴文字==，其余照旧写颜色标签 */
-export function highlightFormat(kind: "color" | "bg", color: string): InlineFormat {
-  if (kind === "bg" && color === THEME_HIGHLIGHT) return { kind: "highlight" };
-  const hl = kind === "bg" ? highlightOf(color) : null;
-  return hl ? { kind: "highlight", color: hl } : { kind, color };
-}
-
-/** 颜色下拉选了一个颜色（null = 去掉）要上的格式 */
-export function colorFormat(kind: "text" | "bg", color: string | null): InlineFormat {
-  if (color === null) return { kind: kind === "text" ? "nocolor" : "nobg" };
-  return highlightFormat(kind === "text" ? "color" : "bg", color);
-}
+export { colorFormat, highlightFormat } from "./color-palette";
+import { type InlineFormat } from "./format";
+import { paletteText, t } from "./i18n";
 
 /** 颜色的说明：🔴 这些和主题高亮用文字，其余就是色值 */
 export function colorTitle(color: string): string {
@@ -121,6 +110,7 @@ export function createFormatBar(doc: Document, o: FormatBarOptions): HTMLElement
           apply(colorFormat(kind, c));
         };
         const pal = createPalette(doc, {
+          text: paletteText(),
           common: common(kind),
           recent: mem.recent(kind),
           alpha: true,

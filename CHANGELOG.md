@@ -7,8 +7,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Added
 - With several nodes selected, drag the width handle on the primary selected node to give all of them the same width (image and video nodes excepted), undone in one step; right-click one of them and choose Reset to automatic width to reset them all. With one node selected, or when dragging an unselected node's handle with hover width handles on, only that node changes, as before.
 - Tables in nodes: vertical alignment (top / middle / bottom) from the cell right-click and column menus, same as gogoga Table.
+- Tables in nodes: the format bar while editing a cell now has the same text color and highlighter split buttons and palette as the mind map's format bar, sharing its last and recent colors.
 
 ### Fixed
+- In the format bar, No highlighter didn't remove a plain ==highlight== (only colored ones), and picking a highlighter color on ==highlighted== text stacked two highlights. Both now replace it.
 - Tables in nodes: themes that force a background on table headers and cells no longer hide the colors set on cells (same as gogoga Table).
 - After restarting Obsidian, a mind map sometimes showed nodes piled on top of each other (it was laid out before the plugin's styles or fonts were ready, measured the nodes too small, and never laid out again). Node sizes are now checked after a map opens, when a background tab comes to the front and when fonts finish loading, and the map is laid out again if they're off.
 - Tables in nodes: inline code in cells had no background in Live Preview (same as gogoga Table).

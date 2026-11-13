@@ -13,10 +13,11 @@
  * 第一下输入就把它变成这一格的编辑框，组字不会被打断。
  */
 
+import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
 import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
-import { applyInlineFormat, highlightOf, type InlineFormat } from "../core/format";
+import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
 import { t } from "./i18n";
 
@@ -75,6 +76,8 @@ export interface EditorHost {
   richEdit?(): boolean;
   /** 编辑格子时选中文字浮出的格式栏用哪些颜色；返回 null（或不给）就不显示格式栏 */
   formatColors?(): { text: string[]; highlight: string[] } | null;
+  /** 格式栏颜色下拉记住的颜色（上次用的、最近使用）；不给就只记在这次的格式栏里 */
+  colorMemory?(): ColorMemory;
   readonly?: boolean;
 }
 
@@ -1577,26 +1580,103 @@ export class TableEditor {
     btn("is-italic", t("fmtItalic"), { kind: "italic" }, (b) => (b.textContent = "I"));
     btn("is-strike", t("fmtStrike"), { kind: "strike" }, (b) => (b.textContent = "S"));
     btn("is-underline", t("fmtUnderline"), { kind: "underline" }, (b) => (b.textContent = "U"));
-    btn("is-highlight", t("fmtHighlight"), { kind: "highlight" }, iconBtn("highlighter", "H"));
-    if (colors.text.length) sep();
-    for (const c of colors.text)
-      btn("is-color", `${t("fmtTextColor")} ${c}`, { kind: "color", color: c }, (b) => {
-        b.textContent = "A";
-        b.style.color = c;
+    sep();
+    // 文字颜色、荧光笔：和 gogoga Mind Map 一样的「按钮 + 下拉」。左半边套用上次的颜色，▾ 打开色板（常用、色块网格、最近使用、透明度、自定义）
+    const local: Record<string, string> = {};
+    const mem: ColorMemory = this.host.colorMemory?.() ?? {
+      last: (k) => local[k] ?? null,
+      recent: () => [],
+      remember: (k, c) => (local[k] = c),
+    };
+    const common = (kind: "text" | "bg") => (kind === "text" ? colors.text : colors.highlight);
+    const current = (kind: "text" | "bg") => mem.last(kind) ?? common(kind)[0] ?? (kind === "bg" ? THEME_HIGHLIGHT : null);
+    const tip = (el: HTMLElement, text: string) => (el.title = text);
+    let open: { kind: "text" | "bg"; el: HTMLElement } | null = null;
+    const closePalette = () => {
+      open?.el.remove();
+      open = null;
+    };
+    const split = (kind: "text" | "bg") => {
+      const el = createColorSplit({
+        doc,
+        cls: kind === "text" ? "is-text-color" : "is-highlighter",
+        title: kind === "text" ? t("fmtTextColor") : t("fmtHighlightColor"),
+        caretTitle: kind === "text" ? t("palTextMore") : t("palBgMore"),
+        face: (f) => {
+          if (kind === "text") f.textContent = "A";
+          else iconBtn("highlighter", "H")(f as HTMLButtonElement);
+        },
+        current: () => current(kind),
+        paintBar: (b, c) => paintColor(b, c, kind),
+        tip,
+        onApply: () => {
+          const c = current(kind);
+          if (!c) return;
+          closePalette();
+          this.applyFormat(colorFormat(kind, c));
+        },
+        onOpen: (anchor) => {
+          if (open?.kind === kind) return closePalette();
+          closePalette();
+          const pick = (c: string | null, apply: (fmt: InlineFormat) => void = (f) => this.applyFormat(f)) => {
+            closePalette();
+            if (c !== null) mem.remember(kind, c);
+            refreshColorSplit(anchor);
+            apply(colorFormat(kind, c));
+          };
+          const pal = createPalette(doc, {
+            text: { common: t("palCommon"), recent: t("palRecent"), alpha: t("palAlpha"), custom: t("palCustom") },
+            common: common(kind),
+            recent: mem.recent(kind),
+            alpha: true,
+            defaultAlpha: kind === "text" ? 100 : 60,
+            paint: (b, c) => paintColor(b, c, kind),
+            label: (c) => (c === THEME_HIGHLIGHT ? t("fmtHighlight") : c),
+            noneLabel: kind === "text" ? t("palNoText") : t("palNoHighlight"),
+            extras: kind === "bg" && !common("bg").includes(THEME_HIGHLIGHT) ? [{ value: THEME_HIGHLIGHT, label: t("fmtHighlight"), paint: (b) => paintColor(b, THEME_HIGHLIGHT, "bg") }] : [],
+            onPick: (c) => pick(c),
+            onCustom: () => {
+              const apply = this.customColorTarget();
+              return (c) => pick(c, apply);
+            },
+            tip,
+          });
+          pal.classList.add("ggt-format-palette");
+          bar.append(pal);
+          pal.style.left = `${Math.max(0, anchor.offsetLeft)}px`;
+          open = { kind, el: pal };
+        },
       });
-    if (colors.highlight.length) sep();
-    for (const c of colors.highlight) {
-      const hl = highlightOf(c);
-      btn("is-bg", `${t("fmtHighlightColor")} ${c}`, hl ? { kind: "highlight", color: hl } : { kind: "bg", color: c }, (b) => {
-        b.textContent = "A";
-        if (hl) b.dataset.highlight = hl;
-        else b.style.background = c;
-      });
-    }
+      bar.append(el);
+    };
+    split("text");
+    split("bg");
     sep();
     btn("is-clear", t("fmtClear"), { kind: "clear" }, iconBtn("eraser", "⌫"));
     doc.body.append(bar);
     return bar;
+  }
+
+  /**
+   * 色板里点「自定义…」：系统取色器会拿走焦点，格子可能已经保存退出编辑了。先记下是哪一格、选的哪几个字，
+   * 选好颜色后还在编辑这一格就照常上格式，否则直接改这一格的源码
+   */
+  private customColorTarget(): (fmt: InlineFormat) => void {
+    const pos = this.sel ? { ...this.sel } : null;
+    const { from, to } = this.input.visibleSelection();
+    return (fmt) => {
+      if (!pos || from === to) return;
+      if (this.editing && this.sel && this.sel.r === pos.r && this.sel.c === pos.c) {
+        this.input.focus();
+        this.input.setSelectionRange(from, to);
+        this.applyFormat(fmt);
+        return;
+      }
+      const cur = this.table.cells[pos.r]?.[pos.c];
+      if (cur === undefined) return;
+      const r = applyInlineFormat(cur, from, to, fmt);
+      if (r.text !== cur) this.apply(setCell(this.table, pos.r, pos.c, r.text), pos);
+    };
   }
 
   /** ⌘K：选中的文字变成 [文字]()，光标放进括号里填网址 */

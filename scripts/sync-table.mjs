@@ -10,7 +10,7 @@ import path from "node:path";
 export const TABLE_SRC = path.resolve("../gogoga-table");
 export const PARTS = ["core", "editor"];
 /** 两个插件共用、源头在脑图的文件：先从脑图 src/ 复制到表格的 src/core/，再随表格同步回 src/table/core/ */
-export const SHARED = ["format.ts", "tokens.ts", "live-preview.ts", "cm-format.ts"];
+export const SHARED = ["format.ts", "tokens.ts", "live-preview.ts", "cm-format.ts", "color-palette.ts"];
 export const CSS_BEGIN = "/* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */";
 export const CSS_END = "/* ==== gogoga-table 同步结束 ==== */";
 

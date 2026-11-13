@@ -94,7 +94,7 @@ import {
   unlinkText,
 } from "./inline";
 import { baseThemeOf, BRANCH_COLOR_COUNT, EdgeOptions, EdgeStyle, isThemeName, isUnderlineAt, resolveTheme, ThemeId, themeIds, themeLabel, themeShortLabel } from "./theme";
-import { Key, t } from "./i18n";
+import { Key, paletteText, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
 import { clampCard, NOTE_CARD_MAX, type NoteCards, type NoteCardState } from "./state";
 import { TableEditor, type EditorHost } from "./table/editor/editor";
@@ -6851,6 +6851,7 @@ export class MindMapCanvas {
       }
     };
     const pal = createPalette(this.el.ownerDocument, {
+      text: paletteText(),
       common,
       recent: mem.recent(kind),
       alpha: kind !== "node",
@@ -7951,6 +7952,8 @@ export class MindMapCanvas {
       richEdit: () => true,
       // 编辑格子时的格式栏：跟着脑图的「选中文字时显示格式栏」开关和常用颜色
       formatColors: () => (this.opts.formatBar?.() ? { text: this.opts.textColors?.() ?? [], highlight: this.opts.highlightColors?.() ?? [] } : null),
+      // 节点表格的格式栏和脑图自己的格式栏记同一份「上次用的颜色、最近使用」
+      colorMemory: () => this.colorMemory(),
       // Esc、从第一行往上、最后一行往下：回到画布，节点还选着，方向键接着在节点之间走
       onLeave: () => {
         this.el.focus({ preventScroll: true });

@@ -195,6 +195,21 @@ function toggleHighlight(text: string, s: number, e: number, color?: HighlightCo
   return { text: text.slice(0, s) + wrapped + text.slice(e), start: s + 2 + emoji.length, end: s + wrapped.length - 2 };
 }
 
+/** 去掉包住选区（或选区正好是一整段）的 ==高亮==（带不带颜色都去）；没有就原样返回 */
+function removeHighlight(text: string, s: number, e: number): FormatResult {
+  const open = HIGHLIGHT_OPEN_BEFORE.exec(text.slice(0, s));
+  if (open && text.slice(e, e + 2) === "==") {
+    const from = s - open[0].length;
+    return { text: text.slice(0, from) + text.slice(s, e) + text.slice(e + 2), start: from, end: from + (e - s) };
+  }
+  const whole = WHOLE_HIGHLIGHT.exec(text.slice(s, e));
+  if (whole) {
+    const inner = whole[2];
+    return { text: text.slice(0, s) + inner + text.slice(e), start: s, end: s + inner.length };
+  }
+  return { text, start: s, end: e };
+}
+
 /** 清除颜色时，碰到选区的彩色高亮去掉颜色、留下普通高亮 */
 function clearHighlightColors(text: string, start: number, end: number): FormatResult {
   let out = "";
@@ -357,13 +372,19 @@ export function applyInlineFormat(text: string, start: number, end: number, fmt:
     case "highlight":
       return toggleHighlight(text, s, e, fmt.color);
     case "color":
-    case "bg":
       return applyColor(text, s, e, fmt.kind, fmt.color);
+    case "bg": {
+      // 荧光笔换成指定颜色：原来包着的 ==高亮== 先去掉，不叠两层
+      const h = removeHighlight(text, s, e);
+      return applyColor(h.text, h.start, h.end, "bg", fmt.color);
+    }
     case "nocolor":
       return applyColor(text, s, e, "color", null);
     case "nobg": {
+      // 去掉荧光笔：<mark style> 和 ==高亮==（主题高亮、彩色高亮）都去掉
       const b = applyColor(text, s, e, "bg", null);
-      return clearHighlightColors(b.text, b.start, b.end);
+      const c = clearHighlightColors(b.text, b.start, b.end);
+      return removeHighlight(c.text, c.start, c.end);
     }
     case "clear": {
       const a = applyColor(text, s, e, "color", null);

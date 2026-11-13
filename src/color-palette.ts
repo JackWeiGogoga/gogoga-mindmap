@@ -3,10 +3,12 @@
  * 文字颜色、荧光笔点左半边直接用色条上的颜色（上次用的），点 ▾ 打开色板：常用（设置里的）、色块网格、最近使用、
  * 透明度、自定义（系统取色器）。按下色板里的东西不让编辑器失焦（pointerdown / mousedown 都 preventDefault），
  * 所以透明度是自己画的滑块，不用 <input type="range">（它要拿焦点才能拖）
+ *
+ * gogoga Mind Map 和 gogoga Table 共用（源头在脑图，scripts/sync-table.mjs 复制到表格的 src/core/）：
+ * 这里不引用哪一边的翻译，界面上的字由调用方在 PaletteOptions.text 里给
  */
 
-import { highlightOf } from "./format";
-import { t } from "./i18n";
+import { highlightOf, type InlineFormat } from "./format";
 
 /** 三种颜色：文字颜色、荧光笔、节点颜色 */
 export type ColorKind = "text" | "bg" | "node";
@@ -20,6 +22,19 @@ export interface ColorMemory {
 
 /** 荧光笔颜色表里表示 Obsidian 普通 ==高亮== 的那一项 */
 export const THEME_HIGHLIGHT = "==";
+
+/** 格式栏、命令里的一个颜色：荧光笔颜色表里的 🔴 之类写成 Obsidian 的 ==🔴文字==，其余照旧写颜色标签 */
+export function highlightFormat(kind: "color" | "bg", color: string): InlineFormat {
+  if (kind === "bg" && color === THEME_HIGHLIGHT) return { kind: "highlight" };
+  const hl = kind === "bg" ? highlightOf(color) : null;
+  return hl ? { kind: "highlight", color: hl } : { kind, color };
+}
+
+/** 颜色下拉选了一个颜色（null = 去掉）要上的格式 */
+export function colorFormat(kind: "text" | "bg", color: string | null): InlineFormat {
+  if (color === null) return { kind: kind === "text" ? "nocolor" : "nobg" };
+  return highlightFormat(kind === "text" ? "color" : "bg", color);
+}
 
 /**
  * 给色块 / 色条上色：🔴 这些和 ==（主题高亮）按 Obsidian 主题的高亮色，节点颜色的颜色名按脑图主题，其余直接用颜色值
@@ -80,7 +95,16 @@ export function pushRecent(list: readonly string[], color: string): string[] {
   return [color, ...list.filter((x) => x.toLowerCase() !== c)].slice(0, RECENT_MAX);
 }
 
+/** 色板上的几处文字（各插件按自己的语言给） */
+export interface PaletteText {
+  common: string;
+  recent: string;
+  alpha: string;
+  custom: string;
+}
+
 export interface PaletteOptions {
+  text: PaletteText;
   /** 常用：设置里配的颜色（十六进制、颜色名、🔴 之类都可能有），原样交回 onPick */
   common: readonly string[];
   recent: readonly string[];
@@ -147,7 +171,7 @@ export function createPalette(doc: Document, o: PaletteOptions): HTMLElement {
     return row;
   };
   // 常用：无颜色 + 特殊项 + 设置里的
-  const common = section(t("palette.common"));
+  const common = section(o.text.common);
   swatch(common, o.noneLabel, (b) => b.classList.add("is-none"), () => o.onPick(null));
   for (const x of o.extras ?? []) swatch(common, x.label, x.paint, () => o.onPick(x.value));
   for (const c of o.common) swatch(common, o.label(c), (b) => o.paint(b, c), () => o.onPick(c), () => c);
@@ -168,7 +192,7 @@ export function createPalette(doc: Document, o: PaletteOptions): HTMLElement {
     }
   // 最近使用
   if (o.recent.length) {
-    const recent = section(t("palette.recent"));
+    const recent = section(o.text.recent);
     for (const c of o.recent) swatch(recent, o.label(c), (b) => o.paint(b, c), () => o.onPick(c), () => c);
   }
   // 透明度：自己画的滑块（不拿焦点）
@@ -176,7 +200,7 @@ export function createPalette(doc: Document, o: PaletteOptions): HTMLElement {
     const line = doc.createElement("div");
     line.className = "mm-palette-alpha";
     const name = doc.createElement("span");
-    name.textContent = t("palette.alpha");
+    name.textContent = o.text.alpha;
     const track = doc.createElement("div");
     track.className = "mm-palette-track";
     const fill = doc.createElement("div");
@@ -226,7 +250,7 @@ export function createPalette(doc: Document, o: PaletteOptions): HTMLElement {
   const custom = doc.createElement("button");
   custom.type = "button";
   custom.className = "mm-palette-custom";
-  custom.textContent = t("palette.custom");
+  custom.textContent = o.text.custom;
   custom.addEventListener("click", (ev) => {
     ev.stopPropagation();
     const apply = o.onCustom?.() ?? ((c: string) => o.onPick(c));

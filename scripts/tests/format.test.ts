@@ -137,3 +137,24 @@ test("下划线：加上、去掉（选里面的字或连标签一起选）、�
   // 选区为空：整段
   assert.equal(applyInlineFormat("学校", 1, 1, { kind: "underline" }).text, "<u>学校</u>");
 });
+
+test("去掉荧光笔：==高亮==（主题、彩色）和 <mark style> 都去掉", () => {
+  const at = (t: string, w: string) => [t.indexOf(w), t.indexOf(w) + w.length] as const;
+  const go = (t: string, w: string, fmt: Parameters<typeof applyInlineFormat>[3]) => {
+    const [s, e] = at(t, w);
+    const r = applyInlineFormat(t, s, e, fmt);
+    return [r.text, r.text.slice(r.start, r.end)];
+  };
+  assert.deepEqual(go("这是==重点==内容", "重点", { kind: "nobg" }), ["这是重点内容", "重点"]);
+  assert.deepEqual(go("这是==🔴重点==内容", "重点", { kind: "nobg" }), ["这是重点内容", "重点"]);
+  assert.deepEqual(go("这是==重点==内容", "==重点==", { kind: "nobg" }), ["这是重点内容", "重点"]);
+  assert.deepEqual(go('这是<mark style="background:#ffd43b99">重点</mark>内容', "重点", { kind: "nobg" }), ["这是重点内容", "重点"]);
+});
+
+test("荧光笔换成指定颜色：原来的 ==高亮== 去掉，不叠两层", () => {
+  const t = "这是==重点==内容";
+  const s = t.indexOf("重点");
+  const r = applyInlineFormat(t, s, s + 2, { kind: "bg", color: "#51cf6699" });
+  assert.equal(r.text, '这是<mark style="background:#51cf6699">重点</mark>内容');
+  assert.equal(r.text.slice(r.start, r.end), "重点");
+});

@@ -1405,3 +1405,8 @@ export function t(key: Key, vars?: Record<string, string | number>): string {
   if (!vars) return text;
   return text.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
 }
+
+/** 色板（color-palette.ts，和 gogoga Table 共用）上的文字 */
+export function paletteText(): { common: string; recent: string; alpha: string; custom: string } {
+  return { common: t("palette.common"), recent: t("palette.recent"), alpha: t("palette.alpha"), custom: t("palette.custom") };
+}

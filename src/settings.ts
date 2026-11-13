@@ -4,7 +4,7 @@ import { COLOR_NAMES, parseNodeColors } from "./markdown";
 import { MINDMAP_LIST_ICON } from "./icon";
 import { IconPickerModal, storedValue } from "./icon-picker";
 import { displayEmoji, iconIdOf, isEmojiValue } from "./icon-value";
-import { t } from "./i18n";
+import { paletteText, t } from "./i18n";
 import { themeIds, themeLabel, type ThemeId } from "./theme";
 import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
@@ -600,6 +600,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           const doc = anchor.ownerDocument;
           doc.querySelectorAll(".mm-settings-palette").forEach((e) => e.remove());
           const pal = createPalette(doc, {
+            text: paletteText(),
             common: kind === "node" ? [...COLOR_NAMES] : kind === "bg" ? ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣"] : [],
             recent: plugin.colorMemory.recent(kind),
             alpha: kind !== "node",
