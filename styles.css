@@ -2300,6 +2300,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动 */
 .ggt.is-full { width: auto; }
 .ggt.is-full .ggt-table { width: 100%; }
+/* 设置「列宽按比例缩放」：设过列宽、比正文宽的表，各列按比例缩到正好放下（列宽由编辑器按比例算好写在 col 上） */
+.ggt.is-fit .ggt-table { table-layout: fixed; }
+.ggt.is-fit .ggt-cell { min-width: 0; }
 .ggt .ggt-cell {
   position: relative;
   padding: 0;
@@ -2317,6 +2320,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt .ggt-table .ggt-cell[data-c="0"] { border-left: 1px solid var(--ggt-line); }
 .ggt .ggt-table thead .ggt-cell { border-top: 1px solid var(--ggt-line); background: var(--ggt-head-bg); font-weight: var(--font-semibold, 600); }
 .ggt .ggt-cell[data-align="center"] { text-align: center; }
+.ggt .ggt-cell[data-valign="middle"] { vertical-align: middle; }
+.ggt .ggt-cell[data-valign="bottom"] { vertical-align: bottom; }
 .ggt .ggt-cell[data-align="right"] { text-align: right; }
 
 .ggt-content {
@@ -2620,13 +2625,13 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-grid-modal { width: auto; }
 
 /* 文字颜色：用主题的颜色，深浅色都清楚 */
-.ggt .ggt-cell[data-fg="gray"] { color: var(--text-muted); }
-.ggt .ggt-cell[data-fg="red"] { color: var(--color-red); }
-.ggt .ggt-cell[data-fg="orange"] { color: var(--color-orange); }
-.ggt .ggt-cell[data-fg="yellow"] { color: var(--color-yellow); }
-.ggt .ggt-cell[data-fg="green"] { color: var(--color-green); }
-.ggt .ggt-cell[data-fg="blue"] { color: var(--color-blue); }
-.ggt .ggt-cell[data-fg="purple"] { color: var(--color-purple); }
+.ggt .ggt-cell[data-fg="gray"] { color: var(--text-muted) !important; }
+.ggt .ggt-cell[data-fg="red"] { color: var(--color-red) !important; }
+.ggt .ggt-cell[data-fg="orange"] { color: var(--color-orange) !important; }
+.ggt .ggt-cell[data-fg="yellow"] { color: var(--color-yellow) !important; }
+.ggt .ggt-cell[data-fg="green"] { color: var(--color-green) !important; }
+.ggt .ggt-cell[data-fg="blue"] { color: var(--color-blue) !important; }
+.ggt .ggt-cell[data-fg="purple"] { color: var(--color-purple) !important; }
 .ggt-menu button.ggt-swatch.is-text { background: var(--background-primary); font-weight: 700; font-size: 13px; line-height: 1; color: var(--text-normal); }
 .ggt-menu button.ggt-swatch.is-text[data-fg="none"] { background: var(--background-primary); color: var(--text-normal); }
 .ggt-menu button.ggt-swatch.is-text[data-fg="gray"] { color: var(--text-muted); }
@@ -2674,8 +2679,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
  * 格子自己的底色压过一切默认底色：表头的浅灰、标题列、斑马纹、极简线和三线表的透明表头。
  * 表头吸顶时底下要不透明：先铺页面底色，再叠一层格子的颜色
  */
-.ggt .ggt-table .ggt-cell[data-bg] { background-color: var(--ggt-cell-bg); }
-.ggt.is-stuck .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+/* 格子颜色加 !important：有的主题给 th / thead 强制设底色（甚至带 !important），会把格子颜色盖住，看着像没选上 */
+.ggt .ggt-table .ggt-cell[data-bg] { background-color: var(--ggt-cell-bg) !important; }
+.ggt.is-stuck .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)) !important; }
 /*
  * 能吸顶的表格（原生吸顶 / 滚动驱动）：表头格子一直先铺页面底色，再叠表头的浅灰，看起来和不铺一样。
  * is-stuck 是滚动之后 JS 才加的，快速滑动时表头已经贴到顶上、类还没加，半透明的表头会透出底下正文的笔画
@@ -2684,7 +2690,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt[data-preset="minimal"], .ggt[data-preset="academic"] { --ggt-head-tint: transparent; }
 .ggt.is-native-stick .ggt-table thead .ggt-cell, .ggt.is-sd .ggt-table thead .ggt-cell { background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-head-tint), var(--ggt-head-tint)); }
 .ggt.is-stuck.is-native-stick .ggt-table thead .ggt-cell, .ggt.is-stuck.is-sd .ggt-table thead .ggt-cell { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
-.ggt.is-native-stick .ggt-table thead .ggt-cell[data-bg], .ggt.is-sd .ggt-table thead .ggt-cell[data-bg] { background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+.ggt.is-native-stick .ggt-table thead .ggt-cell[data-bg], .ggt.is-sd .ggt-table thead .ggt-cell[data-bg] { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)) !important; }
 /* 表格位置带小数时（阅读视图常见），格子各自对齐到像素，两行表头之间、表头顶边会留一条一像素的缝透出正文：整个表头底下再垫一层；吸顶时往上多垫一点 */
 .ggt.is-native-stick .ggt-table thead::before, .ggt.is-sd .ggt-table thead::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--background-primary); pointer-events: none; }
 .ggt.is-stuck.is-native-stick .ggt-table thead::before, .ggt.is-stuck.is-sd .ggt-table thead::before { top: -2px; }
@@ -2695,7 +2701,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt.is-freeze .ggt-table .ggt-cell.is-frozen { position: sticky; left: 0; z-index: 2; background-color: var(--background-primary); background-image: linear-gradient(var(--ggt-frozen-tint), var(--ggt-frozen-tint)); }
 .ggt.is-freeze .ggt-table thead .ggt-cell.is-frozen { background-image: linear-gradient(var(--ggt-head-bg), var(--ggt-head-bg)); }
 .ggt.is-freeze[data-preset="minimal"] .ggt-table thead .ggt-cell.is-frozen, .ggt.is-freeze[data-preset="academic"] .ggt-table thead .ggt-cell.is-frozen { background-image: none; }
-.ggt.is-freeze .ggt-table .ggt-cell.is-frozen[data-bg] { background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)); }
+.ggt.is-freeze .ggt-table .ggt-cell.is-frozen[data-bg] { background-color: var(--background-primary) !important; background-image: linear-gradient(var(--ggt-cell-bg), var(--ggt-cell-bg)) !important; }
 /* 滚动过后：冻结列右边出一道阴影，表示后面的格子从它底下滑过 */
 .ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.18); }
 .theme-dark .ggt.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: 6px 0 6px -6px rgba(0, 0, 0, 0.5); }

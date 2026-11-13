@@ -13,8 +13,8 @@
  * 第一下输入就把它变成这一格的编辑框，组字不会被打断。
  */
 
-import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle } from "../core/table";
-import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf } from "../core/ops";
+import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
+import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, highlightOf, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
@@ -90,6 +90,12 @@ export function sameTable(a: Table, b: Table): boolean {
  * 不用走 Markdown 渲染的格子：只有文字、数字和不会触发任何写法的标点（没有链接、加粗、标签、公式、HTML、换行……），
  * 也不以列表、引用、标题的记号开头。拿不准的一律交给渲染，宁可慢不能显示错
  */
+/** 垂直对齐菜单项的图标 */
+const V_ICONS = { top: "align-vertical-justify-start", middle: "align-vertical-justify-center", bottom: "align-vertical-justify-end" } as const;
+
+/** 列宽按比例缩放时每列最窄多少（再窄就宁可横向滚动） */
+const MIN_FIT_COL = 56;
+
 const PLAIN_RE = /^[\p{L}\p{N}\p{Zs},.;:!?'"()%+\-/@，。、；：！？“”‘’（）《》【】…—·]*$/u;
 export function isPlainText(md: string): boolean {
   if (!PLAIN_RE.test(md)) return false;
@@ -172,10 +178,12 @@ export class TableEditor {
   private popover: HTMLElement | null = null;
   /** 编辑时的补全列表（[[ 链接、# 标签） */
   private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement } | null = null;
-  private resize: { c: number; startX: number; startW: number; col: HTMLElement } | null = null;
+  private resize: { c: number; startX: number; startW: number; col: HTMLElement; fitW: number; scale: number } | null = null;
   private destroyed = false;
   /** 横向滚动条占的高度（覆盖式滚动条是 0） */
   private scrollbarH = 0;
+  /** 列宽按比例缩放时缩了多少（1 = 没缩）；拖列宽时按它换算回文件里的宽度 */
+  private fitScale = 1;
   /** 上一次长按开菜单的时间（安卓随后还会来一次右键事件，忽略掉） */
   private longPressAt = -Infinity;
   private readonly cleanups: (() => void)[] = [];
@@ -445,8 +453,21 @@ export class TableEditor {
       findOuter();
       update();
     });
+    // 正文变宽变窄（开关侧栏、拖窗口）：按比例缩放的列宽跟着重算。表格缩到正文宽以后自己不会跟着变宽，所以看外面那层
+    let parentW = -1;
+    const onParent = () => {
+      const p = this.root.parentElement;
+      const w = p ? p.clientWidth : 0;
+      if (w === parentW) return;
+      parentW = w;
+      if (!this.resize) this.fitCols();
+      onScroll();
+    };
     const ro = new win.ResizeObserver(onScroll);
     ro.observe(this.scroller);
+    const pro = new win.ResizeObserver(() => win.requestAnimationFrame(onParent));
+    if (this.root.parentElement) pro.observe(this.root.parentElement);
+    this.cleanups.push(() => pro.disconnect());
     this.cleanups.push(() => ro.disconnect());
   }
 
@@ -602,6 +623,8 @@ export class TableEditor {
         cell.dataset.c = String(c);
         const a = tb.align[c];
         if (a) cell.dataset.align = a;
+        const va = vAlignOf(tb, c);
+        if (va) cell.dataset.valign = va;
         const bg = bgOf(tb, r, c);
         if (bg) cell.dataset.bg = bg;
         const fg = fgOf(tb, r, c);
@@ -617,6 +640,7 @@ export class TableEditor {
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
       }
     }
+    this.fitCols();
     this.markSel();
     if (hadFocus && this.sel) this.input.focus();
     this.stickHeader();
@@ -1203,6 +1227,7 @@ export class TableEditor {
     this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => {
       this.refreshInput();
       this.applyLook();
+      this.fitCols();
       this.markCross();
     });
     // 十字高亮（悬停模式）：鼠标在哪格，就高亮那一格所在的行和列
@@ -1899,7 +1924,7 @@ export class TableEditor {
         if (m && (m.r1 !== r || m.c1 !== c) && m.r1 >= rect.r1 && m.c1 >= rect.c1) continue;
         const el = this.cellEl({ r, c });
         const cs = el ? win.getComputedStyle(el) : null;
-        const styles = ["border:1px solid #d9d9d9", "padding:6px 10px", "vertical-align:top"];
+        const styles = ["border:1px solid #d9d9d9", "padding:6px 10px", `vertical-align:${vAlignOf(tb, c) ?? "top"}`];
         const a = tb.align[c];
         if (a) styles.push(`text-align:${a}`);
         if (cs) {
@@ -2112,7 +2137,7 @@ export class TableEditor {
     const col = this.tableEl.querySelectorAll("col")[c];
     if (!col || Number.isNaN(c)) return;
     const k = this.scale();
-    this.resize = { c, startX: ev.clientX, startW: col.getBoundingClientRect().width / k, col };
+    this.resize = { c, startX: ev.clientX, startW: col.getBoundingClientRect().width / k, col, fitW: this.root.classList.contains("is-fit") ? parseFloat(this.tableEl.style.width) || 0 : 0, scale: this.fitScale };
     const startLeft = parseFloat(handle.style.left) || 0;
     handle.classList.add("is-active");
     this.root.classList.add("is-resizing");
@@ -2126,6 +2151,8 @@ export class TableEditor {
       if (!r) return;
       const w = Math.max(40, Math.round(r.startW + (e.clientX - r.startX) / k));
       r.col.style.width = `${w}px`;
+      // 按比例缩着的表（table-layout: fixed、总宽写死）：总宽跟着这一列变，别的列不动
+      if (r.fitW) this.tableEl.style.width = `${r.fitW - r.startW + w}px`;
       // 线跟着鼠标走
       const tr = this.tableEl.getBoundingClientRect();
       const base = this.root.getBoundingClientRect();
@@ -2142,7 +2169,9 @@ export class TableEditor {
       this.resize = null;
       if (!r) return;
       const w = parseFloat(r.col.style.width);
-      if (Math.abs(w - r.startW) >= 1) this.apply(setWidth(this.table, r.c, w));
+      // 缩着拖的：看到的宽度换算回没缩时的宽度再存，重新缩放后和拖到的差不多
+      if (Math.abs(w - r.startW) >= 1) this.apply(setWidth(this.table, r.c, Math.round(w / r.scale)));
+      else this.fitCols();
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
@@ -2416,6 +2445,15 @@ export class TableEditor {
       align("left", t("alignAllLeft"), "align-left"),
       align("center", t("alignAllCenter"), "align-center"),
       align("right", t("alignAllRight"), "align-right"),
+      ...(["top", "middle", "bottom"] as const).map((v): MenuItem => {
+        const val: VAlign | null = v === "top" ? null : v;
+        return {
+          title: t(`vAlignAll_${v}`),
+          icon: V_ICONS[v],
+          checked: Array.from({ length: colCount(tb) }, (_, c) => vAlignOf(tb, c)).every((x) => x === val),
+          run: () => keep(vAlignAll(this.table, val)),
+        };
+      }),
       { separator: true },
       { title: t("headerRows") },
       ...Array.from({ length: MAX_HEAD_ROWS }, (_, i): MenuItem => ({
@@ -2471,6 +2509,40 @@ export class TableEditor {
   private colWidths(): number[] {
     const k = this.scale();
     return Array.from(this.tableEl.querySelectorAll("col")).map((c) => c.getBoundingClientRect().width / k);
+  }
+
+  /**
+   * 设置「列宽按比例缩放」（#10）：设过列宽的表格比正文宽时，各列按现在的比例缩到正好放下，不出横向滚动条。
+   * 只改显示（col 的 style），文件里还是原来的像素列宽。每列最窄 MIN_FIT_COL，列太多缩不下的照样横向滚动
+   */
+  private fitCols(): void {
+    const tb = this.table;
+    const t = this.tableEl;
+    const cols = Array.from(t.querySelectorAll<HTMLElement>("colgroup > col"));
+    if (this.fitScale !== 1 || this.root.classList.contains("is-fit")) {
+      cols.forEach((col, c) => {
+        const w = widthOf(tb, c);
+        col.style.width = w ? `${w}px` : "";
+      });
+      t.style.removeProperty("width");
+      this.root.classList.remove("is-fit");
+      this.fitScale = 1;
+    }
+    if (this.root.dataset.defFit !== "1" || !tb.meta.w?.some((x) => x != null) || this.resize) return;
+    const host = this.root.parentElement;
+    const avail = host ? host.clientWidth - 2 : 0;
+    const natural = t.offsetWidth;
+    if (avail <= 0 || !natural || natural <= avail + 1) return;
+    const k = this.scale();
+    const ws = cols.map((c) => c.getBoundingClientRect().width / k);
+    const sum = ws.reduce((a, b) => a + b, 0);
+    if (!sum) return;
+    const f = avail / sum;
+    const px = ws.map((w) => Math.max(MIN_FIT_COL, Math.floor(w * f)));
+    cols.forEach((col, c) => (col.style.width = `${px[c]}px`));
+    t.style.width = `${px.reduce((a, b) => a + b, 0)}px`;
+    this.root.classList.add("is-fit");
+    this.fitScale = f;
   }
 
   /** 撑满页面：按现在各列的比例放大 / 缩小到正文的可用宽度 */
@@ -2653,7 +2725,34 @@ export class TableEditor {
         }
       },
     });
-    return [item("left", t("alignLeft"), "align-left"), item("center", t("alignCenter"), "align-center"), item("right", t("alignRight"), "align-right")];
+    const vCur = new Set(cols.map((x) => vAlignOf(this.table, x)));
+    const vOne = vCur.size === 1 ? [...vCur][0] : undefined;
+    const vItem = (v: "top" | "middle" | "bottom"): MenuItem => {
+      const val: VAlign | null = v === "top" ? null : v;
+      return {
+        title: t(`vAlign_${v}`),
+        icon: V_ICONS[v],
+        checked: vOne === val,
+        run: () => {
+          const k = keep();
+          let next = this.table;
+          for (const x of cols) next = setVAlign(next, x, val);
+          this.apply(next, k.sel ?? undefined);
+          if (k.anchor) {
+            this.anchor = k.anchor;
+            this.markSel();
+          }
+        },
+      };
+    };
+    return [
+      item("left", t("alignLeft"), "align-left"),
+      item("center", t("alignCenter"), "align-center"),
+      item("right", t("alignRight"), "align-right"),
+      vItem("top"),
+      vItem("middle"),
+      vItem("bottom"),
+    ];
   }
 
   /** 底色：一排色块，标题是「底色」 */

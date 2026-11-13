@@ -3,7 +3,7 @@
  * 增删、移动行列时，注释里按坐标记的东西（底色）和按列记的东西（列宽）跟着挪。
  */
 
-import { type Align, type Calc, type CellColor, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle } from "./table";
+import { type Align, type Calc, type CellColor, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
 import { fillSeries } from "./fill";
 
 export function cloneTable(t: Table): Table {
@@ -96,7 +96,7 @@ function remapMerges(meta: TableMeta, fr: (r: number) => number | null, fc: (c: 
 }
 
 /** 按列记的设置（列宽、合计方式、状态选项）：插、删、挪列时一起改 */
-const COL_KEYS = ["w", "calc", "opts"] as const;
+const COL_KEYS = ["w", "calc", "opts", "va"] as const;
 function spliceCols(meta: TableMeta, n: number, op: (a: unknown[]) => void): void {
   for (const key of COL_KEYS) {
     const src = meta[key] as unknown[] | undefined;
@@ -214,6 +214,30 @@ export function setAlign(t: Table, c: number, a: Align): Table {
   if (c < 0 || c >= colCount(t) || t.align[c] === a) return t;
   const n = cloneTable(t);
   n.align[c] = a;
+  return n;
+}
+
+/** 第 c 列的垂直对齐；null 是顶端 */
+export function vAlignOf(t: Table, c: number): VAlign | null {
+  return t.meta.va?.[c] ?? null;
+}
+
+/** 设一列的垂直对齐（null 是顶端） */
+export function setVAlign(t: Table, c: number, v: VAlign | null): Table {
+  if (c < 0 || c >= colCount(t) || vAlignOf(t, c) === v) return t;
+  const n = cloneTable(t);
+  const va = (n.meta.va ?? []).slice(0, colCount(t));
+  while (va.length < colCount(t)) va.push(null);
+  va[c] = v;
+  if (va.some(Boolean)) n.meta.va = va;
+  else delete n.meta.va;
+  return n;
+}
+
+/** 整表垂直对齐 */
+export function vAlignAll(t: Table, v: VAlign | null): Table {
+  let n = t;
+  for (let c = 0; c < colCount(t); c++) n = setVAlign(n, c, v);
   return n;
 }
 
@@ -567,6 +591,7 @@ export function duplicateCol(t: Table, c: number): Table {
   let n = insertCol(t, c + 1);
   for (let r = 0; r < rowCount(t); r++) n.cells[r][c + 1] = t.cells[r][c];
   n.align[c + 1] = t.align[c];
+  n = setVAlign(n, c + 1, vAlignOf(t, c));
   const w = widthOf(t, c);
   if (w) n = setWidth(n, c + 1, w);
   for (const key of ["bg", "fg"] as const) {

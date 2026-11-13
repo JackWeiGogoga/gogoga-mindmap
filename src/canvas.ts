@@ -724,7 +724,8 @@ export class MindMapCanvas {
   private widthHandleNode: MindNode | null = null;
   /** 鼠标正指着的节点（悬停调宽度用） */
   private hoverNode: MindNode | null = null;
-  private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1 } | null = null;
+  /** 拖宽度手柄：group 是一起改宽度的节点（框选了好几个、拖的是其中一个时是选中的全部，否则只有它） */
+  private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1; group: { node: MindNode; el: HTMLElement; w: number }[] } | null = null;
   private imgResize: {
     node: MindNode;
     /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
@@ -7071,7 +7072,11 @@ export class MindMapCanvas {
         const on = !!node.parent.numbered;
         entries.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
       }
-      if (node.width) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidth(node) });
+      {
+        // 右键的是选中的节点之一：选中的里面设过宽度的一起恢复
+        const many = this.selected.size > 1 && this.selected.has(node) ? [...this.selected].filter((n) => n.width) : node.width ? [node] : [];
+        if (many.length) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidths(many) });
+      }
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
       if (box) entries.push({ title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
@@ -7598,7 +7603,12 @@ export class MindMapCanvas {
       if (ev.button !== 0) return;
       ev.stopPropagation();
       ev.preventDefault();
-      this.widthResize = { node, el, startWorldX: this.toWorld(ev.clientX, ev.clientY).x, startW: el.offsetWidth, dir };
+      // 框选了好几个、拖的是其中一个：选中的节点（图片、视频节点除外）一起设成同样宽度
+      const group = (this.selected.size > 1 && this.selected.has(node) ? [...this.selected] : [node])
+        .map((n) => ({ node: n, el: this.els.get(n.id)! }))
+        .filter((g) => g.el && !g.el.querySelector("img.mm-img, iframe.mm-frame"))
+        .map((g) => ({ ...g, w: g.el.offsetWidth }));
+      this.widthResize = { node, el, startWorldX: this.toWorld(ev.clientX, ev.clientY).x, startW: el.offsetWidth, dir, group };
       try {
         handle.setPointerCapture(ev.pointerId);
       } catch {
@@ -7611,9 +7621,12 @@ export class MindMapCanvas {
       if (!r) return;
       const dx = this.toWorld(clientX, clientY).x - r.startWorldX;
       const w = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, r.startW + r.dir * dx));
-      r.el.classList.add("has-width");
-      r.el.style.width = `${Math.round(w)}px`;
-      this.reflow(r.node);
+      for (const g of r.group) {
+        g.el.classList.add("has-width");
+        g.el.style.width = `${Math.round(w)}px`;
+      }
+      if (r.group.length > 1) this.reflow();
+      else this.reflow(r.node);
       this.positionNodebar();
     };
     handle.addEventListener("pointermove", (ev) => {
@@ -7630,8 +7643,8 @@ export class MindMapCanvas {
       this.stopAutoScroll();
       this.widthResize = null;
       const w = Math.round(r.el.offsetWidth);
-      if (w === r.startW) return;
-      r.node.width = w;
+      if (r.group.every((g) => g.w === w && (g.node.width ?? g.w) === w)) return;
+      for (const g of r.group) g.node.width = w;
       this.render();
       this.notify();
     };
@@ -7653,7 +7666,8 @@ export class MindMapCanvas {
     if (!this.opts.editable || this.editing || this.drag) return null;
     const hovered = this.hoverNode;
     if (hovered && this.opts.widthHandleOnHover?.() && this.els.has(hovered.id)) return hovered;
-    return this.primary && this.selected.size === 1 ? this.primary : null;
+    // 框选了好几个：手柄在主选中的那个上，拖它就一起改（见 updateWidthHandle）
+    return this.primary && this.selected.has(this.primary) ? this.primary : null;
   }
 
   /** 鼠标指着的节点变了：悬停调宽度打开时把手柄挪过去 */
@@ -7725,6 +7739,14 @@ export class MindMapCanvas {
   resetWidth(node: MindNode): void {
     if (!this.opts.editable || !node.width) return;
     node.width = undefined;
+    this.render();
+    this.notify();
+  }
+
+  /** 几个节点一起恢复自动宽度（一步撤销） */
+  private resetWidths(nodes: MindNode[]): void {
+    if (!this.opts.editable || !nodes.some((n) => n.width)) return;
+    for (const n of nodes) n.width = undefined;
     this.render();
     this.notify();
   }

@@ -20,6 +20,10 @@ export type CellColor = (typeof CELL_COLORS)[number];
 export const CALCS = ["sum", "avg", "count", "max", "min"] as const;
 export type Calc = (typeof CALCS)[number];
 
+/** 垂直对齐：不写是顶端 */
+export const VALIGNS = ["middle", "bottom"] as const;
+export type VAlign = (typeof VALIGNS)[number];
+
 export const TABLE_STYLES = ["default", "zebra", "minimal", "academic"] as const;
 export type TableStyle = (typeof TABLE_STYLES)[number];
 export const TABLE_DENSITIES = ["comfortable", "compact"] as const;
@@ -34,6 +38,8 @@ export interface TableMeta {
   merge?: string[];
   /** 格子的文字颜色，键是 A1 式坐标 */
   fg?: Record<string, CellColor>;
+  /** 每列的垂直对齐（middle 居中、bottom 底端），null 是顶端 */
+  va?: (VAlign | null)[];
   /** 每列的合计方式；有任何一列设了，最后一行就是合计行 */
   calc?: (Calc | null)[];
   /** 状态列：每列「值 → 颜色」；设了的列，格子画成彩色标签 */
@@ -170,6 +176,11 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
     const calc = Array.isArray(raw.calc) ? raw.calc.map((x) => ((CALCS as readonly unknown[]).includes(x) ? (x as Calc) : null)) : [];
     if (calc.some(Boolean)) meta.calc = calc;
     else delete meta.calc;
+  }
+  if (raw.va !== undefined) {
+    const va = Array.isArray(raw.va) ? raw.va.map((x) => ((VALIGNS as readonly unknown[]).includes(x) ? (x as VAlign) : null)) : [];
+    if (va.some(Boolean)) meta.va = va;
+    else delete meta.va;
   }
   if (raw.opts !== undefined) {
     const opts = Array.isArray(raw.opts)
@@ -310,7 +321,7 @@ export function metaToWrite(meta: TableMeta, cols: number): TableMeta | null {
   }
   if (out.bg && !Object.keys(out.bg).length) delete out.bg;
   if (out.fg && !Object.keys(out.fg).length) delete out.fg;
-  for (const key of ["calc", "opts"] as const) {
+  for (const key of ["calc", "opts", "va"] as const) {
     const a = out[key] as unknown[] | undefined;
     if (!a) continue;
     const b = a.slice(0, cols);
