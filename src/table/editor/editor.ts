@@ -28,6 +28,8 @@ export interface MenuItem {
   swatch?: CellColor | "none";
   /** 色块是文字颜色（画成一个带颜色的「A」） */
   textSwatch?: boolean;
+  /** 只画图标、和相邻的 inline 项排成一排（对齐这类），名字在悬停提示里；菜单短一些，矮窗口里不用滚 */
+  inline?: boolean;
   checked?: boolean;
   disabled?: boolean;
   danger?: boolean;
@@ -2510,6 +2512,7 @@ export class TableEditor {
     const align = (a: Align, title: string, icon: string): MenuItem => ({
       title,
       icon,
+      inline: true,
       checked: tb.align.every((x) => (x ?? "left") === a),
       run: () => keep(alignAll(this.table, a)),
     });
@@ -2522,6 +2525,7 @@ export class TableEditor {
       dens(null),
       ...TABLE_DENSITIES.map((x) => dens(x)),
       { separator: true },
+      { title: t("align") },
       align("left", t("alignAllLeft"), "align-left"),
       align("center", t("alignAllCenter"), "align-center"),
       align("right", t("alignAllRight"), "align-right"),
@@ -2530,6 +2534,7 @@ export class TableEditor {
         return {
           title: t(`vAlignAll_${v}`),
           icon: V_ICONS[v],
+          inline: true,
           checked: Array.from({ length: colCount(tb) }, (_, c) => vAlignOf(tb, c)).every((x) => x === val),
           run: () => keep(vAlignAll(this.table, val)),
         };
@@ -2793,6 +2798,7 @@ export class TableEditor {
     const item = (a: Align, title: string, icon: string): MenuItem => ({
       title,
       icon,
+      inline: true,
       checked: one === a,
       run: () => {
         const k = keep();
@@ -2812,6 +2818,7 @@ export class TableEditor {
       return {
         title: t(`vAlign_${v}`),
         icon: V_ICONS[v],
+        inline: true,
         checked: vOne === val,
         run: () => {
           const k = keep();
@@ -2826,6 +2833,7 @@ export class TableEditor {
       };
     };
     return [
+      { title: t("align") },
       item("left", t("alignLeft"), "align-left"),
       item("center", t("alignCenter"), "align-center"),
       item("right", t("alignRight"), "align-right"),
@@ -2866,7 +2874,7 @@ export class TableEditor {
         continue;
       }
       if (item.swatch) {
-        if (!swatches) {
+        if (!swatches || swatches.classList.contains("ggt-menu-icons")) {
           swatches = pop.appendChild(doc.createElement("div"));
           swatches.className = "ggt-menu-swatches";
         }
@@ -2885,6 +2893,30 @@ export class TableEditor {
         });
         continue;
       }
+      if (item.inline && item.run) {
+        if (!swatches || !swatches.classList.contains("ggt-menu-icons")) {
+          swatches = pop.appendChild(doc.createElement("div"));
+          swatches.className = "ggt-menu-icons";
+        }
+        // 第二组（比如上下对齐接在左右对齐后面）中间留一道竖线
+        if (item.inline && swatches.childElementCount && (swatches.lastElementChild as HTMLElement).dataset.group !== (item.icon?.startsWith("align-vertical") ? "v" : "h")) swatches.appendChild(doc.createElement("span")).className = "ggt-menu-icons-sep";
+        const b = swatches.appendChild(doc.createElement("button"));
+        b.type = "button";
+        b.className = "ggt-menu-item is-icon" + (item.checked ? " is-checked" : "");
+        b.dataset.group = item.icon?.startsWith("align-vertical") ? "v" : "h";
+        b.disabled = !!item.disabled;
+        b.setAttribute("role", "menuitem");
+        b.setAttribute("aria-label", item.title ?? "");
+        b.title = item.title ?? "";
+        if (item.icon && this.host.setIcon) this.host.setIcon(b, item.icon);
+        else b.textContent = (item.title ?? "").slice(0, 2);
+        b.addEventListener("click", () => {
+          this.closePopover();
+          item.run?.();
+        });
+        continue;
+      }
+      if (swatches?.classList.contains("ggt-menu-icons")) swatches = null;
       if (!item.run) {
         swatches = null;
         const label = pop.appendChild(doc.createElement("div"));

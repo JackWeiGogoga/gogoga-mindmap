@@ -2421,6 +2421,12 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   cursor: pointer;
 }
 .ggt-menu button.ggt-menu-item:hover:not(:disabled) { background: var(--background-modifier-hover); }
+/* 对齐这类：只有图标、排成一排（名字在悬停提示里） */
+.ggt-menu-icons { display: flex; align-items: center; gap: 2px; padding: 2px 4px; }
+.ggt-menu button.ggt-menu-item.is-icon { width: 30px; height: 28px; padding: 0; justify-content: center; color: var(--text-muted); }
+.ggt-menu button.ggt-menu-item.is-icon svg { width: 16px; height: 16px; }
+.ggt-menu button.ggt-menu-item.is-icon.is-checked { background: var(--background-modifier-active-hover, var(--background-modifier-hover)); color: var(--interactive-accent); }
+.ggt-menu-icons-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--background-modifier-border); }
 .ggt-menu button.ggt-menu-item:disabled { opacity: 0.4; cursor: default; }
 .ggt-menu button.ggt-menu-item.is-danger:not(:disabled) { color: var(--text-error); }
 .ggt-menu-icon { display: inline-flex; width: 16px; color: var(--text-muted); }
