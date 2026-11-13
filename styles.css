@@ -2801,6 +2801,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 .ggt-content img { cursor: zoom-in; }
+
+/* 实时预览里格子不在 .markdown-rendered 下面，Obsidian 给行内代码的样式套不上：照它的写法补一份（阅读视图里本来就有） */
+.ggt-content :not(pre) > code { color: var(--code-normal); font-family: var(--font-monospace); background-color: var(--code-background); border-radius: var(--code-radius); font-size: var(--code-size); padding: 0.1em 0.25em; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

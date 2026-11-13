@@ -4,6 +4,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- After restarting Obsidian, a mind map sometimes showed nodes piled on top of each other (it was laid out before the plugin's styles or fonts were ready, measured the nodes too small, and never laid out again). Node sizes are now checked after a map opens, when a background tab comes to the front and when fonts finish loading, and the map is laid out again if they're off.
+- Tables in nodes: inline code in cells had no background in Live Preview (same as gogoga Table).
+
 ## [0.65.0] - 2026-11-13
 
 ### Fixed

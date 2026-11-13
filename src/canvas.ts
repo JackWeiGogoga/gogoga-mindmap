@@ -835,11 +835,22 @@ export class MindMapCanvas {
           return;
         }
         if (!this.hasView && this.initialFit()) this.hasView = true;
+        // 从看不见变成看得见（后台标签页切过来、侧栏展开）：藏着的时候量的尺寸可能不准
+        const visible = this.el.clientWidth > 0 && this.el.clientHeight > 0;
+        if (visible && !this.wasVisible) this.scheduleSizeCheck();
+        this.wasVisible = visible;
         this.updateBottomInset();
         this.positionNodebar();
       });
       this.ro.observe(this.el);
       this.noteRo = new ResizeObserver(() => this.scheduleReflow());
+    }
+    // 字体加载完：节点文字的宽度会变
+    const fonts = this.el.ownerDocument.fonts;
+    if (fonts) {
+      const onFonts = () => this.scheduleSizeCheck();
+      fonts.addEventListener("loadingdone", onFonts);
+      this.sizeCheckCleanup = () => fonts.removeEventListener("loadingdone", onFonts);
     }
   }
 
@@ -860,6 +871,11 @@ export class MindMapCanvas {
     if (this.primary && !this.selected.has(this.primary)) this.primary = null;
     this.render();
     if (this.search) this.runSearch(this.search.input.value, false);
+    // 第一次打开：重启时可能在样式、字体还没就绪时就排了版，过一会儿核对一下尺寸
+    if (!this.sizeCheckedOnce) {
+      this.sizeCheckedOnce = true;
+      this.scheduleSizeCheck();
+    }
   }
 
   getDoc(): MindDoc | null {
@@ -1282,6 +1298,8 @@ export class MindMapCanvas {
 
   destroy(): void {
     liveCanvases.delete(this);
+    this.sizeCheckCleanup?.();
+    for (const t of this.sizeCheckTimers) window.clearTimeout(t);
     this.nodeEditor?.destroy();
     this.ro?.disconnect();
     this.noteRo?.disconnect();
@@ -1670,6 +1688,38 @@ export class MindMapCanvas {
 
   private reflowTimer: number | null = null;
   /** 图片陆续加载完时合并成一次重排 */
+  /**
+   * 保护：重启 Obsidian 时脑图可能在插件样式或字体还没就绪时就排了版，量出来的节点偏小，节点叠在一起，
+   * 之后又没有东西触发重排。在容易出这种事的时候（第一次打开、从看不见变成看得见、字体加载完）
+   * 过一会儿核对节点现在的实际尺寸和排版用的尺寸，不一致就重排。只读尺寸；一轮最多重排 3 次
+   */
+  private sizeCheckCleanup: (() => void) | null = null;
+  private sizeCheckTimers: number[] = [];
+  private sizeCheckedOnce = false;
+  private wasVisible = false;
+  private sizeFixes = 0;
+  private scheduleSizeCheck(): void {
+    for (const t of this.sizeCheckTimers) window.clearTimeout(t);
+    this.sizeFixes = 0;
+    this.sizeCheckTimers = [50, 300, 1000, 2500].map((ms) => window.setTimeout(() => this.checkSizes(), ms));
+  }
+
+  private checkSizes(): void {
+    if (!this.doc || !this.els.size || this.editing || this.sizeFixes >= 3) return;
+    // 藏着（后台标签页、折叠的侧栏）：量不出来，等变成看得见时再核对
+    if (!this.el.isConnected || this.el.clientWidth === 0) return;
+    for (const [id, el] of this.els) {
+      if (el.offsetParent === null) continue;
+      const used = this.sizes.get(id);
+      if (!used) continue;
+      if (Math.abs(el.offsetWidth - used.w) > 1 || Math.abs(el.offsetHeight - used.h) > 1) {
+        this.sizeFixes++;
+        this.reflow();
+        return;
+      }
+    }
+  }
+
   private scheduleReflow(): void {
     if (this.reflowTimer !== null) return;
     this.reflowTimer = window.setTimeout(() => {
