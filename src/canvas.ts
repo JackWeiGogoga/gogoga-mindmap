@@ -117,6 +117,13 @@ export interface CanvasHost {
   openLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
   /** 内部链接悬停：Obsidian 用来弹页面预览 */
   hoverLink?: (ev: MouseEvent, linktext: string, targetEl: HTMLElement) => void;
+  /**
+   * 右键链接、图片：弹出 Obsidian 原生的链接菜单（新标签页打开、重命名、移动……）。extra 是放在最前面的额外项。
+   * linktext 为空时只放 extra
+   */
+  linkContextMenu?: (ev: MouseEvent, linktext: string, extra: { title: string; icon: string; warning?: boolean; run: () => void }[]) => void;
+  /** 用 Obsidian 自己的确认框删掉链接指向的文件；删了返回 true */
+  deleteLinkedFile?: (linktext: string) => Promise<boolean>;
   /** 让用户挑一篇笔记（或新建），返回笔记名；取消返回 null */
   pickNote?: (suggested: string) => Promise<string | null>;
   /** 渲染 $…$ 公式 */
@@ -7898,6 +7905,17 @@ export class MindMapCanvas {
       // 格子里的双链：和节点里的链接一样打开（按「链接打开位置」设置，⌘/Ctrl 点新标签），悬停预览
       openLink: host?.openLink ? (href, ev) => host.openLink!(href, true, ev) : undefined,
       hoverLink: host?.hoverLink,
+      // 右键格子里的双链：原生链接菜单
+      linkMenu: host?.linkContextMenu ? (ev, href) => host.linkContextMenu!(ev, href, []) : undefined,
+      // 右键格子里的图片：复制图片 + 原生文件菜单 + 删除图片（Obsidian 的确认框，删了再把嵌入从格子里去掉）
+      imageMenu: host?.linkContextMenu
+        ? (ev, img, link, remove) => {
+            const extra: { title: string; icon: string; warning?: boolean; run: () => void }[] = [{ title: t("menu.copyImage"), icon: "copy", run: () => void this.copyImage(img) }];
+            if (link && remove && host.deleteLinkedFile)
+              extra.push({ title: t("menu.deleteImage"), icon: "trash-2", warning: true, run: () => void host.deleteLinkedFile!(link).then((ok) => ok && remove()) });
+            host.linkContextMenu!(ev, link ?? "", extra);
+          }
+        : undefined,
       // 往格子里粘贴截图：和往节点里粘贴图片一样存成附件
       saveImage: editable && host?.saveBinary
         ? async (file) => {

@@ -60,6 +60,13 @@ export interface EditorHost {
   openLink?(href: string, ev: MouseEvent): void;
   /** 鼠标悬停在格子里的双链上：页面预览 */
   hoverLink?(ev: MouseEvent, href: string, el: HTMLElement): void;
+  /** 右键格子里的双链：宿主弹出原生的链接菜单（新标签页打开、重命名、移动……）；不给就照常弹格子菜单 */
+  linkMenu?(ev: MouseEvent, href: string): void;
+  /**
+   * 右键格子里的图片：宿主弹出图片菜单。link 是 ![[…]] 里的文件名（Markdown 图片语法时为 null）；
+   * remove 把这张图的嵌入从格子里去掉（删掉文件后调用；只读时为 null）
+   */
+  imageMenu?(ev: MouseEvent, img: HTMLImageElement, link: string | null, remove: (() => void) | null): void;
   /** 往格子里粘贴图片：存成附件，返回要插进格子的 Markdown（![[…]]）；不给就不接图片 */
   saveImage?(file: File): Promise<string | null>;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
@@ -1142,8 +1149,39 @@ export class TableEditor {
     });
     this.on(this.tableEl, "dblclick", (ev) => {
       const target = ev.target as HTMLElement;
+      // 双击格子里的图片：放大看（和原生表格、gogoga Mind Map 一样）；双击别处进入编辑
+      const img = !this.editing && target.closest(".ggt-cell") ? target.closest<HTMLImageElement>(".ggt-content img") : null;
+      if (img) {
+        ev.preventDefault();
+        // 脑图节点里的表格：别让画布再把双击当成编辑节点
+        ev.stopPropagation();
+        this.openLightbox(img);
+        return;
+      }
       if (target.closest(".ggt-cell") && !this.editing) this.startEdit(true);
     });
+    // 右键格子里的图片、双链：弹出 Obsidian 原生的菜单（只读的表也弹，只是不能从格子里删图）
+    this.on(this.tableEl, "contextmenu", (ev) => {
+      const target = ev.target as HTMLElement;
+      const cellEl = target.closest<HTMLElement>(".ggt-cell");
+      if (!cellEl || (this.editing && this.input.contains(target))) return;
+      const p = { r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) };
+      const img = target.closest<HTMLImageElement>(".ggt-content img");
+      if (img && this.host.imageMenu) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const link = img.closest<HTMLElement>(".internal-embed")?.getAttribute("src") ?? null;
+        this.host.imageMenu(ev, img, link, link && !this.host.readonly ? () => this.removeEmbed(p, link) : null);
+        return;
+      }
+      const a = target.closest<HTMLAnchorElement>(".ggt-content a.internal-link");
+      const href = a?.dataset.href ?? a?.getAttribute("href");
+      if (a && href && this.host.linkMenu) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.host.linkMenu(ev, href);
+      }
+    }, { capture: true });
     this.on(this.tableEl, "contextmenu", (ev) => {
       const cell = (ev.target as HTMLElement).closest<HTMLElement>(".ggt-cell");
       if (!cell || this.host.readonly || (this.editing && this.input.contains(ev.target as Node))) return;
@@ -1933,6 +1971,37 @@ export class TableEditor {
     this.apply(next, { r: r.r1, c: r.c1 });
     // 粘贴进来的那一片选中
     if (grid.length > 1 || grid[0].length > 1) this.setSel({ r: r.r1 + grid.length - 1, c: r.c1 + Math.max(...grid.map((x) => x.length)) - 1 }, true, true);
+  }
+
+  /** 从格子里去掉一张图的嵌入 ![[文件名]]（带 |100 这类尺寸的也算），前后多出的空格一起收掉 */
+  private removeEmbed(p: Pos, link: string): void {
+    const cur = shownText(this.table, p.r, p.c);
+    const esc = link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const next = cur.replace(new RegExp(`[ \\t]?!\\[\\[${esc}(?:\\|[^\\]]*)?\\]\\]`), "").trim();
+    if (next !== cur) this.apply(editCell(this.table, p.r, p.c, next), p);
+  }
+
+  /** 双击格子里的图片：盖住整个窗口看原图，点一下或按 Esc 关掉 */
+  private openLightbox(img: HTMLImageElement): void {
+    const doc = this.root.ownerDocument;
+    if (doc.querySelector(".ggt-lightbox")) return;
+    const box = doc.body.appendChild(doc.createElement("div"));
+    box.className = "ggt-lightbox";
+    const big = box.appendChild(doc.createElement("img"));
+    big.src = img.currentSrc || img.src;
+    big.alt = img.alt;
+    const close = () => {
+      box.remove();
+      doc.removeEventListener("keydown", onKey, true);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      close();
+    };
+    box.addEventListener("click", close);
+    doc.addEventListener("keydown", onKey, true);
   }
 
   /** 图片存好以后插进格子：编辑中插在光标处；只是选中就接在格子原有内容后面（不覆盖） */

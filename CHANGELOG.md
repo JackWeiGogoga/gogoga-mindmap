@@ -7,6 +7,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Fixed
 - A blank line between a heading and its marker line (`%%…%%`) made the markers count as note text, so relation lines broke and colors, folding and the like stopped working. Plugins such as Linter add that blank line after headings. Markers are now recognized anyway, and the blank line is kept when writing back.
 - Double-clicking a node to edit selects its text but didn't show the format bar until you selected again. With **Format bar when selecting text** on, it now appears right away. New nodes don't show it.
+- Tables in nodes: double-click an image in a cell to enlarge it; right-click an image for Copy image, the native file menu and Delete image; right-click a link for the native link menu (same as gogoga Table).
 - Tables in nodes: typing 【【 with a Chinese input method in a cell opens link suggestions too (same as gogoga Table).
 - Tables in nodes: the horizontal scroll bar could sit under the add-row button (same fix as gogoga Table).
 

@@ -2781,6 +2781,26 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 阅读视图：Obsidian 给表格套的 .el-table 会横向滚动、裁掉超出的部分，骑在表格左边线上的行手柄、左上角按钮会被切掉半边。
    接管了的表格横向滚动由 .ggt-scroll 自己负责，这一层不用滚动（这样长表格在阅读视图里也能用原生吸顶）。Obsidian 在它上面写了内联的 overflow-x: auto，要 !important 才盖得住 */
 .markdown-rendered .el-table:has(> .ggt-reading) { overflow: visible !important; }
+
+/* 双击格子里的图片看大图 */
+.ggt-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal, 50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: zoom-out;
+}
+.ggt-lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+.ggt-content img { cursor: zoom-in; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

@@ -1938,6 +1938,26 @@ export default class MindMapPlugin extends Plugin {
         if (mod === "split" || (!mod && this.settings.linkOpen === "split")) void this.openInLinkSplit(href, sourcePath());
         else void this.app.workspace.openLinkText(href, sourcePath(), mod || (this.settings.linkOpen === "tab" ? "tab" : false));
       },
+      linkContextMenu: (ev, linktext, extra) => {
+        const menu = new Menu();
+        for (const x of extra)
+          menu.addItem((item) => {
+            item
+              .setSection(x.warning ? "danger" : "action")
+              .setTitle(x.title)
+              .setIcon(x.icon)
+              .onClick(() => x.run());
+            if (x.warning) item.setWarning(true);
+          });
+        // Obsidian 给链接右键用的内部方法：菜单和笔记里一模一样，别的插件加的项也在；没有就只放 extra
+        const ws = this.app.workspace as unknown as { handleLinkContextMenu?: (menu: Menu, linktext: string, sourcePath: string) => boolean };
+        if (linktext) ws.handleLinkContextMenu?.(menu, linktext, sourcePath());
+        menu.showAtMouseEvent(ev);
+      },
+      deleteLinkedFile: async (linktext) => {
+        const file = this.app.metadataCache.getFirstLinkpathDest(linktext, sourcePath());
+        return file ? this.app.fileManager.promptForDeletion(file) : false;
+      },
       hoverLink: hoverParent
         ? (event, linktext, targetEl) => {
             this.app.workspace.trigger("hover-link", { event, source: HOVER_SOURCE, hoverParent, targetEl, linktext, sourcePath: sourcePath() });
