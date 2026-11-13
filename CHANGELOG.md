@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.67.0] - 2026-11-13
+
 ### Added
 - More ways to split a topic: right-click → **More → Split into subtopics ▸** and choose at commas, enumeration commas and semicolons (the old behavior), at periods, question and exclamation marks, at semicolons, at numbering (1. / 1、 / (1) / ① / 一、 / （一） / I. / ii), counting up 1, 2, 3), or a split you add under **Custom splits** in settings (one per line, "name: characters").
 - While editing a topic, select some text and use **Split** in the format bar to split just that text into subtopics.
@@ -847,7 +849,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...HEAD
+[0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0

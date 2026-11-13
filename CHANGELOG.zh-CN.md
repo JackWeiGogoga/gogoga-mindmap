@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.67.0] - 2026-11-13
+
 ### 新增
 - 拆成子节点有了几种拆法：右键「更多 → 拆成子节点 ▸」里选按逗号顿号分号（原来的）、按句号问号叹号、按分号、按序号（1. / 1、 / (1) / ① / 一、 / （一） / I. / ii)，要按 1、2、3 的顺序），以及设置里「自定义拆分方式」加的（每行「名称：符号」）。
 - 编辑节点时选中一段文字，格式栏里的「拆分」只把选中的那段拆成子节点。
@@ -847,7 +849,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...HEAD
+[0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0
 [0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
