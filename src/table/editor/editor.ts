@@ -167,6 +167,8 @@ export class TableEditor {
   private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement } | null = null;
   private resize: { c: number; startX: number; startW: number; col: HTMLElement } | null = null;
   private destroyed = false;
+  /** 横向滚动条占的高度（覆盖式滚动条是 0） */
+  private scrollbarH = 0;
   /** 上一次长按开菜单的时间（安卓随后还会来一次右键事件，忽略掉） */
   private longPressAt = -Infinity;
   private readonly cleanups: (() => void)[] = [];
@@ -380,6 +382,13 @@ export class TableEditor {
       const sc = this.scroller;
       this.root.classList.toggle("can-left", sc.scrollLeft > 1);
       this.root.classList.toggle("can-right", sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1);
+      // 横向滚动条占地方时（Windows、或者 macOS 设成「始终显示滚动条」），底下的「加一行」按钮挪到滚动条下面，
+      // 不然按钮正好盖在滚动条上，滚动条拖不动也点不到
+      const bar = Math.max(0, sc.offsetHeight - sc.clientHeight);
+      if (bar !== this.scrollbarH) {
+        this.scrollbarH = bar;
+        this.root.style.setProperty("--ggt-sb", `${bar}px`);
+      }
       this.stickHeader();
       // 左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
       this.placeHandles();
@@ -536,6 +545,8 @@ export class TableEditor {
     const d = this.root.dataset;
     d.preset = this.table.meta.style ?? d.defPreset ?? "default";
     d.density = this.table.meta.density ?? d.defDensity ?? "comfortable";
+    // 设置「表格默认撑满页面宽度」：只管没拖过列宽的表（拖过的按设的宽度）
+    this.root.classList.toggle("is-full", d.defFull === "1" && !this.table.meta.w?.some((x) => x != null));
   }
 
   // ---------- 渲染 ----------

@@ -670,12 +670,18 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       let { marker } = split;
       // 标题的标记写在下一行（只有 %%…%% 的一行）：标题行保持干净，[[笔记#标题]] 的链接才对得上。
       // 老写法（标记在标题行末尾）照样认；两处都有时以下一行为准
-      const next = tokens[ti + 1];
+      // 标题和标记行之间空了行也认（Linter 这类插件会在标题后面自动加空行，以前标记就被当成备注，关联线、颜色都丢了）；
+      // 空了几行记下来，写回时照样空，不改用户的排版
+      let k = ti + 1;
+      while (tokens[k]?.t === "line" && (tokens[k] as { raw: string }).raw.trim() === "") k++;
+      const next = tokens[k];
+      let markerGap = 0;
       if (next?.t === "line" && next.raw.trim() !== "") {
         const own = splitMarker(next.raw.trim());
-        if (own.text === "") {
+        if (own.text === "" && (k === ti + 1 || Object.keys(own.marker).length)) {
           marker = mergeMarker(marker, own.marker);
-          ti++;
+          markerGap = k - ti - 1;
+          ti = k;
         }
       }
       if (!seenRoot && rootFromHeading) {
@@ -695,6 +701,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.calloutColor = marker.calloutColor;
         root.anchor = marker.anchor;
         root.rels = marker.rels;
+        root.markerGap = markerGap || undefined;
         root.level = 1;
         root.kind = "heading";
         opts.lines?.set(root, lineNo);
@@ -708,6 +715,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
         const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
+        if (markerGap) node.markerGap = markerGap;
         parent.children.push(node);
         headingStack.push(node);
         opts.lines?.set(node, lineNo);
@@ -880,7 +888,11 @@ export function serializeMarkdown(doc: MindDoc): string {
     out.push(`${"#".repeat(level)} ${node.text}`.trimEnd());
     // 标记单独一行写在标题下面，不进标题文字（见解析处的说明）
     const marker = formatMarker(node).trim();
-    if (marker) out.push(marker);
+    if (marker) {
+      // 原文标题和标记行之间空了行（Linter 加的）：照样空
+      for (let i = 0; i < (node.markerGap ?? 0); i++) out.push("");
+      out.push(marker);
+    }
     lastNode = node;
     nodeEnd = out.length;
     if (node.note) {

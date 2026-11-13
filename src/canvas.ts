@@ -6035,6 +6035,14 @@ export class MindMapCanvas {
       },
     });
     this.reflow();
+    // 双击进入编辑时文字已经全选：选区是建编辑框时就给好的，不会触发 onSelect，格式栏要自己叫一次（等排好版、拿到焦点）。
+    // 新建的节点（默认名字全选着，马上就要打字替换）不弹，免得连续加节点时格式栏一直闪
+    if (!isNew) {
+      const win = this.el.ownerDocument.defaultView ?? window;
+      win.requestAnimationFrame(() => {
+        if (this.editing === node) this.updateFormatBar();
+      });
+    }
   }
 
   /** 新节点的默认名字：主题1、主题2……，接着同级里已有的最大编号往下排 */

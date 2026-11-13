@@ -75,6 +75,8 @@ export interface MindNode {
   topicOf?: MindNode;
   /** 文件里写了 %%summary-topic=N%% 却挂不成概要主题（前面的兄弟不够、起始节点已经有概要……）：当普通节点，标记原样写回 */
   topicSpan?: number;
+  /** 标题和它的标记行之间原文空了几行（Linter 这类插件加的）；写回时照样空 */
+  markerGap?: number;
   children: MindNode[];
   parent: MindNode | null;
   depth: number;

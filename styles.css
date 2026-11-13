@@ -2275,7 +2275,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   --ggt-font-size: var(--table-text-size, 0.93em);
   position: relative;
   margin: 0.4em 0 0.8em;
-  padding: 10px 26px 26px 14px;
+  padding: 10px 26px calc(26px + var(--ggt-sb, 0px)) 14px;
   margin-left: -14px;
   width: fit-content;
   max-width: calc(100% + 40px);
@@ -2297,6 +2297,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   line-height: 1.5;
 }
 .ggt-table col { min-width: 40px; }
+/* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动 */
+.ggt.is-full .ggt-table { width: 100%; }
 .ggt .ggt-cell {
   position: relative;
   padding: 0;
@@ -2445,7 +2447,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-add svg { width: 14px; height: 14px; }
 .ggt:hover button.ggt-add { opacity: 1; }
 .ggt button.ggt-add:hover { background: rgba(var(--mono-rgb-100), 0.06); color: var(--text-normal); }
-.ggt-add-col { top: 10px; bottom: 26px; right: 4px; width: 18px; height: auto; }
+.ggt-add-col { top: 10px; bottom: calc(26px + var(--ggt-sb, 0px)); right: 4px; width: 18px; height: auto; }
 .ggt-add-row { left: 14px; right: 26px; bottom: 4px; height: 18px; width: auto; }
 .ggt.is-readonly .ggt-add, .ggt.is-readonly .ggt-handle { display: none; }
 
