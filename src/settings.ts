@@ -117,6 +117,12 @@ export interface MindMapSettings {
   leftDrag: "pan" | "select";
   /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
   editCaret: "select" | "end";
+  /** 拆成子节点：原来的文字留着（默认）；关掉时整个节点拆分就由拆出来的几段代替，只拆选中的文字就把选中的那段去掉 */
+  splitKeepOriginal: boolean;
+  /** 拆成子节点：拆分符号（标点、序号）留在每段里（默认不留） */
+  splitKeepDelims: boolean;
+  /** 自定义拆分方式：每行「名称：符号」 */
+  customSplits: string;
   /** 点节点、备注里的笔记链接时在哪里打开（⌘ / ⌘⌥ 点照 Obsidian 的习惯，不看这个） */
   linkOpen: "current" | "tab" | "split";
   /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
@@ -202,6 +208,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   wheelAction: "pan",
   leftDrag: "pan",
   editCaret: "select",
+  splitKeepOriginal: true,
+  splitKeepDelims: false,
+  customSplits: "",
   linkOpen: "current",
   dragToFloat: false,
   openView: "fit",
@@ -394,6 +403,24 @@ export class MindMapSettingTab extends PluginSettingTab {
       ),
       page(t("settings.group.edit"), t("settings.page.edit"), [
         dropdown("editCaret", t("settings.editCaret.name"), t("settings.editCaret.desc"), { select: t("settings.editCaret.select"), end: t("settings.editCaret.end") }, ["cursor", "光标"]),
+        toggle("splitKeepOriginal", t("settings.splitKeepOriginal.name"), t("settings.splitKeepOriginal.desc"), ["split", "拆分", "拆成子节点"]),
+        toggle("splitKeepDelims", t("settings.splitKeepDelims.name"), t("settings.splitKeepDelims.desc"), ["split", "拆分", "标点", "序号"]),
+        {
+          name: t("settings.customSplits.name"),
+          desc: t("settings.customSplits.desc"),
+          aliases: ["split", "拆分", "自定义"],
+          render: (setting) => {
+            setting.addTextArea((ta) => {
+              ta.setPlaceholder(t("settings.customSplits.placeholder"))
+                .setValue(this.plugin.settings.customSplits)
+                .onChange(async (v) => {
+                  this.plugin.settings.customSplits = v;
+                  await this.plugin.saveSettings();
+                });
+              ta.inputEl.rows = 4;
+            });
+          },
+        },
         dropdown("linkOpen", t("settings.linkOpen.name"), t("settings.linkOpen.desc"), { current: t("settings.linkOpen.current"), tab: t("settings.linkOpen.tab"), split: t("settings.linkOpen.split") }, ["link", "链接", "分屏", "split", "打开"]),
         dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),

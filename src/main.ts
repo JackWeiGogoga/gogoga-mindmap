@@ -1,3 +1,5 @@
+import { type CustomSplit, parseCustomSplits } from "./split";
+import type { QuickSetting } from "./canvas";
 import {
   Component,
   FileView,
@@ -469,6 +471,51 @@ export default class MindMapPlugin extends Plugin {
   toggleShowHidden(): void {
     this.showHidden = !this.showHidden;
     this.reloadMaps();
+  }
+
+  /** 工具栏「快捷设置」面板里的几项：编辑、拆分这些常调的细节设置；和设置页是同一份 */
+  quickSettings(): QuickSetting[] {
+    const s = this.settings;
+    const save = () => void this.saveSettings();
+    return [
+      {
+        label: t("settings.editCaret.name"),
+        value: s.editCaret,
+        options: [
+          { value: "select", label: t("settings.editCaret.select") },
+          { value: "end", label: t("settings.editCaret.end") },
+        ],
+        set: (v) => {
+          s.editCaret = v === "end" ? "end" : "select";
+          save();
+        },
+      },
+      { label: t("settings.formatBar.name"), value: s.formatBar, set: (v) => {
+          s.formatBar = !!v;
+          save();
+        },
+      },
+      { label: t("settings.widthHandleOnHover.name"), value: s.widthHandleOnHover, set: (v) => {
+          s.widthHandleOnHover = !!v;
+          save();
+        },
+      },
+      { label: t("settings.splitKeepOriginal.name"), value: s.splitKeepOriginal, set: (v) => {
+          s.splitKeepOriginal = !!v;
+          save();
+        },
+      },
+      { label: t("settings.splitKeepDelims.name"), value: s.splitKeepDelims, set: (v) => {
+          s.splitKeepDelims = !!v;
+          save();
+        },
+      },
+    ];
+  }
+
+  /** 拆成子节点的偏好（设置里的保留原文字、保留拆分符号、自定义拆分方式） */
+  splitPrefs(): { keepOriginal: boolean; keepDelims: boolean; custom: CustomSplit[] } {
+    return { keepOriginal: this.settings.splitKeepOriginal, keepDelims: this.settings.splitKeepDelims, custom: parseCustomSplits(this.settings.customSplits) };
   }
 
   /** 颜色下拉记住的颜色（上次用的、最近使用），脑图、嵌入的脑图、笔记里的格式栏共用一份 */
@@ -1489,6 +1536,7 @@ export default class MindMapPlugin extends Plugin {
         wheelZoom: () => this.settings.wheelAction === "zoom",
         notePreview: () => this.settings.notePreview,
         formatBar: () => this.settings.formatBar,
+        split: () => this.splitPrefs(),
         centerOnSelect: () => this.settings.centerOnSelect,
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,

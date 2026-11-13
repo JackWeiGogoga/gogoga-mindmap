@@ -539,6 +539,23 @@
 .mm-swatch-more { all: unset; box-sizing: border-box; height: 18px; padding: 0 3px; margin-left: 1px; border-radius: 4px; font-size: 11px; letter-spacing: 1px; line-height: 18px; color: var(--text-muted, #888); cursor: pointer; }
 .mm-swatch-more:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); color: var(--text-normal); }
 .mm-format-bar .mm-palette.mm-format-palette { top: calc(100% + 6px); }
+/* 工具栏「快捷设置」面板：一行一项，右边是开关或几选一 */
+.mm-menu.mm-quick-settings { width: 300px; padding: 8px 10px; }
+.mm-quick-title { margin: 2px 0 6px; font-size: 12px; font-weight: 600; color: var(--text-muted, #888); }
+.mm-quick-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13px; color: var(--text-normal, #1f1f1f); }
+.mm-quick-row + .mm-quick-row { border-top: 1px solid var(--background-modifier-border, #eee); }
+.mm-quick-label { flex: 1; min-width: 0; }
+.mm-quick-toggle { all: unset; position: relative; flex: none; width: 32px; height: 18px; border-radius: 9px; background: var(--background-modifier-border, #ccc); cursor: pointer; transition: background 0.15s; }
+.mm-quick-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: left 0.15s; }
+.mm-quick-toggle.is-on { background: var(--interactive-accent, #7b6cd9); }
+.mm-quick-toggle.is-on::after { left: 16px; }
+.mm-quick-seg { display: inline-flex; flex: none; padding: 2px; border-radius: 6px; background: var(--background-modifier-hover, rgba(0, 0, 0, 0.05)); }
+.mm-quick-opt { all: unset; padding: 2px 8px; border-radius: 4px; font-size: 12px; color: var(--text-muted, #888); cursor: pointer; white-space: nowrap; }
+.mm-quick-opt.is-active { background: var(--background-primary, #fff); color: var(--text-normal, #1f1f1f); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+/* 格式栏「拆分」的下拉：一列拆分方式 */
+.mm-palette.mm-split-menu { width: auto; min-width: 200px; padding: 4px; }
+.mm-split-item { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 6px 10px; border-radius: 6px; font-size: 13px; color: var(--text-normal, #1f1f1f); cursor: pointer; white-space: nowrap; }
+.mm-split-item:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06)); }
 /* 设置页的颜色清单、色板不在脑图里面，节点颜色名（red …）的取色单独给一份，和脑图里一样 */
 .mm-color-list,
 .mm-settings-palette {

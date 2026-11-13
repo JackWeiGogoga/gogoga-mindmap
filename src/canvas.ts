@@ -102,7 +102,8 @@ import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { isWebUrl, linkDestination } from "./paste-link";
 import { addTable, noteOnlyTable, noteRest, noteTable, tableSource, withoutTable, withTable } from "./node-table";
-import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, splitByPunctuation, subtreeToList, unescapeNote } from "./markdown";
+import { type CustomSplit, type SplitRule, splitText } from "./split";
+import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 嵌入的图拿到焦点时，截下会和画布按键撞车的 Obsidian 全局热键交给 onKey；返回注销函数 */
@@ -182,6 +183,14 @@ export interface MenuEntry {
   submenu?: MenuEntry[];
 }
 
+/** 快捷设置面板的一项：value 是布尔就画开关，否则按 options 画几选一 */
+export interface QuickSetting {
+  label: string;
+  value: boolean | string;
+  options?: { value: string; label: string }[];
+  set: (value: boolean | string) => void;
+}
+
 /** 把二级菜单平铺开（不支持二级菜单的地方用），子项前后加分隔线 */
 export function flattenMenu(entries: MenuEntry[]): MenuEntry[] {
   const out: MenuEntry[] = [];
@@ -255,6 +264,10 @@ export interface CanvasOptions {
   nodeColors?: () => string[];
   /** 编辑节点文字时选中一段文字弹出格式栏 */
   formatBar?: () => boolean;
+  /** 工具栏「快捷设置」面板里的几项（给了才有这个按钮）：开关或几选一，改了直接存进设置 */
+  quickSettings?: () => QuickSetting[];
+  /** 拆成子节点的偏好：保留原文字、保留拆分符号、设置里自定义的拆分方式 */
+  split?: () => { keepOriginal: boolean; keepDelims: boolean; custom: CustomSplit[] };
   /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
   centerOnSelect?: () => boolean;
   /** 编辑时光标挨着格式也不露出 ** == 这些标记（默认关） */
@@ -433,6 +446,8 @@ const ICONS: Record<string, string> = {
   down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  quick: '<svg viewBox="0 0 24 24"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>',
+  split: '<svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
   outline: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
   child: '<svg viewBox="0 0 24 24"><path d="M4 6h6M4 12h4M12 12h8M16 8v8"/></svg>',
@@ -3616,9 +3631,10 @@ export class MindMapCanvas {
    * 点到 el 外面就关闭。不能用 once：点面板内部时监听器也会被消耗掉，
    * 之后就再也关不掉了（标记面板最初的 bug）。
    */
-  private dismissOnOutside(el: HTMLElement, close: () => void): () => void {
+  private dismissOnOutside(el: HTMLElement, close: () => void, except?: HTMLElement): () => void {
     const onDown = (ev: PointerEvent) => {
-      if (el.contains(ev.target as Node)) return;
+      // except：打开它的那个按钮，点它由按钮自己收起（不然这里先收起、按钮又把它打开）
+      if (el.contains(ev.target as Node) || except?.contains(ev.target as Node)) return;
       cleanup();
       close();
     };
@@ -3788,6 +3804,9 @@ export class MindMapCanvas {
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
+    if (this.opts.quickSettings) {
+      const quick = btn("quick", t("canvas.quickSettings"), () => this.toggleQuickSettings(quick));
+    }
     // 按设置里的顺序摆。嵌入的脑图的「编辑 / 完成」「打开」按钮：清单里有它（嵌入的选了自定义）就按清单，
     // 否则不能关，放在「结构」那一格前面
     const layout = this.opts.toolbarLayout?.() ?? mergeLayout(undefined, TOOLBAR_DEFAULT);
@@ -4007,9 +4026,17 @@ export class MindMapCanvas {
     if (!anchor) {
       menu.style.left = `${clampX(point?.x ?? 0)}px`;
       menu.style.top = `${clampY(point?.y ?? 0)}px`;
-    } else {
+    } else this.placeAtAnchor(menu, anchor);
+    cleanup = this.dismissOnOutside(menu, closeAll);
+    return menu;
+  }
+
+  /** 弹出的菜单、面板摆在按钮旁边：工具栏里的按钮按工具栏位置决定弹出方向，其他地方（节点工具栏）一律向上弹 */
+  private placeAtAnchor(menu: HTMLElement, anchor: HTMLElement): void {
+    const host = this.el.getBoundingClientRect();
+    const clampX = (x: number) => Math.max(4, Math.min(x, host.width - menu.offsetWidth - 4));
+    const clampY = (y: number) => Math.max(4, Math.min(y, host.height - menu.offsetHeight - 4));
     const r = anchor.getBoundingClientRect();
-    // 工具栏里的按钮按工具栏位置决定弹出方向；其他地方（节点工具栏）一律向上弹
     const pos: ToolbarPosition = anchor.closest(".mm-toolbar") ? this.toolbarPos : "bottom";
     if (pos === "left" || pos === "right") {
       menu.style.left = `${clampX(pos === "left" ? r.right - host.left + 8 : r.left - host.left - menu.offsetWidth - 8)}px`;
@@ -4018,9 +4045,6 @@ export class MindMapCanvas {
       menu.style.left = `${clampX(r.left - host.left + r.width / 2 - menu.offsetWidth / 2)}px`;
       menu.style.top = `${clampY(pos === "top" ? r.bottom - host.top + 6 : r.top - host.top - menu.offsetHeight - 6)}px`;
     }
-    }
-    cleanup = this.dismissOnOutside(menu, closeAll);
-    return menu;
   }
 
   // ---------- 节点浮动工具栏 ----------
@@ -6419,6 +6443,81 @@ export class MindMapCanvas {
     );
   }
 
+  private quickPanel: HTMLElement | null = null;
+
+  /** 工具栏「快捷设置」：编辑、拆分这些常调的细节设置，改了马上生效（和设置页是同一份设置） */
+  private toggleQuickSettings(anchor: HTMLElement): void {
+    if (this.quickPanel) {
+      this.closeQuickSettings();
+      return;
+    }
+    const panel = createDiv();
+    panel.className = "mm-menu mm-quick-settings";
+    panel.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    const head = createDiv();
+    head.className = "mm-quick-title";
+    head.textContent = t("canvas.quickSettingsTitle");
+    panel.append(head);
+    const fill = () => {
+      panel.querySelectorAll(".mm-quick-row").forEach((r) => r.remove());
+      for (const q of this.opts.quickSettings?.() ?? []) {
+        const row = createDiv();
+        row.className = "mm-quick-row";
+        const label = createSpan();
+        label.className = "mm-quick-label";
+        label.textContent = q.label;
+        row.append(label);
+        if (typeof q.value === "boolean") {
+          const on = q.value;
+          const sw = createEl("button");
+          sw.type = "button";
+          sw.className = "mm-quick-toggle" + (on ? " is-on" : "");
+          sw.setAttribute("role", "switch");
+          sw.setAttribute("aria-checked", String(on));
+          sw.setAttribute("aria-label", q.label);
+          sw.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            q.set(!on);
+            fill();
+          });
+          row.append(sw);
+        } else {
+          const seg = createDiv();
+          seg.className = "mm-quick-seg";
+          for (const o of q.options ?? []) {
+            const b = createEl("button");
+            b.type = "button";
+            b.className = "mm-quick-opt" + (o.value === q.value ? " is-active" : "");
+            b.textContent = o.label;
+            b.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              if (o.value !== q.value) q.set(o.value);
+              fill();
+            });
+            seg.append(b);
+          }
+          row.append(seg);
+        }
+        panel.append(row);
+      }
+    };
+    fill();
+    this.el.append(panel);
+    this.placeAtAnchor(panel, anchor);
+    const cleanup = this.dismissOnOutside(panel, () => this.closeQuickSettings(), anchor);
+    this.quickPanel = panel;
+    this.quickPanelCleanup = cleanup;
+  }
+
+  private quickPanelCleanup: (() => void) | null = null;
+
+  private closeQuickSettings(): void {
+    this.quickPanelCleanup?.();
+    this.quickPanelCleanup = null;
+    this.quickPanel?.remove();
+    this.quickPanel = null;
+  }
+
   private closeFoldMenu(): void {
     this.foldMenu?.remove();
     this.foldMenu = null;
@@ -7107,7 +7206,11 @@ export class MindMapCanvas {
         { title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
         { title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
       );
-      more.push({ title: t("menu.splitByPunctuation"), icon: "split", disabled: !this.splittable(node).length, run: () => this.splitIntoChildren(node) });
+      more.push({
+        title: t("menu.splitInto"),
+        icon: "split",
+        submenu: this.splitRules().map((r) => ({ title: r.label, disabled: !this.splittable(node, r.rule).length, run: () => this.splitIntoChildren(node, r.rule) })),
+      });
       if (node.parent && !topic) {
         more.push(
           node.hidden
@@ -7286,6 +7389,7 @@ export class MindMapCanvas {
         };
       },
       ...(this.opts.host?.pickNote ? { onLink: () => void this.linkEditSelection(), linkKey: sc("Mod", "K") } : {}),
+      split: { title: t("bar.split"), items: this.splitRules().map((r) => ({ label: r.label, run: () => this.splitSelection(r.rule) })) },
     });
     this.el.append(bar);
     return bar;
@@ -7701,26 +7805,98 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 拆分方式：内置的几种，加上设置里自定义的 */
+  private splitRules(): { label: string; rule: SplitRule }[] {
+    return [
+      { label: t("split.comma"), rule: { kind: "comma" } },
+      { label: t("split.period"), rule: { kind: "period" } },
+      { label: t("split.semicolon"), rule: { kind: "semicolon" } },
+      { label: t("split.number"), rule: { kind: "number" } },
+      ...(this.opts.split?.().custom ?? []).map((c): { label: string; rule: SplitRule } => ({ label: c.name, rule: { kind: "chars", chars: c.chars } })),
+    ];
+  }
+
+  private splitPrefs(): { keepOriginal: boolean; keepDelims: boolean } {
+    const s = this.opts.split?.();
+    return { keepOriginal: s?.keepOriginal ?? true, keepDelims: s?.keepDelims ?? false };
+  }
+
   /** 右键的是选中的节点之一时就是选中的这几个，否则只有它；只留下文字能拆出两段以上的 */
-  private splittable(node: MindNode): { node: MindNode; parts: string[] }[] {
+  private splittable(node: MindNode, rule: SplitRule = { kind: "comma" }): { node: MindNode; prefix: string; lead: string; parts: string[] }[] {
     const nodes = this.selected.has(node) ? [...this.selected] : [node];
+    const { keepDelims } = this.splitPrefs();
     return nodes.flatMap((n) => {
       // 开头的标记（emoji）和任务框留在原节点上，只拆后面的文字
-      const parts = splitByPunctuation(splitMarkers(n.text).rest.replace(/^\[( |x|X)\]\s+/, ""));
-      return parts ? [{ node: n, parts }] : [];
+      const { rest } = splitMarkers(n.text);
+      const body = rest.replace(/^\[( |x|X)\]\s+/, "");
+      const prefix = n.text.endsWith(body) ? n.text.slice(0, n.text.length - body.length) : "";
+      const r = splitText(body, rule, keepDelims);
+      return r ? [{ node: n, prefix, lead: r.lead, parts: r.parts }] : [];
     });
   }
 
-  /** 按标点把节点文字拆成几段，每段一个子节点，接在已有的子节点后面；节点自己的文字不动 */
-  splitIntoChildren(node: MindNode): void {
+  /**
+   * 按 rule 把节点文字拆成几段。保留原文字（默认）：每段一个子节点，接在已有的子节点后面，节点自己的文字不动。
+   * 不保留：拆出来的几段代替这个节点、放在原来那一层（第一段就是这个节点，子节点、备注、颜色都留着），
+   * 序号前面有文字（「水果：1. 苹果 2. 梨」）时节点留下那段文字、各项成为子节点；中心主题、概要没有同级，照旧加成子节点
+   */
+  splitIntoChildren(node: MindNode, rule: SplitRule = { kind: "comma" }): void {
     if (!this.opts.editable || !this.doc) return;
-    const list = this.splittable(node);
+    const list = this.splittable(node, rule);
     if (!list.length) return;
-    for (const { node: n, parts } of list) {
+    const { keepOriginal } = this.splitPrefs();
+    for (const { node: n, prefix, lead, parts } of list) {
       n.folded = false;
-      for (const p of parts) addChild(n, this.doc.style, p);
+      if (keepOriginal || !n.parent || isSummaryTopic(n)) {
+        for (const p of parts) addChild(n, this.doc.style, p);
+      } else if (lead) {
+        n.text = prefix + lead;
+        for (const p of parts) addChild(n, this.doc.style, p);
+      } else {
+        n.text = prefix + parts[0];
+        let prev = n;
+        for (const p of parts.slice(1)) prev = addSibling(prev, p) ?? prev;
+      }
     }
     this.render();
+    this.notify();
+  }
+
+  /**
+   * 编辑节点时只拆选中的文字：拆出来的几段接成这个节点的子节点。不保留原文字时把选中的那段从节点里去掉
+   * （选中的就是全部文字时，和整个节点拆分一样：由拆出来的几段代替这个节点）
+   */
+  private splitSelection(rule: SplitRule): void {
+    const ed = this.nodeEditor;
+    const node = this.editing;
+    if (!ed || !node || !this.doc || !this.opts.editable) return;
+    const { from, to } = ed.visibleSelection;
+    if (from === to) return;
+    const { keepOriginal, keepDelims } = this.splitPrefs();
+    const text = ed.savedText;
+    const res = splitText(text.slice(from, to), rule, keepDelims);
+    if (!res) {
+      this.opts.host?.notice?.(t("split.none"));
+      return;
+    }
+    const remaining = keepOriginal ? text : text.slice(0, from) + res.lead + text.slice(to);
+    // 编辑框里的文字自己定：先取消编辑（不提交、不记一步撤销），再一次改好、记一步
+    this.commitEdit(true, false);
+    const parts = res.parts.map((p) => fromEditableText(p));
+    const whole = !keepOriginal && !splitMarkers(fromEditableText(remaining)).rest.trim();
+    if (whole && node.parent && !isSummaryTopic(node)) {
+      const head = fromEditableText(remaining).trim();
+      node.text = head ? `${head} ${parts[0]}` : parts[0];
+      let prev = node;
+      for (const p of parts.slice(1)) prev = addSibling(prev, p) ?? prev;
+    } else {
+      node.text = fromEditableText(remaining).replace(/\s+$/, "");
+      node.folded = false;
+      for (const p of parts) addChild(node, this.doc.style, p);
+    }
+    this.select(node);
+    this.render();
+    this.el.focus({ preventScroll: true });
     this.notify();
   }
 

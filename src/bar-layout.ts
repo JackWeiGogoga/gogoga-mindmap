@@ -36,6 +36,7 @@ export const TOOLBAR_DEFAULT = [
   "hidden",
   "recite",
   "layers",
+  "quick",
 ];
 
 /**

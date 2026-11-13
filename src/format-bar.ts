@@ -19,7 +19,7 @@ export interface FormatBarOptions {
   highlightColors: string[];
   /** 下划线的快捷键说明，比如 ⌘U */
   underlineKey: string;
-  icon: (name: "highlighter" | "eraser" | "link") => HTMLElement;
+  icon: (name: "highlighter" | "eraser" | "link" | "split") => HTMLElement;
   tip: (el: HTMLElement, text: string) => void;
   onFormat: (fmt: InlineFormat) => void;
   /** 上次用的颜色、最近使用（插件存在设置里）；不给就只记在这个格式栏里 */
@@ -29,6 +29,8 @@ export interface FormatBarOptions {
   /** 选中的字做成笔记链接（给了才有这个按钮）；linkKey 是快捷键说明，比如 ⌘K */
   onLink?: () => void;
   linkKey?: string;
+  /** 「拆分」按钮的下拉：几种拆分方式（给了才有这个按钮） */
+  split?: { title: string; items: { label: string; run: () => void }[] };
 }
 
 /** 造一个格式栏（还没挂到页面上）。按下按钮不会让编辑器失焦，选区留着 */
@@ -73,7 +75,7 @@ export function createFormatBar(doc: Document, o: FormatBarOptions): HTMLElement
   };
   const common = (kind: "text" | "bg") => (kind === "text" ? o.textColors : o.highlightColors);
   const current = (kind: "text" | "bg") => mem.last(kind) ?? common(kind)[0] ?? (kind === "bg" ? THEME_HIGHLIGHT : null);
-  let open: { kind: ColorKind; el: HTMLElement } | null = null;
+  let open: { kind: ColorKind | "split"; el: HTMLElement } | null = null;
   const closePalette = () => {
     open?.el.remove();
     open = null;
@@ -156,5 +158,44 @@ export function createFormatBar(doc: Document, o: FormatBarOptions): HTMLElement
     bar.append(b);
   }
   btn("is-clear", t("format.clear"), { kind: "clear" }, (b) => b.append(o.icon("eraser")));
+  // 拆分：点开是一列拆分方式（和右键「拆成子节点」的二级菜单一样），选一种就把选中的文字拆成子节点
+  if (o.split?.items.length) {
+    const split = o.split;
+    sep();
+    const b = doc.createElement("button");
+    b.className = "mm-format-btn is-split";
+    b.type = "button";
+    b.setAttribute("aria-label", split.title);
+    o.tip(b, split.title);
+    b.append(o.icon("split"));
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (open?.kind === "split") return closePalette();
+      closePalette();
+      const menu = doc.createElement("div");
+      menu.className = "mm-palette mm-format-palette mm-split-menu";
+      menu.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      menu.addEventListener("mousedown", (e) => e.preventDefault());
+      for (const it of split.items) {
+        const item = doc.createElement("button");
+        item.type = "button";
+        item.className = "mm-split-item";
+        item.textContent = it.label;
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          closePalette();
+          it.run();
+        });
+        menu.append(item);
+      }
+      bar.append(menu);
+      menu.style.left = `${Math.max(0, b.offsetLeft)}px`;
+      open = { kind: "split", el: menu };
+    });
+    bar.append(b);
+  }
   return bar;
 }

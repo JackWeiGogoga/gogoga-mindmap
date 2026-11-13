@@ -1151,33 +1151,3 @@ export function foldPlan(
   return { nodeLines: new Set(lines.values()), lineOf, folds, paths };
 }
 
-/** 拆分时不能从中间断开的片段：双链、链接、图片、行内代码、公式、HTML 标签、网址 */
-const SPLIT_KEEP_RE = /!?\[\[[^\]]*\]\]|!?\[[^\]]*\]\([^)]*\)|`[^`]*`|\$\$?[^$]*\$\$?|<[^>]+>|https?:\/\/\S+/g;
-
-/**
- * 「按标点拆成子节点」：按中文逗号、顿号、分号和英文逗号、分号把一句话拆成几段。
- * 链接、公式、代码里的标点不算；数字里的千分位逗号（1,000）不算；每段去掉首尾空白和句末的句号。
- * 拆不出两段以上返回 null
- */
-export function splitByPunctuation(text: string): string[] | null {
-  const keep: [number, number][] = [];
-  for (const m of text.matchAll(SPLIT_KEEP_RE)) keep.push([m.index, m.index + m[0].length]);
-  const parts: string[] = [];
-  let start = 0;
-  for (let i = 0; i < text.length; i++) {
-    const span = keep.find(([a, b]) => i >= a && i < b);
-    if (span) {
-      i = span[1] - 1;
-      continue;
-    }
-    const c = text[i];
-    const comma = c === "," && !(/\d/.test(text[i - 1] ?? "") && /\d/.test(text[i + 1] ?? ""));
-    if ("，、；;".includes(c) || comma) {
-      parts.push(text.slice(start, i));
-      start = i + 1;
-    }
-  }
-  parts.push(text.slice(start));
-  const out = parts.map((p) => p.trim().replace(/[。．]+$/, "").trim()).filter(Boolean);
-  return out.length >= 2 ? out : null;
-}

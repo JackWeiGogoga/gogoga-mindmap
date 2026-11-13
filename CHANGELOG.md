@@ -5,6 +5,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [Unreleased]
 
 ### Added
+- More ways to split a topic: right-click → **More → Split into subtopics ▸** and choose at commas, enumeration commas and semicolons (the old behavior), at periods, question and exclamation marks, at semicolons, at numbering (1. / 1、 / (1) / ① / 一、 / （一） / I. / ii), counting up 1, 2, 3), or a split you add under **Custom splits** in settings (one per line, "name: characters").
+- While editing a topic, select some text and use **Split** in the format bar to split just that text into subtopics.
+- Setting **Keep the original text when splitting** (on by default, as before): turn it off and splitting a whole topic replaces it with the pieces at the same level (the first piece keeps its subtopics, note and color); with text before the numbering ("Fruit: 1. apples 2. pears") the topic keeps "Fruit:" and the items become subtopics; splitting selected text removes that text from the topic.
+- Setting **Keep separators when splitting** (off by default, as before): turn it on to keep punctuation at the end of each piece and numbering at the start; off removes them, along with the punctuation or space right after a number ("一、苹果" → "苹果").
+- **Quick settings** toolbar button: a small panel with everyday options — editing a node, the format bar on selection, hover width handles and the two split settings — that apply right away. It can be turned off in the main toolbar button list in settings.
 - In the note window opened from a node's note icon, double-click the text to start editing, like expanded note cards, instead of clicking Edit; the window stays put and the cursor goes to the end. Double-clicking an image doesn't count (a click on it opens the full-size view), and recite mode doesn't enter editing.
 
 ## [0.66.0] - 2026-11-13
