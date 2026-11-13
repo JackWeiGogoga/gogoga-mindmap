@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-11-13
+
 ### Fixed
 - A blank line between a heading and its marker line (`%%…%%`) made the markers count as note text, so relation lines broke and colors, folding and the like stopped working. Plugins such as Linter add that blank line after headings. Markers are now recognized anyway, and the blank line is kept when writing back.
 - Double-clicking a node to edit selects its text but didn't show the format bar until you selected again. With **Format bar when selecting text** on, it now appears right away. New nodes don't show it.
@@ -824,7 +826,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...HEAD
+[0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0

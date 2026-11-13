@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-11-13
+
 ### 修复
 - 标题和它下面的标记行（`%%…%%`）之间空了一行时，标记被当成备注：关联线断了、颜色、折叠这些都不生效。Linter 这类插件会在标题后面自动加空行，就会这样。现在照样认，写回时那行空行也保留。
 - 双击节点进入编辑时文字已经全选，但不弹格式栏（要重新拖选一次才出来）。现在开着「选中文字时显示格式栏」时，双击进去马上就有。新建节点时不弹。
@@ -824,7 +826,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...HEAD
+[0.65.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.64.0...0.65.0
 [0.64.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.1...0.64.0
 [0.63.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.63.0...0.63.1
 [0.63.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.62.0...0.63.0
