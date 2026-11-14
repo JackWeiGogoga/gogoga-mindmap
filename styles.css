@@ -2569,10 +2569,16 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 表头吸顶：贴着时表头要不透明，压在内容上面 */
 .ggt thead { position: relative; z-index: 3; }
+/* 表头格子自己也压在正文上面：iOS（WebKit）里 thead 的层级管不住挪下来的格子，正文后画会盖住表头（#15）。
+   冻结列的表头格子再高一层，左右滚动时别的表头格子从它底下过 */
+.ggt .ggt-table thead .ggt-cell { z-index: 3; }
+.ggt.is-freeze .ggt-table thead .ggt-cell.is-frozen { z-index: 4; }
 /* 表头吸顶：滚动驱动动画，位置由浏览器按外面容器的滚动位置算（范围由 JS 在布局变化时写进变量） */
 .ggt-y-host { scroll-timeline: --ggt-y block; }
 @keyframes ggt-stick { from { transform: translateY(0); } to { transform: translateY(var(--ggt-stick-len)); } }
-.ggt.is-sd .ggt-table thead { animation: ggt-stick linear both; animation-timing-function: steps(var(--ggt-stick-steps, 1000), end); animation-timeline: --ggt-y; animation-range: var(--ggt-stick-a) var(--ggt-stick-b); }
+/* 挪的是表头的每个格子，不是整个 thead：iOS（WebKit）给 thead 加 transform 时文字跟着挪、格子底色留在原地，
+   表头变透明压在正文上，有时正文整块不显示（#15） */
+.ggt.is-sd .ggt-table thead .ggt-cell { animation: ggt-stick linear both; animation-timing-function: steps(var(--ggt-stick-steps, 1000), end); animation-timeline: --ggt-y; animation-range: var(--ggt-stick-a) var(--ggt-stick-b); }
 /* 原生吸顶（不用横向滚动的表格）：表头 position: sticky，贴着外面滚动区的顶端；横向滚动的容器换成不滚动，免得表头贴到它上面 */
 .ggt.is-native-stick .ggt-scroll { overflow: visible; }
 .ggt.is-native-stick .ggt-table thead { position: sticky; top: var(--ggt-sticky-top, 0px); z-index: 3; }

@@ -4,6 +4,16 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-11-14
+
+### Added
+- Setting "Focus the note after opening it in a split" (off by default): after a link opens in the right split, the focus moves to the note, so shortcuts like close tab act on it. Off, the focus stays on the mind map as before.
+- Setting "Folder for new notes from the map": Obsidian's new file location (default), the mind map's folder, a folder named after the mind map next to it, or a folder of your choice. Applies to new linked notes from nodes and to clicking links to notes that don't exist yet, so a map's linked notes can stay together.
+
+### Fixed
+- Clicking a link in a node on the right side of the map and opening it in a split to the right narrowed the map and pushed that node out of sight. After the split opens, the node is now moved to the middle of the map if it isn't visible; if it still is, the view stays put.
+- On phones (#37): the map's bottom toolbar was half covered by Obsidian's floating navigation bar. The toolbar now sits above it.
+
 ## [0.69.0] - 2026-11-14
 
 ### Added
@@ -872,7 +882,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...HEAD
+[0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0

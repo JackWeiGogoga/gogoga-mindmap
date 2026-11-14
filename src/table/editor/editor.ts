@@ -544,17 +544,31 @@ export class TableEditor {
       const pad = parseFloat((outer.ownerDocument.defaultView ?? window).getComputedStyle(outer).paddingTop) || 0;
       // 原生吸顶贴的是滚动区内边距的下沿：往上挪回去，贴着滚动区顶端
       this.root.style.setProperty("--ggt-sticky-top", `${-pad}px`);
-      head.removeAttribute("style");
+      this.moveHead(head, 0);
       return;
     }
     if (outer && this.scrollDriven && Math.abs(this.scale() - 1) < 0.01) {
       this.stickRange(outer, head);
-      head.removeAttribute("style");
+      this.moveHead(head, 0);
       return;
     }
     this.root.classList.remove("is-sd");
-    if (stuck) head.setAttribute("style", `transform: translateY(${Math.round(offset / this.scale())}px)`);
-    else head.removeAttribute("style");
+    this.moveHead(head, stuck ? Math.round(offset / this.scale()) : 0);
+  }
+
+  /**
+   * 表头往下挪 y 像素（0 是不挪）。挪每个格子，不挪整个 thead：iOS（WebKit）给 thead 加 transform 时
+   * 文字跟着挪、格子底色留在原地，表头变透明压在正文上（#15）
+   */
+  private headShift = 0;
+  private moveHead(head: HTMLTableSectionElement, y: number): void {
+    if (y === this.headShift && !head.hasAttribute("style")) return;
+    this.headShift = y;
+    head.removeAttribute("style");
+    for (const cell of Array.from(head.querySelectorAll<HTMLElement>(".ggt-cell"))) {
+      if (y) cell.setCssProps({ transform: `translateY(${y}px)` });
+      else cell.style.removeProperty("transform");
+    }
   }
 
   /**
@@ -646,6 +660,8 @@ export class TableEditor {
       if (set.length) col.setCssProps({ "--ggt-pct": `${(((w || avg) / total) * 100).toFixed(3)}%` });
     }
     const thead = this.tableEl.appendChild(doc.createElement("thead"));
+    // 表头格子是新建的，还没挪过（render 最后的 stickHeader 会按现在的滚动位置再挪）
+    this.headShift = 0;
     const tbody = this.tableEl.appendChild(doc.createElement("tbody"));
     // 表头可以有几行（注释里的 head）：都放进 thead，一起吸顶
     const head = headRows(tb);
@@ -1518,6 +1534,19 @@ export class TableEditor {
       return true;
     }
     if (!mark && !link) return false;
+    return this.formatMark(mark);
+  }
+
+  /** 按 Obsidian 命令做格式（用户把加粗、斜体这些命令改成了别的快捷键时，keys.ts 按命令调这里） */
+  formatCommand(kind: "bold" | "italic" | "strike" | "highlight" | "link"): boolean {
+    if (!this.sel || this.host.readonly) return false;
+    const marks = { bold: "**", italic: "*", strike: "~~", highlight: "==" } as const;
+    return this.formatMark(kind === "link" ? null : marks[kind]);
+  }
+
+  /** mark 是 null 时插链接 */
+  private formatMark(mark: string | null): boolean {
+    if (!this.sel) return false;
     if (this.editing) {
       // 所见即所得的编辑框选了字：和格式栏一样按看得见的字加（标签藏着，不能直接在两头插记号）
       const kinds: Record<string, InlineFormat> = { "**": { kind: "bold" }, "*": { kind: "italic" }, "~~": { kind: "strike" }, "==": { kind: "highlight" } };

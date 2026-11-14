@@ -4,6 +4,16 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-11-14
+
+### 新增
+- 设置「分屏打开链接后把焦点放到笔记」（默认关）：在右侧分屏打开链接后焦点移到笔记上，关闭标签页这类快捷键作用在笔记上。关着时和以前一样留在脑图上，方便接着加节点。
+- 设置「从脑图新建的笔记放在」：跟随 Obsidian 的新文件位置（默认）、脑图所在的文件夹、脑图旁边和它同名的文件夹、指定的文件夹。从节点新建链接笔记、点还不存在的笔记链接时都按它放，一张脑图的链接笔记可以集中在一起。
+
+### 修复
+- 在脑图右边的节点里点链接、在右侧分屏打开笔记后，脑图变窄，刚点的节点被挤到分屏底下看不见。现在分屏打开后，这个节点不在画面里就移到脑图中间；本来就看得见的不动。
+- 手机上（#37）：脑图底部的工具栏被 Obsidian 底部那条悬浮导航栏挡住一半。现在工具栏会让到导航栏上面。
+
 ## [0.69.0] - 2026-11-14
 
 ### 新增
@@ -872,7 +882,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...HEAD
+[0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0

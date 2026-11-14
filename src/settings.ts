@@ -131,6 +131,12 @@ export interface MindMapSettings {
   customSplits: string;
   /** 点节点、备注里的笔记链接时在哪里打开（⌘ / ⌘⌥ 点照 Obsidian 的习惯，不看这个） */
   linkOpen: "current" | "tab" | "split";
+  /** 在右侧分屏打开链接后，焦点放到打开的笔记上（默认关：留在脑图上，方便接着加节点） */
+  linkFocusNote: boolean;
+  /** 从脑图新建的链接笔记放在哪：跟随 Obsidian 的新文件位置 / 脑图所在文件夹 / 脑图旁边和它同名的文件夹 / 指定文件夹 */
+  newNoteFolder: "default" | "map" | "mapSub" | "custom";
+  /** newNoteFolder 是 custom 时的文件夹路径 */
+  newNoteFolderPath: string;
   /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
   dragToFloat: boolean;
   /** 没有记住的视口时打开脑图：fit 适应画布，center 中心主题 100% */
@@ -221,6 +227,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   splitKeepDelims: false,
   customSplits: "",
   linkOpen: "current",
+  linkFocusNote: false,
+  newNoteFolder: "default",
+  newNoteFolderPath: "",
   dragToFloat: false,
   openView: "fit",
   syncSplit: false,
@@ -434,6 +443,9 @@ export class MindMapSettingTab extends PluginSettingTab {
           },
         },
         dropdown("linkOpen", t("settings.linkOpen.name"), t("settings.linkOpen.desc"), { current: t("settings.linkOpen.current"), tab: t("settings.linkOpen.tab"), split: t("settings.linkOpen.split") }, ["link", "链接", "分屏", "split", "打开"]),
+        toggle("linkFocusNote", t("settings.linkFocusNote.name"), t("settings.linkFocusNote.desc"), ["focus", "焦点", "分屏", "split"]),
+        dropdown("newNoteFolder", t("settings.newNoteFolder.name"), t("settings.newNoteFolder.desc"), { default: t("settings.newNoteFolder.default"), map: t("settings.newNoteFolder.map"), mapSub: t("settings.newNoteFolder.mapSub"), custom: t("settings.newNoteFolder.custom") }, ["folder", "文件夹", "新建", "位置", "存放"]),
+        text("newNoteFolderPath", t("settings.newNoteFolderPath.name"), t("settings.newNoteFolderPath.desc"), t("settings.newNoteFolderPath.placeholder"), ["folder", "文件夹", "路径"]),
         dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
         dropdown("embedWheel", t("settings.embedWheel.name"), t("settings.embedWheel.desc"), { click: t("settings.embedWheel.click"), always: t("settings.embedWheel.always") }, ["embed", "嵌入", "滚轮", "scroll", "锁定"]),
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),

@@ -845,6 +845,9 @@ export class MindMapCanvas {
 
     if (typeof ResizeObserver !== "undefined") {
       this.ro = new ResizeObserver(() => {
+        // 刚点了节点里的链接、在旁边分屏打开了笔记：脑图变窄，点的那个节点别被挤到看不见的地方（B站 13579abc_）
+        const kept = this.linkNode && performance.now() < this.linkNode.until ? this.nodeById.get(this.linkNode.id) : null;
+        if (kept) this.el.win.requestAnimationFrame(() => this.revealLinkNode(kept));
         // 恢复的视口：按现在的大小把原来的中心放回中间（下面的重画会直接返回，所以放在前面）
         if (this.viewAnchor) {
           this.applyViewAnchor();
@@ -1580,7 +1583,10 @@ export class MindMapCanvas {
         const label = createDiv();
         label.className = "mm-label";
         renderInline(label, node.text || (node.depth === 0 ? t("canvas.centralTopic") : ""), {
-          onLink: (href, internal, ev) => this.opts.host?.openLink?.(href, internal, ev),
+          onLink: (href, internal, ev) => {
+            this.keepLinkNode(node);
+            this.opts.host?.openLink?.(href, internal, ev);
+          },
           onHover: (href, ev, a) => this.opts.host?.hoverLink?.(ev, href, a),
           renderMath: this.opts.host?.renderMath,
           resolveImage: this.opts.host?.resolveImage,
@@ -4182,7 +4188,12 @@ export class MindMapCanvas {
    */
   private updateBottomInset(): void {
     const doc = this.el.ownerDocument;
-    const bars = [...doc.querySelectorAll<HTMLElement>(".mobile-navbar, .mobile-toolbar")].filter((b) => b.offsetParent !== null);
+    // 看有没有画出来，不看 offsetParent：手机上 Obsidian 底部那条悬浮导航栏是 position: fixed，offsetParent 永远是 null，
+    // 以前因此当它不存在，脑图的工具栏被它挡住（#37）
+    const bars = [...doc.querySelectorAll<HTMLElement>(".mobile-navbar, .mobile-toolbar")].filter((b) => {
+      const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
+    });
     const r = this.el.getBoundingClientRect();
     let inset = 0;
     for (const b of bars) {
@@ -6701,6 +6712,25 @@ export class MindMapCanvas {
     this.tx += dx;
     this.ty += dy;
     this.applyTransform();
+    this.positionNodebar();
+  }
+
+  /** 点链接时记下节点：接下来一会儿里画布变窄（分屏打开了笔记），把它带回视野 */
+  private linkNode: { id: string; until: number } | null = null;
+  private keepLinkNode(node: MindNode): void {
+    this.linkNode = { id: node.id, until: performance.now() + 1500 };
+  }
+
+  /** 节点不完整在画面里就挪到中间（分屏后左边只剩一半宽，挪最小距离会贴在边上）；完整看得见就不动 */
+  private revealLinkNode(node: MindNode): void {
+    const p = this.layout?.placed.get(node.id);
+    if (!p) return;
+    const x1 = this.tx + p.x * this.k;
+    const x2 = this.tx + (p.x + p.w) * this.k;
+    const y1 = this.ty + p.y * this.k;
+    const y2 = this.ty + (p.y + p.h) * this.k;
+    if (x1 >= 0 && y1 >= 0 && x2 <= this.el.clientWidth && y2 <= this.el.clientHeight) return;
+    this.centerOn(node, true);
     this.positionNodebar();
   }
 

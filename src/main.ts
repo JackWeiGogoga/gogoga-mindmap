@@ -29,6 +29,7 @@ import {
   TAbstractFile,
   TFile,
   TFolder,
+  normalizePath,
   WorkspaceLeaf,
   ViewState,
   editorInfoField,
@@ -2044,9 +2045,14 @@ export default class MindMapPlugin extends Plugin {
         }
         // ⌘ 点新标签页、⌘⌥ 点右侧分屏……照 Obsidian 的习惯；不按修饰键时按设置
         const mod = Keymap.isModEvent(ev);
-        if (!mod && this.revealInOpenPdf(href, sourcePath())) return;
-        if (mod === "split" || (!mod && this.settings.linkOpen === "split")) void this.openInLinkSplit(href, sourcePath());
-        else void this.app.workspace.openLinkText(href, sourcePath(), mod || (this.settings.linkOpen === "tab" ? "tab" : false));
+        const sp = sourcePath();
+        if (!mod && this.revealInOpenPdf(href, sp)) return;
+        void (async () => {
+          // 链到还不存在的笔记：按设置「从脑图新建的笔记放在」先建好，再照常打开
+          await this.ensureLinkTarget(href, sp);
+          if (mod === "split" || (!mod && this.settings.linkOpen === "split")) await this.openInLinkSplit(href, sp);
+          else await this.app.workspace.openLinkText(href, sp, mod || (this.settings.linkOpen === "tab" ? "tab" : false));
+        })();
       },
       linkContextMenu: (ev, linktext, extra) => {
         const menu = new Menu();
@@ -2094,9 +2100,59 @@ export default class MindMapPlugin extends Plugin {
     };
   }
 
-  /** 从节点新建笔记：放在新文件默认位置，已存在就直接复用，并在右侧分栏打开 */
+  /** 从脑图新建的笔记放在哪个文件夹（设置「从脑图新建的笔记放在」）；要建的文件夹建不了就退回 Obsidian 的新文件位置 */
+  private async newNoteFolder(sourcePath: string): Promise<TFolder> {
+    const fallback = this.app.fileManager.getNewFileParent(sourcePath);
+    const mode = this.settings.newNoteFolder;
+    if (mode === "default") return fallback;
+    const map = this.app.vault.getAbstractFileByPath(sourcePath);
+    const parent = map instanceof TFile ? map.parent : null;
+    let path = "";
+    if (mode === "map") path = parent?.path ?? "/";
+    else if (mode === "mapSub") path = map instanceof TFile ? joinPath(parent?.path ?? "", map.basename) : "";
+    else path = normalizePath(this.settings.newNoteFolderPath.trim() || "/");
+    if (!path) return fallback;
+    if (path === "/") return this.app.vault.getRoot();
+    const hit = this.app.vault.getAbstractFileByPath(path);
+    if (hit instanceof TFolder) return hit;
+    if (hit) return fallback;
+    try {
+      return await this.app.vault.createFolder(path);
+    } catch {
+      return fallback;
+    }
+  }
+
+  /**
+   * 点到还不存在的笔记链接：设置选了别的位置时，先在那里建好空笔记，Obsidian 再按名字找到它打开。
+   * 跟随 Obsidian 时不管（交给 Obsidian 照常新建）；链接写了文件夹路径、或者链的不是 Markdown 时也不管
+   */
+  private async ensureLinkTarget(href: string, sourcePath: string): Promise<void> {
+    if (this.settings.newNoteFolder === "default") return;
+    const { path } = parseLinktext(href);
+    if (!path || path.includes("/") || this.app.metadataCache.getFirstLinkpathDest(path, sourcePath)) return;
+    const ext = /\.([^./]+)$/.exec(path)?.[1];
+    if (ext && ext.toLowerCase() !== "md") return;
+    const name = path.replace(/\.md$/i, "");
+    const folder = await this.newNoteFolder(sourcePath);
+    const file = joinPath(folder.path, `${name}.md`);
+    if (this.app.vault.getAbstractFileByPath(file)) return;
+    try {
+      await this.app.vault.create(file, "");
+    } catch (e) {
+      new Notice(t("notice.createNoteFailed", { error: (e as Error).message }));
+    }
+  }
+
+  /** 在右侧分屏打开链接以后，焦点放哪：设置打开时给笔记，否则回到脑图（方便接着加节点） */
+  private focusAfterLinkSplit(origin: WorkspaceLeaf | undefined, leaf: WorkspaceLeaf): void {
+    if (this.settings.linkFocusNote) this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    else if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
+  }
+
+  /** 从节点新建笔记：按设置放在对应的文件夹，已存在就直接复用，并在右侧分栏打开 */
   private async createLinkedNote(name: string, sourcePath: string): Promise<TFile | null> {
-    const folder = this.app.fileManager.getNewFileParent(sourcePath);
+    const folder = await this.newNoteFolder(sourcePath);
     const path = joinPath(folder.path, `${name}.md`);
     let file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) {
@@ -2111,8 +2167,8 @@ export default class MindMapPlugin extends Plugin {
     const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
     const leaf = this.linkSplit(origin);
     await leaf.openFile(file, { active: false });
-    // 新笔记在右侧打开，焦点留在脑图上，方便继续加节点
-    if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
+    // 新笔记在右侧打开；焦点默认留在脑图上，方便继续加节点
+    this.focusAfterLinkSplit(origin, leaf);
     return file;
   }
 
@@ -2141,7 +2197,7 @@ export default class MindMapPlugin extends Plugin {
     }
     const leaf = this.linkSplit(origin);
     await leaf.openFile(file, { active: false, eState: subpath ? { subpath } : undefined });
-    if (origin) this.app.workspace.setActiveLeaf(origin, { focus: true });
+    this.focusAfterLinkSplit(origin, leaf);
   }
 }
 
