@@ -213,6 +213,14 @@ export default class MindMapPlugin extends Plugin {
     }
     this.addSettingTab(new MindMapSettingTab(this.app, this));
     this.patchSetViewState();
+    // 记下用户最后在用的是不是 PDF（空标签页不算）：PDF++ 跳回笔记时先建好新标签页再打开，
+    // 那一刻「最近的标签页」已经是那个空标签页了，看不出是从 PDF 跳过来的
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        const type = leaf?.view?.getViewType();
+        if (type && type !== "empty") this.lastLeafWasPdf = type === "pdf";
+      }),
+    );
     this.registerCodeBlock();
     registerMindMapEmbeds(this);
     // 阅读视图里的节点颜色（设置「在笔记里显示节点颜色」）
@@ -814,12 +822,16 @@ export default class MindMapPlugin extends Plugin {
   /**
    * 从 PDF 里点被引用的标注跳回笔记（PDF++）：它只在 markdown 类型的标签页里找这篇笔记，找不到就新开一个标签页。
    * 这篇笔记已经以脑图开着时，就在那张脑图里跳到对应的行（选中节点），新开的空标签页关掉，不再多出一张脑图。
-   * 只管「从 PDF 视图发起、带行号、要打开到一个空的新标签页」这一种，别的打开方式（⌘ 点链接想再开一个）照旧
+   * 只管「从 PDF 视图发起、带行号、要打开到一个空的新标签页」这一种，别的打开方式（⌘ 点链接想再开一个）照旧。
+   * PDF 在主区域、侧边栏、单独的窗口里都算；脑图开在哪个窗口都能找到
    */
+  /** 用户最后在用的（不算空标签页）是不是 PDF：判断「是不是从 PDF 跳回来的」 */
+  private lastLeafWasPdf = false;
+
   private reuseOpenMindMap(leaf: WorkspaceLeaf, path: string, eState: unknown): Promise<void> | null {
     const st = eState as { line?: unknown } | undefined;
     if (typeof st?.line !== "number" || leaf.view?.getViewType() !== "empty") return null;
-    if (this.app.workspace.getMostRecentLeaf()?.view.getViewType() !== "pdf") return null;
+    if (!this.lastLeafWasPdf) return null;
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => l !== leaf && (l.view as { file?: TFile }).file?.path === path);
     if (!existing) return null;
     existing.view.setEphemeralState(eState);

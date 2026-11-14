@@ -2266,6 +2266,10 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   font-size: var(--ggt-font-size);
   line-height: 1.5;
 }
+/* 文字大小（整表 fs × 格子 fz）：设在格子上。阅读视图里 Obsidian 给 table、th、td 各自定了字号，设在表上传不到格子；
+   两个视图都按「表格文字大小 × 倍数」算，大小一样。没设过的表不受影响 */
+.ggt[style*="--ggt-fs"] .ggt-table .ggt-cell,
+.ggt .ggt-table .ggt-cell[style*="--ggt-fz"] { font-size: calc(var(--table-text-size, 1em) * var(--ggt-fs, 1) * var(--ggt-fz, 1)); }
 .ggt-table col { min-width: 40px; }
 /* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动 */
 .ggt.is-full { width: auto; }
@@ -2516,6 +2520,12 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   cursor: pointer;
 }
 .ggt-menu button.ggt-swatch:hover { border-color: var(--text-muted); }
+/* 文字大小：一排大小不同的「A」，和色块一样的小方块 */
+.ggt-menu-sizes { display: flex; align-items: center; gap: 4px; padding: 4px 8px; }
+.ggt-menu-sizes-label { flex: 1 1 auto; margin-right: 4px; color: var(--text-faint); font-size: 0.92em; white-space: nowrap; }
+.ggt-menu button.ggt-size-chip { display: flex; align-items: center; justify-content: center; width: 26px; height: 24px; padding: 0; border: 1px solid var(--background-modifier-border); border-radius: 5px; background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: calc(13px * var(--ggt-chip, 1)); font-weight: 500; line-height: 1; cursor: pointer; }
+.ggt-menu button.ggt-size-chip:hover { border-color: var(--text-muted); }
+.ggt-menu button.ggt-size-chip.is-checked { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .ggt-menu button.ggt-swatch.is-checked { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .ggt-menu button.ggt-swatch[data-bg="none"] { background: linear-gradient(135deg, transparent 45%, var(--text-faint) 45%, var(--text-faint) 55%, transparent 55%), var(--background-primary); }
 .ggt-menu button.ggt-swatch[data-bg="gray"] { background: rgba(var(--mono-rgb-100), 0.12); }
@@ -2906,7 +2916,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt.is-strict .ggt-table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 !important; background: transparent !important; box-shadow: none !important; }
 .ggt.is-strict .ggt-table thead, .ggt.is-strict .ggt-table tbody, .ggt.is-strict .ggt-table tr { border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .ggt.is-strict .ggt-table, .ggt.is-strict .ggt-table thead, .ggt.is-strict .ggt-table tbody, .ggt.is-strict .ggt-table .ggt-cell { border-radius: 0 !important; }
-.ggt.is-strict .ggt-table .ggt-cell { border-top: 0 !important; border-left: 0 !important; border-right: 1px solid var(--ggt-line) !important; border-bottom: 1px solid var(--ggt-line) !important; text-shadow: none !important; }
+.ggt.is-strict .ggt-table .ggt-cell { padding: 0 !important; border-top: 0 !important; border-left: 0 !important; border-right: 1px solid var(--ggt-line) !important; border-bottom: 1px solid var(--ggt-line) !important; text-shadow: none !important; }
 .ggt.is-strict .ggt-table .ggt-cell[data-c="0"] { border-left: 1px solid var(--ggt-line) !important; }
 .ggt.is-strict .ggt-table thead .ggt-cell { border-top: 1px solid var(--ggt-line) !important; font-weight: var(--font-semibold, 600) !important; }
 .ggt.is-strict .ggt-table .ggt-cell:not([data-fg]) { color: var(--text-normal) !important; }
@@ -2934,6 +2944,15 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 /* 选中格所在列的表头淡色高亮（选了一片时不要） */
 .ggt.ggt.is-strict .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: linear-gradient(var(--ggt-sel-soft), var(--ggt-sel-soft)) !important; }
 .ggt.ggt.is-strict.has-range .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: none !important; }
+
+/* Export Image 插件导出图片：它复制编辑器里画好的表格去截图，复制件没有脚本，拖过列宽的表格按记下的比例缩到图片宽（#7） */
+.export-image-root .ggt-table[style*="--ggt-total"] {
+  width: min(100%, var(--ggt-total)) !important;
+  table-layout: fixed !important;
+}
+.export-image-root .ggt-table col[style*="--ggt-pct"] {
+  width: var(--ggt-pct) !important;
+}
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

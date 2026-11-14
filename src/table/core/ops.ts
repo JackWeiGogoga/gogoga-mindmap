@@ -20,6 +20,7 @@ function cloneMeta(m: TableMeta): TableMeta {
   if (m.w) out.w = m.w.slice();
   if (m.bg) out.bg = { ...m.bg };
   if (m.fg) out.fg = { ...m.fg };
+  if (m.fz) out.fz = { ...m.fz };
   if (m.calc) out.calc = m.calc.slice();
   if (m.opts) out.opts = m.opts.map((o) => (o ? { ...o } : null));
   if (m.merge) out.merge = m.merge.slice();
@@ -51,17 +52,17 @@ export const colCount = (t: Table) => t.align.length;
 
 /** 按坐标记的设置换位置：map 返回新的 (行, 列)，null 表示这格没了 */
 function remapCells(meta: TableMeta, map: (r: number, c: number) => [number, number] | null): void {
-  // 底色和文字颜色都按格子坐标记，一起挪
-  for (const key of ["bg", "fg"] as const) {
-    const src = meta[key];
+  // 底色、文字颜色、文字大小都按格子坐标记，一起挪
+  for (const key of ["bg", "fg", "fz"] as const) {
+    const src = meta[key] as Record<string, unknown> | undefined;
     if (!src) continue;
-    const next: Record<string, CellColor> = {};
+    const next: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(src)) {
       const p = parseRef(k);
       const to = p && map(p.r, p.c);
       if (to) next[cellRef(to[0], to[1])] = v;
     }
-    meta[key] = next;
+    (meta as Record<string, unknown>)[key] = next;
   }
 }
 
@@ -276,6 +277,33 @@ export function setFg(t: Table, cells: readonly { r: number; c: number }[], colo
     else delete fg[k];
   }
   n.meta.fg = fg;
+  return n;
+}
+
+/** 设格子的文字大小倍数（null 或 1 是正常） */
+export function setFontSize(t: Table, cells: readonly { r: number; c: number }[], size: number | null): Table {
+  const n = cloneTable(t);
+  const fz = { ...(n.meta.fz ?? {}) };
+  for (const p of cells) {
+    const k = cellRef(p.r, p.c);
+    if (size && size !== 1) fz[k] = size;
+    else delete fz[k];
+  }
+  if (Object.keys(fz).length) n.meta.fz = fz;
+  else delete n.meta.fz;
+  return n;
+}
+
+export function fontSizeOf(t: Table, r: number, c: number): number | null {
+  return t.meta.fz?.[cellRef(r, c)] ?? null;
+}
+
+/** 整表文字大小倍数（null 或 1 是正常） */
+export function setTableFontSize(t: Table, size: number | null): Table {
+  if ((t.meta.fs ?? null) === (size === 1 ? null : size)) return t;
+  const n = cloneTable(t);
+  if (size && size !== 1) n.meta.fs = size;
+  else delete n.meta.fs;
   return n;
 }
 
@@ -574,13 +602,13 @@ export function duplicateRow(t: Table, r: number): Table {
   if (r < 1 || r >= rowCount(t)) return t;
   const n = insertRow(t, r + 1);
   n.cells[r + 1] = t.cells[r].slice();
-  for (const key of ["bg", "fg"] as const) {
-    const m = { ...(n.meta[key] ?? {}) };
+  for (const key of ["bg", "fg", "fz"] as const) {
+    const m: Record<string, unknown> = { ...(n.meta[key] ?? {}) };
     for (let c = 0; c < colCount(t); c++) {
       const v = t.meta[key]?.[cellRef(r, c)];
       if (v) m[cellRef(r + 1, c)] = v;
     }
-    n.meta[key] = m;
+    (n.meta as Record<string, unknown>)[key] = m;
   }
   return n;
 }
@@ -594,13 +622,13 @@ export function duplicateCol(t: Table, c: number): Table {
   n = setVAlign(n, c + 1, vAlignOf(t, c));
   const w = widthOf(t, c);
   if (w) n = setWidth(n, c + 1, w);
-  for (const key of ["bg", "fg"] as const) {
-    const m = { ...(n.meta[key] ?? {}) };
+  for (const key of ["bg", "fg", "fz"] as const) {
+    const m: Record<string, unknown> = { ...(n.meta[key] ?? {}) };
     for (let r = 0; r < rowCount(t); r++) {
       const v = t.meta[key]?.[cellRef(r, c)];
       if (v) m[cellRef(r, c + 1)] = v;
     }
-    n.meta[key] = m;
+    (n.meta as Record<string, unknown>)[key] = m;
   }
   return n;
 }
@@ -787,9 +815,9 @@ export function subTable(t: Table, rect: Rect): Table {
   const c2 = Math.min(colCount(t) - 1, rect.c2);
   if (r1 === 0 && c1 === 0 && r2 === rowCount(t) - 1 && c2 === colCount(t) - 1) return cloneTable(t);
   const cols = (a?: readonly unknown[]) => (a ? a.slice(c1, c2 + 1) : undefined);
-  const shift = (m?: Record<string, CellColor>) => {
+  const shift = <V>(m?: Record<string, V>) => {
     if (!m) return undefined;
-    const out: Record<string, CellColor> = {};
+    const out: Record<string, V> = {};
     for (const [k, v] of Object.entries(m)) {
       const p = parseRef(k);
       if (p && p.r >= r1 && p.r <= r2 && p.c >= c1 && p.c <= c2) out[cellRef(p.r - r1, p.c - c1)] = v;
@@ -806,6 +834,7 @@ export function subTable(t: Table, rect: Rect): Table {
   meta.calc = hasTotal(t) && r2 === rowCount(t) - 1 ? (cols(t.meta.calc) as TableMeta["calc"]) : undefined;
   meta.bg = shift(t.meta.bg);
   meta.fg = shift(t.meta.fg);
+  meta.fz = shift(t.meta.fz);
   if (c1 > 0) {
     delete meta.headerCol;
     delete meta.freeze;
@@ -818,6 +847,7 @@ export function subTable(t: Table, rect: Rect): Table {
   if (!meta.merge.length) delete meta.merge;
   if (meta.bg && !Object.keys(meta.bg).length) delete meta.bg;
   if (meta.fg && !Object.keys(meta.fg).length) delete meta.fg;
+  if (meta.fz && !Object.keys(meta.fz).length) delete meta.fz;
   for (const k of Object.keys(meta)) if (meta[k] === undefined) delete meta[k];
   const cells = t.cells.slice(r1, r2 + 1).map((row) => row.slice(c1, c2 + 1));
   // 合并区域的左上角在这片外面：裁剪后的新左上角显示原来那块的内容（不然显示的是被盖住的那格）

@@ -27,6 +27,9 @@ export type VAlign = (typeof VALIGNS)[number];
 export const TABLE_STYLES = ["default", "zebra", "minimal", "academic"] as const;
 export type TableStyle = (typeof TABLE_STYLES)[number];
 export const TABLE_DENSITIES = ["comfortable", "compact"] as const;
+/** 菜单里的文字大小档位（很小、小、正常、大、很大）；文件里写别的倍数也认，0.5～3 */
+export const FONT_SIZES = [0.75, 0.85, 1, 1.15, 1.3] as const;
+export const fontSizeOk = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0.5 && v <= 3;
 export type TableDensity = (typeof TABLE_DENSITIES)[number];
 
 export interface TableMeta {
@@ -53,6 +56,10 @@ export interface TableMeta {
   /** 这张表自己的样式、行距（不写就跟着设置走） */
   style?: TableStyle;
   density?: TableDensity;
+  /** 整表文字大小，相对正常大小的倍数（1.15 大一号）；不写是正常 */
+  fs?: number;
+  /** 格子的文字大小倍数，键是 A1 式坐标；和整表的相乘 */
+  fz?: Record<string, number>;
   /** 不认识的键原样保留，新版本加的东西旧版本不会弄丢 */
   [key: string]: unknown;
 }
@@ -214,6 +221,17 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
     if (Object.keys(bg).length) meta.bg = bg;
     else delete meta.bg;
   }
+  if (raw.fs !== undefined && (!fontSizeOk(raw.fs) || raw.fs === 1)) delete meta.fs;
+  if (raw.fz !== undefined) {
+    const fz: Record<string, number> = {};
+    if (raw.fz && typeof raw.fz === "object" && !Array.isArray(raw.fz)) {
+      for (const [k, v] of Object.entries(raw.fz as Record<string, unknown>)) {
+        if (parseRef(k) && fontSizeOk(v) && v !== 1) fz[k] = v;
+      }
+    }
+    if (Object.keys(fz).length) meta.fz = fz;
+    else delete meta.fz;
+  }
   if (raw.style !== undefined && !(TABLE_STYLES as readonly unknown[]).includes(raw.style)) delete meta.style;
   if (raw.density !== undefined && !(TABLE_DENSITIES as readonly unknown[]).includes(raw.density)) delete meta.density;
   if (raw.merge !== undefined) {
@@ -321,6 +339,8 @@ export function metaToWrite(meta: TableMeta, cols: number): TableMeta | null {
   }
   if (out.bg && !Object.keys(out.bg).length) delete out.bg;
   if (out.fg && !Object.keys(out.fg).length) delete out.fg;
+  if (out.fz && !Object.keys(out.fz).length) delete out.fz;
+  if (out.fs === 1) delete out.fs;
   for (const key of ["calc", "opts", "va"] as const) {
     const a = out[key] as unknown[] | undefined;
     if (!a) continue;

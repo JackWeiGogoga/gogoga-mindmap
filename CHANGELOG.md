@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.69.0] - 2026-11-14
+
+### Added
+- Tables in nodes: "Table text size" in the table menu and "Text size" in the cell menu, five steps; table and cell sizes multiply (same as gogoga Table).
+
+### Fixed
+- Jumping back to a mind map from an annotation in a PDF (PDF++): the "second click opens another tab" bug fixed in 0.68.0 still happened in many cases. It recognized the jump by checking that the most recent tab was the PDF, but PDF++ creates the new tab before opening the note, so by then the most recent tab is that empty new tab. The plugin now remembers whether you were last in a PDF, so the open mind map jumps to the node whether the PDF is in the main area, a sidebar or a separate window.
+
 ## [0.68.0] - 2026-11-14
 
 ### Added
@@ -864,7 +872,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...HEAD
+[0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0

@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.69.0] - 2026-11-14
+
+### 新增
+- 节点里的表格：表格菜单里「整表文字大小」、格子右键菜单里「文字大小」，五档，整表和格子的相乘（同 gogoga Table）。
+
+### 修复
+- 从 PDF 里点被脑图引用的标注跳回脑图（PDF++）：0.68.0 修过的「第二次点又新开一个标签页」在很多情况下还在。原来靠「最近用的标签页是 PDF」认出是从 PDF 跳回来的，但 PDF++ 会先建好新标签页再打开笔记，那时最近的标签页已经是新开的空标签页。现在插件自己记着最后在用的是不是 PDF，PDF 在主区域、侧边栏或单独窗口里都能在已经开着的脑图里跳到对应节点。
+
 ## [0.68.0] - 2026-11-14
 
 ### 新增
@@ -864,7 +872,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...HEAD
+[0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
 [0.67.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.66.0...0.67.0
 [0.66.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.65.0...0.66.0

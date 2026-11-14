@@ -14,8 +14,8 @@
  */
 
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
-import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
-import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
+import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
@@ -35,6 +35,12 @@ export interface MenuItem {
   danger?: boolean;
   run?: () => void;
   separator?: boolean;
+  /** 现成的图标元素（别的插件加进来的项，只有画好的图标，没有图标名） */
+  iconNode?: Node;
+  /** 文字大小档位（倍数）：画成一个这么大的「A」，和相邻的排成一排 */
+  sizeChip?: number;
+  /** 这一排开头的名字（文字大小那排：名字和「A」放一行，菜单矮一些） */
+  rowLabel?: string;
 }
 
 export interface EditorHost {
@@ -70,6 +76,8 @@ export interface EditorHost {
    * remove 把这张图的嵌入从格子里去掉（删掉文件后调用；只读时为 null）
    */
   imageMenu?(ev: MouseEvent, img: HTMLImageElement, link: string | null, remove: (() => void) | null): void;
+  /** 右键格子时，别的插件往这次右键里加的菜单项（比如 adjustable-media 的「包成布局块」）：交给表格自己的菜单显示，不另弹一个 */
+  eventMenuItems?(ev: MouseEvent, take: (items: MenuItem[]) => void): void;
   /** 往格子里粘贴图片：存成附件，返回要插进格子的 Markdown（![[…]]）；不给就不接图片 */
   saveImage?(file: File): Promise<string | null>;
   /** 选中或开始编辑时通知宿主（实时预览里用来防止编辑器抢走光标） */
@@ -601,6 +609,9 @@ export class TableEditor {
     this.root.classList.toggle("is-full", d.defFull === "1" && !this.table.meta.w?.some((x) => x != null));
     // 设置「表格样式优先于主题」（#12）
     this.root.classList.toggle("is-strict", d.defStrict === "1");
+    // 整表文字大小（格子自己的再乘上去）
+    if (this.table.meta.fs) this.root.setCssProps({ "--ggt-fs": String(this.table.meta.fs) });
+    else this.root.style.removeProperty("--ggt-fs");
   }
 
   // ---------- 渲染 ----------
@@ -620,10 +631,19 @@ export class TableEditor {
     this.marked = [];
     this.crossed = [];
     const colgroup = this.tableEl.appendChild(doc.createElement("colgroup"));
+    // 拖过列宽的：再记一份按比例的宽度（没拖过的列按拖过的平均宽度算）。Export Image 这类插件把画好的表格复制一份去截图，
+    // 复制件上没有脚本，「列宽按比例缩放」不起作用，靠样式里用这份比例缩到图片宽（#7）
+    const ws = Array.from({ length: cols }, (_, c) => widthOf(tb, c) ?? 0);
+    const set = ws.filter((w) => w > 0);
+    const avg = set.length ? set.reduce((a, b) => a + b, 0) / set.length : 0;
+    const total = ws.reduce((a, w) => a + (w || avg), 0);
+    if (set.length) this.tableEl.setCssProps({ "--ggt-total": `${Math.ceil(total)}px` });
+    else this.tableEl.style.removeProperty("--ggt-total");
     for (let c = 0; c < cols; c++) {
       const col = colgroup.appendChild(doc.createElement("col"));
-      const w = widthOf(tb, c);
+      const w = ws[c];
       if (w) col.style.width = `${w}px`;
+      if (set.length) col.setCssProps({ "--ggt-pct": `${(((w || avg) / total) * 100).toFixed(3)}%` });
     }
     const thead = this.tableEl.appendChild(doc.createElement("thead"));
     const tbody = this.tableEl.appendChild(doc.createElement("tbody"));
@@ -655,6 +675,8 @@ export class TableEditor {
         if (bg) cell.dataset.bg = bg;
         const fg = fgOf(tb, r, c);
         if (fg) cell.dataset.fg = fg;
+        const fz = fontSizeOf(tb, r, c);
+        if (fz) cell.setCssProps({ "--ggt-fz": String(fz) });
         if (tb.meta.headerCol && c === 0 && r >= head) cell.classList.add("is-head-col");
         // 冻结标题列：第一列（横跨到第二列的合并格不冻，不然盖住第二列）左右滚动时固定在左边
         if (freeze && c === 0 && (!m || m.c2 === 0)) cell.classList.add("is-frozen");
@@ -1250,7 +1272,14 @@ export class TableEditor {
       const inRange = this.isMulti() && r && p.r >= r.r1 && p.r <= r.r2 && p.c >= r.c1 && p.c <= r.c2;
       if (!inRange) this.setSel(p, true);
       else this.input.focus();
-      this.openMenu(this.cellMenu(inRange && this.sel ? this.sel : p), ev.clientX, ev.clientY);
+      const items = this.cellMenu(inRange && this.sel ? this.sel : p);
+      this.openMenu(items, ev.clientX, ev.clientY);
+      // 别的插件加的项接在菜单最后（菜单还开着才加，重画一次）
+      const pop = this.popover;
+      this.host.eventMenuItems?.(ev, (extra) => {
+        if (!extra.length || this.popover !== pop) return;
+        this.openMenu([...items, { separator: true }, ...extra], ev.clientX, ev.clientY);
+      });
     });
     this.on(this.resizeBar, "pointerdown", (ev) => this.startResize(ev, this.resizeBar));
     this.on(this.fillHandle, "pointerdown", (ev) => this.fillDrag(ev));
@@ -2161,6 +2190,9 @@ export class TableEditor {
           if (!plain && fgOf(tb, r, c)) styles.push(`color:${onWhite(cs.color) ?? cs.color}`);
           if (Number(cs.fontWeight) >= 600) styles.push("font-weight:600");
         }
+        // 文字大小（整表 × 格子）：粘到 Word 里也大一号 / 小一号
+        const size = (tb.meta.fs ?? 1) * (fontSizeOf(tb, r, c) ?? 1);
+        if (!plain && size !== 1) styles.push(`font-size:${Math.round(size * 100)}%`);
         let span = "";
         if (m && m.r1 === r && m.c1 === c) {
           const cs2 = Math.min(m.c2, rect.c2) - c + 1;
@@ -2703,6 +2735,7 @@ export class TableEditor {
       { title: t("rowSpacing") },
       dens(null),
       ...TABLE_DENSITIES.map((x) => dens(x)),
+      ...this.sizeItems(t("tableFontSize"), tb.meta.fs ?? 1, (v) => keep(setTableFontSize(this.table, v))),
       { separator: true },
       { title: t("align") },
       align("left", t("alignAllLeft"), "align-left"),
@@ -2880,6 +2913,10 @@ export class TableEditor {
       { separator: true },
       ...this.statusColorItems(p),
       ...this.colorItems(cells),
+      ...(() => {
+        const sizes = new Set(cells.map((q) => fontSizeOf(tb, q.r, q.c) ?? 1));
+        return this.sizeItems(t("fontSize"), sizes.size === 1 ? [...sizes][0] : undefined, (v) => this.applyKeepRange(setFontSize(this.table, cells, v)));
+      })(),
       { separator: true },
       { title: CHECK_RE.test(tb.cells[p.r][p.c]) ? t("removeCheckbox") : t("addCheckbox"), icon: "square-check", disabled: multi, run: () => this.apply(setCell(tb, p.r, p.c, CHECK_RE.test(tb.cells[p.r][p.c]) ? tb.cells[p.r][p.c].replace(CHECK_RE, "").trimStart() : `[ ] ${tb.cells[p.r][p.c]}`.trimEnd()), p) },
       { title: t("clearCell"), icon: "eraser", disabled: !cells.some((c) => tb.cells[c.r][c.c]), run: () => this.apply(clearCells(tb, cells), this.sel ?? p) },
@@ -3038,6 +3075,12 @@ export class TableEditor {
     ];
   }
 
+  /** 文字大小：一排大小不同的「A」。current 是现在的倍数（几格不一样时是 undefined，哪个都不勾） */
+  private sizeItems(title: string, current: number | undefined, set: (size: number | null) => void): MenuItem[] {
+    const names = ["fontSize_xs", "fontSize_s", "fontSize_m", "fontSize_l", "fontSize_xl"] as const;
+    return FONT_SIZES.map((v, i): MenuItem => ({ sizeChip: v, rowLabel: i === 0 ? title : undefined, title: t(names[i]), checked: current === v, run: () => set(v === 1 ? null : v) }));
+  }
+
   /** 自己画的弹出菜单：样式统一，色块能排成一行，手机上也好点 */
   private openMenu(items: MenuItem[], x: number, y: number): void {
     this.closePopover();
@@ -3052,8 +3095,31 @@ export class TableEditor {
         if (pop.lastElementChild && !pop.lastElementChild.classList.contains("ggt-menu-sep")) pop.appendChild(doc.createElement("div")).className = "ggt-menu-sep";
         continue;
       }
+      if (item.sizeChip) {
+        if (!swatches || !swatches.classList.contains("ggt-menu-sizes")) {
+          swatches = pop.appendChild(doc.createElement("div"));
+          swatches.className = "ggt-menu-sizes";
+          if (item.rowLabel) {
+            const label = swatches.appendChild(doc.createElement("span"));
+            label.className = "ggt-menu-sizes-label";
+            label.textContent = item.rowLabel;
+          }
+        }
+        const b = swatches.appendChild(doc.createElement("button"));
+        b.type = "button";
+        b.className = "ggt-size-chip" + (item.checked ? " is-checked" : "");
+        b.textContent = "A";
+        b.setCssProps({ "--ggt-chip": String(item.sizeChip) });
+        b.setAttribute("aria-label", item.title ?? "");
+        b.title = item.title ?? "";
+        b.addEventListener("click", () => {
+          this.closePopover();
+          item.run?.();
+        });
+        continue;
+      }
       if (item.swatch) {
-        if (!swatches || swatches.classList.contains("ggt-menu-icons")) {
+        if (!swatches || !swatches.classList.contains("ggt-menu-swatches")) {
           swatches = pop.appendChild(doc.createElement("div"));
           swatches.className = "ggt-menu-swatches";
         }
@@ -3111,6 +3177,7 @@ export class TableEditor {
       const ic = b.appendChild(doc.createElement("span"));
       ic.className = "ggt-menu-icon";
       if (item.icon && this.host.setIcon) this.host.setIcon(ic, item.icon);
+      else if (item.iconNode) ic.appendChild(item.iconNode.cloneNode(true));
       b.appendChild(doc.createElement("span")).textContent = item.title ?? "";
       if (item.checked) {
         const ck = b.appendChild(doc.createElement("span"));
