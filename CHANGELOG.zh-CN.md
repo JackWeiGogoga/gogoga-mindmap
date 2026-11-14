@@ -4,6 +4,20 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.72.0] - 2026-11-15
+
+### 新增
+- 导出为 PDF（电脑上）：脑图右上角「⋯」菜单和命令面板里，整张图一页，页面按图的大小，文字是矢量的。
+- 导出图片时节点里的表格完整展开：导出 PNG、SVG、PDF 和复制成图片时，大表格不再只导出节点里看得到的那一块（还带着滚动条和淡出），节点跟着变大、周围的节点让位；导出完画布照旧。节点设了宽度的表格宽度照旧跟着节点。
+- 设置「保留节点开头结尾的空格」（默认关）：Markdown 列表项、标题开头结尾的空格存不住，打开后在笔记里写成 `&nbsp;`，编辑节点时显示成普通空格。
+
+### 变更
+- 跳到某个节点时（点 [[笔记#标题]]、「链接的笔记已经开着时直接跳到那里」、从 PDF 跳回来、从 Markdown 切过来）不再一律把节点放在正中：节点连同它展开的分支一起看，放得下就整个分支居中；放不下就把节点贴在分支生长方向的反面（往右长的贴左边、往左长的贴右边、往下长的贴上边），右边、下边是它的内容。
+
+### 修复
+- 节点文字里的 `&nbsp;` 显示成了字样，现在和 Obsidian 一样显示成空格。
+- 导出图片里表格的格子之间多了 2 像素的间隔，表格比节点高一截、最后一行伸出节点；表格的菜单按钮、加号也被导了出去。
+
 ## [0.71.1] - 2026-11-14
 
 ### 修复
@@ -900,7 +914,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...HEAD
+[0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0
 [0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0

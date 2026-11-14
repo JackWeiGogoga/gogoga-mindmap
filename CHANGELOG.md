@@ -4,6 +4,20 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.72.0] - 2026-11-15
+
+### Added
+- Export as PDF (desktop): in the map's ⋯ menu and the command palette — the whole map on one page sized to it, with vector text.
+- Tables in nodes are exported in full: PNG, SVG and PDF export and Copy as image no longer cut a large table to the part visible in its node (with the scrollbar and fade); the node grows and the map makes room, and the canvas goes back to normal afterwards. Tables in nodes with a set width still follow the node's width.
+- Setting "Keep spaces at the start and end of topics" (off by default): Markdown drops them from list items and headings, so with this on they're saved as `&nbsp;` and show as ordinary spaces while you edit the topic.
+
+### Changed
+- Jumping to a topic (a [[note#heading]] link, "Jump to the note if it's already open", coming back from a PDF, switching from Markdown) no longer always puts the topic dead center: the topic and its expanded branch are shown together — centered as a whole when they fit, otherwise with the topic pinned to the side the branch grows away from (left for branches growing right, right for left, top for down), so its content fills the rest of the view.
+
+### Fixed
+- `&nbsp;` in topic text showed up literally; it now shows as a space, like in Obsidian.
+- Exported images added 2px between table cells, so a table came out taller than its node with the last row sticking out, and the table's menu button and + buttons were exported too.
+
 ## [0.71.1] - 2026-11-14
 
 ### Fixed
@@ -900,7 +914,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...HEAD
+[0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0
 [0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
