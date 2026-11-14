@@ -464,6 +464,11 @@
 :is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-scroller { overflow: visible; font-family: inherit; line-height: inherit; }
 :is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-content { padding: 0; font-family: inherit; caret-color: currentColor; }
 :is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-line { padding: 0; }
+/* 嵌在笔记编辑器里（代码块、嵌入的脑图）时，笔记编辑器的规则会套到节点编辑框上：.cm-editor 是 flex: 1 1 0、.cm-content 宽 0、
+   可读行宽的 max-width，编辑框被压成最窄，字一个一个竖着排（#38）。在节点编辑框里还原；多写一层 .cm-scroller 压过它们 */
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-editor.cm-editor { flex: 0 1 auto; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-editor .cm-scroller .cm-content { width: auto; max-width: none; flex-basis: auto; }
+:is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-editor .cm-scroller .cm-line { max-width: none; }
 :is(.gg-mm-root, .mm-outline) .mm-has-editor .cm-placeholder { color: var(--text-faint, #999); }
 /* 实时预览：和节点渲染出来的样子一致；光标进到某段时露出的标记符淡一些 */
 .mm-has-editor .mm-ed-strong { font-weight: 700; }
@@ -2246,7 +2251,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   --ggt-sel: var(--interactive-accent);
   --ggt-sel-soft: rgba(var(--interactive-accent-rgb, 72, 54, 153), 0.08);
   --ggt-pad-y: 7px;
-  --ggt-pad-x: 10px;
+  --ggt-pad-x: var(--ggt-pad-user, 10px);
   --ggt-font-size: var(--table-text-size, 0.93em);
   position: relative;
   margin: 0.4em 0 0.8em;
@@ -2256,7 +2261,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   max-width: calc(100% + 40px);
   box-sizing: border-box;
 }
-.ggt[data-density="compact"] { --ggt-pad-y: 3px; --ggt-pad-x: 8px; }
+.ggt[data-density="compact"] { --ggt-pad-y: 3px; --ggt-pad-x: min(8px, var(--ggt-pad-user, 10px)); }
 
 /* 右边、下边留出位置：骑在表格右下角的填充柄（连同它放大的点击范围）不会被裁掉，也不会把表格撑出横向滚动 */
 .ggt-scroll { overflow-x: auto; overflow-y: visible; padding: 0 12px 12px 0; margin: 0 -12px -12px 0; }

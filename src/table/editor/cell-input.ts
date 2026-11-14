@@ -269,7 +269,17 @@ export class CodeMirrorInput implements CellInput {
     return visibleSelection(this.view);
   }
   focus(): void {
+    this.syncRoot();
     this.view.contentDOM.focus({ preventScroll: true });
+  }
+  /**
+   * 编辑器跟着它现在所在的 document 走：白板卡片编辑时 Obsidian 先在主窗口建好表格、再挪进卡片的 iframe，
+   * 编辑器还当自己在主窗口，点格子里的字时 CodeMirror 把 iframe 当成别处的焦点让它失焦，这一格就保存退出了，
+   * 光标挪不到想要的位置（B站反馈：白板里改格子只能全删重打）
+   */
+  private syncRoot(): void {
+    const v = this._view;
+    if (v && v.dom.isConnected && v.root !== v.dom.ownerDocument) v.setRoot(v.dom.ownerDocument);
   }
   hasFocus(): boolean {
     return !!this._view?.hasFocus;
