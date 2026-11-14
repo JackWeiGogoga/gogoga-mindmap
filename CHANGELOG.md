@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.71.0] - 2026-11-14
+
+### Added
+- Setting "Jump to the note if it's already open" (off by default): when a clicked link's note is already open in another tab or split, go there instead of opening it again; in a mind map the linked heading or block is selected. Handy with two maps side by side. ⌘-click (Ctrl-click) still opens a new tab.
+- "Markdown and mind map side by side" now keeps the current side as it is and opens the other one opposite: if the window is already split (left/right or top/bottom), it opens in the pane next to it instead of adding a third; otherwise the new setting "Mind map side in side by side" puts the map on the right (default) or left.
+- Command "Swap Markdown and mind map sides", also a button at the top right of the map while side by side: swaps the two, and the focus follows the view you were in.
+- Callouts can be formatted: while editing a callout, text color, highlight (commands, hotkeys, floating format bar) and ⌘B / ⌘I / ⌘U apply to the selected text.
+- Tables in nodes (as in gogoga Table 0.14.0): Space on a selected cell starts editing instead of clearing it; a + on the left adds a column.
+
+### Fixed
+- Several spaces in a row in a node showed as one after editing, so the text was a different length while editing and after. They now show as typed, in exported images too.
+
 ## [0.70.0] - 2026-11-14
 
 ### Added
@@ -882,7 +894,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...HEAD
+[0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0

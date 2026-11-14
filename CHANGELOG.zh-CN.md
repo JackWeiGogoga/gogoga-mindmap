@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.71.0] - 2026-11-14
+
+### 新增
+- 设置「链接的笔记已经开着时直接跳到那里」（默认关）：点链接时，链到的笔记已经在别的标签页或分屏里开着，就跳到那里，脑图选中链到的标题、块对应的节点，不再开一个。两张脑图左右并排时好用；⌘ 点（Ctrl 点）照旧新标签页打开。
+- 「Markdown 和思维导图分屏对照」改成当前这一边不动、另一种开在对面：已经左右或上下分好屏的，开在旁边那个分屏里，不再分出第 3 屏；还没分屏时按新设置「分屏对照时脑图在」放右边（默认）或左边。
+- 命令「分屏对照：左右互换」，对照着时脑图右上角也有这个按钮：两边的脑图和 Markdown 对调，焦点跟着原来那种视图。
+- 标注也能上格式：编辑标注时，文字颜色、高亮（命令、快捷键、浮动格式栏）和 ⌘B / ⌘I / ⌘U 作用于选中的文字。
+- 节点里的表格（同 gogoga Table 0.14.0）：选中格子按空格进入编辑、不再清空格子；左边也有加一列的加号。
+
+### 修复
+- 节点里连着打的几个空格，编辑完只显示一个，编辑时和显示时长短不一样。现在照原样显示，导出图片也一样。
+
 ## [0.70.0] - 2026-11-14
 
 ### 新增
@@ -882,7 +894,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...HEAD
+[0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
 [0.68.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.67.0...0.68.0
