@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.71.1] - 2026-11-14
+
+### 修复
+- 笔记里用代码块嵌入的脑图（#38）：新建节点打字时文字一个字一行竖着排，按回车后才正常。节点的编辑框吃到了笔记编辑器自己的样式，被压成最窄；现在节点编辑框不受它影响。
+- 节点里的表格（同 gogoga Table 0.15.0）：白板卡片里改格子时光标挪不动的问题。
+
 ## [0.71.0] - 2026-11-14
 
 ### 新增
@@ -894,7 +900,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...HEAD
+[0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0

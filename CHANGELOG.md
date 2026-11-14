@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.71.1] - 2026-11-14
+
+### Fixed
+- Mind maps embedded in a note with a code block (#38): typing in a new node stacked the text one character per line until you pressed Enter. The node's editor picked up the note editor's own styles and was squeezed to its narrowest; it no longer is.
+- Tables in nodes (as in gogoga Table 0.15.0): the cursor couldn't be moved while editing a cell in a Canvas card.
+
 ## [0.71.0] - 2026-11-14
 
 ### Added
@@ -894,7 +900,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...HEAD
+[0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
 [0.70.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.69.0...0.70.0
 [0.69.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.68.0...0.69.0
