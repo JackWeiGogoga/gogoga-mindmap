@@ -142,6 +142,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   updateSplitSync(available: boolean): void {
     this.canvas?.setSplitSyncAvailable(available);
     this.sideAction?.toggle(!available);
+    this.swapAction?.toggle(available);
   }
 
   followLine(text: string, line: number): void {
@@ -219,6 +220,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   private sideAction: HTMLElement | null = null;
+  private swapAction: HTMLElement | null = null;
 
   /** 摘录开着时标题栏多一个高亮的按钮，点它关掉 */
   setExcerpting(on: boolean): void {
@@ -295,6 +297,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
     });
     this.sideAction.addClass("mm-side-action");
+    // 分屏对照着的时候：左右互换（群里反馈），没对照时藏起来
+    this.swapAction = this.addAction("arrow-left-right", t("command.swapSides"), () => void this.plugin.swapSides(this.leaf));
+    this.swapAction.addClass("mm-swap-action");
+    this.swapAction.hide();
     this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
     const host = this.contentEl.createDiv({ cls: "mm-canvas-host" });
     this.canvas = new MindMapCanvas(host, {

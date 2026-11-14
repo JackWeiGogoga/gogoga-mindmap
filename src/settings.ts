@@ -133,6 +133,8 @@ export interface MindMapSettings {
   linkOpen: "current" | "tab" | "split";
   /** 在右侧分屏打开链接后，焦点放到打开的笔记上（默认关：留在脑图上，方便接着加节点） */
   linkFocusNote: boolean;
+  /** 点链接时，链到的笔记已经在别的标签页、分屏里开着：直接跳到那里（脑图里选中对应节点），不再开一个（默认关） */
+  linkReuseOpen: boolean;
   /** 从脑图新建的链接笔记放在哪：跟随 Obsidian 的新文件位置 / 脑图所在文件夹 / 脑图旁边和它同名的文件夹 / 指定文件夹 */
   newNoteFolder: "default" | "map" | "mapSub" | "custom";
   /** newNoteFolder 是 custom 时的文件夹路径 */
@@ -143,6 +145,8 @@ export interface MindMapSettings {
   openView: "fit" | "center";
   /** 同一文件的脑图和 Markdown 同时显示时，选中和光标互相跟随（默认关） */
   syncSplit: boolean;
+  /** 分屏对照（还没分屏、要新分一屏时）脑图放在哪边：右边（默认）/ 左边 */
+  splitMapSide: "right" | "left";
   /** 分屏联动定位到折叠着的节点时，把它展开（会改文件里的 %%fold%%，默认关） */
   followExpand: boolean;
   /** Markdown 跟着脑图折叠：编辑器和阅读视图里对应的节点按脑图的折叠状态折起来（默认关） */
@@ -228,11 +232,13 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   customSplits: "",
   linkOpen: "current",
   linkFocusNote: false,
+  linkReuseOpen: false,
   newNoteFolder: "default",
   newNoteFolderPath: "",
   dragToFloat: false,
   openView: "fit",
   syncSplit: false,
+  splitMapSide: "right",
   followExpand: false,
   foldFollow: false,
   customMarkers: "",
@@ -444,6 +450,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         },
         dropdown("linkOpen", t("settings.linkOpen.name"), t("settings.linkOpen.desc"), { current: t("settings.linkOpen.current"), tab: t("settings.linkOpen.tab"), split: t("settings.linkOpen.split") }, ["link", "链接", "分屏", "split", "打开"]),
         toggle("linkFocusNote", t("settings.linkFocusNote.name"), t("settings.linkFocusNote.desc"), ["focus", "焦点", "分屏", "split"]),
+        toggle("linkReuseOpen", t("settings.linkReuseOpen.name"), t("settings.linkReuseOpen.desc"), ["link", "链接", "分屏", "split", "跳转", "已经打开"]),
         dropdown("newNoteFolder", t("settings.newNoteFolder.name"), t("settings.newNoteFolder.desc"), { default: t("settings.newNoteFolder.default"), map: t("settings.newNoteFolder.map"), mapSub: t("settings.newNoteFolder.mapSub"), custom: t("settings.newNoteFolder.custom") }, ["folder", "文件夹", "新建", "位置", "存放"]),
         text("newNoteFolderPath", t("settings.newNoteFolderPath.name"), t("settings.newNoteFolderPath.desc"), t("settings.newNoteFolderPath.placeholder"), ["folder", "文件夹", "路径"]),
         dropdown("wheelAction", t("settings.wheel.name"), t("settings.wheel.desc"), { pan: t("settings.wheel.pan"), zoom: t("settings.wheel.zoom") }, ["scroll", "滚动", "缩放"]),
@@ -505,6 +512,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         ]),
         group(t("settings.group.sync"), [
           toggle("syncSplit", t("settings.syncSplit.name"), t("settings.syncSplit.desc"), ["split", "分屏", "联动"]),
+          dropdown("splitMapSide", t("settings.splitMapSide.name"), t("settings.splitMapSide.desc"), { right: t("settings.splitMapSide.right"), left: t("settings.splitMapSide.left") }, ["split", "分屏", "对照", "左边", "右边", "left", "right"]),
           toggle("followExpand", t("settings.followExpand.name"), t("settings.followExpand.desc")),
           toggle("foldFollow", t("settings.foldFollow.name"), t("settings.foldFollow.desc"), ["fold", "折叠"]),
           toggle("followActiveNote", t("settings.followActive.name"), t("settings.followActive.desc"), ["sidebar", "侧边栏"]),

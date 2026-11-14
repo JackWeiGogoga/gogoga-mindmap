@@ -15,7 +15,7 @@
 
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
-import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
@@ -259,6 +259,15 @@ export class TableEditor {
     this.colHandle = this.handle("ggt-col-handle", t("colMenu"), "grip-horizontal");
     this.addButton("ggt-add-col", t("addCol"), () => this.apply(insertCol(this.table, colCount(this.table)), { r: this.sel?.r ?? 0, c: colCount(this.table) }));
     this.addButton("ggt-add-row", t("addRow"), () => this.apply(insertRow(this.table, rowCount(this.table)), { r: rowCount(this.table), c: this.sel?.c ?? 0 }));
+    // 群里反馈：四边都能加。左边加在最前面；上边加在表头下面（Markdown 的表头只能是第一行）。
+    // 这两条在表格外面（里面的留白放着行列手柄），盖在上一行文字、左边留白上：鼠标先进了表格才接得住点击，免得点上一行的字误加一行
+    this.addButton("ggt-add-col-first", t("addColFirst"), () => this.apply(insertCol(this.table, 0), { r: this.sel?.r ?? 0, c: 0 }));
+    this.addButton("ggt-add-row-first", t("addRowFirst"), () => {
+      const at = headRows(this.table);
+      this.apply(insertRow(this.table, at), { r: at, c: this.sel?.c ?? 0 });
+    });
+    this.root.addEventListener("pointerenter", () => this.root.classList.add("is-hot"));
+    this.root.addEventListener("pointerleave", () => this.root.classList.remove("is-hot"));
     this.root.classList.toggle("is-readonly", !!host.readonly);
     parent.appendChild(this.root);
     this.bind();
@@ -404,6 +413,31 @@ export class TableEditor {
       }
     }
     return false;
+  }
+
+  /**
+   * 搜索跳到表格里（在文件中查找、全局搜索点进来）：第 r 行第 c 列格子里第 k 处 text 标出来、滚进视野（#15）。
+   * 用浏览器的自定义高亮，不改格子的 DOM；不支持或者找不到这段字（格式把字拆开了）就让整格闪一下
+   */
+  showMatch(r: number, c: number, text: string, k: number): void {
+    const el = this.grid[r]?.[c];
+    if (!el) return;
+    clearSearchMark();
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+    const content = el.querySelector(".ggt-content");
+    const win = this.root.ownerDocument.defaultView ?? window;
+    const reg = (win.CSS as { highlights?: Map<string, unknown> } | undefined)?.highlights;
+    const H = (win as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+    const range = content && text ? findTextRange(content, text, k) : null;
+    // 点一下页面（点格子不经过编辑器，编辑器看不到选区变化）就去掉
+    this.root.ownerDocument.addEventListener("pointerdown", clearSearchMark, { once: true, capture: true });
+    if (range && reg && H) {
+      reg.set("ggt-search", new H(range));
+      searchMarkReg = reg;
+      return;
+    }
+    el.classList.add("is-search-hit");
+    searchMarkCell = el;
   }
 
   destroy(): void {
@@ -1404,9 +1438,10 @@ export class TableEditor {
         this.commit();
         this.move(0, ev.shiftKey ? -1 : 1, true);
       } else if (ev.key === "Escape") {
+        // Esc 保存并退出编辑，和 Obsidian 自己的表格一样（以前是取消、丢掉刚打的字，#15）；想撤销按 ⌘Z
         ev.preventDefault();
         ev.stopPropagation();
-        this.cancel();
+        this.commit();
       }
       ev.stopPropagation();
       return;
@@ -1454,7 +1489,9 @@ export class TableEditor {
           this.apply(toggleCheck(this.table, this.sel.r, this.sel.c), this.sel);
           return;
         }
-        break;
+        // 选中格子按空格：进入编辑、内容留着、光标在最后（群里反馈：以前和打字一样把整格换成一个空格，内容没了）
+        stop();
+        return this.startEdit(true);
       case "Enter":
       case "F2":
         stop();
@@ -2491,9 +2528,22 @@ export class TableEditor {
       this.resize = null;
       if (!r) return;
       const w = parseFloat(r.col.style.width);
-      // 缩着拖的：看到的宽度换算回没缩时的宽度再存，重新缩放后和拖到的差不多
-      if (Math.abs(w - r.startW) >= 1) this.apply(setWidth(this.table, r.c, Math.round(w / r.scale)));
-      else this.fitCols();
+      if (Math.abs(w - r.startW) < 1) {
+        this.fitCols();
+        return;
+      }
+      // 开着「列宽按比例缩放」时，拖得表格比正文宽了：用户就是想让这张表左右滑动，记下来，以后不缩它（群里反馈）；
+      // 拖回正文以内就去掉，又跟着缩放。缩着拖的那次，各列按眼前看到的宽度存，松手后和拖到的一样宽
+      // 没开这个设置：不记也不清，留着这张表原来的标记
+      const fit = this.root.dataset.defFit === "1";
+      const avail = this.availWidth();
+      const wide = fit && avail > 0 && this.tableEl.offsetWidth > avail + 1;
+      if (wide) this.apply(setWide(r.scale !== 1 ? setWidths(this.table, this.colWidths()) : setWidth(this.table, r.c, w), true));
+      else {
+        // 缩着拖的：看到的宽度换算回没缩时的宽度再存，重新缩放后和拖到的差不多
+        const n = setWidth(this.table, r.c, Math.round(w / r.scale));
+        this.apply(fit ? setWide(n, false) : n);
+      }
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
@@ -2794,7 +2844,7 @@ export class TableEditor {
       ...(tb.meta.headerCol ? [{ title: t("freezeHeaderCol"), icon: "pin", checked: tb.meta.freeze === 1, run: () => keep(setTableLook(this.table, { freeze: this.table.meta.freeze !== 1 })) }] : []),
       { separator: true },
       { title: t("distributeCols"), icon: "columns-3", run: () => keep(setWidths(this.table, this.colWidths().map((_, _i, all) => all.reduce((a, b) => a + b, 0) / all.length))) },
-      { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWidths(this.table, this.fitWidths())) },
+      { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWide(setWidths(this.table, this.fitWidths()), false)) },
       { title: t("autoWidthAll"), icon: "move-horizontal", disabled: !tb.meta.w?.some((x) => x != null), run: () => keep(autoWidthAll(this.table)) },
       { title: t("clearAllBg"), icon: "paintbrush", disabled: !Object.keys(tb.meta.bg ?? {}).length && !Object.keys(tb.meta.fg ?? {}).length, run: () => keep(clearAllBg(this.table)) },
       { separator: true },
@@ -2854,9 +2904,8 @@ export class TableEditor {
       this.root.classList.remove("is-fit");
       this.fitScale = 1;
     }
-    if (this.root.dataset.defFit !== "1" || !tb.meta.w?.some((x) => x != null) || this.resize) return;
-    const host = this.root.parentElement;
-    const avail = host ? host.clientWidth - 2 : 0;
+    if (this.root.dataset.defFit !== "1" || tb.meta.wide || !tb.meta.w?.some((x) => x != null) || this.resize) return;
+    const avail = this.availWidth();
     const natural = t.offsetWidth;
     if (avail <= 0 || !natural || natural <= avail + 1) return;
     const k = this.scale();
@@ -2869,6 +2918,12 @@ export class TableEditor {
     t.style.width = `${px.reduce((a, b) => a + b, 0)}px`;
     this.root.classList.add("is-fit");
     this.fitScale = f;
+  }
+
+  /** 正文给表格的宽度（量外层，表格自己比它宽时就要横向滚动） */
+  private availWidth(): number {
+    const host = this.root.parentElement;
+    return host ? host.clientWidth - 2 : 0;
   }
 
   /** 撑满页面：按现在各列的比例放大 / 缩小到正文的可用宽度 */
@@ -3240,6 +3295,49 @@ export class TableEditor {
     this.popover?.remove();
     this.popover = null;
   }
+}
+
+let searchMarkReg: Map<string, unknown> | null = null;
+let searchMarkCell: HTMLElement | null = null;
+
+/** 去掉搜索跳转时标出的那一处（选区挪走了、换了一处）。按名字从窗口里删：插件重载前留下的也删掉 */
+export function clearSearchMark(): void {
+  searchMarkReg?.delete("ggt-search");
+  (window.CSS as { highlights?: Map<string, unknown> } | undefined)?.highlights?.delete("ggt-search");
+  searchMarkReg = null;
+  searchMarkCell?.classList.remove("is-search-hit");
+  searchMarkCell = null;
+}
+
+/** 元素里第 k 处（从 0 数）text 的范围：文字可能跨好几个文字节点；不够 k 处就用最后一处 */
+function findTextRange(root: Element, text: string, k: number): Range | null {
+  const doc = root.ownerDocument;
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let all = "";
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    nodes.push(n as Text);
+    all += (n as Text).data;
+  }
+  const hits: number[] = [];
+  for (let i = all.indexOf(text); i >= 0; i = all.indexOf(text, i + text.length)) hits.push(i);
+  if (!hits.length) return null;
+  const start = hits[Math.min(k, hits.length - 1)];
+  const at = (pos: number): [Text, number] => {
+    let acc = 0;
+    for (const n of nodes) {
+      if (pos <= acc + n.data.length) return [n, pos - acc];
+      acc += n.data.length;
+    }
+    const last = nodes[nodes.length - 1];
+    return [last, last.data.length];
+  };
+  const range = doc.createRange();
+  const [sn, so] = at(start);
+  const [en, eo] = at(start + text.length);
+  range.setStart(sn, so);
+  range.setEnd(en, eo);
+  return range;
 }
 
 /** 一个 HTML 格子里的文字：<br> 和块级元素之间算换行 */

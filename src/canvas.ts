@@ -784,6 +784,8 @@ export class MindMapCanvas {
   private formatBar: HTMLElement | null = null;
   /** 正在编辑的节点文字的编辑框（CodeMirror），和 editing 同生同灭 */
   private nodeEditor: InlineEditor | null = null;
+  /** 正在编辑的标注的编辑框：文字颜色、高亮、加粗这些格式也能用在标注上（群里反馈） */
+  private calloutEditor: InlineEditor | null = null;
 
   constructor(container: HTMLElement, opts: CanvasOptions) {
     this.opts = { ...opts };
@@ -3189,8 +3191,9 @@ export class MindMapCanvas {
     this.ensureVisible(node);
     delete box.dataset.raw;
     box.classList.add("is-editing");
-    this.editInPlace(el, {
+    this.calloutEditor = this.editInPlace(el, {
       text: before,
+      format: true,
       // 改已有的：光标放末尾，接着写
       selectAll: false,
       multiline: true,
@@ -3202,6 +3205,8 @@ export class MindMapCanvas {
         const text = commit ? calloutFromMarker(calloutToMarker(raw)) : before;
         box.classList.remove("is-editing");
         this.editingCallout = null;
+        this.calloutEditor = null;
+        this.updateFormatBar();
         node.callout = text || undefined;
         if (!node.callout) node.calloutColor = undefined;
         // 隐藏标注时编辑完留着浮出的那条，方便看结果；点别处再收起
@@ -3554,8 +3559,8 @@ export class MindMapCanvas {
    */
   private editInPlace(
     host: HTMLElement,
-    opts: { text: string; selectAll: boolean; multiline: boolean; placeholder?: string; onChange?: () => void; done: (commit: boolean, text: string) => void },
-  ): void {
+    opts: { text: string; selectAll: boolean; multiline: boolean; placeholder?: string; onChange?: () => void; done: (commit: boolean, text: string) => void; format?: boolean },
+  ): InlineEditor {
     let finished = false;
     const finish = (commit: boolean) => {
       if (finished) return;
@@ -3584,11 +3589,21 @@ export class MindMapCanvas {
           finish(false);
           return true;
         }
+        // 能上格式的（标注）：⌘B / ⌘I / ⌘U 作用于选中的那段文字，和编辑节点一样
+        const mod = ev.metaKey || ev.ctrlKey;
+        if (opts.format && mod && !ev.shiftKey && !ev.altKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
+          ev.preventDefault();
+          const k = ev.key.toLowerCase();
+          this.formatText({ kind: k === "b" ? "bold" : k === "i" ? "italic" : "underline" });
+          return true;
+        }
         return false;
       },
       onChange: opts.onChange,
+      onSelect: opts.format ? () => this.updateFormatBar() : undefined,
       onBlur: () => finish(true),
     });
+    return editor;
   }
 
   private settleTimer: number | null = null;
@@ -7365,7 +7380,7 @@ export class MindMapCanvas {
    */
   formatText(fmt: InlineFormat): void {
     if (!this.opts.editable) return;
-    if (this.editing) {
+    if (this.editing || this.calloutEditor) {
       this.formatEditing(fmt);
       return;
     }
@@ -7395,7 +7410,7 @@ export class MindMapCanvas {
   }
 
   private formatEditing(fmt: InlineFormat): void {
-    const ed = this.nodeEditor;
+    const ed = this.nodeEditor ?? this.calloutEditor;
     if (!ed) return;
     // 选中的只是藏起来的标记、一个看得见的字都没有：不动（不然会当成没选，整段都上格式）
     const raw = ed.selection;
@@ -7407,7 +7422,7 @@ export class MindMapCanvas {
 
   /** 编辑中选中一段文字时浮在它上面的格式栏（设置里打开才有） */
   private updateFormatBar(): void {
-    const ed = this.nodeEditor;
+    const ed = this.nodeEditor ?? this.calloutEditor;
     const rect = ed && this.opts.formatBar?.() ? ed.selectionRect() : null;
     if (!ed || !rect) {
       this.formatBar?.remove();
@@ -7441,10 +7456,21 @@ export class MindMapCanvas {
       // 系统取色器会让编辑框失焦（编辑先提交）：记下节点和选区，选好颜色后在提交后的文字上同一段上色
       onCustom: () => {
         const node = this.editing;
-        const sel = this.nodeEditor?.visibleSelection ?? null;
+        const callout = this.calloutEditor ? this.editingCallout : null;
+        const sel = (this.nodeEditor ?? this.calloutEditor)?.visibleSelection ?? null;
         return (fmt) => {
-          if (this.editing && this.editing === node) {
+          if ((this.editing && this.editing === node) || (callout && this.editingCallout === callout && this.calloutEditor)) {
             this.formatText(fmt);
+            return;
+          }
+          // 标注：取色时编辑框失焦、标注已经提交，在提交后的文字上同一段上色
+          if (callout) {
+            if (!sel || callout.callout === undefined) return;
+            const next = calloutFromMarker(calloutToMarker(applyInlineFormat(callout.callout, sel.from, sel.to, fmt).text));
+            if (next === callout.callout) return;
+            callout.callout = next;
+            this.render();
+            this.notify();
             return;
           }
           if (!node || !sel) return;

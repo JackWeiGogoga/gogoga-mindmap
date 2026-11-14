@@ -180,7 +180,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const scale = canvas.el.getBoundingClientRect().width / Math.max(1, canvas.el.clientWidth);
     const h = label.getBoundingClientRect().height / (scale || 1);
     const zoom = (canvas as unknown as { k: number }).k || 1;
-    if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "nowrap" });
+    if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "pre" });
   });
   clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold, .mm-note-card-resize, .mm-quiz-tag, .mm-pdf-jump").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target, .mm-rel-label.is-active").forEach((n) => {

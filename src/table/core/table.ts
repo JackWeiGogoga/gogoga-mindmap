@@ -60,6 +60,8 @@ export interface TableMeta {
   fs?: number;
   /** 格子的文字大小倍数，键是 A1 式坐标；和整表的相乘 */
   fz?: Record<string, number>;
+  /** 拖列宽时把表格拉得比正文宽了：这张表想左右滑动，「列宽按比例缩放」不缩它 */
+  wide?: 1;
   /** 不认识的键原样保留，新版本加的东西旧版本不会弄丢 */
   [key: string]: unknown;
 }
@@ -178,6 +180,7 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
   }
   if (raw.headerCol !== undefined && raw.headerCol !== true) delete meta.headerCol;
   if (raw.freeze !== undefined && raw.freeze !== 1) delete meta.freeze;
+  if (raw.wide !== undefined && raw.wide !== 1) delete meta.wide;
   if (raw.head !== undefined && !(raw.head === 2 || raw.head === 3)) delete meta.head;
   if (raw.calc !== undefined) {
     const calc = Array.isArray(raw.calc) ? raw.calc.map((x) => ((CALCS as readonly unknown[]).includes(x) ? (x as Calc) : null)) : [];

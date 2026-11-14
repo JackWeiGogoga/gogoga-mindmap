@@ -100,6 +100,8 @@ export function markerText(s: string): string {
 export function calloutToMarker(s: string): string {
   let open = false;
   return s
+    // 文字颜色、荧光笔的 <span style="…">：属性改用单引号，不然双引号会截断标记（标注也能上颜色，群里反馈）
+    .replace(/<span style="([^"<>]*)">/g, "<span style='$1'>")
     .replace(/"/g, () => {
       open = !open;
       return open ? "\u201c" : "\u201d";
@@ -114,7 +116,10 @@ export function calloutToMarker(s: string): string {
 
 /** 标记里的标注文字 → 内存里的（<br> 还原成换行） */
 export function calloutFromMarker(s: string): string {
-  return s.replace(/<br\s*\/?>/gi, "\n").trim();
+  return s
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<span style='([^'<>]*)'>/g, '<span style="$1">')
+    .trim();
 }
 
 export function splitMarker(text: string): { text: string; marker: Marker } {

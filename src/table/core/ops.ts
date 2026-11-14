@@ -311,6 +311,15 @@ export function fgOf(t: Table, r: number, c: number): CellColor | null {
   return t.meta.fg?.[cellRef(r, c)] ?? null;
 }
 
+/** 这张表要不要左右滑动（拖列宽时拉得比正文宽了）：要的话「列宽按比例缩放」不缩它 */
+export function setWide(t: Table, wide: boolean): Table {
+  if (!!t.meta.wide === wide) return t;
+  const n = cloneTable(t);
+  if (wide) n.meta.wide = 1;
+  else delete n.meta.wide;
+  return n;
+}
+
 /** 一次设好所有列宽（平均分布、撑满页面） */
 export function setWidths(t: Table, ws: readonly number[]): Table {
   const n = cloneTable(t);
@@ -512,6 +521,7 @@ export function autoWidthAll(t: Table): Table {
   if (!t.meta.w?.some((x) => x != null)) return t;
   const n = cloneTable(t);
   delete n.meta.w;
+  delete n.meta.wide;
   return n;
 }
 

@@ -31,6 +31,7 @@ import {
   TFolder,
   normalizePath,
   WorkspaceLeaf,
+  WorkspaceTabs,
   ViewState,
   editorInfoField,
   editorLivePreviewField,
@@ -1287,30 +1288,110 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /**
-   * 左右分屏对照：左边 Markdown，右边脑图，都不写 frontmatter。
-   * leaf 正显示着这篇的脑图（脑图笔记默认就是）：先把它换成 Markdown，再在右侧开脑图；
-   * 没给 leaf、或 leaf 显示的不是这篇：在当前标签页打开 Markdown
+   * 分屏对照：当前显示的这一边不动，另一种（脑图 ↔ Markdown）开在对面，都不写 frontmatter。
+   * 已经分好屏（左右、上下）的：开在旁边那个分屏里（另一边已经开着就切过去），不再多分一屏（群里反馈）；
+   * 还没分屏的：新分一屏，脑图在哪边按设置「分屏对照时脑图在」。
+   * 没给 leaf、或 leaf 显示的不是这篇：先在当前标签页打开 Markdown
    */
   async openSideBySide(file: TFile, leaf?: WorkspaceLeaf): Promise<void> {
     const target = leaf ?? this.app.workspace.getLeaf(false);
-    const view = target.view;
-    if (!(view instanceof MarkdownView && view.file === file)) await this.openAsMarkdown(file, target);
-    this.app.workspace.setActiveLeaf(target, { focus: true });
-    await this.openPreview(file);
-  }
-
-  /** 在右侧分屏用脑图看当前笔记，不写 frontmatter；已经开着就直接显示那个 */
-  async openPreview(file: TFile): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => (l.view as MindMapView).file?.path === file.path);
-    if (existing) {
-      await this.app.workspace.revealLeaf(existing);
+    const shows = (l: WorkspaceLeaf, type: string) => l.view.getViewType() === type && (l.view as { file?: TFile }).file?.path === file.path;
+    if (!shows(target, VIEW_TYPE_MINDMAP) && !shows(target, "markdown")) await this.openAsMarkdown(file, target);
+    const want = shows(target, VIEW_TYPE_MINDMAP) ? "markdown" : VIEW_TYPE_MINDMAP;
+    const restore = () => this.app.workspace.setActiveLeaf(target, { focus: true });
+    // 另一边已经开在别的分屏里：切过去就行
+    const other: WorkspaceLeaf[] = [];
+    this.app.workspace.iterateAllLeaves((l) => {
+      if (l.parent !== target.parent && shows(l, want)) other.push(l);
+    });
+    if (other.length) {
+      await this.app.workspace.revealLeaf(other.find((l) => l.view.containerEl.isShown()) ?? other[0]);
+      restore();
       return;
     }
-    const source = this.app.workspace.getMostRecentLeaf();
-    const leaf = this.app.workspace.getLeaf("split", "vertical");
-    await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
-    // 新分屏会抢走焦点；预览是给人看的，光标留在原来的编辑器里
-    if (source) this.app.workspace.setActiveLeaf(source, { focus: true });
+    const pane = this.neighborPane(target);
+    let side: WorkspaceLeaf;
+    if (pane) side = this.app.workspace.createLeafInParent(pane, (pane as unknown as { children: unknown[] }).children.length);
+    else {
+      const mapLeft = this.settings.splitMapSide === "left";
+      side = this.app.workspace.createLeafBySplit(target, "vertical", want === VIEW_TYPE_MINDMAP ? mapLeft : !mapLeft);
+    }
+    if (want === VIEW_TYPE_MINDMAP) await side.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+    else await this.openAsMarkdown(file, side);
+    await this.app.workspace.revealLeaf(side);
+    // 新开的会抢走焦点；对照是给人看的，焦点留在原来那一边
+    restore();
+  }
+
+  /**
+   * 旁边那个分屏（一组标签页）：和 leaf 所在的这组挨着的那组，先找后面（右、下）的，没有再找前面的。
+   * 只在主区域、单独窗口里找，侧边栏不算；没分屏就是 null
+   */
+  private neighborPane(leaf: WorkspaceLeaf): WorkspaceTabs | null {
+    type Node = { parent?: Node; children?: Node[] };
+    const tabs = leaf.parent as unknown as Node;
+    const root = leaf.getRoot();
+    const ws = this.app.workspace;
+    if (root === ws.leftSplit || root === ws.rightSplit) return null;
+    const leafOf = (n: Node, last: boolean): Node | null => {
+      if (n instanceof WorkspaceTabs) return n;
+      const kids = n.children ?? [];
+      for (const k of last ? [...kids].reverse() : kids) {
+        const hit = leafOf(k, last);
+        if (hit) return hit;
+      }
+      return null;
+    };
+    // 从这组往上找：哪一层有兄弟，就取挨着的那个兄弟里离得最近的一组
+    let cur: Node = tabs;
+    while (cur.parent) {
+      const kids = cur.parent.children ?? [];
+      const i = kids.indexOf(cur);
+      const next = kids[i + 1] ? leafOf(kids[i + 1], false) : null;
+      const prev = !next && i > 0 ? leafOf(kids[i - 1], true) : null;
+      if (next || prev) return (next ?? prev) as unknown as WorkspaceTabs;
+      cur = cur.parent;
+    }
+    return null;
+  }
+
+  /** 分屏对照的另一边：和 leaf 不在同一组、正显示着同一篇的另一种视图 */
+  private sidePartner(leaf: WorkspaceLeaf): WorkspaceLeaf | null {
+    const file = (leaf.view as { file?: TFile }).file;
+    const type = leaf.view.getViewType();
+    if (!file || (type !== "markdown" && type !== VIEW_TYPE_MINDMAP)) return null;
+    const want = type === "markdown" ? VIEW_TYPE_MINDMAP : "markdown";
+    let hit: WorkspaceLeaf | null = null;
+    this.app.workspace.iterateAllLeaves((l) => {
+      if (!hit && l.parent !== leaf.parent && l.view.getViewType() === want && (l.view as { file?: TFile }).file?.path === file.path && l.view.containerEl.isShown()) hit = l;
+    });
+    return hit;
+  }
+
+  /** 分屏对照时左右（上下）互换：两边的脑图和 Markdown 对调，焦点跟着原来那种视图走（群里反馈） */
+  async swapSides(leaf: WorkspaceLeaf): Promise<boolean> {
+    const partner = this.sidePartner(leaf);
+    const file = (leaf.view as { file?: TFile }).file;
+    if (!partner || !file) return false;
+    const mapLeaf = leaf.view instanceof MindMapView ? leaf : partner;
+    const mdLeaf = mapLeaf === leaf ? partner : leaf;
+    const focusMap = mapLeaf === leaf;
+    if (mapLeaf.view instanceof MindMapView) {
+      mapLeaf.view.rememberViewportNow();
+      await mapLeaf.view.save();
+    }
+    if (mdLeaf.view instanceof MarkdownView) await mdLeaf.view.save();
+    const mdState = mdLeaf.getViewState();
+    await mdLeaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: false });
+    this.markdownOverride.add(file.path);
+    try {
+      await mapLeaf.setViewState({ ...mdState, active: false });
+    } finally {
+      this.markdownOverride.delete(file.path);
+    }
+    this.app.workspace.setActiveLeaf(focusMap ? mdLeaf : mapLeaf, { focus: true });
+    this.updateSplitSyncButtons();
+    return true;
   }
 
   async openAsMindMap(file: TFile, leaf: WorkspaceLeaf, remember = this.settings.rememberView): Promise<void> {
@@ -1370,6 +1451,16 @@ export default class MindMapPlugin extends Plugin {
           return true;
         },
       });
+    this.addCommand({
+      id: "swap-sides",
+      name: t("command.swapSides"),
+      checkCallback: (checking) => {
+        const leaf = this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf ?? this.app.workspace.getActiveViewOfType(MindMapView)?.leaf;
+        if (!leaf || !this.sidePartner(leaf)) return false;
+        if (!checking) void this.swapSides(leaf);
+        return true;
+      },
+    });
     this.addCommand({
       id: "open-preview",
       name: t("command.openPreview"),
@@ -2047,6 +2138,7 @@ export default class MindMapPlugin extends Plugin {
         const mod = Keymap.isModEvent(ev);
         const sp = sourcePath();
         if (!mod && this.revealInOpenPdf(href, sp)) return;
+        if (!mod && this.settings.linkReuseOpen && this.revealInOpenLeaf(href, sp)) return;
         void (async () => {
           // 链到还不存在的笔记：按设置「从脑图新建的笔记放在」先建好，再照常打开
           await this.ensureLinkTarget(href, sp);
@@ -2142,6 +2234,29 @@ export default class MindMapPlugin extends Plugin {
     } catch (e) {
       new Notice(t("notice.createNoteFailed", { error: (e as Error).message }));
     }
+  }
+
+  /**
+   * 设置「链接的笔记已经开着时直接跳到那里」：链到的笔记在别的标签页、分屏里开着（脑图优先），就在那里跳到链到的位置，不再开一个。
+   * 同一组标签页里的（切过去就看不到脑图了）焦点跟过去；别的分屏里的，焦点按「分屏打开链接后把焦点放到笔记」走
+   */
+  private revealInOpenLeaf(href: string, sourcePath: string): boolean {
+    const { path, subpath } = parseLinktext(href);
+    if (!path) return false;
+    const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath);
+    if (!file) return false;
+    const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
+    const open: WorkspaceLeaf[] = [];
+    this.app.workspace.iterateAllLeaves((l) => {
+      if (l !== origin && (l.view as { file?: TFile }).file?.path === file.path) open.push(l);
+    });
+    const leaf = open.find((l) => l.view.getViewType() === VIEW_TYPE_MINDMAP) ?? open[0];
+    if (!leaf) return false;
+    void this.app.workspace.revealLeaf(leaf);
+    if (subpath) leaf.view.setEphemeralState({ subpath });
+    if (origin && leaf.parent !== origin.parent) this.focusAfterLinkSplit(origin, leaf);
+    else this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    return true;
   }
 
   /** 在右侧分屏打开链接以后，焦点放哪：设置打开时给笔记，否则回到脑图（方便接着加节点） */
