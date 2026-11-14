@@ -11,6 +11,8 @@ const INLINE_PROPS = [
   "padding", "margin", "border", "border-radius", "border-bottom", "background-color", "color", "opacity",
   "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-align", "text-decoration",
   "white-space", "overflow-wrap", "word-break", "max-width", "vertical-align",
+  // 节点里的表格：导出时去掉了类名，不写的话表格按浏览器默认格子间隔 2px 排，比画面上高一截，最后一行伸出节点
+  "border-collapse", "border-spacing", "border-top", "border-left", "border-right", "table-layout", "background-image",
   // 展开的备注：超出最大高度的部分照画面裁掉，底部渐隐
   "overflow", "max-height", "mask-image", "-webkit-mask-image",
   "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
@@ -182,7 +184,7 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const zoom = (canvas as unknown as { k: number }).k || 1;
     if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "pre" });
   });
-  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold, .mm-note-card-resize, .mm-quiz-tag, .mm-pdf-jump").forEach((t) => t.remove());
+  clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold, .mm-note-card-resize, .mm-quiz-tag, .mm-pdf-jump, .ggt-corner, .ggt-add, .ggt-handle, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-cross-band, .ggt-input, .ggt-suggest").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target, .mm-rel-label.is-active").forEach((n) => {
     (n as HTMLElement).setCssStyles({ boxShadow: "none" });
   });
@@ -230,4 +232,41 @@ export async function svgToPng(exp: SvgExport, scale = 2): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
     c.toBlob((b) => (b ? resolve(b) : reject(new Error(t("export.pngEncodeFailed")))), "image/png");
   });
+}
+
+/**
+ * SVG → PDF（只在桌面端）：在一个不显示的窗口里打开导出的 SVG，按图的大小打印成一页 PDF，文字和线条都是矢量的。
+ * Chromium 一页最大 200 英寸，图再大就整体缩小放进一页
+ */
+export async function svgToPdf(exp: SvgExport): Promise<ArrayBuffer> {
+  type Win = {
+    loadFile(path: string): Promise<void>;
+    webContents: { printToPDF(o: Record<string, unknown>): Promise<Uint8Array> };
+    destroy(): void;
+  };
+  const req = (window as unknown as { require?: (m: string) => unknown }).require;
+  if (!req) throw new Error(t("export.pdfDesktopOnly"));
+  const electron = req("electron") as { remote?: { BrowserWindow: new (o: Record<string, unknown>) => Win } };
+  const remote = electron.remote ?? (req("@electron/remote") as { BrowserWindow: new (o: Record<string, unknown>) => Win });
+  const fs = req("fs") as { promises: { writeFile(p: string, d: string): Promise<void>; mkdtemp(p: string): Promise<string>; rm(p: string, o: Record<string, unknown>): Promise<void> } };
+  const os = req("os") as { tmpdir(): string };
+  const path = req("path") as { join(...p: string[]): string };
+  const MAX = 200 * 96;
+  const k = Math.min(1, MAX / Math.max(exp.width, exp.height));
+  const w = Math.max(1, Math.floor(exp.width * k));
+  const h = Math.max(1, Math.floor(exp.height * k));
+  const svg = exp.svg.replace(/^<svg ([^>]*?)width="[^"]*" height="[^"]*"/, `<svg $1width="${w}" height="${h}"`);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${w}px ${h}px;margin:0}html,body{margin:0;padding:0}svg{display:block}</style></head><body>${svg}</body></html>`;
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "gogoga-mindmap-"));
+  const file = path.join(dir, "map.html");
+  await fs.promises.writeFile(file, html);
+  const win = new remote.BrowserWindow({ show: false, webPreferences: { javascript: false } });
+  try {
+    await win.loadFile(file);
+    const data = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+  } finally {
+    win.destroy();
+    void fs.promises.rm(dir, { recursive: true, force: true });
+  }
 }

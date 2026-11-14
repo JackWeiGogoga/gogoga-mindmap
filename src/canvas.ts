@@ -268,6 +268,8 @@ export interface CanvasOptions {
   quickSettings?: () => QuickSetting[];
   /** 设置「保留节点里的空行」：多行节点中间的空行不抹掉 */
   keepBlankLines?: () => boolean;
+  /** 设置「保留节点开头结尾的空格」：文件里写成 &nbsp;，编辑框里是普通空格 */
+  keepEdgeSpaces?: () => boolean;
   /** 拆成子节点的偏好：保留原文字、保留拆分符号、设置里自定义的拆分方式 */
   split?: () => { keepOriginal: boolean; keepDelims: boolean; custom: CustomSplit[] };
   /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
@@ -1015,6 +1017,30 @@ export class MindMapCanvas {
     return this.layout?.bounds ?? null;
   }
 
+  /**
+   * 导出图片 / PDF 时节点里的表格完整展开（小红书反馈：大表格导出只有节点里看得到的那一块，还带着滚动条和淡出）：
+   * 去掉表格的最大宽高、不滚动不淡出，重新量一遍排版，导出完再还原。画布上平时的样子不变
+   */
+  async withFullTables<T>(fn: () => Promise<T>): Promise<T> {
+    const scrolls = [...this.nodesEl.querySelectorAll<HTMLElement>(".mm-node-table .ggt-scroll")];
+    const clipped = scrolls.some((s) => s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1);
+    if (!clipped || !this.doc) return fn();
+    for (const s of scrolls) {
+      s.scrollLeft = 0;
+      s.scrollTop = 0;
+    }
+    // 滚回顶上后吸顶的表头要先归位（滚动事件里挪的），等一帧
+    await new Promise<void>((r) => this.el.win.requestAnimationFrame(() => r()));
+    this.el.classList.add("is-export-full");
+    this.reflow();
+    try {
+      return await fn();
+    } finally {
+      this.el.classList.remove("is-export-full");
+      if (this.doc) this.reflow();
+    }
+  }
+
   /** 导出用：节点层与连线层 */
   get layers(): { nodes: HTMLElement; edges: SVGSVGElement } {
     return { nodes: this.nodesEl, edges: this.svg };
@@ -1055,8 +1081,60 @@ export class MindMapCanvas {
     this.select(node);
     // 适应画布后整张大图可能缩得很小，跳过来的节点要看得清
     if (this.k < 0.8) this.k = 1;
-    this.centerOn(node);
+    this.showBranch(node);
     this.hasView = true;
+  }
+
+  /** node 和它展开着的子孙（含概要主题）在画布上占的范围 */
+  private branchBox(node: MindNode): { x: number; y: number; w: number; h: number } | null {
+    const placed = this.layout?.placed;
+    const p0 = placed?.get(node.id);
+    if (!placed || !p0) return null;
+    let x1 = p0.x;
+    let y1 = p0.y;
+    let x2 = p0.x + p0.w;
+    let y2 = p0.y + p0.h;
+    const visit = (n: MindNode) => {
+      for (const c of [...visibleChildren(n), ...visibleTopics(n)]) {
+        const p = placed.get(c.id);
+        if (p) {
+          x1 = Math.min(x1, p.x);
+          y1 = Math.min(y1, p.y);
+          x2 = Math.max(x2, p.x + p.w);
+          y2 = Math.max(y2, p.y + p.h);
+        }
+        visit(c);
+      }
+    };
+    visit(node);
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }
+
+  /**
+   * 跳到某个节点（点链接、PDF 跳回来、从 Markdown 切过来）时摆画面：节点连同它展开的分支一起看。
+   * 分支放得下就整个居中；放不下就把节点贴在分支生长方向的反面（往右长贴左边、往左长贴右边、往下长贴上边），
+   * 另一个方向不偏的就让节点居中。以前一律把节点放正中，往右长的图左半边全是空的、右边的内容反而出了画面（群里反馈）
+   */
+  private showBranch(node: MindNode): void {
+    const p = this.layout?.placed.get(node.id);
+    const box = this.branchBox(node);
+    if (!p || !box) return;
+    const k = this.k;
+    const m = 56;
+    const cw = this.el.clientWidth;
+    const ch = this.el.clientHeight;
+    const axis = (bLo: number, bLen: number, nLo: number, nLen: number, view: number): number => {
+      if (bLen * k <= view - 2 * m) return view / 2 - (bLo + bLen / 2) * k;
+      const after = bLo + bLen > nLo + nLen + 1 && bLo >= nLo - 1;
+      const before = bLo < nLo - 1 && bLo + bLen <= nLo + nLen + 1;
+      if (after) return m - nLo * k;
+      if (before) return view - m - (nLo + nLen) * k;
+      return view / 2 - (nLo + nLen / 2) * k;
+    };
+    this.stopPanAnim();
+    this.tx = axis(box.x, box.w, p.x, p.w, cw);
+    this.ty = axis(box.y, box.h, p.y, p.h, ch);
+    this.applyTransform();
   }
   private pendingReveal: string | null = null;
 
@@ -6128,7 +6206,7 @@ export class MindMapCanvas {
     this.positionNodebar();
     el.classList.add("is-editing");
     this.nodeEditor = new InlineEditor(label, {
-      text: toEditableText(node.text),
+      text: this.toEdit(node.text),
       // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
       selectAll: named || !this.opts.caretAtEnd?.(),
       multiline: true,
@@ -6197,7 +6275,7 @@ export class MindMapCanvas {
     this.nodeEditor = null;
     this.updateFormatBar();
     // 没改：进编辑时跨行的格式被拆好了（toEditableText），原样提交回来和原文写法不同但意思一样，照旧用原文，不算改动
-    const text = cancel || raw === this.fromEdit(toEditableText(node.text)) ? node.text : raw;
+    const text = cancel || raw === this.fromEdit(this.toEdit(node.text)) ? node.text : raw;
     // 新节点没写字就当没加；但编辑中贴了图片（进了备注）的要留着，不然图片就丢了
     if (text === "" && isNew && !node.note) {
       const parent = node.parent;
@@ -7387,10 +7465,10 @@ export class MindMapCanvas {
     if (!this.selected.size) return;
     let changed = false;
     for (const n of this.selected) {
-      const editable = toEditableText(n.text);
+      const editable = this.toEdit(n.text);
       const { rest } = splitMarkers(n.text);
       const task = /^\[( |x|X)\]\s+/.exec(rest)?.[0].length ?? 0;
-      const start = editable.length - toEditableText(rest).length + task;
+      const start = editable.length - this.toEdit(rest).length + task;
       if (start >= editable.length) continue;
       const next = this.fromEdit(applyInlineFormat(editable, start, editable.length, fmt).text);
       if (next !== n.text) {
@@ -7474,7 +7552,7 @@ export class MindMapCanvas {
             return;
           }
           if (!node || !sel) return;
-          const next = this.fromEdit(applyInlineFormat(toEditableText(node.text), sel.from, sel.to, fmt).text);
+          const next = this.fromEdit(applyInlineFormat(this.toEdit(node.text), sel.from, sel.to, fmt).text);
           if (next === node.text) return;
           node.text = next;
           this.render();
@@ -7900,7 +7978,11 @@ export class MindMapCanvas {
 
   /** 编辑框里的文字 → 存进节点的（按设置决定要不要留中间的空行） */
   private fromEdit(text: string): string {
-    return fromEditableText(text, this.opts.keepBlankLines?.() ?? false);
+    return fromEditableText(text, this.opts.keepBlankLines?.() ?? false, this.opts.keepEdgeSpaces?.() ?? false);
+  }
+
+  private toEdit(text: string): string {
+    return toEditableText(text, this.opts.keepEdgeSpaces?.() ?? false);
   }
 
   /** 拆分方式：内置的几种，加上设置里自定义的 */

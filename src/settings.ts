@@ -125,6 +125,8 @@ export interface MindMapSettings {
   splitKeepOriginal: boolean;
   /** 多行节点中间的空行留着（默认关：保存时抹掉空行） */
   keepBlankLines: boolean;
+  /** 保留节点开头结尾的空格（默认关）：文件里写成 &nbsp;，编辑框里是普通空格 */
+  keepEdgeSpaces: boolean;
   /** 拆成子节点：拆分符号（标点、序号）留在每段里（默认不留） */
   splitKeepDelims: boolean;
   /** 自定义拆分方式：每行「名称：符号」 */
@@ -228,6 +230,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   editCaret: "select",
   splitKeepOriginal: true,
   keepBlankLines: false,
+  keepEdgeSpaces: false,
   splitKeepDelims: false,
   customSplits: "",
   linkOpen: "current",
@@ -430,6 +433,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       page(t("settings.group.edit"), t("settings.page.edit"), [
         dropdown("editCaret", t("settings.editCaret.name"), t("settings.editCaret.desc"), { select: t("settings.editCaret.select"), end: t("settings.editCaret.end") }, ["cursor", "光标"]),
         toggle("keepBlankLines", t("settings.keepBlankLines.name"), t("settings.keepBlankLines.desc"), ["blank line", "空行", "换行", "多行"]),
+        toggle("keepEdgeSpaces", t("settings.keepEdgeSpaces.name"), t("settings.keepEdgeSpaces.desc"), ["space", "空格", "nbsp", "缩进", "开头", "结尾"]),
         toggle("splitKeepOriginal", t("settings.splitKeepOriginal.name"), t("settings.splitKeepOriginal.desc"), ["split", "拆分", "拆成子节点"]),
         toggle("splitKeepDelims", t("settings.splitKeepDelims.name"), t("settings.splitKeepDelims.desc"), ["split", "拆分", "标点", "序号"]),
         {

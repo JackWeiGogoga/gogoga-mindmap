@@ -1,6 +1,6 @@
-import { HoverPopover, Menu, normalizePath, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
+import { HoverPopover, Menu, normalizePath, Notice, Platform, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
 import { mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT } from "./bar-layout";
-import { buildSvg, svgToPng } from "./export";
+import { buildSvg, svgToPdf, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
 import { blankBeforeNodeTables } from "./node-table";
 import { MindMapCanvas, NodeCommand } from "./canvas";
@@ -346,6 +346,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       formatBar: () => this.plugin.settings.formatBar,
       split: () => this.plugin.splitPrefs(),
       keepBlankLines: () => this.plugin.settings.keepBlankLines,
+      keepEdgeSpaces: () => this.plugin.settings.keepEdgeSpaces,
       quickSettings: () => this.plugin.quickSettings(),
       centerOnSelect: () => this.plugin.settings.centerOnSelect,
       hideSyntax: () => this.plugin.settings.hideSyntax,
@@ -490,6 +491,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     );
     menu.addItem((item) => item.setTitle(t("command.exportPng")).setIcon("image").setSection("pane").onClick(() => void this.exportPng()));
     menu.addItem((item) => item.setTitle(t("command.exportSvg")).setIcon("image").setSection("pane").onClick(() => void this.exportSvg()));
+    if (Platform.isDesktopApp) menu.addItem((item) => item.setTitle(t("command.exportPdf")).setIcon("file-text").setSection("pane").onClick(() => void this.exportPdf()));
     menu.addItem((item) => item.setTitle(t("command.copyPng")).setIcon("copy").setSection("pane").onClick(() => void this.copyPng()));
   }
 
@@ -504,7 +506,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (!this.canvas) return;
     try {
       this.canvas.select(null);
-      const blob = await svgToPng(await buildSvg(this.canvas), 2);
+      const canvas = this.canvas;
+      const blob = await canvas.withFullTables(async () => svgToPng(await buildSvg(canvas), 2));
       const path = await this.attachmentPath("png");
       await this.app.vault.createBinary(path, await blob.arrayBuffer());
       new Notice(t("notice.exported", { path }));
@@ -517,9 +520,26 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (!this.canvas) return;
     try {
       this.canvas.select(null);
-      const { svg } = await buildSvg(this.canvas);
+      const canvas = this.canvas;
+      const { svg } = await canvas.withFullTables(() => buildSvg(canvas));
       const path = await this.attachmentPath("svg");
       await this.app.vault.create(path, svg);
+      new Notice(t("notice.exported", { path }));
+    } catch (e) {
+      new Notice(t("notice.exportFailed", { error: (e as Error).message }));
+    }
+  }
+
+  /** 导出为 PDF（桌面端）：整张图一页，页面按图的大小，矢量 */
+  async exportPdf(): Promise<void> {
+    if (!this.canvas) return;
+    try {
+      this.canvas.select(null);
+      const canvas = this.canvas;
+      const exp = await canvas.withFullTables(() => buildSvg(canvas));
+      const data = await svgToPdf(exp);
+      const path = await this.attachmentPath("pdf");
+      await this.app.vault.createBinary(path, data);
       new Notice(t("notice.exported", { path }));
     } catch (e) {
       new Notice(t("notice.exportFailed", { error: (e as Error).message }));
@@ -530,7 +550,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (!this.canvas) return;
     try {
       this.canvas.select(null);
-      const blob = await svgToPng(await buildSvg(this.canvas), 2);
+      const canvas = this.canvas;
+      const blob = await canvas.withFullTables(async () => svgToPng(await buildSvg(canvas), 2));
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       new Notice(t("notice.copiedAsImage"));
     } catch (e) {

@@ -1551,6 +1551,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("expand-all", t("command.expandAll"), async (v) => v.setFoldLevel(null));
     exportCommand("collapse-all", t("command.collapseAll"), async (v) => v.setFoldLevel(1));
     exportCommand("export-png", t("command.exportPng"), (v) => v.exportPng());
+    if (Platform.isDesktopApp) exportCommand("export-pdf", t("command.exportPdf"), (v) => v.exportPdf());
     exportCommand("export-svg", t("command.exportSvg"), (v) => v.exportSvg());
     exportCommand("copy-png", t("command.copyPng"), (v) => v.copyPng());
   }
@@ -1691,6 +1692,7 @@ export default class MindMapPlugin extends Plugin {
         formatBar: () => this.settings.formatBar,
         split: () => this.splitPrefs(),
         keepBlankLines: () => this.settings.keepBlankLines,
+        keepEdgeSpaces: () => this.settings.keepEdgeSpaces,
         centerOnSelect: () => this.settings.centerOnSelect,
         hideSyntax: () => this.settings.hideSyntax,
         widthHandleOnHover: () => this.settings.widthHandleOnHover,

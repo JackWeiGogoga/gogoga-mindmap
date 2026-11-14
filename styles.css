@@ -2226,6 +2226,9 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 /* 左边的加号收进节点里（不压节点边框）；上边那条在节点里会压住节点标题，不显示（表头下加一行用菜单） */
 .gg-mm-node .mm-node-table .ggt button.ggt-add-col-first { top: 6px; bottom: 18px; left: 0; width: 14px; height: auto; }
 .gg-mm-node .mm-node-table .ggt button.ggt-add-row-first { display: none; }
+/* 导出图片 / PDF 时表格完整展开（canvas.withFullTables）：不限宽高、不滚动、不淡出；节点设了宽度的表格宽度照旧跟着节点 */
+.gg-mm-root.is-export-full .gg-mm-node .mm-node-table .ggt-scroll { max-height: none; -webkit-mask-image: none !important; mask-image: none !important; }
+.gg-mm-root.is-export-full .gg-mm-node:not(.has-width) .mm-node-table .ggt-scroll { max-width: none; overflow: visible; }
 .gg-mm-node .mm-node-table .ggt-table { background: var(--background-primary); }
 
 /* 同级编号：标题前面的 1. 2. 3.，比文字淡一点，不能编辑 */

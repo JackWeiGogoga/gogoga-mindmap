@@ -343,7 +343,7 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
   let last = 0;
   for (const m of rest.matchAll(TOKEN_RE)) {
     const idx = m.index ?? 0;
-    if (idx > last) el.appendChild(document.createTextNode(rest.slice(last, idx)));
+    if (idx > last) el.appendChild(plainNode(rest.slice(last, idx)));
     last = idx + m[0].length;
     if (m[1] !== undefined) {
       el.appendChild(image(m[1], m[2], m[1], opts));
@@ -396,7 +396,12 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
       el.appendChild(e);
     }
   }
-  if (last < rest.length) el.appendChild(document.createTextNode(rest.slice(last)));
+  if (last < rest.length) el.appendChild(plainNode(rest.slice(last)));
+}
+
+/** 普通文字：&nbsp; 显示成不换行空格（Obsidian 渲染 Markdown 也是这样），不露出字样；代码里的照原样 */
+function plainNode(s: string): Text {
+  return document.createTextNode(s.includes("&nbsp;") ? s.replace(/&nbsp;/g, "\u00a0") : s);
 }
 
 function math(tex: string, opts: InlineOptions): HTMLElement {
@@ -660,15 +665,29 @@ function link(label: string, href: string, internal: boolean, opts: InlineOption
 }
 
 /** 编辑框里的换行 ⇄ 存储用的 <br> */
-export function toEditableText(text: string): string {
+export function toEditableText(text: string, keepEdgeSpaces = false): string {
   // 跨行的格式在换行处收尾、下一行再接上：编辑框一行一行认格式，跨行的认不出来会露出源码
-  return carryAcrossBreaks(text.split(/<br\s*\/?>/i)).join("\n");
+  const lines = carryAcrossBreaks(text.split(/<br\s*\/?>/i));
+  return (keepEdgeSpaces ? lines.map(edgeNbspToSpaces) : lines).join("\n");
 }
-export function fromEditableText(text: string, keepBlankLines = false): string {
+/**
+ * 设置「保留节点开头结尾的空格」：Markdown 列表项、标题开头结尾的空格存不住，文件里写成 &nbsp;，编辑框里显示成普通空格（群里反馈）。
+ * 只认每行开头、结尾连着的 &nbsp;；中间的不动
+ */
+export function edgeNbspToSpaces(line: string): string {
+  return line.replace(/^(?:&nbsp;)+/, (m) => " ".repeat(m.length / 6)).replace(/(?:&nbsp;)+$/, (m) => " ".repeat(m.length / 6));
+}
+export function edgeSpacesToNbsp(line: string): string {
+  // 制表符这类别的空白照旧去掉，只留普通空格；整行都是空白的算空行
+  const l = line.replace(/^[^\S ]+|[^\S ]+$/g, "");
+  if (!l.trim()) return "";
+  return l.replace(/^ +/, (m) => "&nbsp;".repeat(m.length)).replace(/ +$/, (m) => "&nbsp;".repeat(m.length));
+}
+export function fromEditableText(text: string, keepBlankLines = false, keepEdgeSpaces = false): string {
   const lines = text
     .replace(/\r/g, "")
     .split("\n")
-    .map((l) => l.trim());
+    .map((l) => (keepEdgeSpaces ? edgeSpacesToNbsp(l) : l.trim()));
   if (!keepBlankLines) return lines.filter(Boolean).join("<br>");
   // 设置「保留节点里的空行」：中间的空行原样留着（连着的 <br><br>），只去掉开头、结尾多出来的空行
   while (lines.length && !lines[0]) lines.shift();
@@ -680,6 +699,7 @@ export function fromEditableText(text: string, keepBlankLines = false): string {
 export function plainText(text: string): string {
   return text
     .replace(/<br\s*\/?>/gi, " ")
+    .replace(/&nbsp;/gi, " ")
     .replace(/<\/?(?:span|mark)\b[^>]*>/gi, "")
     .replace(/!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
