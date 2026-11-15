@@ -330,6 +330,8 @@ export interface CanvasOptions {
    * 双击也是打开原文件
    */
   onOpenFile?: () => void;
+  /** 代码块嵌入：工具栏「编辑」旁边多一个「大窗口编辑」，在铺满窗口的编辑框里改这张图（#41） */
+  onBigEdit?: () => void;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -441,6 +443,7 @@ const ICONS: Record<string, string> = {
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  expand: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
   highlighter: '<svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>',
   eraser: '<svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>',
@@ -3702,6 +3705,30 @@ export class MindMapCanvas {
     }, 200);
   }
 
+  /**
+   * 手动平移（拖空白、滚轮）。嵌入的脑图框不大，平移没边界时滚几下整张图就跑出框外、只剩空白（#41）：
+   * 嵌入的图至少留一半在框里（图比框小时留图的一半），已经在界外时只拦再往外走的那一步
+   */
+  private panTo(tx: number, ty: number): void {
+    if (this.opts.embedded && this.layout) {
+      const b = this.layout.bounds;
+      const axis = (prev: number, next: number, lo: number, size: number, view: number) => {
+        const span = size * this.k;
+        const m = Math.min(span, view) / 2;
+        const min = m - (lo * this.k + span);
+        const max = view - m - lo * this.k;
+        if (next < min) return Math.max(next, Math.min(prev, min));
+        if (next > max) return Math.min(next, Math.max(prev, max));
+        return next;
+      };
+      tx = axis(this.tx, tx, b.x, b.w, this.el.clientWidth);
+      ty = axis(this.ty, ty, b.y, b.h, this.el.clientHeight);
+    }
+    this.tx = tx;
+    this.ty = ty;
+    this.applyTransform();
+  }
+
   private applyTransform(): void {
     this.viewport.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.k})`;
     this.holdLayer();
@@ -3868,6 +3895,10 @@ export class MindMapCanvas {
         this.setEditable(!this.opts.editable),
       );
       this.editToggle.classList.toggle("is-active", this.opts.editable);
+      if (this.opts.onBigEdit) {
+        const big = this.opts.onBigEdit;
+        btn("expand", t("canvas.bigEdit"), () => big());
+      }
     }
     if (this.opts.editable || this.opts.embedded) {
       const sb = btn("structure", "", () => this.toggleStructureMenu(sb));
@@ -3930,6 +3961,14 @@ export class MindMapCanvas {
       }
     }
     if (embed && !embed.isConnected) bar.prepend(embed);
+    // 「大窗口编辑」不进按钮清单，总跟在「编辑」后面
+    const big = pool.get("expand");
+    if (big) {
+      const edit = pool.get("embed");
+      // 工具栏这时还没挂进页面，isConnected 一直是 false，按父元素判断
+      if (edit?.parentElement === bar) edit.after(big);
+      else bar.prepend(big);
+    }
     // 分隔线：前后没有看得见的按钮就藏起来。按钮会随情况显示 / 隐藏（有标注才出现标注按钮这类），类名一变就重新整理
     const tidy = () => {
       const kids = [...bar.children] as HTMLElement[];
@@ -4549,9 +4588,7 @@ export class MindMapCanvas {
       const dy = ev.clientY - this.pan.y;
       if (!this.pan.moved && Math.hypot(dx, dy) < 3) return;
       this.pan.moved = true;
-      this.tx = this.pan.tx + dx;
-      this.ty = this.pan.ty + dy;
-      this.applyTransform();
+      this.panTo(this.pan.tx + dx, this.pan.ty + dy);
     });
 
     const endPointer = (ev: PointerEvent) => {
@@ -4653,12 +4690,9 @@ export class MindMapCanvas {
           this.zoomBy(Math.exp(-d * 0.0018), ev.clientX - rect.left, ev.clientY - rect.top);
         } else if (ev.shiftKey && !ev.deltaX) {
           // Shift + 滚轮左右平移：有的系统不会把竖着滚换成横向（deltaX 还是 0），这里自己换
-          this.tx -= ev.deltaY * scale;
-          this.applyTransform();
+          this.panTo(this.tx - ev.deltaY * scale, this.ty);
         } else {
-          this.tx -= ev.deltaX * scale;
-          this.ty -= ev.deltaY * scale;
-          this.applyTransform();
+          this.panTo(this.tx - ev.deltaX * scale, this.ty - ev.deltaY * scale);
         }
       },
       { passive: false },

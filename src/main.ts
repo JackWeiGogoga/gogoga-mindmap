@@ -38,7 +38,7 @@ import {
 } from "obsidian";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
-import { mergeLayout, nodebarDefault } from "./bar-layout";
+import { mergeLayout, nodebarDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 import { type ColorMemory, pushRecent } from "./color-palette";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables } from "./node-table";
@@ -52,9 +52,10 @@ import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } f
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
+import { BlockEditorModal } from "./block-editor";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, setSpacingScale } from "./canvas";
+import { CanvasHost, type CanvasOptions, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, setSpacingScale } from "./canvas";
 import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -1686,33 +1687,13 @@ export default class MindMapPlugin extends Plugin {
         editable: state.editable,
         embedded: true,
         embedWheelLock: () => this.settings.embedWheel !== "always",
-        toolbarPosition: this.settings.toolbarPosition,
-        wheelZoom: () => this.settings.wheelAction === "zoom",
-        notePreview: () => this.settings.notePreview,
-        formatBar: () => this.settings.formatBar,
-        split: () => this.splitPrefs(),
-        keepBlankLines: () => this.settings.keepBlankLines,
-        keepEdgeSpaces: () => this.settings.keepEdgeSpaces,
-        centerOnSelect: () => this.settings.centerOnSelect,
-        hideSyntax: () => this.settings.hideSyntax,
-        widthHandleOnHover: () => this.settings.widthHandleOnHover,
-        newNodeName: () => this.settings.newNodeName,
-        autoNumber: () => this.settings.numberByTyping,
-        copyPlain: () => this.settings.copyPlain,
-        showNodebar: () => this.settings.showNodebar,
-        nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
+        ...this.blockCanvasOptions(),
         toolbarLayout: () => embedToolbarLayout(this.settings),
-        nodeColors: () => parseNodeColors(this.settings.nodeColors),
-        textColors: () => parseColorList(this.settings.textColors),
-        highlightColors: () => parseColorList(this.settings.highlightColors, true),
-        colorMemory: this.colorMemory,
-        marqueeDrag: () => this.settings.leftDrag === "select",
-        caretAtEnd: () => this.settings.editCaret === "end",
-        dragToFloat: () => this.settings.dragToFloat,
-        notesExpanded: () => this.settings.notesExpanded,
-        noteCardFilter: () => this.settings.noteCardShow,
-        notePopoverSize: this.notePopoverSize,
         host: this.canvasHost(() => ctx.sourcePath, child),
+        onBigEdit: () => {
+          state.focused = false;
+          this.openBlockEditor(ctx, el, state, current);
+        },
         onChange: (d) => {
           // 代码块没有文件名可用：补出来的中心主题被起了名字，就升格成一级标题写进去，不然重画后名字丢了（#26）
           // 存不下时只撤掉中心主题的名字，同一次里别的改动照常写回
@@ -1800,11 +1781,152 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
+  /** 代码块嵌入和大窗口编辑共用的画布设置 */
+  private blockCanvasOptions(): Partial<CanvasOptions> {
+    return {
+      toolbarPosition: this.settings.toolbarPosition,
+      wheelZoom: () => this.settings.wheelAction === "zoom",
+      notePreview: () => this.settings.notePreview,
+      formatBar: () => this.settings.formatBar,
+      split: () => this.splitPrefs(),
+      keepBlankLines: () => this.settings.keepBlankLines,
+      keepEdgeSpaces: () => this.settings.keepEdgeSpaces,
+      centerOnSelect: () => this.settings.centerOnSelect,
+      hideSyntax: () => this.settings.hideSyntax,
+      widthHandleOnHover: () => this.settings.widthHandleOnHover,
+      newNodeName: () => this.settings.newNodeName,
+      autoNumber: () => this.settings.numberByTyping,
+      copyPlain: () => this.settings.copyPlain,
+      showNodebar: () => this.settings.showNodebar,
+      nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
+      nodeColors: () => parseNodeColors(this.settings.nodeColors),
+      textColors: () => parseColorList(this.settings.textColors),
+      highlightColors: () => parseColorList(this.settings.highlightColors, true),
+      colorMemory: this.colorMemory,
+      marqueeDrag: () => this.settings.leftDrag === "select",
+      caretAtEnd: () => this.settings.editCaret === "end",
+      dragToFloat: () => this.settings.dragToFloat,
+      notesExpanded: () => this.settings.notesExpanded,
+      noteCardFilter: () => this.settings.noteCardShow,
+      notePopoverSize: this.notePopoverSize,
+    };
+  }
+
+  /**
+   * 代码块的「大窗口编辑」（#41）：铺满窗口的编辑框里放一张完整的脑图，改动照样实时写回代码块，
+   * 撤销记录和嵌入的图共用；关掉框就回到笔记，嵌入的图已经是改好的样子
+   */
+  private openBlockEditor(ctx: MarkdownPostProcessorContext, el: HTMLElement, state: BlockState, source: string): void {
+    const target = this.blockTarget(ctx, el);
+    const style = { maxHeadingLevel: this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) };
+    let current = source.replace(/\n$/, "");
+    let writing = Promise.resolve();
+    const name = this.app.vault.getAbstractFileByPath(ctx.sourcePath)?.name.replace(/\.md$/, "") ?? "";
+    const modal = new BlockEditorModal(
+      this.app,
+      t("blockEditor.title", { name }),
+      (host, component) => {
+        const doc = parseMarkdown(current, { fallbackTitle: "", style });
+        const structure = frontmatterValue(doc.frontmatter, "mindmap-structure");
+        const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
+        const keepFormat = (next: string) =>
+          blankBeforeNodeTables(preserveFormat(current, next.replace(/\n$/, ""), (text) => serializeMarkdown(parseMarkdown(text, { fallbackTitle: "", style })).replace(/\n$/, "")));
+        const writeBack = (next: string, pushHistory = true) => {
+          next = next.replace(/\n$/, "");
+          if (next === current) return;
+          if (pushHistory) state.history.push(current);
+          const prev = current;
+          current = next;
+          writing = writing.then(async () => {
+            try {
+              await this.replaceBlockAt(target, prev, next);
+              // 块变长变短了：闭围栏跟着挪，下次写回先按新的行号找
+              if (target.hint) target.hint = { lineStart: target.hint.lineStart, lineEnd: target.hint.lineStart + 1 + (next === "" ? 0 : next.split("\n").length) };
+            } catch (e) {
+              new Notice(t("notice.writeBackFailed", { error: (e as Error).message }));
+            }
+          });
+        };
+        const canvas = new MindMapCanvas(host, {
+          ...this.blockCanvasOptions(),
+          structure: isStructure(structure) ? structure : this.settings.defaultStructure,
+          theme: isThemeId(theme) ? theme : this.settings.defaultTheme,
+          edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
+          editable: true,
+          toolbarLayout: () => mergeLayout(this.settings.toolbarLayout, TOOLBAR_DEFAULT),
+          host: this.canvasHost(() => ctx.sourcePath, component),
+          onChange: (d) => {
+            if (promoteRoot(d) === "full") {
+              new Notice(t("notice.rootNoRoom"));
+              d.root.text = "";
+              host.win.setTimeout(() => canvas.render(), 0);
+            }
+            writeBack(keepFormat(serializeMarkdown(d)));
+          },
+          onUndo: () => {
+            const prev = state.history.undo(current);
+            if (prev !== null) {
+              writeBack(prev, false);
+              canvas.setDoc(parseMarkdown(prev, { fallbackTitle: "", style }));
+            }
+          },
+          onRedo: () => {
+            const next = state.history.redo(current);
+            if (next !== null) {
+              writeBack(next, false);
+              canvas.setDoc(parseMarkdown(next, { fallbackTitle: "", style }));
+            }
+          },
+          onStructureChange: (s) => {
+            const d = canvas.getDoc();
+            if (!d) return;
+            d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-structure", s === this.settings.defaultStructure ? null : s);
+            writeBack(keepFormat(serializeMarkdown(d)));
+          },
+          onEdgeChange: (e) => {
+            const d = canvas.getDoc();
+            if (!d) return;
+            d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge", e.shape ?? null);
+            d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-dash", e.dashed === undefined ? null : String(e.dashed));
+            d.frontmatter = setFrontmatterValue(d.frontmatter, "mindmap-edge-corner", e.sharp === undefined ? null : e.sharp ? "sharp" : "round");
+            writeBack(keepFormat(serializeMarkdown(d)));
+          },
+        });
+        canvas.setDoc(doc);
+        if (state.selected) canvas.selectPath(state.selected);
+        host.win.requestAnimationFrame(() => canvas.focus());
+        return () => {
+          state.selected = canvas.getSelectedPath();
+          canvas.destroy();
+        };
+      },
+      () => {},
+    );
+    modal.open();
+  }
+
   private async replaceCodeBlock(ctx: MarkdownPostProcessorContext, el: HTMLElement, expectedInner: string, nextInner: string): Promise<void> {
+    await this.replaceBlockAt(this.blockTarget(ctx, el), expectedInner, nextInner);
+  }
+
+  /** 代码块在哪：宿主笔记、渲染时的行号、所在的编辑器视图或白板卡片。大窗口编辑时块的元素会被重画掉，要先记下来 */
+  private blockTarget(ctx: MarkdownPostProcessorContext, el: HTMLElement): BlockTarget {
     const info = ctx.getSectionInfo(el);
-    const hint = info ? { lineStart: info.lineStart, lineEnd: info.lineEnd } : null;
-    // 白板的文本卡片没有宿主笔记（sourcePath 是空的），块在卡片自己的文字里
-    const card = this.canvasTextCard(el);
+    const views = this.app.workspace
+      .getLeavesOfType("markdown")
+      .map((l) => l.view as MarkdownView)
+      .filter((v) => v.file?.path === ctx.sourcePath);
+    return {
+      sourcePath: ctx.sourcePath,
+      hint: info ? { lineStart: info.lineStart, lineEnd: info.lineEnd } : null,
+      // 白板的文本卡片没有宿主笔记（sourcePath 是空的），块在卡片自己的文字里
+      card: this.canvasTextCard(el),
+      view: views.find((v) => v.containerEl.contains(el)) ?? views[0] ?? null,
+    };
+  }
+
+  private async replaceBlockAt(target: BlockTarget, expectedInner: string, nextInner: string): Promise<void> {
+    const { hint, card } = target;
     if (card) {
       const range = locateBlock(card.node.text, hint, expectedInner);
       if (!range) throw new Error(t("error.blockNotFound"));
@@ -1812,14 +1934,15 @@ export default class MindMapPlugin extends Plugin {
       card.canvas.requestSave();
       return;
     }
-    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
-    if (!(file instanceof TFile)) throw new Error(t("error.fileNotFound", { path: ctx.sourcePath }));
+    const file = this.app.vault.getAbstractFileByPath(target.sourcePath);
+    if (!(file instanceof TFile)) throw new Error(t("error.fileNotFound", { path: target.sourcePath }));
 
+    // 记下的视图可能已经关掉或换了笔记，换一个还开着这篇的
     const views = this.app.workspace
       .getLeavesOfType("markdown")
       .map((l) => l.view as MarkdownView)
       .filter((v) => v.file?.path === file.path);
-    const editorView = views.find((v) => v.containerEl.contains(el)) ?? views[0];
+    const editorView = target.view && views.includes(target.view) ? target.view : views[0];
     if (editorView && editorView.getMode() === "source") {
       const editor = editorView.editor;
       const range = locateBlock(editor.getValue(), hint, expectedInner);
@@ -2317,6 +2440,13 @@ export default class MindMapPlugin extends Plugin {
     await leaf.openFile(file, { active: false, eState: subpath ? { subpath } : undefined });
     this.focusAfterLinkSplit(origin, leaf);
   }
+}
+
+interface BlockTarget {
+  sourcePath: string;
+  hint: { lineStart: number; lineEnd: number } | null;
+  card: { canvas: { requestSave(): void }; node: { text: string; setText(text: string): void } } | null;
+  view: MarkdownView | null;
 }
 
 interface BlockState {

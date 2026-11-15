@@ -3094,3 +3094,37 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 文字颜色选单：每项前面一个带颜色的 A */
 .mm-textcolor-menu .mm-textcolor-a { display: inline-block; width: 1.2em; margin-right: 6px; font-weight: 700; text-align: center; }
+
+/* 代码块的「大窗口编辑」（#41）：铺满 Obsidian 窗口，脑图占满标题下面的地方 */
+.modal.mm-block-editor {
+  width: calc(100vw - 48px);
+  height: calc(100vh - 48px);
+  max-width: none;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.modal.mm-block-editor .modal-header,
+.modal.mm-block-editor .modal-title {
+  padding: 14px 48px 10px 20px;
+  margin: 0;
+}
+.modal.mm-block-editor .modal-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+.mm-block-editor-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.is-mobile .modal.mm-block-editor {
+  width: 100vw;
+  height: 100%;
+  border-radius: 0;
+}
