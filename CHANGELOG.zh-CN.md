@@ -4,10 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.73.0] - 2026-11-15
+
 ### 新增
 - 节点右键菜单「插入 ▸ 插入图片或视频」（#40）：用系统的选文件框选图片、视频、音频，按 Obsidian 的附件位置存好，嵌入接在节点文字后面，直接显示在节点上。手机上没法往节点里粘贴、拖文件，现在长按节点就能插；手机上节点浮动工具栏默认也有这个按钮，电脑上默认不显示，可在设置「工具栏与颜色」里打开。中心主题就是文件名时插成子节点，不会把文件改名。
 - 节点里的视频、音频直接显示成播放器（#40）：以前 `![[片段.mp4]]` 只显示成文字。和网页播放器一样外面盖了一层，单击是选中、拖动节点，双击画面或点「激活」后才能播放；视频拖右下角改宽度（写成 `![[片段.mp4|宽度]]`），改完不会从头播。从文件列表拖进来的视频、音频也是嵌入，不再是链接。导出图片时视频换成当前画面，音频换成文件名。
-- 节点里的表格也能折叠：表格左上角菜单「折叠表格（只显示表头）」，只剩表头和一条「▸ 展开 N 行」（同步表格插件）。
+- 节点里的表格也能折叠：表格左上角菜单「折叠表格（只显示表头）」，只剩表头和一条「▸ 展开 N 行」（同步表格插件）。菜单里「表头行数」也改成了一排 1 / 2 / 3 小按钮。
 
 ### 修复
 - 节点里的表格：右键格子里的双链或图片弹出菜单后，点别的格子菜单不收起（同步表格插件 0.15.2）。
@@ -927,7 +929,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...HEAD
+[0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0
 [0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1
 [0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0
 [0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
