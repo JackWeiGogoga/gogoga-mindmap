@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.72.1] - 2026-11-15
+
+### 修复
+- iPhone：长按节点弹出菜单后，点空白处取消不了选中，点别的节点也没反应。长按时已经开始拖这个节点，松手落在菜单上，脑图一直以为这根手指还按着，之后每点一下都当成双指缩放。现在长按弹出菜单时这一下不再算拖动或平移；之前没收到松开的手指，下一根手指按下时一律清掉。
+
 ## [0.72.0] - 2026-11-15
 
 ### 新增
@@ -914,7 +919,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...HEAD
+[0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1
 [0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0
 [0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0

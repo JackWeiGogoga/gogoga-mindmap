@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.72.1] - 2026-11-15
+
+### Fixed
+- iPhone: after long-pressing a topic to open its menu, tapping empty space no longer cleared the selection, and tapping other topics did nothing. The long press had already started dragging the topic, and lifting the finger landed on the menu, so the map kept thinking that finger was down and treated every later tap as a pinch. A long press that opens the menu no longer drags or pans, and touches the map never saw end are cleared when the next finger goes down.
+
 ## [0.72.0] - 2026-11-15
 
 ### Added
@@ -914,7 +919,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...HEAD
+[0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1
 [0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0
 [0.71.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.0...0.71.1
 [0.71.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.70.0...0.71.0
