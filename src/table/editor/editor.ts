@@ -41,6 +41,8 @@ export interface MenuItem {
   sizeChip?: number;
   /** 这一排开头的名字（文字大小那排：名字和「A」放一行，菜单矮一些） */
   rowLabel?: string;
+  /** 和文字大小一样排成一排的小按钮，上面写这几个字（表头行数的 1、2、3） */
+  chipText?: string;
 }
 
 export interface EditorHost {
@@ -2902,8 +2904,10 @@ export class TableEditor {
         };
       }),
       { separator: true },
-      { title: t("headerRows") },
+      // 表头行数排成一排（1 2 3），菜单矮一些，矮窗口里不用滚
       ...Array.from({ length: MAX_HEAD_ROWS }, (_, i): MenuItem => ({
+        chipText: String(i + 1),
+        rowLabel: i === 0 ? t("headerRows") : undefined,
         title: t("headerRowsN").replace("{n}", String(i + 1)),
         checked: headRows(tb) === i + 1,
         disabled: headRows(tb) !== i + 1 && !canSetHead(tb, i + 1),
@@ -2920,7 +2924,6 @@ export class TableEditor {
           keep(setFolded(this.table, this.table.meta.fold !== 1));
         },
       },
-      { separator: true },
       { title: t("headerColumn"), icon: "panel-left", checked: !!tb.meta.headerCol, run: () => keep(setTableLook(this.table, { headerCol: !this.table.meta.headerCol })) },
       // 冻结是标题列的选项：标题列开着才出现
       ...(tb.meta.headerCol ? [{ title: t("freezeHeaderCol"), icon: "pin", checked: tb.meta.freeze === 1, run: () => keep(setTableLook(this.table, { freeze: this.table.meta.freeze !== 1 })) }] : []),
@@ -3261,7 +3264,7 @@ export class TableEditor {
         if (pop.lastElementChild && !pop.lastElementChild.classList.contains("ggt-menu-sep")) pop.appendChild(doc.createElement("div")).className = "ggt-menu-sep";
         continue;
       }
-      if (item.sizeChip) {
+      if (item.sizeChip || item.chipText) {
         if (!swatches || !swatches.classList.contains("ggt-menu-sizes")) {
           swatches = pop.appendChild(doc.createElement("div"));
           swatches.className = "ggt-menu-sizes";
@@ -3274,8 +3277,9 @@ export class TableEditor {
         const b = swatches.appendChild(doc.createElement("button"));
         b.type = "button";
         b.className = "ggt-size-chip" + (item.checked ? " is-checked" : "");
-        b.textContent = "A";
-        b.setCssProps({ "--ggt-chip": String(item.sizeChip) });
+        b.textContent = item.chipText ?? "A";
+        if (item.sizeChip) b.setCssProps({ "--ggt-chip": String(item.sizeChip) });
+        b.disabled = !!item.disabled;
         b.setAttribute("aria-label", item.title ?? "");
         b.title = item.title ?? "";
         b.addEventListener("click", () => {
