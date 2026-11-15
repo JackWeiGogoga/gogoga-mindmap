@@ -7442,7 +7442,20 @@ export class MindMapCanvas {
       );
       if (this.noteShown(node)) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(
-        { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
+        // 带标注的节点：编辑、颜色、删除收进「标注」二级菜单（颜色原来只在气泡上右键才有，不好找，蝈蝈）；
+        // 第一层项数不变，菜单才放得进窗口
+        node.callout !== undefined
+          ? {
+              title: t("menu.calloutGroup"),
+              icon: "message-square",
+              submenu: [
+                { title: t("menu.editCallout"), icon: "pencil", run: () => this.editCallout(node) },
+                { title: t("menu.removeCallout"), icon: "x", run: () => this.removeCallout(node) },
+                { separator: true },
+                ...this.calloutColorEntries(node),
+              ],
+            }
+          : { title: t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
         { title: t("menu.addRel"), icon: "spline", run: () => this.startRel(node) },
         { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
         { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
