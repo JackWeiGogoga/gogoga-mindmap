@@ -1677,7 +1677,7 @@ export default class MindMapPlugin extends Plugin {
       const child = new MarkdownRenderChild(wrap);
       const info = ctx.getSectionInfo(el);
       const key = `${ctx.sourcePath}:${info?.lineStart ?? "?"}`;
-      const state: BlockState = this.blockStates.get(key) ?? { view: null, selected: null, editable: false, focused: false, history: new History() };
+      const state: BlockState = this.blockStates.get(key) ?? { view: null, viewAuto: true, keepView: false, selected: null, editable: false, focused: false, history: new History() };
       this.blockStates.set(key, state);
 
       const style = { maxHeadingLevel: this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) };
@@ -1699,6 +1699,9 @@ export default class MindMapPlugin extends Plugin {
         current = next;
         state.selected = canvas.getSelectedPath();
         state.view = canvas.getViewState();
+        state.viewAuto = !canvas.hasUserView();
+        // 写回后代码块会重画：接着用现在的视口，画面别跳
+        state.keepView = true;
         state.focused = wrap.contains(wrap.ownerDocument.activeElement);
         writing = writing.then(async () => {
           try {
@@ -1715,6 +1718,7 @@ export default class MindMapPlugin extends Plugin {
         edge: edgeFromFrontmatter((k) => frontmatterValue(doc.frontmatter, k)),
         editable: state.editable,
         embedded: true,
+        autoRefit: true,
         embedWheelLock: () => this.settings.embedWheel !== "always",
         ...this.blockCanvasOptions(),
         toolbarLayout: () => embedToolbarLayout(this.settings),
@@ -1769,6 +1773,7 @@ export default class MindMapPlugin extends Plugin {
         },
         onViewChange: (v) => {
           state.view = v;
+          state.viewAuto = !canvas.hasUserView();
         },
         onEditableChange: (e) => {
           state.editable = e;
@@ -1776,7 +1781,10 @@ export default class MindMapPlugin extends Plugin {
         },
       });
       wrap.classList.toggle("is-editable", state.editable);
-      if (state.view) canvas.setViewState(state.view);
+      // 自动适应出来的视口只在编辑写回后的重画里接着用；切阅读 / 实时预览、重新打开时框的大小不一样，重新适应（蝈蝈反馈）。
+      // 手动拖过、缩放过的照旧恢复
+      if (state.view && (!state.viewAuto || state.keepView)) canvas.setViewState(state.view, state.viewAuto);
+      state.keepView = false;
       canvas.setDoc(doc);
       if (state.selected) canvas.selectPath(state.selected);
       if (state.focused) {
@@ -1793,6 +1801,7 @@ export default class MindMapPlugin extends Plugin {
       child.register(() => {
         state.selected = canvas.getSelectedPath();
         state.view = canvas.getViewState();
+        state.viewAuto = !canvas.hasUserView();
         if (wrap.contains(wrap.ownerDocument.activeElement)) state.focused = true;
         canvas.destroy();
       });
@@ -2480,6 +2489,10 @@ interface BlockTarget {
 
 interface BlockState {
   view: { tx: number; ty: number; k: number } | null;
+  /** 记下的视口是自动适应出来的（没手动拖过、缩放过） */
+  viewAuto: boolean;
+  /** 下一次重画是编辑写回引起的：接着用记下的视口 */
+  keepView: boolean;
   selected: string | null;
   editable: boolean;
   /** 重新渲染前画布有焦点：新画布接着拿焦点，键盘操作不断 */

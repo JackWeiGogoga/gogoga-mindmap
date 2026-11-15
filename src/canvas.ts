@@ -332,6 +332,11 @@ export interface CanvasOptions {
   onOpenFile?: () => void;
   /** 代码块嵌入：工具栏「编辑」旁边多一个「大窗口编辑」，在铺满窗口的编辑框里改这张图（#41） */
   onBigEdit?: () => void;
+  /**
+   * 嵌入的图：还没手动拖过、缩放过时，框的大小一变（插件按内容调高、阅读模式排完版、侧栏开合）就重新适应画布，
+   * 一直居中、给工具栏留位置（蝈蝈反馈嵌入的图没居中、工具栏压在图上）
+   */
+  autoRefit?: boolean;
 }
 
 export type ToolbarPosition = "bottom" | "top" | "left" | "right";
@@ -871,7 +876,10 @@ export class MindMapCanvas {
           this.render();
           return;
         }
-        if (!this.hasView && this.initialFit()) this.hasView = true;
+        if (!this.hasView && this.initialFit()) {
+          this.hasView = true;
+          this.refitSize = `${this.el.clientWidth}x${this.el.clientHeight}`;
+        } else this.autoRefitIfNeeded();
         // 从看不见变成看得见（后台标签页切过来、侧栏展开）：藏着的时候量的尺寸可能不准
         const visible = this.el.clientWidth > 0 && this.el.clientHeight > 0;
         if (visible && !this.wasVisible) this.scheduleSizeCheck();
@@ -1252,9 +1260,12 @@ export class MindMapCanvas {
   }
 
   /** 恢复视口；之后首次渲染不再自动适应画布 */
-  setViewState(state: ViewState): void {
+  setViewState(state: ViewState, auto = false): void {
     // 坏掉的视口（空值、文字、无穷大）不用，免得之后的平移缩放全算错
     if (![state.tx, state.ty, state.k].every((v) => typeof v === "number" && Number.isFinite(v)) || state.k <= 0) return;
+    // auto：编辑写回后接着显示的自动视口，不算用户调过，但先别重新适应
+    if (auto) this.viewFrozen = true;
+    else this.userView = true;
     this.tx = state.tx;
     this.ty = state.ty;
     this.k = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, state.k));
@@ -1515,6 +1526,43 @@ export class MindMapCanvas {
     this.tx = this.el.clientWidth / 2;
     this.ty = this.el.clientHeight / 2;
     this.applyTransform();
+  }
+
+  /** 用户手动拖过、缩放过、点过居中：嵌入的图不再自动适应（见 autoRefit） */
+  private userView = false;
+  /** 编辑写回后恢复的视口：图在改，别跟着框的高度一直重新适应，画面会跳 */
+  private viewFrozen = false;
+  private refitSize = "";
+
+  hasUserView(): boolean {
+    return this.userView;
+  }
+
+  private userZoomBy(factor: number, sx?: number, sy?: number): void {
+    this.userView = true;
+    this.zoomBy(factor, sx, sy);
+  }
+
+  /** 点「适应画布」：嵌入的图回到自动适应 */
+  private userFit(): void {
+    this.userView = false;
+    this.viewFrozen = false;
+    this.fit();
+    this.refitSize = `${this.el.clientWidth}x${this.el.clientHeight}`;
+  }
+
+  private userCenter(): void {
+    this.userView = true;
+    this.center();
+  }
+
+  /** 框的大小变了：嵌入的图还是自动适应的状态就重新适应 */
+  private autoRefitIfNeeded(): void {
+    if (!this.opts.autoRefit || !this.hasView || this.userView || this.viewFrozen || !this.layout) return;
+    const size = `${this.el.clientWidth}x${this.el.clientHeight}`;
+    if (size === this.refitSize || !this.el.clientWidth || !this.el.clientHeight) return;
+    this.refitSize = size;
+    this.fit();
   }
 
   zoomBy(factor: number, sx?: number, sy?: number): void {
@@ -3721,6 +3769,7 @@ export class MindMapCanvas {
    * 嵌入的图至少留一半在框里（图比框小时留图的一半），已经在界外时只拦再往外走的那一步
    */
   private panTo(tx: number, ty: number): void {
+    this.userView = true;
     if (this.opts.embedded && this.layout) {
       const b = this.layout.bounds;
       const axis = (prev: number, next: number, lo: number, size: number, view: number) => {
@@ -3925,18 +3974,18 @@ export class MindMapCanvas {
       eb.classList.toggle("is-hidden", !this.opts.editable);
       this.edgeButton = eb;
     }
-    btn("minus", t("canvas.zoomOut", { key: sc("Mod", "-") }), () => this.zoomBy(1 / 1.2));
+    btn("minus", t("canvas.zoomOut", { key: sc("Mod", "-") }), () => this.userZoomBy(1 / 1.2));
     this.zoomLabel = createEl("button");
     this.zoomLabel.type = "button";
     this.zoomLabel.className = "mm-tool mm-zoom-label";
     this.zoomLabel.dataset.tool = "zoom";
     this.tip(this.zoomLabel, t("canvas.zoomLevel"), "toolbar");
     this.zoomLabel.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    this.zoomLabel.addEventListener("click", () => this.zoomBy(1 / this.k));
+    this.zoomLabel.addEventListener("click", () => this.userZoomBy(1 / this.k));
     pool.set("zoom", this.zoomLabel);
-    btn("plus", t("canvas.zoomIn", { key: sc("Mod", "+") }), () => this.zoomBy(1.2));
-    btn("fit", t("canvas.fit", { key: sc("Mod", "0") }), () => this.fit());
-    btn("center", t("canvas.center"), () => this.center());
+    btn("plus", t("canvas.zoomIn", { key: sc("Mod", "+") }), () => this.userZoomBy(1.2));
+    btn("fit", t("canvas.fit", { key: sc("Mod", "0") }), () => this.userFit());
+    btn("center", t("canvas.center"), () => this.userCenter());
     if (this.opts.onUndo) {
       btn("undo", t("canvas.undo", { key: sc("Mod", "Z") }), () => this.opts.onUndo?.());
       btn("redo", t("canvas.redo", { key: sc("Mod", "Shift", "Z") }), () => this.opts.onRedo?.());
@@ -4570,7 +4619,7 @@ export class MindMapCanvas {
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const rect = el.getBoundingClientRect();
         const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, (this.pinch.k * dist) / this.pinch.dist));
-        this.zoomBy(next / this.k, (a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top);
+        this.userZoomBy(next / this.k, (a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top);
         return;
       }
       if (this.marquee) {
@@ -4697,11 +4746,11 @@ export class MindMapCanvas {
           const raw = ev.deltaY * scale;
           const notch = ev.deltaMode !== 0 || Math.abs(raw) >= 50;
           const d = notch ? Math.max(-100, Math.min(100, Math.sign(raw) * Math.max(Math.abs(raw), 100))) * 0.18 : raw;
-          this.zoomBy(Math.exp(-d * 0.01), ev.clientX - rect.left, ev.clientY - rect.top);
+          this.userZoomBy(Math.exp(-d * 0.01), ev.clientX - rect.left, ev.clientY - rect.top);
         } else if (!ev.shiftKey && this.opts.wheelZoom?.()) {
           // 鼠标一格 deltaY 约 100，限幅后每格约 1.2 倍，和工具栏 +/- 一致
           const d = Math.max(-100, Math.min(100, ev.deltaY * scale));
-          this.zoomBy(Math.exp(-d * 0.0018), ev.clientX - rect.left, ev.clientY - rect.top);
+          this.userZoomBy(Math.exp(-d * 0.0018), ev.clientX - rect.left, ev.clientY - rect.top);
         } else if (ev.shiftKey && !ev.deltaX) {
           // Shift + 滚轮左右平移：有的系统不会把竖着滚换成横向（deltaX 还是 0），这里自己换
           this.panTo(this.tx - ev.deltaY * scale, this.ty);
@@ -5061,12 +5110,12 @@ export class MindMapCanvas {
     }
     if (mod && (ev.key === "=" || ev.key === "+")) {
       ev.preventDefault();
-      this.zoomBy(1.2);
+      this.userZoomBy(1.2);
       return;
     }
     if (mod && ev.key === "-") {
       ev.preventDefault();
-      this.zoomBy(1 / 1.2);
+      this.userZoomBy(1 / 1.2);
       return;
     }
     if (mod && ev.shiftKey && (ev.key === "0" || ev.code === "Digit0")) {
@@ -5095,7 +5144,7 @@ export class MindMapCanvas {
     }
     if (mod && ev.key === "0") {
       ev.preventDefault();
-      this.fit();
+      this.userFit();
       return;
     }
     if (ev.key === "Escape") {
@@ -7490,7 +7539,7 @@ export class MindMapCanvas {
     entries.push(
       { title: t("canvas.expandAll"), icon: "chevrons-down-up", run: () => this.setFoldLevel(null) },
       { title: t("canvas.mainTopicsOnly"), icon: "chevrons-up-down", run: () => this.setFoldLevel(1) },
-      { title: t("menu.fit"), icon: "maximize", run: () => this.fit() },
+      { title: t("menu.fit"), icon: "maximize", run: () => this.userFit() },
     );
     if (this.focusRoot) entries.push({ separator: true }, { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() });
     const side = this.opts.onSideBySide;
