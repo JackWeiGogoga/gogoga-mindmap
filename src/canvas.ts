@@ -4028,8 +4028,8 @@ export class MindMapCanvas {
       }
     }
     if (embed && !embed.isConnected) bar.prepend(embed);
-    // 「大窗口编辑」不进按钮清单，总跟在「编辑」后面
-    const big = pool.get("expand");
+    // 「大窗口编辑」：嵌入的选了自定义时按清单（默认关）；否则跟在「编辑」后面
+    const big = layout.some((x) => x.id === "expand") ? undefined : pool.get("expand");
     if (big) {
       const edit = pool.get("embed");
       // 工具栏这时还没挂进页面，isConnected 一直是 false，按父元素判断

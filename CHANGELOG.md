@@ -4,6 +4,19 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.74.0] - 2026-11-15
+
+### Added
+- "Edit in a large window" for mind maps in code blocks (#41): a button next to the pencil on the embedded map's toolbar opens the map in a dialog that fills the Obsidian window, with the full toolbar and the mouse wheel panning right away. Changes are written back to the code block as you go and share its undo history; close the dialog (× or click outside) and you're back in the note. Esc only leaves the topic you're typing in, it doesn't close the dialog, and F2, ⌘B / ⌘I stay inside the map instead of renaming the file or formatting the note behind it. If you chose a custom toolbar for embedded maps, the button is in its list, off by default.
+- Quick settings (the last toolbar button) now have "Show floating toolbar when a topic is selected", so you can turn that row of tools off when it covers things on a small screen; on phones and tablets they also have "Fold buttons on touch screens".
+- Topics with a callout have a "Callout" submenu in their right-click menu: edit, remove and the callout's color. The color used to be reachable only by right-clicking the bubble itself.
+
+### Fixed
+- Embedded maps no longer drift out of their frame (#41): panning keeps at least half of the map inside, so scrolling can't leave you looking at empty space.
+- Mind maps in code blocks stay centered: until you pan or zoom one yourself, it fits itself again whenever its frame changes size (the frame growing to fit the map, reading view finishing its layout, the pane getting wider or narrower), so it no longer sits off to one side with the toolbar over it. Switching between reading view and live preview fits it again instead of reusing a position from the other view; positions you set by panning or zooming are kept, and "Fit" goes back to fitting automatically.
+- Rainbow theme: in horizontal timelines, tree maps and org charts, the line under a topic ran through the middle of its text (or along its top edge). It now sits under the text, like in logic charts.
+- Split panes: the bottom toolbar only moves up to clear the status bar in the pane the status bar actually covers; the other panes keep it at the bottom edge.
+
 ## [0.73.0] - 2026-11-15
 
 ### Added
@@ -929,7 +942,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...HEAD
+[0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
 [0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0
 [0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1
 [0.72.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.71.1...0.72.0

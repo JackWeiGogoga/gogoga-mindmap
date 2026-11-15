@@ -48,7 +48,8 @@ export const TOOLBAR_DEFAULT = [
  * 嵌入的脑图选「自定义」时的工具栏：多一项 embed（「打开这张脑图」/ 代码块的「编辑 / 完成」），
  * 默认只留它一个，其余按钮都关着，要哪个自己开
  */
-export const EMBED_TOOLBAR_DEFAULT = ["embed", ...TOOLBAR_DEFAULT.map((id) => `!${id}`)];
+/** 嵌入的脑图选「自定义」时的按钮：默认只留「打开 / 编辑」；「大窗口编辑」（代码块才有）也在清单里，默认关 */
+export const EMBED_TOOLBAR_DEFAULT = ["embed", "!expand", ...TOOLBAR_DEFAULT.map((id) => `!${id}`)];
 
 const parse = (s: string): BarItem => (s.startsWith("!") ? { id: s.slice(1), on: false } : { id: s, on: true });
 

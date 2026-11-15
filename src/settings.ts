@@ -720,7 +720,7 @@ export class MindMapSettingTab extends PluginSettingTab {
     const at = (id: string) => items().findIndex((x) => x.id === id);
     const rows: SettingDefinition[] = list.map((item, i) => ({
       name: isSep(item.id) ? t("bar.sep") : t(`bar.${item.id}` as Parameters<typeof t>[0]),
-      desc: isSep(item.id) ? t("bar.sepDesc") : item.id === "embed" ? t("bar.embedDesc") : "",
+      desc: isSep(item.id) ? t("bar.sepDesc") : item.id === "embed" ? t("bar.embedDesc") : item.id === "expand" ? t("bar.expandDesc") : "",
       aliases: ["toolbar", "button", "工具栏", "按钮"],
       render: (setting) => {
         const name = ICON[item.id] ?? item.id;
