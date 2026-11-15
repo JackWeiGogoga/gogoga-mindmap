@@ -787,10 +787,10 @@ export class TableEditor {
       }
     }
     if (folded) {
-      const bar = tbody.appendChild(doc.createElement("tr")).appendChild(doc.createElement("td"));
+      const bar = tbody.createEl("tr").createEl("td");
       bar.className = "ggt-fold-bar";
       bar.colSpan = cols;
-      const btn = bar.appendChild(doc.createElement("button"));
+      const btn = bar.createEl("button");
       btn.type = "button";
       btn.className = "ggt-fold-btn";
       btn.textContent = t("unfoldRows").replace("{n}", String(all - head));
