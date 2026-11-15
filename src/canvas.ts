@@ -7297,6 +7297,8 @@ export class MindMapCanvas {
             // 节点里的表格：没有就插入一张，备注里有表就放进节点（第一层菜单放不下了，归到「插入」里）
             ...(this.nodeTable(node) ? [] : [this.tableMenuEntry(node)]),
             { title: t("menu.tableChild"), icon: "table", run: () => this.insertTableChild(node) },
+            // 图片、视频（#40）：手机上没法粘贴、拖文件进节点，从这里选
+            ...(this.opts.host?.saveBinary ? [{ title: t("menu.insertMedia"), icon: "image-plus", run: () => this.pickMedia(node) }] : []),
           ],
         },
         sep,
@@ -7341,7 +7343,6 @@ export class MindMapCanvas {
       entries.push(
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
       );
-      if (this.opts.host?.saveBinary) entries.push({ title: t("menu.insertMedia"), icon: "image-plus", run: () => this.pickMedia(node) });
       if (this.noteShown(node)) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(
         { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
