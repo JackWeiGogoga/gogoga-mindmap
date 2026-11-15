@@ -55,7 +55,7 @@ import { NotePickerModal } from "./note-picker";
 import { BlockEditorModal } from "./block-editor";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, type CanvasOptions, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, setSpacingScale } from "./canvas";
+import { CanvasHost, type CanvasOptions, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, refreshAllNodebars, setSpacingScale } from "./canvas";
 import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
 import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -491,7 +491,36 @@ export default class MindMapPlugin extends Plugin {
   quickSettings(): QuickSetting[] {
     const s = this.settings;
     const save = () => void this.saveSettings();
+    // 手机屏幕小，浮动工具栏、触屏的折叠按钮常要随手开关，放进快捷设置（zhiqiang 的建议）
+    const touch = Platform.isMobile || window.matchMedia("(pointer: coarse)").matches;
     return [
+      {
+        label: t("settings.showNodebar.name"),
+        value: s.showNodebar,
+        set: (v) => {
+          s.showNodebar = !!v;
+          save();
+          refreshAllNodebars();
+        },
+      },
+      ...(touch
+        ? [
+            {
+              label: t("settings.touchToggles.name"),
+              value: s.touchToggles,
+              options: [
+                // 面板窄（手机上），用短一点的说法
+                { value: "always", label: t("quick.touchToggles.always") },
+                { value: "selected", label: t("quick.touchToggles.selected") },
+              ],
+              set: (v: boolean | string) => {
+                s.touchToggles = v === "selected" ? "selected" : "always";
+                save();
+                this.applyEmbedToolbar();
+              },
+            },
+          ]
+        : []),
       {
         label: t("settings.editCaret.name"),
         value: s.editCaret,

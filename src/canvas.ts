@@ -424,6 +424,11 @@ export function refreshAllBars(): void {
   for (const c of liveCanvases) c.refreshBars();
 }
 
+/** 只重画浮动工具栏（快捷设置里开关它时用，主工具栏和开着的快捷设置面板不动） */
+export function refreshAllNodebars(): void {
+  for (const c of liveCanvases) c.refreshNodebar();
+}
+
 export function syncNotesExpandedAll(): void {
   for (const c of liveCanvases) c.syncNotesExpanded();
 }
@@ -1220,6 +1225,12 @@ export class MindMapCanvas {
   }
 
   /** 设置里改了工具栏的按钮：主工具栏重建，浮动工具栏下次显示时按新的清单建 */
+  refreshNodebar(): void {
+    this.nodebar?.remove();
+    this.nodebar = null;
+    this.positionNodebar();
+  }
+
   refreshBars(): void {
     this.toolbar?.remove();
     this.positionMenu?.remove();
@@ -4320,14 +4331,16 @@ export class MindMapCanvas {
   }
 
   /**
-   * 手机版 Obsidian 底部有一条悬浮导航栏（.mobile-navbar），会盖住画布底部。
+   * 手机版 Obsidian 底部有一条悬浮导航栏（.mobile-navbar），电脑上右下角有状态栏，会盖住画布底部。
    * 量出它压住画布的高度，写进 --mm-bottom-inset，底部工具栏和搜索框据此抬高。
    */
   private updateBottomInset(): void {
     const doc = this.el.ownerDocument;
     // 看有没有画出来，不看 offsetParent：手机上 Obsidian 底部那条悬浮导航栏是 position: fixed，offsetParent 永远是 null，
     // 以前因此当它不存在，脑图的工具栏被它挡住（#37）
-    const bars = [...doc.querySelectorAll<HTMLElement>(".mobile-navbar, .mobile-toolbar")].filter((b) => {
+    // 电脑上要避开的是右下角的状态栏：它只压在最右下那个窗格上，分屏时别的窗格不用抬高（zhiqiang 反馈分屏时工具栏下面空一截）
+    const desktop = !doc.body.classList.contains("is-mobile");
+    const bars = [...doc.querySelectorAll<HTMLElement>(desktop ? ".status-bar" : ".mobile-navbar, .mobile-toolbar")].filter((b) => {
       const r = b.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
     });
@@ -4337,7 +4350,8 @@ export class MindMapCanvas {
       const br = b.getBoundingClientRect();
       if (br.top < r.bottom && br.bottom > r.top && br.left < r.right && br.right > r.left) inset = Math.max(inset, r.bottom - br.top);
     }
-    const v = inset > 0 ? `${Math.round(inset + 8)}px` : "";
+    // 电脑上没被压着就和别的位置一样离底边 12px（样式表里没量过时的默认值是 44px，给状态栏留的）
+    const v = inset > 0 ? `${Math.round(inset + 8)}px` : desktop ? "12px" : "";
     if (this.el.style.getPropertyValue("--mm-bottom-inset") !== v) {
       if (v) this.el.style.setProperty("--mm-bottom-inset", v);
       else this.el.style.removeProperty("--mm-bottom-inset");
