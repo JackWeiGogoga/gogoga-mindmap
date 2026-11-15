@@ -2492,6 +2492,29 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt.is-hot button.ggt-add-col-first, .ggt.is-hot button.ggt-add-row-first { pointer-events: auto; }
 .is-mobile .ggt button.ggt-add-col-first, .is-mobile .ggt button.ggt-add-row-first, .is-phone .ggt button.ggt-add-col-first, .is-phone .ggt button.ggt-add-row-first { display: none; }
 .ggt.is-readonly .ggt-add, .ggt.is-readonly .ggt-handle { display: none; }
+/* 折叠的表：表头下面一条「▸ 展开 N 行」；没有加行的加号（加的行会藏起来） */
+.ggt.is-folded .ggt-add-row, .ggt.is-folded .ggt-add-row-first { display: none; }
+.ggt .ggt-table td.ggt-fold-bar {
+  padding: 0;
+  border: 1px solid var(--ggt-line);
+  border-top: 0;
+  background: transparent;
+}
+.ggt .ggt-table td.ggt-fold-bar button.ggt-fold-btn {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small, 13px);
+  text-align: left;
+  cursor: pointer;
+}
+.ggt .ggt-table td.ggt-fold-bar button.ggt-fold-btn:hover { background: rgba(var(--mono-rgb-100), 0.04); color: var(--text-normal); }
 
 /* 弹出菜单 */
 .ggt-menu {

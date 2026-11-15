@@ -499,6 +499,16 @@ export function setTableLook(t: Table, look: { style?: TableStyle | null; densit
   return n;
 }
 
+/** 折叠 / 展开整张表（只显示表头）；没有表头以外的行时折了也没意义，不折 */
+export function setFolded(t: Table, on: boolean): Table {
+  if (on === (t.meta.fold === 1)) return t;
+  if (on && rowCount(t) <= headRows(t)) return t;
+  const n = cloneTable(t);
+  if (on) n.meta.fold = 1;
+  else delete n.meta.fold;
+  return n;
+}
+
 /** 整表对齐 */
 export function alignAll(t: Table, a: Align): Table {
   const n = cloneTable(t);

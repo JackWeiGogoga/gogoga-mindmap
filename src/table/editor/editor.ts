@@ -15,7 +15,7 @@
 
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
-import { headRows, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
@@ -194,6 +194,8 @@ export class TableEditor {
   private anchor: Pos | null = null;
   /** 选区是点行 / 列手柄选的整行 / 整列：不因为碰到合并格往外扩 */
   private lineSel = false;
+  /** 折着的表在这张编辑器里临时展开了（阅读视图点「展开」、搜索跳到藏着的行），不改文件 */
+  private localUnfold = false;
   private editing = false;
   /** 编辑时宿主送来的新表：等这一格改完再换上 */
   private pending: Table | null = null;
@@ -299,7 +301,36 @@ export class TableEditor {
   }
 
   select(r: number, c: number): void {
+    this.revealRow(r);
     this.setSel({ r, c }, true);
+  }
+
+  /** 折着的表：在这一张编辑器里先展开（不改文件），要去的那一行藏着的时候用（搜索跳过来、宿主要选某一格） */
+  private revealRow(r: number): void {
+    if (!this.folded() || r < headRows(this.table)) return;
+    this.localUnfold = true;
+    this.render();
+  }
+
+  /** 折叠着：注释里有 fold、没在这张编辑器里临时展开、表头下面真有行 */
+  private folded(): boolean {
+    const tb = this.table;
+    return tb.meta.fold === 1 && !this.localUnfold && rowCount(tb) > headRows(tb);
+  }
+
+  /** 画出来的行数：折着时只有表头 */
+  private shownRows(): number {
+    return this.folded() ? headRows(this.table) : rowCount(this.table);
+  }
+
+  /** 点「展开 N 行」：能改文件就去掉注释里的 fold；只读（阅读视图）只在这里展开，不改文件 */
+  private unfold(): void {
+    if (this.host.readonly) {
+      this.localUnfold = true;
+      this.render();
+      return;
+    }
+    this.applyKeepRange(setFolded(this.table, false));
   }
 
   /**
@@ -423,6 +454,7 @@ export class TableEditor {
    * 不改格子的内容。找不到这段字（格式把字拆开了）就给整格画框
    */
   showMatch(r: number, c: number, text: string, k: number): void {
+    this.revealRow(r);
     const el = this.grid[r]?.[c];
     if (!el) return;
     clearSearchMark();
@@ -680,14 +712,18 @@ export class TableEditor {
     const doc = this.root.ownerDocument;
     const hadFocus = this.input.hasFocus();
     const tb = this.table;
-    const rows = rowCount(tb);
+    const all = rowCount(tb);
+    const folded = this.folded();
+    // 折着时只画表头那几行，下面一条「展开 N 行」；选区不进藏着的行
+    const rows = this.shownRows();
     const cols = colCount(tb);
     if (this.sel) this.sel = this.canon({ r: Math.min(this.sel.r, rows - 1), c: Math.min(this.sel.c, cols - 1) });
     if (this.anchor) this.anchor = { r: Math.min(this.anchor.r, rows - 1), c: Math.min(this.anchor.c, cols - 1) };
+    this.root.classList.toggle("is-folded", folded);
     const ms = merges(tb);
     this.applyLook();
     this.tableEl.replaceChildren();
-    this.grid = Array.from({ length: rows }, () => new Array<HTMLElement>(cols));
+    this.grid = Array.from({ length: all }, () => new Array<HTMLElement>(cols));
     this.marked = [];
     this.crossed = [];
     const colgroup = this.tableEl.appendChild(doc.createElement("colgroup"));
@@ -723,7 +759,7 @@ export class TableEditor {
         cell.className = "ggt-cell";
         if (m) {
           cell.colSpan = m.c2 - m.c1 + 1;
-          cell.rowSpan = m.r2 - m.r1 + 1;
+          cell.rowSpan = Math.min(m.r2, rows - 1) - m.r1 + 1;
           cell.classList.add("is-merged");
           for (let i = m.r1; i <= m.r2; i++) for (let j = m.c1; j <= m.c2; j++) this.grid[i][j] = cell;
         } else this.grid[r][c] = cell;
@@ -746,9 +782,28 @@ export class TableEditor {
         if (!m && !widthOf(tb, c)) cell.classList.add("is-auto-width");
         const content = cell.appendChild(doc.createElement("div"));
         content.className = "ggt-content";
-        if (r === rows - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
+        if (r === all - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
       }
+    }
+    if (folded) {
+      const bar = tbody.appendChild(doc.createElement("tr")).appendChild(doc.createElement("td"));
+      bar.className = "ggt-fold-bar";
+      bar.colSpan = cols;
+      const btn = bar.appendChild(doc.createElement("button"));
+      btn.type = "button";
+      btn.className = "ggt-fold-btn";
+      btn.textContent = t("unfoldRows").replace("{n}", String(all - head));
+      // 不走格子的按下（选中、拖选）
+      btn.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      });
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.unfold();
+      });
     }
     this.fitCols();
     this.markSel();
@@ -886,7 +941,7 @@ export class TableEditor {
 
   /** 填充柄放在选区右下角；没选中、在编辑、只读时不显示 */
   private placeFill(): void {
-    const box = !this.editing && !this.host.readonly ? this.selBox() : null;
+    const box = !this.editing && !this.host.readonly && !this.folded() ? this.selBox() : null;
     this.fillHandle.classList.toggle("is-shown", !!box);
     if (box) this.fillHandle.setAttribute("style", `left:${box.x + box.w - 4}px;top:${box.y + box.h - 4}px`);
   }
@@ -1142,7 +1197,8 @@ export class TableEditor {
   /** 方向键、Tab、Enter 走格；extend 是 Shift+方向键扩大选区。从合并的格子出发时从它的边上走出去 */
   private move(dr: number, dc: number, wrap = false, extend = false): void {
     if (!this.sel) return;
-    const rows = rowCount(this.table);
+    // 折着时藏着的行走不进去
+    const rows = this.shownRows();
     const cols = colCount(this.table);
     const m = mergeAt(this.table, this.sel.r, this.sel.c);
     let { r, c } = this.sel;
@@ -1171,7 +1227,7 @@ export class TableEditor {
       return;
     }
     if (r >= rows) {
-      if (wrap) {
+      if (wrap && !this.folded()) {
         // 最后一格按 Tab：加一行，和飞书、Notion 一样
         this.apply(insertRow(this.table, rows), { r: rows, c: 0 });
         return;
@@ -2656,7 +2712,7 @@ export class TableEditor {
         // 选区的两头直接给，不经过 setSel：合并格会把起点挪到它的左上角（别的行），整行就选歪了
         if (this.editing) this.commit();
         this.anchor = row ? { r: p.r, c: 0 } : { r: 0, c: p.c };
-        this.sel = row ? { r: p.r, c: colCount(this.table) - 1 } : { r: rowCount(this.table) - 1, c: p.c };
+        this.sel = row ? { r: p.r, c: colCount(this.table) - 1 } : { r: this.shownRows() - 1, c: p.c };
         this.lineSel = true;
         this.markSel();
         this.input.focus();
@@ -2748,7 +2804,8 @@ export class TableEditor {
       const el = this.cellEl(q);
       return !!el && el.getBoundingClientRect().left <= vis.left + 1;
     };
-    const rowP = (h && atRowStart(h) ? h : null) ?? lineRow ?? touchSel;
+    // 折着时没有行手柄（藏着的行挪不了，表头行也不让在折着时挪）
+    const rowP = this.folded() ? null : ((h && atRowStart(h) ? h : null) ?? lineRow ?? touchSel);
     const colP = (h && h.r < head ? h : null) ?? lineCol ?? touchSel;
     this.rowHandle.classList.toggle("is-shown", !!rowP);
     this.colHandle.classList.toggle("is-shown", !!colP);
@@ -2852,6 +2909,17 @@ export class TableEditor {
         disabled: headRows(tb) !== i + 1 && !canSetHead(tb, i + 1),
         run: () => keep(setTableLook(this.table, { head: i + 1 })),
       })),
+      { separator: true },
+      {
+        title: t("foldTable"),
+        icon: "chevrons-down-up",
+        checked: tb.meta.fold === 1,
+        disabled: tb.meta.fold !== 1 && rowCount(tb) <= headRows(tb),
+        run: () => {
+          this.localUnfold = false;
+          keep(setFolded(this.table, this.table.meta.fold !== 1));
+        },
+      },
       { separator: true },
       { title: t("headerColumn"), icon: "panel-left", checked: !!tb.meta.headerCol, run: () => keep(setTableLook(this.table, { headerCol: !this.table.meta.headerCol })) },
       // 冻结是标题列的选项：标题列开着才出现

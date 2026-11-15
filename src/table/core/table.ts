@@ -62,6 +62,8 @@ export interface TableMeta {
   fz?: Record<string, number>;
   /** 拖列宽时把表格拉得比正文宽了：这张表想左右滑动，「列宽按比例缩放」不缩它 */
   wide?: 1;
+  /** 折叠：只显示表头和一条「展开 N 行」（小欧欧的建议）。展开就去掉这个键 */
+  fold?: 1;
   /** 不认识的键原样保留，新版本加的东西旧版本不会弄丢 */
   [key: string]: unknown;
 }
