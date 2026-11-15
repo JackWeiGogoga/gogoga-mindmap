@@ -2985,7 +2985,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 }
 
 /* 搜索跳到表格里：标出当前这一处（#15） */
-::highlight(ggt-search) { background-color: var(--text-highlight-bg, rgba(255, 208, 0, 0.4)); color: var(--text-normal); }
+/* 和 Obsidian 标当前这一处一样：字外面一圈强调色的框，叠在格子底色、==高亮== 上面 */
+.ggt-search-mark { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ggt-search-mark > div { position: absolute; border-radius: 2px; box-shadow: 0 0 0 3px var(--text-accent); }
 .ggt .ggt-cell.is-search-hit { box-shadow: inset 0 0 0 2px var(--text-accent); }
 /* ==== gogoga-table 同步结束 ==== */
 

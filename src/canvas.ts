@@ -4423,6 +4423,9 @@ export class MindMapCanvas {
       this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
       const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
       this.cancelTapCenter();
+      // 第一根手指按下：之前记着的按点都是没收到松开的（iPhone 长按弹出菜单后，松手落在菜单上，画布收不到）。
+      // 不清掉的话这一下会被当成双指缩放，点哪里都没反应、取消不了选中
+      if (ev.isPrimary && ev.pointerType !== "mouse" && this.pointers.size) this.dropTouch();
       this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
@@ -4757,6 +4760,8 @@ export class MindMapCanvas {
       }
       // Windows 松开后才发：刚拖完平移的那一下不弹
       if (performance.now() < this.suppressMenuUntil) return;
+      // 触屏长按弹菜单：这一按变成了菜单，不再拖节点、平移
+      if (this.touchPress || (this.drag && !ev.button && this.pointers.size)) this.dropTouch();
       const pressed = this.pendingMenuNode;
       this.pendingMenuNode = null;
       this.contextMenuAt(ev, pressed ?? undefined);
@@ -7187,6 +7192,16 @@ export class MindMapCanvas {
     this.select(node);
     this.render();
     this.notify();
+  }
+
+  /** 收掉这一次触摸留下的状态：按住计时、拖动中的节点（不落下）、平移、缩放、记着的按点和指针捕获 */
+  private dropTouch(): void {
+    this.cancelTouchPress();
+    if (this.drag) this.endDrag(false);
+    this.pan = null;
+    this.pinch = null;
+    for (const id of this.pointers.keys()) if (this.el.hasPointerCapture(id)) this.el.releasePointerCapture(id);
+    this.pointers.clear();
   }
 
   private cancelTouchPress(): void {

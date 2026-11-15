@@ -417,7 +417,8 @@ export class TableEditor {
 
   /**
    * 搜索跳到表格里（在文件中查找、全局搜索点进来）：第 r 行第 c 列格子里第 k 处 text 标出来、滚进视野（#15）。
-   * 用浏览器的自定义高亮，不改格子的 DOM；不支持或者找不到这段字（格式把字拆开了）就让整格闪一下
+   * 和 Obsidian 标当前这一处一样，在那几个字外面画一圈强调色的框（盖在格子底色、==高亮== 上面，不会被它们盖住）；
+   * 不改格子的内容。找不到这段字（格式把字拆开了）就给整格画框
    */
   showMatch(r: number, c: number, text: string, k: number): void {
     const el = this.grid[r]?.[c];
@@ -425,15 +426,24 @@ export class TableEditor {
     clearSearchMark();
     el.scrollIntoView({ block: "center", inline: "nearest" });
     const content = el.querySelector(".ggt-content");
-    const win = this.root.ownerDocument.defaultView ?? window;
-    const reg = (win.CSS as { highlights?: Map<string, unknown> } | undefined)?.highlights;
-    const H = (win as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
     const range = content && text ? findTextRange(content, text, k) : null;
     // 点一下页面（点格子不经过编辑器，编辑器看不到选区变化）就去掉
     this.root.ownerDocument.addEventListener("pointerdown", clearSearchMark, { once: true, capture: true });
-    if (range && reg && H) {
-      reg.set("ggt-search", new H(range));
-      searchMarkReg = reg;
+    const rects = range ? Array.from(range.getClientRects()).filter((b) => b.width > 0 && b.height > 0) : [];
+    if (rects.length) {
+      // 屏幕上量的位置换成格子里的 CSS 像素（脑图画布会整体缩放）
+      const k2 = this.scale();
+      const box = el.getBoundingClientRect();
+      const layer = el.createDiv({ cls: "ggt-search-mark" });
+      for (const b of rects) {
+        layer.createDiv().setCssProps({
+          left: `${(b.left - box.left) / k2 - el.clientLeft}px`,
+          top: `${(b.top - box.top) / k2 - el.clientTop}px`,
+          width: `${b.width / k2}px`,
+          height: `${b.height / k2}px`,
+        });
+      }
+      searchMarkLayer = layer;
       return;
     }
     el.classList.add("is-search-hit");
@@ -3297,14 +3307,14 @@ export class TableEditor {
   }
 }
 
-let searchMarkReg: Map<string, unknown> | null = null;
+let searchMarkLayer: HTMLElement | null = null;
 let searchMarkCell: HTMLElement | null = null;
 
-/** 去掉搜索跳转时标出的那一处（选区挪走了、换了一处）。按名字从窗口里删：插件重载前留下的也删掉 */
+/** 去掉搜索跳转时标出的那一处（选区挪走了、换了一处、查找框关了）。0.13.2–0.15.0 用过的自定义高亮也删掉（插件升级前留下的） */
 export function clearSearchMark(): void {
-  searchMarkReg?.delete("ggt-search");
   (window.CSS as { highlights?: Map<string, unknown> } | undefined)?.highlights?.delete("ggt-search");
-  searchMarkReg = null;
+  searchMarkLayer?.remove();
+  searchMarkLayer = null;
   searchMarkCell?.classList.remove("is-search-hit");
   searchMarkCell = null;
 }
