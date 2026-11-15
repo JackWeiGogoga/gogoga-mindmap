@@ -278,6 +278,10 @@ Pushing a tag publishes a release: `git tag 0.3.1 && git push --tags` (the tag m
 BRAT users can install it by entering the repository URL. To install manually, put these three files in
 `<vault>/.obsidian/plugins/gogoga-mindmap/`. Node isn't needed at runtime.
 
+## Community
+
+Bugs and feature requests: please open an [issue](https://github.com/JackWeiGogoga/gogoga-mindmap/issues) with a screenshot or recording and the version. Chinese-speaking users can also join the WeChat group: add `JackWeiGogoga` with the note “gogoga”, or scan the QR code on the [community page](https://obsidian.gogoga.top/en/community/).
+
 ## Support
 
 gogoga is free and open source. If this plugin helps you, you can support its development on [afdian (爱发电)](https://afdian.com/a/jackweigogoga). Obsidian also shows a support button for it in the community directory. Bug reports and ideas help just as much.

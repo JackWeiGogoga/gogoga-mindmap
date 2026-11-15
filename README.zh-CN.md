@@ -285,6 +285,10 @@ pnpm gen-bench 3000  # 生成压测用的大脑图笔记到 vault 的 inbox
 挂到 Release。用 BRAT 的人填仓库地址就能装；手动安装把这三个文件放进
 `<vault>/.obsidian/plugins/gogoga-mindmap/`。运行时不需要 Node。
 
+## 交流
+
+用法问题、建议可以加微信 `JackWeiGogoga`（备注「gogoga」），我拉你进交流群，二维码在[官网交流页](https://obsidian.gogoga.top/community/)。bug 和功能建议请在本仓库的 [Issues](https://github.com/JackWeiGogoga/gogoga-mindmap/issues) 里提，附上截图或录屏和版本号。
+
 ## 支持作者
 
 gogoga 系列全部免费开源。如果这个插件帮到了你，欢迎在 [爱发电](https://afdian.com/a/jackweigogoga) 支持一下，Obsidian 社区插件页面里也有赞助按钮。反馈 bug、提建议同样是很大的支持。
