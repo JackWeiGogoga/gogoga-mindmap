@@ -2011,6 +2011,9 @@ export class MindMapCanvas {
       if (child.side === "right" || child.side === "left") {
         if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
         if (anchorBottom(child)) g.y2 = child.y + child.h;
+      } else if ((child.side === "tree" || child.side === "tree-up") && anchorBottom(child)) {
+        // 树形分支（树形图、横向时间轴主题下面那一列）也从文字底下接进来，下划线才不会从字中间穿过去
+        g.y2 = child.y + child.h;
       }
       const style = this.opts.edge?.shape ?? (parentNode === base ? theme.rootEdge : theme.edge);
       // 复用已有的 path，只改变了的属性；重新创建几千个 SVG 元素会让布局整体失效
@@ -2024,9 +2027,13 @@ export class MindMapCanvas {
       edgeIndex += 1;
       // 下划线式节点：文字底下那条线由本条连线一路画过去，而不是再用 CSS 的 border-bottom 另画一条，
       // 否则两者的粗细和 y 坐标对不齐，接缝处会断开
-      const tail = anchorBottom(child)
-        ? ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`
-        : "";
+      // 上下方向（组织结构图）的连线接在节点上沿或下沿中间，接不成下划线：下划线单独在文字底下画一段
+      const vertical = child.side === "down" || child.side === "up";
+      const tail = !anchorBottom(child)
+        ? ""
+        : vertical
+          ? ` M${round2(child.x)},${round2(child.y + child.h)} L${round2(child.x + child.w)},${round2(child.y + child.h)}`
+          : ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`;
       const d = seg
         ? `M${round2(seg.x1)},${round2(seg.y1)} L${round2(seg.x2)},${round2(seg.y2)}`
         : edgePath(g, style, (this.opts.edge?.sharp ?? theme.sharp) ? 0 : 8) + tail;
