@@ -4,6 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- "Insert image or video" in the topic menu (#40): pick images, videos or audio with the system file picker; they're saved where Obsidian's attachment settings say and embedded after the topic's text, shown right in the topic. On phones you can't paste or drop files into a topic, so a long press now gets you there; phones also show this button on the floating topic toolbar by default (off on desktop, turn it on under Settings → Toolbars and colors). When the central topic is the file name, the file goes in as a child topic so the note isn't renamed.
+- Videos and audio in topics play inline (#40): `![[clip.mp4]]` used to show as plain text. Like web players, they're covered so a click selects or drags the topic; double-click the player or click Activate to use its controls. Drag a video's corner to resize it (saved as `![[clip.mp4|width]]`) without restarting playback. Videos and audio dragged in from the file list are embedded instead of linked. Image export shows a video's current frame and an audio file's name.
+
+### Fixed
+- Tables in topics: after right-clicking a link or image in a cell, clicking another cell didn't close the menu (synced from Table 0.15.2).
+
 ## [0.72.1] - 2026-11-15
 
 ### Fixed

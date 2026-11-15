@@ -1429,6 +1429,20 @@
   padding: 10px;
 }
 .gg-mm-node.has-frame .mm-label { display: block; text-align: center; }
+/* 节点里的视频、音频（#40）：视频默认和图片缩略图差不多大（宽一点，放得下播放控件），拖过宽度就照写的来；
+   音频没有自己的宽度（放在 max-content 的盒子里会缩成 0），给一个固定宽 */
+.mm-label video.mm-media {
+  display: block;
+  width: calc(var(--mm-img-thumb-w, 240px) * 4 / 3);
+  height: auto;
+  border-radius: 6px;
+  background: #000;
+}
+.mm-label audio.mm-media {
+  display: block;
+  width: 280px;
+  height: 40px;
+}
 
 /* ---------- 大纲面板 ---------- */
 

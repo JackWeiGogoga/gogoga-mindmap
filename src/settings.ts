@@ -13,7 +13,7 @@ import type MindMapPlugin from "./main";
 import { colorLabel, redrawAllCanvases, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
 import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
 import { colorTitle } from "./format-bar";
-import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
+import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, nodebarDefault, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 
 /** 嵌入的脑图选了「自定义」就用自己那份按钮清单，否则和打开的脑图一样 */
 export function embedToolbarLayout(s: MindMapSettings): BarItem[] {
@@ -706,7 +706,7 @@ export class MindMapSettingTab extends PluginSettingTab {
    */
   private barLayoutPage(key: "nodebarLayout" | "toolbarLayout" | "embedToolbarLayout"): SettingDefinitionItem {
     const plugin = this.plugin;
-    const defaults = key === "nodebarLayout" ? NODEBAR_DEFAULT : key === "toolbarLayout" ? TOOLBAR_DEFAULT : EMBED_TOOLBAR_DEFAULT;
+    const defaults = key === "nodebarLayout" ? nodebarDefault(Platform.isMobile) : key === "toolbarLayout" ? TOOLBAR_DEFAULT : EMBED_TOOLBAR_DEFAULT;
     const embed = key === "embedToolbarLayout";
     const items = () => mergeLayout(plugin.settings[key], defaults);
     const save = async (next: BarItem[]) => {

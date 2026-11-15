@@ -1,5 +1,5 @@
 import { HoverPopover, Menu, normalizePath, Notice, Platform, Scope, TextFileView, TFile, WorkspaceLeaf } from "obsidian";
-import { mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT } from "./bar-layout";
+import { mergeLayout, nodebarDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 import { buildSvg, svgToPdf, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
 import { blankBeforeNodeTables } from "./node-table";
@@ -355,7 +355,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       autoNumber: () => this.plugin.settings.numberByTyping,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
-      nodebarLayout: () => mergeLayout(this.plugin.settings.nodebarLayout, NODEBAR_DEFAULT),
+      nodebarLayout: () => mergeLayout(this.plugin.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       toolbarLayout: () => mergeLayout(this.plugin.settings.toolbarLayout, TOOLBAR_DEFAULT),
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),
       textColors: () => parseColorList(this.plugin.settings.textColors),

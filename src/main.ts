@@ -38,7 +38,7 @@ import {
 } from "obsidian";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif"]);
-import { mergeLayout, NODEBAR_DEFAULT } from "./bar-layout";
+import { mergeLayout, nodebarDefault } from "./bar-layout";
 import { type ColorMemory, pushRecent } from "./color-palette";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables } from "./node-table";
@@ -60,7 +60,7 @@ import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, Mi
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, useFallbackViewType, VIEW_TYPE_MINDMAP, VIEW_TYPE_MINDMAP_FALLBACK } from "./view";
-import { parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
+import { mediaKind, parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
@@ -1700,7 +1700,7 @@ export default class MindMapPlugin extends Plugin {
         autoNumber: () => this.settings.numberByTyping,
         copyPlain: () => this.settings.copyPlain,
         showNodebar: () => this.settings.showNodebar,
-        nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, NODEBAR_DEFAULT),
+        nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
         toolbarLayout: () => embedToolbarLayout(this.settings),
         nodeColors: () => parseNodeColors(this.settings.nodeColors),
         textColors: () => parseColorList(this.settings.textColors),
@@ -2112,7 +2112,8 @@ export default class MindMapPlugin extends Plugin {
             name: f.name,
             basename: f.basename,
             linktext: this.app.metadataCache.fileToLinktext(f, sourcePath()),
-            isImage: IMAGE_EXTS.has(f.extension.toLowerCase()),
+            // 图片、视频、音频拖进来是嵌入（显示在节点上），别的文件是链接
+            isImage: IMAGE_EXTS.has(f.extension.toLowerCase()) || !!mediaKind(f.name),
           }));
       },
       saveBinary: async (name, data) => {

@@ -474,6 +474,8 @@ const ICONS: Record<string, string> = {
   // 浮动工具栏的可选按钮：关联线（带箭头的虚线弧）、表格、折叠
   rel: '<svg viewBox="0 0 24 24"><path d="M4 18C4 9 11 5 19 6" stroke-dasharray="3 3"/><path d="m15 3 4 3-3 4"/></svg>',
   table: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
+  // Lucide image-plus（ISC）
+  media: '<svg viewBox="0 0 24 24"><path d="M16 5h6M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/></svg>',
   fold: '<svg viewBox="0 0 24 24"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>',
   box: '<svg viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"/></svg>',
 };
@@ -634,7 +636,7 @@ export class MindMapCanvas {
   /** 只跟「节点里画什么」有关的签名；它没变就别动 DOM 子节点（iframe 重新插入会重新加载） */
   private elContent = new WeakMap<HTMLElement, string>();
   /** 每个节点当前活着的 iframe，按 id 存，重渲染时复用同一个元素 */
-  private frames = new Map<string, HTMLIFrameElement>();
+  private frames = new Map<string, HTMLIFrameElement | HTMLMediaElement>();
   /** 挡板已经放开的那个节点；跨域 iframe 里点了哪儿看不见，默认全挡住免得误跳转 */
   private liveFrame: string | null = null;
   /** 上次写进去的位置，避免重复写同样的值 */
@@ -750,7 +752,7 @@ export class MindMapCanvas {
   private imgResize: {
     node: MindNode;
     /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
-    box: HTMLImageElement | HTMLIFrameElement;
+    box: HTMLImageElement | HTMLIFrameElement | HTMLVideoElement;
     frame: boolean;
     startX: number;
     startY: number;
@@ -1686,7 +1688,7 @@ export class MindMapCanvas {
             return f && f.src === src ? f : null;
           },
         });
-        const frame = label.querySelector("iframe");
+        const frame = label.querySelector<HTMLIFrameElement | HTMLMediaElement>(".mm-frame");
         if (frame) this.frames.set(node.id, frame);
         else this.frames.delete(node.id);
         const shield = label.querySelector<HTMLElement>(".mm-frame-shield");
@@ -4235,6 +4237,9 @@ export class MindMapCanvas {
     // 可选按钮（设置里打开才显示）
     tool("rel", "rel", t("menu.addRel"), () => {
       if (this.primary) this.startRel(this.primary);
+    });
+    tool("media", "media", t("menu.insertMedia"), () => {
+      if (this.primary) this.pickMedia(this.primary);
     });
     tool("table", "table", t("menu.insertTable"), () => {
       if (this.primary) this.tableMenuEntry(this.primary).run?.();
@@ -7336,6 +7341,7 @@ export class MindMapCanvas {
       entries.push(
         { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
       );
+      if (this.opts.host?.saveBinary) entries.push({ title: t("menu.insertMedia"), icon: "image-plus", run: () => this.pickMedia(node) });
       if (this.noteShown(node)) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(
         { title: node.callout ? t("menu.editCallout") : t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
@@ -7758,7 +7764,8 @@ export class MindMapCanvas {
     try {
       const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
       const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-      const name = f.name && f.name !== "image.png" ? f.name : `Pasted image ${stamp}.${ext}`;
+      // 剪贴板、手机相册给的是 image.png / image.jpg 这种通用名：换成和 Obsidian 粘贴图片一样的名字
+      const name = f.name && !/^image\.\w+$/i.test(f.name) ? f.name : `Pasted image ${stamp}.${/\.(\w+)$/.exec(f.name)?.[1] ?? ext}`;
       return await save(name, await f.arrayBuffer());
     } catch (e) {
       this.opts.host?.notice?.(t("notice.saveImageFailed", { error: (e as Error).message }));
@@ -7778,6 +7785,52 @@ export class MindMapCanvas {
     this.opts.host?.notice?.(t("notice.imageAddedToNote"));
     if (this.editing !== node) this.render();
     this.notify();
+  }
+
+  /**
+   * 「插入图片或视频」（#40）：手机上没法往节点里粘贴、拖文件，用系统的选文件框。
+   * 选好的存成附件（照 Obsidian 的附件位置设置），嵌入接在节点文字后面，图片、视频直接显示在节点上。
+   * 中心主题是文件名的时候不能往文字里加（会把文件改名），改成插成子节点
+   */
+  private pickMedia(node: MindNode): void {
+    if (!this.opts.editable) return;
+    if (!this.opts.host?.saveBinary) {
+      this.opts.host?.notice?.(t("notice.saveImageUnsupported"));
+      return;
+    }
+    const doc = this.el.ownerDocument;
+    const input = doc.body.createEl("input", { type: "file" });
+    input.multiple = true;
+    input.accept = "image/*,video/*,audio/*";
+    input.setCssStyles({ display: "none" });
+    const done = () => input.remove();
+    input.addEventListener("change", () => {
+      const files = [...(input.files ?? [])];
+      done();
+      if (files.length) void this.addMediaToNode(node, files);
+    });
+    input.addEventListener("cancel", done);
+    input.click();
+  }
+
+  private async addMediaToNode(node: MindNode, files: File[]): Promise<void> {
+    if (!this.doc) return;
+    if (!node.parent && !this.doc.rootFromHeading) {
+      await this.insertImageFiles(files, node);
+      return;
+    }
+    const links: string[] = [];
+    for (const f of files) {
+      const link = await this.saveImageFile(f);
+      if (link) links.push(`![[${link}]]`);
+    }
+    if (!links.length) return;
+    const live = this.nodeById.get(node.id) ?? node;
+    live.text = [live.text.trimEnd(), ...links].filter(Boolean).join(" ");
+    this.render();
+    this.notify();
+    const active = this.el.ownerDocument.activeElement;
+    if (!active || active === this.el.ownerDocument.body || this.el.contains(active)) this.el.focus({ preventScroll: true });
   }
 
   /** 把图片文件存成附件并作为子节点插入 */
@@ -7870,7 +7923,7 @@ export class MindMapCanvas {
     if (this.widthResize) return;
     const target = this.widthHandleTarget();
     const el = target ? this.els.get(target.id) : undefined;
-    const usable = target && el && !el.querySelector("img.mm-img, iframe.mm-frame") ? target : null;
+    const usable = target && el && !el.querySelector("img.mm-img, iframe.mm-frame, video.mm-media") ? target : null;
     // 悬停调宽度打开时，选中的节点也一样：竖条平时透明，指到右边缘才出现
     const hover = !!usable && !!this.opts.widthHandleOnHover?.();
     // 还是同一个节点、同一个元素：留着，悬停时鼠标在节点里移动不会一直重建
@@ -7897,7 +7950,7 @@ export class MindMapCanvas {
       // 框选了好几个、拖的是其中一个：选中的节点（图片、视频节点除外）一起设成同样宽度
       const group = (this.selected.size > 1 && this.selected.has(node) ? [...this.selected] : [node])
         .map((n) => ({ node: n, el: this.els.get(n.id)! }))
-        .filter((g) => g.el && !g.el.querySelector("img.mm-img, iframe.mm-frame"))
+        .filter((g) => g.el && !g.el.querySelector("img.mm-img, iframe.mm-frame, video.mm-media"))
         .map((g) => ({ ...g, w: g.el.offsetWidth }));
       this.widthResize = { node, el, startWorldX: this.toWorld(ev.clientX, ev.clientY).x, startW: el.offsetWidth, dir, group };
       try {
@@ -8131,15 +8184,17 @@ export class MindMapCanvas {
     if (!this.opts.editable || !this.primary || this.editing) return;
     const el = this.els.get(this.primary.id);
     const iframe = el?.querySelector<HTMLIFrameElement>("iframe.mm-frame");
-    const img = iframe ? null : el?.querySelector<HTMLImageElement>("img.mm-img");
-    const box = iframe ?? img;
+    // 视频和图片一样只调宽度（写成 ![[片段.mp4|宽度]]），高度跟着画面比例
+    const video = iframe ? null : el?.querySelector<HTMLVideoElement>("video.mm-media");
+    const img = iframe || video ? null : el?.querySelector<HTMLImageElement>("img.mm-img");
+    const box = iframe ?? video ?? img;
     if (!el || !box || (img && !img.complete)) return;
     const frame = !!iframe;
     const handle = createDiv();
     handle.className = "mm-img-handle";
     this.tip(
       handle,
-      frame ? t("canvas.resizeFrame") : t("canvas.resizeImage"),
+      frame ? t("canvas.resizeFrame") : video ? t("canvas.resizeVideo") : t("canvas.resizeImage"),
       "fixed",
       "right",
     );

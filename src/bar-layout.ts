@@ -9,7 +9,12 @@ export interface BarItem {
 }
 
 /** 浮动工具栏：颜色一整组算一项，文字颜色是一个按钮（点开选颜色）；后面五个是可选的，默认不显示 */
-export const NODEBAR_DEFAULT = ["colors", "textColor", "highlight", "child", "sibling", "marker", "note", "box", "link", "copy", "paste", "trash", "!rel", "!table", "!fold", "!moveUp", "!moveDown"];
+export const NODEBAR_DEFAULT = ["colors", "textColor", "highlight", "child", "sibling", "marker", "note", "!media", "box", "link", "copy", "paste", "trash", "!rel", "!table", "!fold", "!moveUp", "!moveDown"];
+/** 手机上默认多开「插入图片或视频」：手机上没法往节点里粘贴、拖文件（#40）；电脑上默认关着，要的自己开 */
+export const NODEBAR_DEFAULT_MOBILE = NODEBAR_DEFAULT.map((id) => (id === "!media" ? "media" : id));
+export function nodebarDefault(mobile: boolean): string[] {
+  return mobile ? NODEBAR_DEFAULT_MOBILE : NODEBAR_DEFAULT;
+}
 
 /** 主工具栏：sep1…sep4 是分隔线，也能挪、能藏；两条分隔线中间没有按钮时自动不显示 */
 export const TOOLBAR_DEFAULT = [

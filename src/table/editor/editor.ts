@@ -76,6 +76,8 @@ export interface EditorHost {
    * remove 把这张图的嵌入从格子里去掉（删掉文件后调用；只读时为 null）
    */
   imageMenu?(ev: MouseEvent, img: HTMLImageElement, link: string | null, remove: (() => void) | null): void;
+  /** 收起右键双链、图片弹出的菜单（点格子时会拦下按下的默认动作，宿主的菜单收不到「点了别处」，#9） */
+  dismissMenus?(): void;
   /** 右键格子时，别的插件往这次右键里加的菜单项（比如 adjustable-media 的「包成布局块」）：交给表格自己的菜单显示，不另弹一个 */
   eventMenuItems?(ev: MouseEvent, take: (items: MenuItem[]) => void): void;
   /** 往格子里粘贴图片：存成附件，返回要插进格子的 Markdown（![[…]]）；不给就不接图片 */
@@ -1245,6 +1247,8 @@ export class TableEditor {
         this.touched = true;
         return this.touchStart(ev, p);
       }
+      // 下面拦了按下的默认动作，浏览器就不再发 mousedown：Obsidian 的菜单靠它知道点了别处，这里替它收起来（#9）
+      this.host.dismissMenus?.();
       ev.preventDefault();
       if (ev.button !== 0) return;
       if (ev.shiftKey && this.sel) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ANSWER_MARKER, isAnswer, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
+import { ANSWER_MARKER, isAnswer, mediaKind, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -213,4 +213,15 @@ test("答案标记：和其他标记一起排在开头，可切换", () => {
   assert.equal(toggleMarker(`${ANSWER_MARKER} 解法`, ANSWER_MARKER), "解法");
   // 选择题选项照样认得出来
   assert.equal(taskState(`${ANSWER_MARKER} [x] 选项`), "done");
+});
+
+test("mediaKind：Obsidian 能播的视频、音频（#40），带 #片段、大小写、路径都认", () => {
+  assert.equal(mediaKind("片段.mp4"), "video");
+  assert.equal(mediaKind("a/b/Clip.MOV"), "video");
+  assert.equal(mediaKind("x.webm#t=10"), "video");
+  assert.equal(mediaKind("录音.m4a"), "audio");
+  assert.equal(mediaKind("song.mp3"), "audio");
+  assert.equal(mediaKind("图.png"), null);
+  assert.equal(mediaKind("笔记.md"), null);
+  assert.equal(mediaKind("mp4"), null);
 });

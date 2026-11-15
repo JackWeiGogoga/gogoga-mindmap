@@ -9,8 +9,8 @@
  * 放进白板（Canvas）的卡片里时铺满卡片，卡片拉多大图就多大。
  */
 
-import { mergeLayout, NODEBAR_DEFAULT } from "./bar-layout";
-import { App, Component, TFile } from "obsidian";
+import { mergeLayout, nodebarDefault } from "./bar-layout";
+import { App, Component, Platform, TFile } from "obsidian";
 import type MindMapPlugin from "./main";
 import { findSubpathNode, MindMapCanvas } from "./canvas";
 import { frontmatterValue, parseMarkdown, parseNodeColors } from "./markdown";
@@ -133,7 +133,7 @@ class MindMapEmbed extends Component {
         autoNumber: () => settings.numberByTyping,
         copyPlain: () => settings.copyPlain,
         showNodebar: () => settings.showNodebar,
-        nodebarLayout: () => mergeLayout(settings.nodebarLayout, NODEBAR_DEFAULT),
+        nodebarLayout: () => mergeLayout(settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
         toolbarLayout: () => embedToolbarLayout(settings),
         nodeColors: () => parseNodeColors(settings.nodeColors),
         textColors: () => parseColorList(settings.textColors),

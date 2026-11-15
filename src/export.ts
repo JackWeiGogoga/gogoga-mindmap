@@ -174,6 +174,29 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
       cloneImgs[i].style.height = `${img.clientHeight}px`;
     }),
   );
+  // 节点里的视频：SVG 里放不了播放器，换成当前这一帧的截图（取不到就是一块黑底）；挡板、激活按钮去掉
+  const origVideos = nodes.querySelectorAll<HTMLVideoElement>("video");
+  const cloneVideos = clone.querySelectorAll<HTMLVideoElement>("video");
+  origVideos.forEach((v, i) => {
+    const still = createEl("img");
+    still.setCssStyles({ width: `${v.clientWidth}px`, height: `${v.clientHeight}px`, display: "block", background: "#000", borderRadius: "6px", objectFit: "contain" });
+    try {
+      const c = createEl("canvas");
+      c.width = v.videoWidth || v.clientWidth;
+      c.height = v.videoHeight || v.clientHeight;
+      c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
+      still.src = c.toDataURL("image/png");
+    } catch {
+      still.removeAttribute("src");
+    }
+    cloneVideos[i].replaceWith(still);
+  });
+  // 音频没有画面：留一行文件名
+  clone.querySelectorAll<HTMLAudioElement>("audio").forEach((a) => {
+    const name = decodeURIComponent((a.getAttribute("src") ?? "").split(/[?#]/)[0].split("/").pop() ?? "");
+    a.replaceWith(createSpan({ text: `♪ ${name}` }));
+  });
+  clone.querySelectorAll(".mm-frame-shield").forEach((x) => x.remove());
   // 单行标签禁止换行：导出环境的字体若略宽，宁可溢出也不要多出一行
   const origLabels = nodes.querySelectorAll<HTMLElement>(".mm-label");
   const cloneLabels = clone.querySelectorAll<HTMLElement>(".mm-label");

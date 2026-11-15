@@ -34,7 +34,7 @@ export interface InlineOptions {
    * 取回这个节点上已经建好的 iframe。iframe 一旦从 DOM 里摘下来再插回去就会重新加载，
    * 所以视频这类内容必须复用同一个元素，不能每次重渲染都新建。
    */
-  reuseFrame?: (src: string) => HTMLIFrameElement | null;
+  reuseFrame?: (src: string) => HTMLElement | null;
 }
 
 /** 答案标记：背诵模式下带它的节点连同子树整个遮住，点一下揭开；截图题、文字题都能用 */
@@ -519,7 +519,8 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   const h = frameSize(attrs.get("height"), FRAME_DEFAULT_H);
   const finalSrc = noAutoplay(src);
   // 复用已有的那个，不然每次重渲染视频都从头开始
-  const existing = opts.reuseFrame?.(finalSrc);
+  const kept = opts.reuseFrame?.(finalSrc);
+  const existing = kept?.tagName === "IFRAME" ? (kept as HTMLIFrameElement) : null;
   const f = existing ?? createEl("iframe");
   f.className = "mm-frame";
   // 拖手柄改大小时写的是行内样式，复用时先清掉，让下面的属性说了算
@@ -533,6 +534,11 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   if (!existing) f.src = finalSrc;
   // 盖一层挡板：跨域 iframe 里点了哪儿我们看不见，不挡的话随手一点就跳去源站。
   // 挡板吃掉所有鼠标事件，节点照常能选能拖；双击挡板才把播放器放开（见 canvas.ts）。
+  return shielded(f);
+}
+
+/** 播放器外面包一层挡板：平时点它是选中、拖动节点，双击或点「激活」才轮到播放器自己（见 canvas.ts） */
+function shielded(player: HTMLElement): HTMLElement {
   const box = createSpan();
   box.className = "mm-frame-box";
   const shield = createSpan();
@@ -543,13 +549,57 @@ function frame(attrsRaw: string, original: string, opts: InlineOptions): HTMLEle
   activate.className = "mm-frame-activate";
   activate.textContent = t("inline.activate");
   shield.append(activate);
-  box.append(f, shield);
+  box.append(player, shield);
   return box;
+}
+
+/** Obsidian 自己能嵌入播放的视频、音频格式 */
+const VIDEO_EXTS = new Set(["mp4", "webm", "ogv", "mov", "mkv", "m4v"]);
+const AUDIO_EXTS = new Set(["mp3", "wav", "m4a", "ogg", "3gp", "flac", "aac", "opus"]);
+
+/** `![[片段.mp4]]` 这类嵌入是视频还是音频；都不是返回 null */
+export function mediaKind(link: string): "video" | "audio" | null {
+  const ext = /\.([a-z0-9]+)$/i.exec(link.split(/[#?]/)[0])?.[1]?.toLowerCase() ?? "";
+  return VIDEO_EXTS.has(ext) ? "video" : AUDIO_EXTS.has(ext) ? "audio" : null;
+}
+
+/**
+ * 视频、音频（#40）：和网页播放器一样外面盖挡板，单击选中节点、拖得动，双击或点「激活」后才能点播放。
+ * 视频的宽度参数（`![[片段.mp4|400]]`）和图片一样，高度跟着画面比例走。复用已经建好的元素，重渲染不会从头播
+ */
+function media(kind: "video" | "audio", link: string, param: string | undefined, alt: string, opts: InlineOptions): HTMLElement {
+  const src = opts.resolveImage ? opts.resolveImage(link) : /^https?:\/\//.test(link) ? link : null;
+  if (!src) return wrap("span", alt || link);
+  const reused = opts.reuseFrame?.(src);
+  const existing = reused && reused.tagName.toLowerCase() === kind ? (reused as HTMLMediaElement) : null;
+  const m = existing ?? createEl(kind);
+  m.className = `mm-frame mm-media is-${kind}`;
+  m.setCssStyles({ width: "" });
+  const width = kind === "video" && param && /^\d+$/.test(param.trim()) ? Number(param) : null;
+  if (width) {
+    m.style.width = `${Math.max(IMAGE_MIN_WIDTH, Math.min(imageMaxWidth, width))}px`;
+    m.classList.add("has-size");
+  }
+  if (!existing) {
+    m.controls = true;
+    m.preload = "metadata";
+    if (kind === "video") (m as HTMLVideoElement).playsInline = true;
+    // 视频要等读到画面尺寸才知道多高
+    m.addEventListener("loadedmetadata", () => opts.onImageLoad?.());
+    m.addEventListener("error", () => {
+      m.closest(".mm-frame-box")?.replaceWith(wrap("span", alt || link));
+      opts.onImageLoad?.();
+    });
+    m.src = src;
+  }
+  return shielded(m);
 }
 
 /** 图片：`![[文件|宽度]]` 的参数若是数字就当宽度；解析不到就显示文字 */
 function image(link: string, param: string | undefined, alt: string, opts: InlineOptions): HTMLElement {
   if (isPdfCrop(link)) return pdfCrop(link, param, opts);
+  const kind = mediaKind(link);
+  if (kind) return media(kind, link, param, alt, opts);
   const src = opts.resolveImage ? opts.resolveImage(link) : /^https?:\/\//.test(link) ? link : null;
   if (!src) return wrap("span", alt || link);
   const img = createEl("img");

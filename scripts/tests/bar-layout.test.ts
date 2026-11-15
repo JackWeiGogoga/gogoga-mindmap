@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, sameAsDefault, visibleSeps } from "../../src/bar-layout";
+import { mergeLayout, moveItem, moveTo, NODEBAR_DEFAULT, nodebarDefault, sameAsDefault, visibleSeps } from "../../src/bar-layout";
 
 test("没存过：就是默认清单，可选按钮默认不显示", () => {
   const l = mergeLayout(undefined, NODEBAR_DEFAULT);
   assert.equal(l.length, NODEBAR_DEFAULT.length);
-  assert.deepEqual(l.filter((x) => !x.on).map((x) => x.id), ["rel", "table", "fold", "moveUp", "moveDown"]);
+  assert.deepEqual(l.filter((x) => !x.on).map((x) => x.id), ["media", "rel", "table", "fold", "moveUp", "moveDown"]);
   assert.ok(sameAsDefault(l, NODEBAR_DEFAULT));
+});
+
+test("手机上默认多开「插入图片或视频」（#40），顺序和电脑一样；电脑上存的清单（没有这个按钮）到手机上也是开着的", () => {
+  const m = mergeLayout(undefined, nodebarDefault(true));
+  assert.deepEqual(m.map((x) => x.id), mergeLayout(undefined, nodebarDefault(false)).map((x) => x.id));
+  assert.equal(m.find((x) => x.id === "media")?.on, true);
+  assert.equal(mergeLayout(undefined, nodebarDefault(false)).find((x) => x.id === "media")?.on, false);
+  const old = NODEBAR_DEFAULT.filter((id) => id !== "!media");
+  assert.equal(mergeLayout(old, nodebarDefault(true)).find((x) => x.id === "media")?.on, true);
+  assert.equal(mergeLayout(old, nodebarDefault(false)).find((x) => x.id === "media")?.on, false);
 });
 
 test("存的清单：认不得的丢掉、重复的去掉、新加的按默认位置插回去", () => {
