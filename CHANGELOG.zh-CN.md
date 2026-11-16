@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-11-16
+
 ### 新增
 - 改中心主题时，和它同名的笔记一起改名（JackWei 反馈）：中心主题是一级标题、而且和文件名一样时（新建的「未命名思维导图」就是这样），在脑图里改中心主题，笔记跟着改名，撤销时文件名也改回去；名字里有不能当文件名的字符或者重名时，标题照改，笔记不改名并提示。两者不一样了就不再联动。设置里能关，默认打开。
 - 节点里嵌入另一张脑图（小红书 呦吼在造园 的建议）：节点里写 `![[另一张脑图]]` 或 `![[文件.xmind]]`，原来只显示名字，现在显示一张只读的小预览，那张图改了预览跟着变。默认 320×200，选中节点后拖右下角手柄改大小（写成 `![[脑图|480x300]]`，双击手柄恢复），`![[脑图|400]]` 只定宽度。平时点预览和点节点一样（选中、拖动照常）；双击预览或点右上角「激活」后，能平移、缩放、展开折叠（只影响这个预览，不改那张图），点外面或按 Esc 退出，「适应」回到整张图；「打开」打开那张图。预览里再嵌的脑图不展开；导出图片时预览换成写着脑图名字的卡片。
@@ -982,7 +984,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...HEAD
+[0.78.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...0.78.0
 [0.77.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...0.77.0
 [0.76.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...0.76.0
 [0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1

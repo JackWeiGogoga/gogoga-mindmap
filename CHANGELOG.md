@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-11-16
+
 ### Added
 - Rename the note with the central topic: when the central topic is the level-1 heading and matches the file name (as in a new "Untitled mind map"), renaming the central topic renames the note too, and undo renames it back. If the new name can't be a file name or is taken, the heading still changes and a notice explains why the note kept its name. Once they differ, they're left alone. On by default; can be turned off in settings.
 - Embed another mind map in a topic (suggested on Xiaohongshu): `![[Another map]]` or `![[File.xmind]]` in a topic used to show just the name; it now shows a small read-only preview that follows the map as it changes. 320×200 by default; select the topic and drag the corner handle to resize it (saved as `![[Map|480x300]]`, double-click the handle to reset), or write `![[Map|400]]` to set just the width. Clicking the preview is the same as clicking the topic (select, drag); double-click it or click **Activate** to pan, zoom and fold inside it (only in the preview, the map itself doesn't change), click outside or press Esc to leave, **Fit** to see the whole map again, and **Open** to open that map. Maps embedded inside the preview stay as text; exported images show a card with the map's name instead of the preview.
@@ -982,7 +984,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...HEAD
+[0.78.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...0.78.0
 [0.77.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...0.77.0
 [0.76.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...0.76.0
 [0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
