@@ -16,7 +16,7 @@
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
 import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
-import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula } from "../core/ops";
+import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula, totalsAllSum } from "../core/ops";
 import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
@@ -808,6 +808,7 @@ export class TableEditor {
         if (r === all - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
         if (formulaOf(tb, c)) this.markFx(cell, r, c);
+        if (cell.classList.contains("is-total-row")) this.markCalc(cell, content, c);
       }
     }
     if (folded) {
@@ -3205,7 +3206,7 @@ export class TableEditor {
       title: how ? t(`calc_${how}`) : t("calc_none"),
       checked: cur === how,
       disabled: !how && !cur,
-      run: () => this.apply(setCalc(this.table, c, how, t("totalLabel")), this.sel ?? undefined),
+      run: () => this.apply(setCalc(this.table, c, how, { sum: t("totalLabel"), mixed: t("totalLabelMixed") }), this.sel ?? undefined),
     });
     return [{ title: t("calcTitle") }, ...CALCS.map((x) => item(x)), item(null), { separator: true }];
   }
@@ -3421,6 +3422,21 @@ export class TableEditor {
   private closePopover(): void {
     this.popover?.remove();
     this.popover = null;
+  }
+
+  /**
+   * 合计行的格子：鼠标停上去说是怎么算的；各列不全是求和时（混着平均、最大、计数），数字前面加个小标签（B 站 lucent2019）。
+   * 标签只是显示，格子里还是纯数字
+   */
+  private markCalc(cell: HTMLElement, content: HTMLElement, c: number): void {
+    const how = this.table.meta.calc?.[c];
+    if (!how) return;
+    cell.title = t(`calc_${how}`);
+    if (totalsAllSum(this.table)) return;
+    const tag = this.root.ownerDocument.createElement("span");
+    tag.className = "ggt-calc-tag";
+    tag.textContent = t(`calc_${how}`);
+    content.prepend(tag);
   }
 
   // ---------- 计算列 ----------

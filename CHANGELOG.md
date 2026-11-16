@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- Tables in topics: when total-row columns mix kinds, the row is called "Summary" and each number gets a small label (Sum, Max, Count…) (synced from Table).
+
 ## [0.78.0] - 2026-11-16
 
 ### Added

@@ -752,20 +752,38 @@ export function calcColumn(t: Table, c: number, how: Calc): string {
   return fmt(how === "max" ? Math.max(...vals) : Math.min(...vals), places, pct);
 }
 
+/** 合计行第一格的默认名字：各列都是求和叫「合计」，混着平均、最大、计数这些叫「统计」（B 站 lucent2019 的建议） */
+export interface TotalLabels {
+  sum: string;
+  mixed: string;
+}
+/** 认得出是自动写上的名字（中英文都认）：是这些才跟着改，用户自己改过的不动 */
+const AUTO_LABELS = new Set(["合计", "统计", "Total", "Summary"]);
+
+/** 合计行里是不是全是求和（没有合计行也算 true） */
+export function totalsAllSum(t: Table): boolean {
+  return (t.meta.calc ?? []).every((x) => !x || x === "sum");
+}
+
 /**
  * 设第 c 列的合计方式（null 去掉）。第一次设：在最后加一行合计行，第一列空着就写「合计」。
+ * 第一列的名字还是自动写的，就按现在的统计方式改成「合计」或「统计」。
  * 全都去掉后合计行留着（变成普通的一行），不再自动算
  */
-export function setCalc(t: Table, c: number, how: Calc | null, label = "合计"): Table {
+export function setCalc(t: Table, c: number, how: Calc | null, labels: TotalLabels | string = { sum: "合计", mixed: "统计" }): Table {
+  const names = typeof labels === "string" ? { sum: labels, mixed: labels } : labels;
   let n = cloneTable(t);
-  if (how && !hasTotal(t)) {
-    n.cells.push(Array.from({ length: colCount(t) }, () => ""));
-    if (c !== 0) n.cells[rowCount(n) - 1][0] = label;
-  }
+  const added = !!how && !hasTotal(t);
+  if (added) n.cells.push(Array.from({ length: colCount(t) }, () => ""));
   const calc = Array.from({ length: colCount(n) }, (_, i) => n.meta.calc?.[i] ?? null);
   calc[c] = how;
   n.meta.calc = calc;
   if (!calc.some(Boolean)) delete n.meta.calc;
+  if (hasTotal(n) && !calc[0]) {
+    const last = rowCount(n) - 1;
+    const cur = n.cells[last][0].trim();
+    if ((added && !cur) || AUTO_LABELS.has(cur)) n.cells[last][0] = totalsAllSum(n) ? names.sum : names.mixed;
+  }
   n = computeTotals(n);
   return n;
 }

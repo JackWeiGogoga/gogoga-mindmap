@@ -3094,6 +3094,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-fx-preview { padding: 6px 8px; border-radius: 6px; background: var(--background-secondary); color: var(--text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ggt-fx-preview.is-error { color: var(--text-error); }
 .ggt-fx-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 合计行各列统计方式不一样时，数字前面的小标签（求和、最大、计数……）：只是显示，格子里还是纯数字 */
+.ggt-calc-tag { margin-right: 6px; color: var(--text-faint); font-size: 0.78em; font-weight: normal; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */
