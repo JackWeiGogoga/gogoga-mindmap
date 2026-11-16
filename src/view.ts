@@ -371,6 +371,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       notesExpanded: () => this.plugin.isNotesExpanded(this.file?.path ?? ""),
       noteCardFilter: () => this.plugin.settings.noteCardShow,
       taskProgress: () => this.plugin.settings.taskProgress,
+      taskProgressPos: () => this.plugin.settings.taskProgressPos,
       onNotesExpandedChange: (expanded) => {
         if (this.file) this.plugin.setNotesExpanded(this.file.path, expanded);
       },

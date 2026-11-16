@@ -310,6 +310,8 @@ export interface CanvasOptions {
   onNotesExpandedChange?: (expanded: boolean) => void;
   /** 清单上一级的节点显示任务完成度：关、百分比、完成数/总数、两者都显示；不给就是关 */
   taskProgress?: () => TaskProgressMode;
+  /** 完成度放在哪：文字后面（默认），或者文字下面单独一行 */
+  taskProgressPos?: () => "end" | "below";
   /**
    * 每条展开备注单独的状态（单独收起、拖出来的大小）变了，或者节点改名、挪动让文字路径变了：把整份交回去存。
    * 打开文件时由宿主用 setNoteCards 交进来；不接就只在这次打开有效
@@ -1703,7 +1705,8 @@ export class MindMapCanvas {
       const progMode = this.opts.taskProgress?.() ?? "off";
       const prog = progMode === "off" ? null : taskProgress(node);
       const progText = prog ? progressLabel(prog, progMode) : "";
-      const contentSig = [node.text, num ?? "", progText, this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
+      const progBelow = !!prog && this.opts.taskProgressPos?.() === "below";
+      const contentSig = [node.text, num ?? "", progText + (progBelow ? "\u0002" : ""), this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
@@ -1823,6 +1826,7 @@ export class MindMapCanvas {
       // 只放了表格、没有标题的节点：不显示空的标题行（编辑时照常出现）
       if (nt && !node.text.trim()) el.classList.add("no-title");
       if (num) el.classList.add("has-num");
+      if (progBelow) el.classList.add("has-progress-below");
       // PDF 截区的图是 PDF++ 之后才异步画进来的：排版这时还没有 <img>，看截区的外框也算图片节点（不然节点最宽 300，拖大了图片伸出框外）
       if (el.querySelector(".mm-label img, .mm-label .mm-pdf-crop")) el.classList.add("has-image");
       if (this.frames.has(node.id)) {
@@ -1844,6 +1848,8 @@ export class MindMapCanvas {
         bar.createSpan({ cls: "mm-progress-fill" }).style.width = `${(prog.done / prog.total) * 100}%`;
         chip.createSpan({ cls: "mm-progress-text", text: progText });
         chip.setAttr("aria-label", t("canvas.taskProgress", { done: prog.done, total: prog.total }));
+        // 放下面：前面插一个占满整行的空元素把它挤到下一行，宽度只有胶囊自己那么宽
+        if (progBelow) el.append(createSpan({ cls: "mm-progress-break" }));
         el.append(chip);
       }
 

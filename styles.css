@@ -3165,3 +3165,10 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .gg-mm-node .mm-progress.is-done .mm-progress-fill { opacity: 1; }
 .gg-mm-node .mm-progress.is-done .mm-progress-text { opacity: 1; }
 .gg-mm-node.has-table > .mm-progress { grid-row: 1; justify-self: start; }
+/* 完成度放下面：节点改成两行的网格，文字和图标在第一行、胶囊在第二行靠左。
+   节点宽度取两行里宽的那一行（用换行的 flex 会按排成一行量宽度，短标题被撑得很宽） */
+.gg-mm-node.has-progress-below:not(.has-table) { display: grid; grid-auto-flow: column; grid-auto-columns: auto; justify-content: start; align-items: center; column-gap: 6px; row-gap: 3px; }
+.gg-mm-node.has-progress-below:not(.has-table) > * { grid-row: 1; }
+.gg-mm-node.has-progress-below > .mm-progress-break { display: none; }
+.gg-mm-node.has-progress-below:not(.has-table) > .mm-progress { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
+.gg-mm-node.has-table.has-progress-below > .mm-progress { grid-row: auto; grid-column: 1 / -1; }

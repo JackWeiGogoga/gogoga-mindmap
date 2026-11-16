@@ -1942,6 +1942,7 @@ export default class MindMapPlugin extends Plugin {
       notesExpanded: () => this.settings.notesExpanded,
       noteCardFilter: () => this.settings.noteCardShow,
       taskProgress: () => this.settings.taskProgress,
+      taskProgressPos: () => this.settings.taskProgressPos,
       notePopoverSize: this.notePopoverSize,
     };
   }

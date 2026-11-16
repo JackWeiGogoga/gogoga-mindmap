@@ -45,6 +45,8 @@ export interface MindMapSettings {
   noteCardShow: "all" | "list" | "ordered" | "unordered";
   /** 清单上一级的节点显示任务完成度（默认关） */
   taskProgress: TaskProgressMode;
+  /** 完成度放在文字后面还是下面单独一行 */
+  taskProgressPos: "end" | "below";
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
   /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
@@ -263,6 +265,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   notesExpanded: false,
   noteCardShow: "all",
   taskProgress: "off",
+  taskProgressPos: "end",
   notePreview: false,
   formatBar: false,
   copyPlain: false,
@@ -360,6 +363,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         return syncNotesExpandedAll();
       case "noteCardShow":
       case "taskProgress":
+      case "taskProgressPos":
         return redrawAllCanvases();
       case "toolbarPosition":
         return p.applyToolbarPosition();
@@ -438,6 +442,13 @@ export class MindMapSettingTab extends PluginSettingTab {
             t("settings.taskProgress.desc"),
             { off: t("settings.taskProgress.off"), percent: t("settings.taskProgress.percent"), count: t("settings.taskProgress.count"), both: t("settings.taskProgress.both") },
             ["task", "todo", "checkbox", "progress", "任务", "清单", "待办", "进度", "完成"],
+          ),
+          dropdown(
+            "taskProgressPos",
+            t("settings.taskProgressPos.name"),
+            t("settings.taskProgressPos.desc"),
+            { end: t("settings.taskProgressPos.end"), below: t("settings.taskProgressPos.below") },
+            ["task", "progress", "任务", "进度", "位置", "下方"],
           ),
         ],
         () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
