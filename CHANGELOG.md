@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.76.0] - 2026-11-16
+
 ### Added
 - Fishbone diagrams: two new structures, **Fishbone (head on the right)** and **Fishbone (head on the left)**, in the structure menu. The central topic is the head; main topics sit at the ends of slanted bones along the spine, alternating above and below with the first one nearest the head; second-level topics branch off a bone horizontally (with underline themes the text sits on the bone), and deeper levels hang below them, indented. Arrow keys move along the spine, dragging a main topic onto the spine between two bones reorders it, and folding, notes, callouts, boxes and summaries inside a branch, and export all work. The note itself doesn't change; `mindmap-structure: fishbone-right` is written to its properties like other structures.
 
@@ -962,7 +964,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...HEAD
+[0.76.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...0.76.0
 [0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
 [0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
 [0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
