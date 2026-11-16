@@ -294,6 +294,8 @@ export interface CanvasOptions {
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
   caretAtEnd?: () => boolean;
+  /** 按住 Shift 点同级节点：选中从上次点的节点到这个节点之间的整段（B 站晓兔的建议）；不给或为假就是加选 */
+  shiftRange?: () => boolean;
   /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
   dragToFloat?: () => boolean;
   /** 首次显示（没有恢复视口时）：fit 适应画布（默认），center 中心主题 100% */
@@ -4628,10 +4630,16 @@ export class MindMapCanvas {
         this.closePopover();
         // 先拿焦点再选中：选中会通知分屏联动，联动见旁边的 Markdown 编辑器还有焦点会当成用户在那边打字、不跳过去
         this.el.focus({ preventScroll: true });
-        if (ev.shiftKey) this.select(node, "add");
-        else if (ev.metaKey || ev.ctrlKey) this.select(node, "toggle");
-        else if (!this.selected.has(node)) this.select(node, "replace");
-        else {
+        if (ev.shiftKey) {
+          if (!this.selectRange(node)) this.select(node, "add");
+        } else if (ev.metaKey || ev.ctrlKey) {
+          this.select(node, "toggle");
+          this.rangeAnchor = node.id;
+        } else if (!this.selected.has(node)) {
+          this.select(node, "replace");
+          this.rangeAnchor = node.id;
+        } else {
+          this.rangeAnchor = node.id;
           // 点的是已经选中的节点（比如 Markdown 光标就在这一行，脑图跟着选中了它）：选中没变也照样通知，联动才会跳回去
           this.setPrimary(node);
           this.opts.onSelectionChange?.(this.primary, [...this.selected]);
@@ -5328,6 +5336,31 @@ export class MindMapCanvas {
       }
     }
     this.syncSelectionClasses();
+  }
+
+  /** Shift 连选的起点：上次不按 Shift 点的节点（按编号记，重新解析后还认得） */
+  private rangeAnchor: string | null = null;
+
+  /**
+   * Shift 连选（设置里开了才有）：起点和 node 是同级时，选中两者之间的整段兄弟节点，起点不动，再按 Shift 点别处就换一段；
+   * 起点没了或不是同级返回 false，照旧加选
+   */
+  private selectRange(node: MindNode): boolean {
+    if (!this.opts.shiftRange?.()) return false;
+    // 记下的起点已经不在选中里了（之后用方向键、点空白处换过选中）：从当前选中的节点算
+    const kept = this.rangeAnchor !== null ? this.nodeById.get(this.rangeAnchor) : undefined;
+    const anchor = kept && this.selected.has(kept) ? kept : this.primary;
+    if (!anchor || anchor === node || !node.parent || anchor.parent !== node.parent) return false;
+    const sibs = visibleChildren(node.parent);
+    const i = sibs.indexOf(anchor);
+    const j = sibs.indexOf(node);
+    if (i < 0 || j < 0) return false;
+    this.rangeAnchor = anchor.id;
+    this.selected.clear();
+    for (const n of sibs.slice(Math.min(i, j), Math.max(i, j) + 1)) this.selected.add(n);
+    this.primary = node;
+    this.syncSelectionClasses();
+    return true;
   }
 
   private setPrimary(node: MindNode): void {
