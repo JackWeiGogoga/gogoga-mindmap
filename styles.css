@@ -3129,7 +3129,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   border-radius: 0;
 }
 
-/* 任务完成度：清单上一级节点文字后面的小胶囊（进度条 + 1/5 · 20%），跟着节点文字颜色走，全做完变绿 */
+/* 任务完成度：清单上一级节点文字后面的小胶囊（进度条 + 1/5 · 20%），跟着节点文字颜色走；全做完也不换颜色，进度条满了就是做完了 */
 .gg-mm-node .mm-progress {
   flex: none;
   display: inline-flex;
@@ -3161,9 +3161,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   opacity: 0.7;
 }
 .gg-mm-node .mm-progress-text { opacity: 0.75; }
-.gg-mm-node .mm-progress.is-done { color: var(--color-green); background: color-mix(in srgb, var(--color-green) 14%, transparent); }
-.gg-mm-node .mm-progress.is-done .mm-progress-fill { opacity: 1; }
-.gg-mm-node .mm-progress.is-done .mm-progress-text { opacity: 1; }
 .gg-mm-node.has-table > .mm-progress { grid-row: 1; justify-self: start; }
 /* 完成度放下面：节点改成两行的网格，文字和图标在第一行、胶囊在第二行靠左。
    节点宽度取两行里宽的那一行（用换行的 flex 会按排成一行量宽度，短标题被撑得很宽） */

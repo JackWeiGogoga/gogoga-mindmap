@@ -1702,7 +1702,8 @@ export class MindMapCanvas {
       const nt = node.table ? noteTable(node.note) : null;
       const tableSig = nt ? `T${this.opts.editable && !this.recite ? "e" : ""}` : "";
       const num = numberLabel(node);
-      const progMode = this.opts.taskProgress?.() ?? "off";
+      // 背诵模式下带 [x] / [ ] 子节点的是选择题：显示「2/4」等于把正确选项有几个说出来了，不显示
+      const progMode = this.recite ? "off" : this.opts.taskProgress?.() ?? "off";
       const prog = progMode === "off" ? null : taskProgress(node);
       const progText = prog ? progressLabel(prog, progMode) : "";
       const progBelow = !!prog && this.opts.taskProgressPos?.() === "below";
@@ -1841,7 +1842,7 @@ export class MindMapCanvas {
         delete el.dataset.link;
       }
 
-      // 任务完成度：挂在文字后面的小胶囊，一段进度条加文字，全做完变绿。只是显示，不写进文件
+      // 任务完成度：挂在文字后面的小胶囊，一段进度条加文字（全做完也是同一个颜色，进度条满了就是做完了）。只是显示，不写进文件
       if (!keepChildren && prog) {
         const chip = createSpan({ cls: "mm-progress" + (prog.done === prog.total ? " is-done" : "") });
         const bar = chip.createSpan({ cls: "mm-progress-bar" });
