@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-11-16
+
 ### 新增
 - 聚焦分支时，面包屑里的「›」可以点（#42）：列出这一级的全部主题，当前那个打勾，点一个直接聚焦过去，不用先退回全图——同级、上级、上级的同级都能一步切过去。工具栏在上面（面包屑在下面）时往上弹。
 - 节点里的表格也能设计算列：列菜单「设为计算列…」，用列名写公式（比如 `{单价} * {数量}`），每一行自动算出来（同步 Table）。
@@ -973,7 +975,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...HEAD
+[0.77.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...0.77.0
 [0.76.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...0.76.0
 [0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
 [0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0

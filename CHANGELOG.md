@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-11-16
+
 ### Added
 - While focusing on a branch, the › in the breadcrumb is clickable (#42): it lists every topic at that level with the current one checked, and picking one focuses on it right away, so you can jump to a sibling, a parent or a parent's sibling without going back to the whole map first. With the toolbar at the top (breadcrumb at the bottom) the list opens upward.
 - Tables in topics can have calculated columns: column menu → **Make calculated column…** and write a formula with column names (e.g. `{Price} * {Qty}`); every row is calculated (synced from Table).
@@ -973,7 +975,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...HEAD
+[0.77.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.76.0...0.77.0
 [0.76.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...0.76.0
 [0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
 [0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
