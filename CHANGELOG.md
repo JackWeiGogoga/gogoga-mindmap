@@ -4,6 +4,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.75.0] - 2026-11-16
+
+### Added
+- Task progress: turn on "Task progress" under Settings → Open and display (off by default) and the topic right above a checklist (not a task itself, with tasks as children) shows how many tasks below it are done, as a percentage (20%), done / total (1/5) or both. Every task connected below counts, sub-tasks included; tasks under a plain topic in between count toward that topic instead. It updates as you tick boxes, stays visible when the branch is folded and is included in image export. "Task progress position" puts it after the text or on its own line below. It's only displayed, nothing is written to your file, and it's hidden in recite mode, where those topics are multiple-choice questions.
+
+### Changed
+- Shift-click selects a range: click a topic, then Shift-click a sibling, and everything between them is selected; Shift-click another sibling to change the range. Shift-clicking a topic that isn't a sibling still adds it. To pick siblings one by one, use ⌘ / Ctrl-click (Shift-click used to add one at a time).
+
+### Fixed
+- Switching the same tab between Markdown and mind map no longer jumps around or loses your place. Markdown comes back the way you left it: reading view stays reading view, with the same scroll position and cursor. The map selects the topic you were looking at (the cursor line in editing view, or the middle of the screen when the cursor is scrolled away or you're in reading view), and going back to Markdown goes to the selected topic (or the one in the middle of the map). If that spot is already on screen nothing moves, and the zoom is left alone, so switching back and forth keeps both sides still.
+
 ## [0.74.0] - 2026-11-15
 
 ### Added
@@ -942,7 +953,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...HEAD
+[0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
 [0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
 [0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0
 [0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1

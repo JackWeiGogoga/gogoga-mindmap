@@ -4,6 +4,17 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.75.0] - 2026-11-16
+
+### 新增
+- 任务完成度：在设置「打开与显示」里打开「任务完成度」（默认关），清单的上一级节点（自己不是任务、直接子节点里有任务）后面会显示下面的任务完成了多少，可以选百分比（20%）、完成数/总数（1/5）或两者都显示。下面一路连着的任务都算，子任务也各算一项；中间隔着普通节点的，算在那个普通节点上。勾选时实时变化，折叠后照样显示，导出图片也带上。「任务完成度的位置」可以放在文字后面，或者文字下面单独一行。只是显示，不写进文件；背诵模式下不显示（那时这些节点是选择题）。
+
+### 改进
+- Shift 点击连续选中：先点一个节点，再按住 Shift 点它的同级节点，两者之间的节点全部选中；再按住 Shift 点别的同级节点就换成那一段。Shift 点不是同级的节点还是加选。想跳着选同级节点请用 ⌘ / Ctrl 点（以前 Shift 点是一个一个加选）。
+
+### 修复
+- 同一个标签页在 Markdown 和脑图之间来回切，不再乱跳、丢位置。切回 Markdown 回到离开时的样子：阅读模式还是阅读模式，滚动位置和光标都不变。切到脑图选中你正在看的那个节点（编辑模式看光标所在的行，光标滚出画面或在阅读模式时看画面中间那一行）；切回 Markdown 定位到选中的节点（没选中就用画面中间的节点）。那个位置已经在眼前就一点不动，缩放也不改，来回切两边都稳稳的。
+
 ## [0.74.0] - 2026-11-15
 
 ### 新增
@@ -942,7 +953,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...HEAD
+[0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
 [0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
 [0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0
 [0.72.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.0...0.72.1
