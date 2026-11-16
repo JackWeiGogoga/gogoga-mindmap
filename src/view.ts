@@ -363,7 +363,6 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       colorMemory: this.plugin.colorMemory,
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
-      shiftRange: () => this.plugin.settings.shiftRange,
       dragToFloat: () => this.plugin.settings.dragToFloat,
       calloutsHidden: () => this.plugin.isCalloutsHidden(this.file?.path ?? ""),
       onCalloutsHiddenChange: (hidden) => {

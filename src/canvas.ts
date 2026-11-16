@@ -294,8 +294,6 @@ export interface CanvasOptions {
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
   caretAtEnd?: () => boolean;
-  /** 按住 Shift 点同级节点：选中从上次点的节点到这个节点之间的整段（B 站晓兔的建议）；不给或为假就是加选 */
-  shiftRange?: () => boolean;
   /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
   dragToFloat?: () => boolean;
   /** 首次显示（没有恢复视口时）：fit 适应画布（默认），center 中心主题 100% */
@@ -5342,11 +5340,10 @@ export class MindMapCanvas {
   private rangeAnchor: string | null = null;
 
   /**
-   * Shift 连选（设置里开了才有）：起点和 node 是同级时，选中两者之间的整段兄弟节点，起点不动，再按 Shift 点别处就换一段；
-   * 起点没了或不是同级返回 false，照旧加选
+   * Shift 连选（B 站晓兔的建议，和文件管理器一样：Shift 连选、⌘ / Ctrl 加选）：起点和 node 是同级时，
+   * 选中两者之间的整段兄弟节点，起点不动，再按 Shift 点别处就换一段；起点没了或不是同级返回 false，照旧加选
    */
   private selectRange(node: MindNode): boolean {
-    if (!this.opts.shiftRange?.()) return false;
     // 记下的起点已经不在选中里了（之后用方向键、点空白处换过选中）：从当前选中的节点算
     const kept = this.rangeAnchor !== null ? this.nodeById.get(this.rangeAnchor) : undefined;
     const anchor = kept && this.selected.has(kept) ? kept : this.primary;

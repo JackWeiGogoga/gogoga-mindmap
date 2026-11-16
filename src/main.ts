@@ -1938,7 +1938,6 @@ export default class MindMapPlugin extends Plugin {
       colorMemory: this.colorMemory,
       marqueeDrag: () => this.settings.leftDrag === "select",
       caretAtEnd: () => this.settings.editCaret === "end",
-      shiftRange: () => this.settings.shiftRange,
       dragToFloat: () => this.settings.dragToFloat,
       notesExpanded: () => this.settings.notesExpanded,
       noteCardFilter: () => this.settings.noteCardShow,
