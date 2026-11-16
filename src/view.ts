@@ -619,6 +619,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       } finally {
         this.restoringViewport = false;
       }
+    } else {
+      // 没记过视口（新建的图、关了「记住视口」）：同一个标签页里刚才开着别的图时，画布还停在那张图的位置和缩放，
+      // 新图会落到看不见的地方（JackWei 里开着使用指南时新建脑图，一片空白）。重置一下，画好后适应画布
+      this.canvas.resetView();
     }
     return saved;
   }
