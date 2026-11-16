@@ -8,6 +8,8 @@
  *   timeline-*   时间轴：主主题按顺序串在一条带箭头的主轴上（横向从左到右、纵向从上到下），
  *                每个主主题连同分支照现成的结构排（横向用树形图、纵向用逻辑图），
  *                同侧 / 交错地挂在主轴旁边；交错时相邻分支在两侧，往中间挤
+ *   fishbone-*   鱼骨图：中心主题是鱼头（right 在右、left 在左），一条横向主骨通到鱼头；主主题挂在斜着的大骨末端，
+ *                上下交替，第一个离鱼头最近；二级主题从大骨上横着伸出（小骨），三级以下挂在二级下面按树形图缩进
  */
 
 import { t } from "./i18n";
@@ -22,7 +24,9 @@ export type Structure =
   | "timeline-h-alt"
   | "timeline-v-right"
   | "timeline-v-left"
-  | "timeline-v-alt";
+  | "timeline-v-alt"
+  | "fishbone-right"
+  | "fishbone-left";
 /** label 是 getter：模块加载时界面语言还没定，用到时再取 */
 export const STRUCTURES: { id: Structure; readonly label: string }[] = [
   { id: "logic-right", get label() { return t("structure.logicRight"); } },
@@ -34,7 +38,12 @@ export const STRUCTURES: { id: Structure; readonly label: string }[] = [
   { id: "timeline-v-right", get label() { return t("structure.timelineVRight"); } },
   { id: "timeline-v-left", get label() { return t("structure.timelineVLeft"); } },
   { id: "timeline-v-alt", get label() { return t("structure.timelineVAlt"); } },
+  { id: "fishbone-right", get label() { return t("structure.fishboneRight"); } },
+  { id: "fishbone-left", get label() { return t("structure.fishboneLeft"); } },
 ];
+export function isFishbone(s: Structure): boolean {
+  return s === "fishbone-right" || s === "fishbone-left";
+}
 export function isTimeline(s: Structure): boolean {
   return s.startsWith("timeline-");
 }
@@ -48,9 +57,10 @@ export function isStructure(s: unknown): s is Structure {
 
 /**
  * 子节点相对父节点的方向；连线和折叠徽章都按它画。
- * up：横向时间轴里分支朝上长的主主题（折叠按钮在上面）；tree-up：它的直接子节点，竖干从主主题顶边往上
+ * up：横向时间轴里分支朝上长的主主题（折叠按钮在上面）；tree-up：它的直接子节点，竖干从主主题顶边往上；
+ * rib：鱼骨图的二级主题，连线是从父主题那根斜骨上横着伸过来的小骨
  */
-export type Side = "right" | "left" | "down" | "tree" | "up" | "tree-up";
+export type Side = "right" | "left" | "down" | "tree" | "up" | "tree-up" | "rib";
 
 export interface Size {
   w: number;
@@ -107,6 +117,8 @@ export interface Placed {
    * 不从备注里穿过；其余结构连线从节点侧面出，用不上
    */
   stem?: number;
+  /** 鱼骨图的主主题：它那根斜骨（从主骨上的点到主题）；子主题的小骨横着接到这根线上 */
+  bone?: Segment;
 }
 
 export interface Bounds {
@@ -167,9 +179,10 @@ export interface LayoutResult {
   floating?: Set<MindNode>;
   /**
    * 时间轴的主轴：segs 是每个主主题前面那一段（从上一个主主题或中心主题连过来，代替它和中心主题的连线），
-   * end 是最后一个主主题后面带箭头的那一段
+   * end 是最后一个主主题后面带箭头的那一段。
+   * 鱼骨图也用它：segs 是各主主题的斜骨，end 是从鱼尾通到鱼头的主骨（plain：不跟分支配色）
    */
-  spine?: { segs: Map<string, Segment>; end: Segment | null };
+  spine?: { segs: Map<string, Segment>; end: Segment | null; plain?: boolean };
 }
 
 export interface Segment {
@@ -421,6 +434,8 @@ export function layoutTree(
   let spine: LayoutResult["spine"];
   if (isTimeline(opts.structure)) {
     spine = layoutTimeline(root, kids);
+  } else if (isFishbone(opts.structure)) {
+    spine = layoutFishbone(root, kids);
   } else if (opts.structure === "org-down") {
     layoutDown(root, kids);
   } else if (opts.structure === "tree-right") {
@@ -564,6 +579,120 @@ export function layoutTree(
     // 箭头画到整张图沿主轴方向的最远处再多一截：前面的分支比最后一个主主题伸得远时，主轴不在半路断掉
     const far = Math.max(prevEnd, ...olds.map((o) => (horiz ? o.x + o.w : o.y + o.h)));
     return { segs, end: horiz ? { x1: prevEnd, y1: 0, x2: far + tail, y2: 0 } : { x1: 0, y1: prevEnd, x2: 0, y2: far + tail } };
+  }
+
+  // ---- 鱼骨图：每个主主题连同分支先按树形图单独排好；主主题放到斜骨末端，其余部分整块贴着斜骨放，
+  //      再沿主骨从鱼头往鱼尾依次排开（上下交替），同一侧的不重叠 ----
+  function layoutFishbone(parent: MindNode, list: MindNode[]): LayoutResult["spine"] {
+    const segs = new Map<string, Segment>();
+    if (!list.length) return { segs, end: null, plain: true };
+    /** 斜骨往鱼尾那边倒：鱼头在右时往左（-1），在左时往右 */
+    const d = opts.structure === "fishbone-right" ? -1 : 1;
+    /** 斜骨和主骨的夹角 60°：竖直走一段，横向走它的 cot60° 倍 */
+    const slope = 1 / Math.tan(Math.PI / 3);
+    const boneX = (y: number) => d * Math.abs(y) * slope;
+    /** 主骨到分支、分支到主主题、小骨最短的长度 */
+    const gapSpine = opts.gapSibling + 8;
+    const gapTip = Math.round(opts.gapLevel / 2);
+    const gapRib = Math.round(opts.gapLevel / 2);
+    const rp = placed.get(parent.id)!;
+    /** 已经放好的部分（含鱼头）；新的大骨沿主骨往鱼尾推，直到和它们都隔开 */
+    const olds: Bounds[] = [{ x: rp.x, y: rp.y, w: rp.w, h: rp.h }];
+    const rootNote = noteOf(parent);
+    if (rootNote) olds.push({ x: rp.x, y: rp.y + rp.h + NOTE_GAP, w: rootNote.w, h: rootNote.h });
+    /** 主骨接到鱼头的那一端 */
+    const headX = d < 0 ? rp.x : rp.x + rp.w;
+    let prevS: number | null = null;
+    let tailX = headX;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const up = i % 2 === 0;
+      const sub = layoutTree(c, measure, { ...opts, structure: "tree-right", gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+      const own = (n: MindNode) => n === c;
+      const m = sub.placed.get(c.id)!;
+      // 鱼头在右：小骨从二级主题右边接进来，概要的括号和文字（概要主题）默认也在右边，会被小骨横穿过去 ——
+      // 挪到这一组的左边（离斜骨远的那边）。概要主题自己还挂着子主题的照旧
+      if (d < 0) {
+        sub.summaries = sub.summaries.map((x) => {
+          if ((x.side !== "right" && x.side !== "tree") || (x.topic && visibleChildren(x.topic).length)) return x;
+          let left = Infinity;
+          for (const mem of x.members) {
+            const q = sub.placed.get(mem.id);
+            if (q) left = Math.min(left, q.x);
+          }
+          for (const bx of sub.boxes) if (bx.y < x.brace.y + x.brace.h && x.brace.y < bx.y + bx.h) left = Math.min(left, bx.x);
+          if (!Number.isFinite(left)) return x;
+          const brace = { ...x.brace, x: left - SUMMARY_GAP - BRACE_W };
+          const label = x.label && { ...x.label, x: brace.x - SUMMARY_LABEL_GAP - x.label.w };
+          const tp = x.topic && sub.placed.get(x.topic.id);
+          if (tp) {
+            const dx = brace.x - SUMMARY_LABEL_GAP - tp.w - tp.x;
+            sub.placed.set(tp.node.id, { ...tp, x: tp.x + dx, side: "left" });
+            sub.callouts = sub.callouts.map((q) => (q.node === tp.node ? { ...q, x: q.x + dx } : q));
+            sub.notes = sub.notes.map((q) => (q.node === tp.node ? { ...q, x: q.x + dx } : q));
+          }
+          return { ...x, side: "left", brace, label };
+        });
+      }
+      let mainPart: Bounds = { x: m.x, y: m.y, w: m.w, h: m.h };
+      for (const x of [...sub.callouts, ...sub.notes]) if (own(x.node)) mainPart = union(mainPart, x)!;
+      let rest: Bounds | null = null;
+      for (const p of sub.placed.values()) if (!own(p.node)) rest = union(rest, p);
+      for (const x of [...sub.callouts, ...sub.notes]) if (!own(x.node)) rest = union(rest, x);
+      for (const x of sub.boxes) rest = union(rest, x);
+      for (const x of sub.summaries) rest = union(union(rest, x.brace), x.label);
+      // 以主骨上的接点为原点：分支整块贴着斜骨（离斜骨最近的那个角留出小骨的长度），主主题在斜骨末端
+      let restDx = 0;
+      let restDy = 0;
+      let tipY: number;
+      if (rest) {
+        const top = up ? -gapSpine - rest.h : gapSpine;
+        const near = up ? top : top + rest.h;
+        const edge = boneX(near) + (d < 0 ? -gapRib - rest.w : gapRib);
+        restDx = edge - rest.x;
+        restDy = top - rest.y;
+        tipY = up ? top - gapTip : top + rest.h + gapTip;
+      } else tipY = up ? -gapSpine - gapTip : gapSpine + gapTip;
+      const tipX = boneX(tipY);
+      const mainDx = tipX - (m.x + m.w / 2);
+      const mainDy = up ? tipY - (mainPart.y + mainPart.h) : tipY - mainPart.y;
+      const movedMain = { ...mainPart, x: mainPart.x + mainDx, y: mainPart.y + mainDy };
+      const movedRest = rest && { ...rest, x: rest.x + restDx, y: rest.y + restDy };
+      const boneBox = { x: Math.min(0, tipX), y: Math.min(0, tipY), w: Math.abs(tipX), h: Math.abs(tipY) };
+      const region = union(union(movedMain, movedRest), boneBox)!;
+      // 沿主骨的位置：尽量靠近鱼头，和同一侧已经放好的部分隔开，接点之间至少隔 gapMain
+      let sx = d < 0 ? headX - opts.gapRoot - (region.x + region.w) : headX + opts.gapRoot - region.x;
+      if (prevS !== null) sx = d < 0 ? Math.min(sx, prevS - opts.gapMain) : Math.max(sx, prevS + opts.gapMain);
+      const cross = opts.gapSibling;
+      for (const o of olds) {
+        if (!(region.y < o.y + o.h + cross && o.y < region.y + region.h + cross)) continue;
+        sx = d < 0 ? Math.min(sx, o.x - opts.gapMain - (region.x + region.w)) : Math.max(sx, o.x + o.w + opts.gapMain - region.x);
+      }
+      prevS = sx;
+      const at = (b: Bounds, n?: MindNode): Bounds =>
+        n && own(n) ? { x: b.x + mainDx + sx, y: b.y + mainDy, w: b.w, h: b.h } : { x: b.x + restDx + sx, y: b.y + restDy, w: b.w, h: b.h };
+      const bone = { x1: sx, y1: 0, x2: sx + tipX, y2: tipY };
+      for (const p of sub.placed.values()) {
+        const side: Side = own(p.node) ? (up ? "up" : "down") : p.node.parent === c ? "rib" : p.side;
+        placed.set(p.node.id, { ...p, ...at(p, p.node), side, ...(own(p.node) ? { bone } : {}) });
+      }
+      for (const x of sub.callouts) addCallout(x.node, at(x, x.node), x.dir);
+      for (const x of sub.notes) addNote(x.node, at(x, x.node), x.far);
+      for (const x of sub.boxes) branchBoxes.push({ ...x, ...at(x) });
+      let extra: Bounds | null = null;
+      for (const x of sub.boxes) extra = union(extra, at(x));
+      for (const x of sub.summaries) {
+        branchSummaries.push({ ...x, brace: { ...x.brace, ...at(x.brace) }, label: x.label && { ...x.label, ...at(x.label) } });
+        extra = union(union(extra, at(x.brace)), x.label ? at(x.label) : null);
+      }
+      if (extra) branchExtra.set(c.id, extra);
+      const moved = { ...region, x: region.x + sx };
+      olds.push(moved);
+      segs.set(c.id, bone);
+      tailX = d < 0 ? Math.min(tailX, moved.x) : Math.max(tailX, moved.x + moved.w);
+    }
+    const tail = Math.max(24, Math.round(opts.gapMain * 0.75));
+    return { segs, end: { x1: tailX + d * tail, y1: 0, x2: headX, y2: 0 }, plain: true };
   }
 
   // ---- 水平结构：子树高度自底向上，子节点垂直堆叠并对父节点居中 ----
@@ -998,7 +1127,21 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
       return { parent, child, x1: parent.x + parent.w / 2, y1: parent.y, x2: child.x + child.w / 2, y2: child.y + child.h };
     case "tree-up":
       return { parent, child, x1: parent.x + Math.min(TREE_INDENT / 2, parent.w / 2), y1: parent.y, x2: child.x, y2: child.y + child.h / 2 };
+    case "rib":
+      return ribGeometry(parent, child, child.y + child.h / 2);
   }
+}
+
+/**
+ * 鱼骨图的小骨：在高度 y 处从父主题的斜骨横着连到子主题靠近斜骨的那条边。
+ * y 是子主题的中线，下划线式的主题传文字底边
+ */
+export function ribGeometry(parent: Placed, child: Placed, y: number): EdgeGeometry {
+  const b = parent.bone;
+  if (!b || b.y2 === b.y1) return { parent, child, x1: parent.x, y1: y, x2: child.x, y2: y };
+  const bx = b.x1 + ((b.x2 - b.x1) * (y - b.y1)) / (b.y2 - b.y1);
+  const x2 = bx >= child.x + child.w / 2 ? child.x + child.w : child.x;
+  return { parent, child, x1: bx, y1: y, x2, y2: y };
 }
 
 /** 按子节点方向选路径：水平/垂直 S 曲线、圆角折线、树形图的竖干折线 */
@@ -1006,6 +1149,7 @@ export function edgeGeometry(parent: Placed, child: Placed): EdgeGeometry {
 export function edgePath(e: EdgeGeometry, style: "curve" | "elbow" | "straight", radius = 8): string {
   if (e.child.side === "tree") return treePath(e, radius);
   if (e.child.side === "tree-up") return treeUpPath(e, radius);
+  if (e.child.side === "rib") return `M${r(e.x1)},${r(e.y1)} L${r(e.x2)},${r(e.y2)}`;
   if (style === "straight") return `M${r(e.x1)},${r(e.y1)} L${r(e.x2)},${r(e.y2)}`;
   if (e.child.side === "down" || e.child.side === "up") return style === "curve" ? curvePathVertical(e) : elbowPathVertical(e, radius);
   return style === "curve" ? curvePath(e) : elbowPath(e, radius);

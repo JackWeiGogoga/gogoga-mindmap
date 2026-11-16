@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Fishbone diagrams: two new structures, **Fishbone (head on the right)** and **Fishbone (head on the left)**, in the structure menu. The central topic is the head; main topics sit at the ends of slanted bones along the spine, alternating above and below with the first one nearest the head; second-level topics branch off a bone horizontally (with underline themes the text sits on the bone), and deeper levels hang below them, indented. Arrow keys move along the spine, dragging a main topic onto the spine between two bones reorders it, and folding, notes, callouts, boxes and summaries inside a branch, and export all work. The note itself doesn't change; `mindmap-structure: fishbone-right` is written to its properties like other structures.
+
 ## [0.75.1] - 2026-11-16
 
 ### Fixed

@@ -40,13 +40,13 @@ A `# comment` after a value is fine (as in YAML), but keep the values themselves
 | Key | Values |
 |---|---|
 | `mindmap` | `true`. Only for a mind map note; not needed inside a code block |
-| `mindmap-structure` | `logic-right` (default), `mindmap` (left and right), `org-down`, `tree-right`, `timeline-h`, `timeline-h-alt`, `timeline-v-right`, `timeline-v-left`, `timeline-v-alt` |
+| `mindmap-structure` | `logic-right` (default), `mindmap` (left and right), `org-down`, `tree-right`, `timeline-h`, `timeline-h-alt`, `timeline-v-right`, `timeline-v-left`, `timeline-v-alt`, `fishbone-right`, `fishbone-left` |
 | `mindmap-theme` | `snow` (default), `rainbow`, `business`, `warm`, `mono`, `line`, `forest` |
 | `mindmap-edge` | Line shape: `curve`, `elbow`, `straight`. Leave out to follow the theme |
 | `mindmap-edge-dash` | `true` (dashed), `false` (solid). Leave out to follow the theme |
 | `mindmap-edge-corner` | Corners of elbow lines: `sharp`, `round`. Leave out to follow the theme |
 
-Leave structure, theme and the edge keys out unless the user asks or the content clearly calls for one (`org-down` for hierarchies and org charts, `mindmap` for a balanced overview with many main topics, a timeline for events in order). Timelines string the main topics along an arrowed axis in order: `timeline-h` is horizontal with every branch on one side, `timeline-h-alt` alternates above and below, `timeline-v-right` / `timeline-v-left` run vertically with branches to the right / left, and `timeline-v-alt` alternates left and right.
+Leave structure, theme and the edge keys out unless the user asks or the content clearly calls for one (`org-down` for hierarchies and org charts, `mindmap` for a balanced overview with many main topics, a timeline for events in order, a fishbone for cause analysis). Timelines string the main topics along an arrowed axis in order: `timeline-h` is horizontal with every branch on one side, `timeline-h-alt` alternates above and below, `timeline-v-right` / `timeline-v-left` run vertically with branches to the right / left, and `timeline-v-alt` alternates left and right. A fishbone (`fishbone-right`: head on the right, the classic layout; `fishbone-left`: head on the left) puts the problem in the central topic and the cause categories (for example the 6M: people, machines, materials, methods, measurement, environment) as main topics; their children are the concrete causes, and anything deeper is a sub-cause. Keep it to three levels below the head.
 
 ## Markers
 

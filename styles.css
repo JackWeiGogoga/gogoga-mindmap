@@ -1316,6 +1316,20 @@
   height: 10px;
   margin: 0 0 0 -0.75px;
 }
+/* 鱼骨图的二级主题：小骨从靠斜骨的一侧接进来，折叠按钮放在另一侧（鱼头向右时在左边，向左时就是默认的右边）；
+   放下面会在折起来时压到下一个二级主题上 */
+[data-structure="fishbone-right"] .gg-mm-node[data-side="rib"] .mm-toggle {
+  left: auto;
+  right: 100%;
+  transform: translate(-10px, -50%);
+}
+[data-structure="fishbone-right"] .gg-mm-node[data-side="rib"] .mm-toggle::before {
+  right: auto;
+  left: 100%;
+}
+@media (pointer: coarse) {
+  [data-structure="fishbone-right"] .gg-mm-node[data-side="rib"] .mm-toggle { transform: translate(-12px, -50%); }
+}
 .mm-drop-indicator.is-vertical { width: 4px; height: 40px; }
 .gg-mm-root button.mm-menu-item.is-active { color: var(--mm-selection); }
 .gg-mm-root button.mm-menu-item.is-active::before { content: "✓"; }

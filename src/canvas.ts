@@ -51,6 +51,8 @@ import {
   CALLOUT_GAP,
   DEFAULT_LAYOUT,
   edgeGeometry,
+  ribGeometry,
+  isFishbone,
   edgePath,
   isTimeline,
   isTimelineH,
@@ -569,6 +571,8 @@ interface DropTarget {
   side?: "left" | "right";
   /** 有 side 时：插在那一侧从上往下第几个位置（画指示线用） */
   slot?: number;
+  /** 指示线直接画在这里（画布坐标的中心点，竖着画）：鱼骨图主骨上两根斜骨之间 */
+  at?: { x: number; y: number };
 }
 
 /**
@@ -2068,8 +2072,11 @@ export class MindMapCanvas {
       if (!parent) continue;
       // 时间轴的主主题：不和中心主题连线，改画主轴上从前一个连过来的那一段
       const seg = this.layout.spine?.segs.get(child.node.id);
-      const g = edgeGeometry(parent, child);
-      if (child.side === "right" || child.side === "left") {
+      let g = edgeGeometry(parent, child);
+      if (child.side === "rib") {
+        // 鱼骨图的小骨：下划线式的主题从文字底下接进来，小骨和下划线连成一条
+        if (anchorBottom(child)) g = ribGeometry(parent, child, child.y + child.h);
+      } else if (child.side === "right" || child.side === "left") {
         if (anchorBottom(parent)) g.y1 = parent.y + parent.h;
         if (anchorBottom(child)) g.y2 = child.y + child.h;
       } else if ((child.side === "tree" || child.side === "tree-up") && anchorBottom(child)) {
@@ -2094,7 +2101,9 @@ export class MindMapCanvas {
         ? ""
         : vertical
           ? ` M${round2(child.x)},${round2(child.y + child.h)} L${round2(child.x + child.w)},${round2(child.y + child.h)}`
-          : ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`;
+          : child.side === "rib"
+            ? ` L${round2(g.x2 === child.x ? child.x + child.w : child.x)},${round2(g.y2)}`
+            : ` L${round2(child.side === "left" ? child.x : child.x + child.w)},${round2(g.y2)}`;
       const d = seg
         ? `M${round2(seg.x1)},${round2(seg.y1)} L${round2(seg.x2)},${round2(seg.y2)}`
         : edgePath(g, style, (this.opts.edge?.sharp ?? theme.sharp) ? 0 : 8) + tail;
@@ -2119,13 +2128,16 @@ export class MindMapCanvas {
       edgeIndex += 1;
       const horiz = end.y1 === end.y2;
       const a = 5;
+      // 箭头朝主轴的走向：时间轴往右（往下），鱼头在左的鱼骨图往左
+      const dir = horiz && end.x2 < end.x1 ? -1 : 1;
       const head = horiz
-        ? ` M${round2(end.x2 - a * 1.4)},${round2(end.y2 - a)} L${round2(end.x2)},${round2(end.y2)} L${round2(end.x2 - a * 1.4)},${round2(end.y2 + a)}`
+        ? ` M${round2(end.x2 - dir * a * 1.4)},${round2(end.y2 - a)} L${round2(end.x2)},${round2(end.y2)} L${round2(end.x2 - dir * a * 1.4)},${round2(end.y2 + a)}`
         : ` M${round2(end.x2 - a)},${round2(end.y2 - a * 1.4)} L${round2(end.x2)},${round2(end.y2)} L${round2(end.x2 + a)},${round2(end.y2 - a * 1.4)}`;
       const d = `M${round2(end.x1)},${round2(end.y1)} L${round2(end.x2)},${round2(end.y2)}` + head;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       if (path.dataset.depth !== "1") path.dataset.depth = "1";
-      const last = [...this.layout.spine!.segs.keys()].pop();
+      // 鱼骨图的主骨属于整张图，不跟哪个分支的颜色
+      const last = this.layout.spine?.plain ? undefined : [...this.layout.spine!.segs.keys()].pop();
       const branch = last ? this.els.get(last)?.dataset.branch : undefined;
       const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
       if (path.style.stroke !== stroke) path.style.stroke = stroke;
@@ -5410,6 +5422,7 @@ export class MindMapCanvas {
       }
     };
     if (isTimeline(structure) && this.navigateTimeline(node, p, key, forward)) return;
+    if (isFishbone(structure) && this.navigateFishbone(node, p, key, forward)) return;
     if (structure === "org-down") {
       // 向下结构：上下是父子，左右在兄弟间找最近的
       if (key === "ArrowDown") {
@@ -5423,7 +5436,8 @@ export class MindMapCanvas {
       this.selectNearest(p, key === "ArrowLeft" ? "left" : "right");
       return;
     }
-    if (structure === "tree-right" || isTimelineH(structure)) {
+    // 鱼骨图的分支里面是树形图（二级主题往下缩进挂三级），按树形图走
+    if (structure === "tree-right" || isTimelineH(structure) || isFishbone(structure)) {
       if (key === "ArrowRight") {
         const kids = visibleChildren(node);
         if (kids.length) this.select(kids[0]);
@@ -5479,6 +5493,40 @@ export class MindMapCanvas {
     if (toward) {
       const kids = visibleChildren(node);
       if (horiz && kids.length) this.select(p.side === "up" ? kids[kids.length - 1] : kids[0]);
+      else forward(kids);
+    }
+    return true;
+  }
+
+  /**
+   * 鱼骨图：鱼头和主主题沿主骨走（← → 往鱼尾 / 鱼头），从主主题朝分支那边（主骨上方的往下、下方的往上）进到分支里；
+   * 分支里面交给 navigate 按树形图走。返回是否处理了
+   */
+  private navigateFishbone(node: MindNode, p: Placed, key: string, forward: (kids: MindNode[]) => void): boolean {
+    const base = this.focusRoot ?? this.doc?.root;
+    if (!base || !this.layout) return false;
+    const mains = visibleChildren(base).filter((c) => !this.isFloating(c) && this.layout!.placed.has(c.id));
+    const towardTail = this.opts.structure === "fishbone-right" ? "ArrowLeft" : "ArrowRight";
+    const towardHead = towardTail === "ArrowLeft" ? "ArrowRight" : "ArrowLeft";
+    const along = key === towardTail ? 1 : key === towardHead ? -1 : 0;
+    if (node === base) {
+      if (along > 0 && mains.length) this.select(mains[0]);
+      return true;
+    }
+    const i = mains.indexOf(node);
+    if (i < 0) return false;
+    if (along) {
+      const next = i + along < 0 ? base : mains[i + along];
+      if (next) this.select(next);
+      return true;
+    }
+    // 主骨上方的主主题，分支在它下面（离主题最近的是第一个）；下方的分支在它上面（最近的是最后一个）
+    const kids = visibleChildren(node);
+    if (key === "ArrowDown" && p.side === "up") {
+      if (kids.length) this.select(kids[0]);
+      else forward(kids);
+    } else if (key === "ArrowUp" && p.side === "down") {
+      if (kids.length) this.select(kids[kids.length - 1]);
       else forward(kids);
     }
     return true;
@@ -5652,6 +5700,11 @@ export class MindMapCanvas {
       this.els.get(target.parent.id)?.classList.add("is-drop-target");
       return;
     }
+    if (target.at) {
+      ind.classList.add("is-vertical");
+      ind.setCssStyles({ display: "block", left: `${target.at.x - 2}px`, top: `${target.at.y - 20}px` });
+      return;
+    }
     const kids = visibleChildren(target.parent)
       .filter((c) => !this.drag!.subtree.has(c))
       .map((c) => this.layout!.placed.get(c.id)!)
@@ -5708,6 +5761,12 @@ export class MindMapCanvas {
       if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h && (!hit || p.w * p.h < hit.w * hit.h)) hit = p;
     }
     if (hit) return { parent: hit.node, index: hit.node.children.length, kind: "node" };
+    // 鱼骨图的主骨上：先于「节点屁股后面」判断，二级主题下面挂子节点的那块空白一直延伸到主骨边上
+    const fishBase = this.focusRoot ?? this.doc?.root;
+    if (isFishbone(this.opts.structure) && fishBase) {
+      const t = this.fishboneDropTarget(fishBase, wx, wy, exclude);
+      if (t) return t;
+    }
     const behind = this.behindTarget(placed, wx, wy);
     if (behind) return behind;
 
@@ -5735,7 +5794,8 @@ export class MindMapCanvas {
 
     let best: { t: DropTarget; size: number } | null = null;
     for (const p of placed) {
-      if (this.opts.structure === "mindmap" && p.node === base) continue;
+      // 中心主题下的主主题：思维导图在上面按左右两列找过了，鱼骨图按主骨找过了
+      if ((this.opts.structure === "mindmap" || isFishbone(this.opts.structure)) && p.node === base) continue;
       const kids = kidsOf(p);
       if (!kids.length) continue;
       // 横向时间轴的主主题沿主轴从左往右排（分支朝下朝上都有）
@@ -5806,6 +5866,29 @@ export class MindMapCanvas {
       if (!best || d < best.d) best = { p, d };
     }
     return best ? { parent: best.p.node, index: best.p.node.children.length, kind: "node" } : null;
+  }
+
+  /**
+   * 鱼骨图：拖到主骨附近（鱼头的鱼尾那边）就插到主主题之间，位置按各斜骨在主骨上的起点算 ——
+   * 第一个离鱼头最近，落点和鱼头之间有几根斜骨就排在第几个后面
+   */
+  private fishboneDropTarget(base: MindNode, wx: number, wy: number, exclude: Set<MindNode>): DropTarget | null {
+    const rp = this.layout?.placed.get(base.id);
+    if (!rp || Math.abs(wy - (rp.y + rp.h / 2)) > 12) return null;
+    const right = this.opts.structure === "fishbone-right";
+    const headX = right ? rp.x : rp.x + rp.w;
+    if (right ? wx >= headX : wx <= headX) return null;
+    const mains = visibleChildren(base)
+      .filter((c) => !exclude.has(c) && !this.isFloating(c))
+      .map((c) => this.layout!.placed.get(c.id))
+      .filter((k): k is Placed => !!k?.bone);
+    const xs = mains.map((m) => m.bone!.x1);
+    const before = xs.filter((x) => (right ? x > wx : x < wx)).length;
+    const children = base.children;
+    const index = before < mains.length ? children.indexOf(mains[before].node) : mains.length ? children.indexOf(mains[mains.length - 1].node) + 1 : children.length;
+    const near = before > 0 ? xs[before - 1] : headX;
+    const far = before < xs.length ? xs[before] : near + (right ? -1 : 1) * DEFAULT_LAYOUT.gapMain;
+    return { parent: base, index, kind: "gap", at: { x: (near + far) / 2, y: rp.y + rp.h / 2 } };
   }
 
   /**
