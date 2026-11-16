@@ -2,6 +2,8 @@ import { type CustomSplit, parseCustomSplits } from "./split";
 import type { QuickSetting } from "./canvas";
 import {
   Component,
+  type Editor,
+  type EditorPosition,
   FileView,
   finishRenderMath,
   getLanguage,
@@ -108,6 +110,54 @@ function previewElAtLine(view: MarkdownView, line: number): { el: HTMLElement; r
   const ready = sec.rendered !== false && sec.shown !== false && sec.el.childElementCount > 0;
   const li = [...sec.el.querySelectorAll<HTMLElement>("li[data-line]")].find((l) => sec.start.line + Number(l.dataset.line) === line);
   return { el: li ?? sec.el, ready };
+}
+
+/** 阅读视图画面中间那一行（列表项精确到那一项，其余按段的第一行）；量不出来就用顶上那一行 */
+function previewCenterLine(view: MarkdownView): number | null {
+  const secs = previewSections(view);
+  const scroller = secs.length ? scrollParentWithin(secs[0].el, view.containerEl) : null;
+  if (!scroller) return Math.max(0, Math.round(view.previewMode.getScroll()));
+  const b = scroller.getBoundingClientRect();
+  const cy = b.top + b.height / 2;
+  let best: { line: number; d: number } | null = null;
+  for (const sec of secs) {
+    if (sec.shown === false || !sec.el.isConnected) continue;
+    const r = sec.el.getBoundingClientRect();
+    if (r.height === 0 || r.bottom < b.top || r.top > b.bottom) continue;
+    const cands: { line: number; r: DOMRect }[] = [{ line: sec.start.line, r }];
+    for (const li of sec.el.querySelectorAll<HTMLElement>("li[data-line]")) cands.push({ line: sec.start.line + Number(li.dataset.line), r: li.getBoundingClientRect() });
+    for (const c of cands) {
+      // 列表项的矩形包着它的子项：按它自己那一行（顶上一小截）的位置量，免得父项盖过子项
+      const top = c.r.top;
+      const d = cy < top ? top - cy : Math.max(0, cy - Math.min(c.r.bottom, top + 30));
+      if (!best || d < best.d || (d === best.d && c.line > best.line)) best = { line: c.line, d };
+    }
+  }
+  return best ? best.line : Math.max(0, Math.round(view.previewMode.getScroll()));
+}
+
+/** 编辑模式：光标所在的行；光标被滚出画面了就用画面中间那一行 */
+function sourceFocusLine(view: MarkdownView): number {
+  const cm = (view.editor as unknown as { cm: EditorView }).cm;
+  const cur = view.editor.getCursor().line;
+  if (editorLineVisible(cm, cur)) return cur;
+  const sd = cm.scrollDOM.getBoundingClientRect();
+  const block = cm.lineBlockAtHeight(sd.top + sd.height / 2 - cm.documentTop);
+  return cm.state.doc.lineAt(block.from).number - 1;
+}
+
+/** 编辑器里第 line 行（0 起）有一部分在可视区里 */
+function editorLineVisible(cm: EditorView, line: number): boolean {
+  if (line + 1 > cm.state.doc.lines) return false;
+  const block = cm.lineBlockAt(cm.state.doc.line(line + 1).from);
+  const sd = cm.scrollDOM.getBoundingClientRect();
+  const top = cm.documentTop + block.top;
+  return top + block.height > sd.top && top < sd.bottom;
+}
+
+function clampCursor(editor: Editor, c: EditorPosition): EditorPosition {
+  const line = Math.min(c.line, editor.lineCount() - 1);
+  return { line, ch: Math.min(c.ch, editor.getLine(line).length) };
 }
 
 /** 那一行在阅读视图里被折叠的标题藏着：把它上面折叠着的各级标题都展开（点标题的折叠箭头，和手点一样） */
@@ -888,26 +938,47 @@ export default class MindMapPlugin extends Plugin {
     const from = leaf.view;
     let path: string | null = null;
     if (from instanceof MindMapView && from.file === file) {
-      path = from.getSelectedPath();
+      path = from.getFocusPath();
       from.rememberViewportNow();
       await from.save();
     }
+    // 回到上次在这篇笔记 Markdown 里的样子：阅读模式还是阅读模式，滚动位置、光标都不变（群里反馈：来回切焦点要固定住）
+    const spot = this.mdSpot.get(file.path);
     this.markdownOverride.add(file.path);
     try {
-      await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" }, active: true });
+      // 滚动位置跟着打开一起交给 Obsidian（它会等内容排好再滚），和它自己恢复标签页位置走同一条路
+      await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: spot?.mode ?? "source" }, active: true }, spot ? { scroll: spot.scroll } : undefined);
     } finally {
       this.markdownOverride.delete(file.path);
     }
-    if (path === null) return;
     const view = leaf.view;
     if (!(view instanceof MarkdownView) || view.file !== file) return;
-    const line = lineOfPath(view.editor.getValue(), path, this.rootRule());
-    if (line === null) return;
     const editor = view.editor;
-    editor.setCursor({ line, ch: editor.getLine(line).length });
-    scrollEditorLineToCenter((editor as unknown as { cm: EditorView }).cm, line);
+    const line = path === null ? null : lineOfPath(editor.getValue(), path, this.rootRule());
+    const rule = this.rootRule();
+    // 原来的光标就在这个节点里（同一个节点的备注、续行）：光标不动
+    const keepCursor = !!spot?.cursor && line !== null && spot.cursor.line < editor.lineCount() && pathAtLine(editor.getValue(), spot.cursor.line, rule) === path;
+    if (view.getMode() === "preview") {
+      if (line !== null) this.revealPreviewLine(view, line, { flash: false, onlyIfHidden: !!spot });
+      return;
+    }
+    const cm = (editor as unknown as { cm: EditorView }).cm;
+    if (spot?.cursor && (keepCursor || line === null)) editor.setCursor(clampCursor(editor, spot.cursor));
+    else if (line !== null) editor.setCursor({ line, ch: editor.getLine(line).length });
     editor.focus();
+    if (line === null) return;
+    const target = keepCursor && spot?.cursor ? spot.cursor.line : line;
+    // CodeMirror 量好高度再看：那一行就在眼前就不滚，看不到才滚到中间
+    const win = view.containerEl.win;
+    win.setTimeout(() => {
+      // 打开时恢复的滚动位置是按估算的行高算的，机器忙时会差零点几行：量好之后对一下，差了就再滚一次
+      if (spot && Math.abs(view.currentMode.getScroll() - spot.scroll) > 0.05) view.currentMode.applyScroll(spot.scroll);
+      if (!spot || !editorLineVisible(cm, target)) scrollEditorLineToCenter(cm, target);
+    }, 30);
   }
+
+  /** 同一个标签页在 Markdown 和脑图之间来回切：每篇笔记记住 Markdown 那边的模式、滚动位置和光标（只在这次运行里） */
+  private mdSpot = new Map<string, { mode: "source" | "preview"; scroll: number; cursor: EditorPosition | null }>();
 
   /**
    * remember 为真时往 frontmatter 写 mindmap: true（和列表图标），以后都用脑图打开；
@@ -1228,10 +1299,30 @@ export default class MindMapPlugin extends Plugin {
    * 阅读模式：滚到那一行并闪一下。阅读视图是按段懒渲染的，先用 applyScroll 让那一段画出来，
    * 等它渲染好再找到元素居中（列表项找到那一项，其余是整段）
    */
-  private revealPreviewLine(view: MarkdownView, line: number): void {
+  private revealPreviewLine(view: MarkdownView, line: number, opts: { flash?: boolean; onlyIfHidden?: boolean } = {}): void {
+    const win = view.containerEl.win;
+    // onlyIfHidden：刚恢复了原来的滚动位置，那一行已经在眼前就什么都不做（等那一段渲染出来再判断，最多约 0.3 秒）
+    if (opts.onlyIfHidden) {
+      const t0 = win.performance.now();
+      const wait = () => {
+        const hit = previewElAtLine(view, line);
+        if (!hit?.ready && win.performance.now() - t0 < 300) {
+          win.setTimeout(wait, 16);
+          return;
+        }
+        const scroller = hit?.ready ? scrollParentWithin(hit.el, view.containerEl) : null;
+        if (hit?.ready && scroller) {
+          const s = scroller.getBoundingClientRect();
+          const r = hit.el.getBoundingClientRect();
+          if (r.bottom > s.top && r.top < s.bottom) return;
+        }
+        this.revealPreviewLine(view, line, { flash: opts.flash });
+      };
+      win.setTimeout(wait, 16);
+      return;
+    }
     unfoldPreviewLine(view, line);
     view.previewMode.applyScroll(line);
-    const win = view.containerEl.win;
     const started = win.performance.now();
     const tick = () => {
       const hit = previewElAtLine(view, line);
@@ -1261,7 +1352,7 @@ export default class MindMapPlugin extends Plugin {
         win.setTimeout(recheck, 16);
       };
       win.setTimeout(recheck, 16);
-      if (!el.animate) return;
+      if (opts.flash === false || !el.animate) return;
       const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
       el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
     };
@@ -1433,15 +1524,19 @@ export default class MindMapPlugin extends Plugin {
         if (needsIcon) fm[ICON_KEY] = icon;
       });
     }
-    // 从 Markdown 切过来：选中光标所在的那个节点（中心主题那行不算，回到上次的位置更有用）
+    // 从 Markdown 切过来：选中眼前那一行所在的节点（中心主题那行不算，回到上次的位置更有用）。
+    // 编辑模式看光标，光标被滚出画面了就看画面中间那一行；阅读模式没有光标，看画面中间那一行
     const from = leaf.view;
     let path: string | null = null;
     if (from instanceof MarkdownView && from.file === file) {
-      path = pathAtLine(from.editor.getValue(), from.editor.getCursor().line, this.rootRule());
+      const mode = from.getMode();
+      this.mdSpot.set(file.path, { mode, scroll: from.currentMode.getScroll(), cursor: mode === "source" ? from.editor.getCursor() : this.mdSpot.get(file.path)?.cursor ?? null });
+      const line = mode === "preview" ? previewCenterLine(from) : sourceFocusLine(from);
+      path = line === null ? null : pathAtLine(from.editor.getValue(), line, this.rootRule());
       if (path === "") path = null;
     }
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
-    if (path !== null && leaf.view instanceof MindMapView) leaf.view.revealPath(path);
+    if (path !== null && leaf.view instanceof MindMapView) leaf.view.revealPath(path, true);
   }
 
   // ---------- 命令 ----------

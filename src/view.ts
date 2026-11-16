@@ -417,9 +417,14 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     return path !== null && !!this.canvas?.revealPathFlash(path);
   }
 
-  /** 选中路径对应的节点并移到中间（从 Markdown 切回来时） */
-  revealPath(path: string): void {
-    this.canvas?.revealPath(path);
+  /** 选中路径对应的节点并移到中间（从 Markdown 切回来时）；steady：节点在眼前就不动视口 */
+  revealPath(path: string, steady = false): void {
+    this.canvas?.revealPath(path, steady);
+  }
+
+  /** 选中的节点，没选中就是画面中间的那个 */
+  getFocusPath(): string | null {
+    return this.canvas?.getFocusPath() ?? null;
   }
 
   private viewportTimer: number | null = null;

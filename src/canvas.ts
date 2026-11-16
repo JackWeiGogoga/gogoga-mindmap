@@ -1084,19 +1084,28 @@ export class MindMapCanvas {
    * 选中路径对应的节点并移到画布中间（从 Markdown 切回来时用）。节点藏在折叠里就退到
    * 最近的可见祖先，不去改折叠状态（那会改文件）。还没渲染就等首次渲染再做
    */
-  revealPath(path: string): void {
+  revealPath(path: string, steady = false): void {
     if (!this.doc) {
       this.pendingReveal = path;
+      this.pendingSteady = steady;
       return;
     }
     let node = findByPath(this.doc.root, path);
     if (!node) return;
     for (let a = node.parent; a; a = a.parent) if (a.folded) node = a;
-    if (!this.layout?.placed.get(node.id)) {
+    const p = this.layout?.placed.get(node.id);
+    if (!p) {
       this.pendingReveal = path;
+      this.pendingSteady = steady;
       return;
     }
     this.select(node);
+    // 同一个标签页在 Markdown 和脑图之间来回切（群里反馈：切两次焦点就丢了）：节点就在眼前时视口一点不动，
+    // 看不到才把它移过来，缩放也不改
+    if (steady && this.hasView) {
+      if (!this.rectInView(p)) this.showBranch(node);
+      return;
+    }
     // 适应画布后整张大图可能缩得很小，跳过来的节点要看得清
     if (this.k < 0.8) this.k = 1;
     this.showBranch(node);
@@ -1155,6 +1164,35 @@ export class MindMapCanvas {
     this.applyTransform();
   }
   private pendingReveal: string | null = null;
+  private pendingSteady = false;
+
+  /** 画布坐标里的这块矩形是否整个在可视区里（留一点边） */
+  private rectInView(r: { x: number; y: number; w: number; h: number }): boolean {
+    const m = 8;
+    const x = r.x * this.k + this.tx;
+    const y = r.y * this.k + this.ty;
+    return x >= m && y >= m && x + r.w * this.k <= this.el.clientWidth - m && y + r.h * this.k <= this.el.clientHeight - m;
+  }
+
+  /** 选中的节点，没选中就是离可视区中心最近的节点（切回 Markdown 时定位用） */
+  getFocusPath(): string | null {
+    if (this.primary) return pathOf(this.primary);
+    if (!this.layout) return null;
+    const cx = (this.el.clientWidth / 2 - this.tx) / this.k;
+    const cy = (this.el.clientHeight / 2 - this.ty) / this.k;
+    let best: MindNode | null = null;
+    let bd = Infinity;
+    for (const p of this.layout.placed.values()) {
+      const dx = Math.max(p.x - cx, 0, cx - p.x - p.w);
+      const dy = Math.max(p.y - cy, 0, cy - p.y - p.h);
+      const d = dx * dx + dy * dy;
+      if (d < bd) {
+        bd = d;
+        best = p.node;
+      }
+    }
+    return best ? pathOf(best) : null;
+  }
 
   /**
    * 点了指向这张图里某个节点的链接（[[笔记#^abc]]、[[笔记#标题]]）：折叠着的上级展开，
@@ -1610,7 +1648,7 @@ export class MindMapCanvas {
     if (this.pendingReveal !== null && this.layout) {
       const path = this.pendingReveal;
       this.pendingReveal = null;
-      this.revealPath(path);
+      this.revealPath(path, this.pendingSteady);
     }
     this.updateBottomInset();
     this.positionNodebar();
