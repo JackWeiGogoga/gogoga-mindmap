@@ -3,8 +3,9 @@
  * 增删、移动行列时，注释里按坐标记的东西（底色）和按列记的东西（列宽）跟着挪。
  */
 
-import { type Align, type Calc, type CellColor, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
+import { type Align, type Calc, type CellColor, cellFromSource, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
 import { fillSeries } from "./fill";
+import { evalFormula, type FxEmpty, type FxError, type FxNode, formatFx, formulaRefs, fxEmptyOf, fxErrorOf, nameOk, parseFormula, renameInFormula } from "./formula";
 
 export function cloneTable(t: Table): Table {
   return {
@@ -22,6 +23,8 @@ function cloneMeta(m: TableMeta): TableMeta {
   if (m.fg) out.fg = { ...m.fg };
   if (m.fz) out.fz = { ...m.fz };
   if (m.calc) out.calc = m.calc.slice();
+  if (m.fx) out.fx = m.fx.slice();
+  if (m.fxd) out.fxd = m.fxd.slice();
   if (m.opts) out.opts = m.opts.map((o) => (o ? { ...o } : null));
   if (m.merge) out.merge = m.merge.slice();
   return out;
@@ -97,7 +100,7 @@ function remapMerges(meta: TableMeta, fr: (r: number) => number | null, fc: (c: 
 }
 
 /** 按列记的设置（列宽、合计方式、状态选项）：插、删、挪列时一起改 */
-const COL_KEYS = ["w", "calc", "opts", "va"] as const;
+const COL_KEYS = ["w", "calc", "opts", "va", "fx", "fxd"] as const;
 function spliceCols(meta: TableMeta, n: number, op: (a: unknown[]) => void): void {
   for (const key of COL_KEYS) {
     const src = meta[key] as unknown[] | undefined;
@@ -450,7 +453,7 @@ export function pasteGrid(t: Table, r: number, c: number, grid: readonly (readon
   while (rowCount(n) - total() < r + grid.length) n = insertRow(n, rowCount(n));
   while (colCount(n) < c + width) n = insertCol(n, colCount(n));
   grid.forEach((row, i) => row.forEach((v, j) => (n.cells[r + i][c + j] = v)));
-  return n;
+  return followRenames(t, n);
 }
 
 // ---------- 下拉填充 ----------
@@ -583,12 +586,12 @@ export function shownText(t: Table, r: number, c: number): string {
  */
 export function editCell(t: Table, r: number, c: number, text: string): Table {
   const m = mergeAt(t, r, c);
-  if (!m) return setCell(t, r, c, text);
+  if (!m) return followRenames(t, setCell(t, r, c, text));
   if (text === mergedText(t, m)) return t;
   const n = cloneTable(t);
   for (let i = m.r1; i <= m.r2; i++) for (let j = m.c1; j <= m.c2; j++) n.cells[i][j] = "";
   n.cells[m.r1][m.c1] = text;
-  return n;
+  return followRenames(t, n);
 }
 
 // ---------- 排序、复制行列、多行多列 ----------
@@ -665,6 +668,8 @@ export function duplicateCol(t: Table, c: number): Table {
   n = setVAlign(n, c + 1, vAlignOf(t, c));
   const w = widthOf(t, c);
   if (w) n = setWidth(n, c + 1, w);
+  // 计算列复制出来还是计算列（列名重名了，要引用它得先改个名）
+  if (formulaOf(t, c)) n = setFormula(n, c + 1, formulaOf(t, c), fxPlacesOf(t, c));
   for (const key of ["bg", "fg", "fz"] as const) {
     const m: Record<string, unknown> = { ...(n.meta[key] ?? {}) };
     for (let r = 0; r < rowCount(t); r++) {
@@ -839,9 +844,261 @@ export function optionsOf(t: Table, c: number): string[] {
   return Object.keys(t.meta.opts?.[c] ?? {});
 }
 
-/** 交给宿主之前统一整理：状态列的新值分颜色、合计行重算 */
+/** 交给宿主之前统一整理：状态列的新值分颜色、计算列重算、合计行重算 */
 export function normalize(t: Table): Table {
-  return computeTotals(syncOptions(t));
+  return computeTotals(computeFormulas(syncOptions(t)));
+}
+
+// ---------- 计算列 ----------
+
+/** 第 c 列的公式；不是计算列返回 null */
+export function formulaOf(t: Table, c: number): string | null {
+  return t.meta.fx?.[c] ?? null;
+}
+
+/** 计算列的小数位：null 是自动 */
+export function fxPlacesOf(t: Table, c: number): number | null {
+  return t.meta.fxd?.[c] ?? null;
+}
+
+/** 这一格是计算列算出来的（数据行，不含表头、合计行） */
+export function isFxCell(t: Table, r: number, c: number): boolean {
+  if (!formulaOf(t, c) || r < headRows(t) || r >= rowCount(t)) return false;
+  return !(hasTotal(t) && r === rowCount(t) - 1);
+}
+
+/** 每列的列名：表头最后一行的文字（合并的取左上角那格），换行算空格 */
+export function columnNames(t: Table): string[] {
+  const r = headRows(t) - 1;
+  return Array.from({ length: colCount(t) }, (_, c) => {
+    const m = mergeAt(t, r, c);
+    const src = m ? t.cells[m.r1][m.c1] : (t.cells[r]?.[c] ?? "");
+    return cellFromSource(src).replace(/\\\|/g, "|").replace(/\s+/g, " ").trim();
+  });
+}
+
+/** 列名 → 列号；重名的是 -1（不能引用） */
+function nameIndex(t: Table): Map<string, number> {
+  const idx = new Map<string, number>();
+  columnNames(t).forEach((name, c) => {
+    if (!nameOk(name)) return;
+    idx.set(name, idx.has(name) ? -1 : c);
+  });
+  return idx;
+}
+
+/** 一列公式的状况：能算（node、引用的列号）或者出错（error） */
+export interface FxInfo {
+  node?: FxNode;
+  deps: number[];
+  error?: FxError;
+}
+
+/** 检查每个计算列的公式：写错、引用的列不存在或重名、引用自己、互相引用绕成圈都算出错 */
+function analyze(t: Table): Map<number, FxInfo> {
+  const out = new Map<number, FxInfo>();
+  const fx = t.meta.fx;
+  if (!fx) return out;
+  const idx = nameIndex(t);
+  const names = columnNames(t);
+  for (let c = 0; c < colCount(t); c++) {
+    const src = fx[c];
+    if (!src) continue;
+    let node: FxNode;
+    try {
+      node = parseFormula(src);
+    } catch (e) {
+      out.set(c, { deps: [], error: fxErrorOf(e) ?? { code: "syntax" } });
+      continue;
+    }
+    const deps: number[] = [];
+    let error: FxError | undefined;
+    for (const name of formulaRefs(node)) {
+      const at = idx.get(name);
+      if (at === undefined) error ??= { code: "unknownCol", name };
+      else if (at === -1) error ??= { code: "ambiguous", name };
+      else if (at === c || name === names[c]) error ??= { code: "self", name };
+      else deps.push(at);
+    }
+    out.set(c, error ? { deps: [], error } : { node, deps });
+  }
+  // 互相引用绕成圈：圈上的列都出错
+  const state = new Map<number, 1 | 2>();
+  const stack: number[] = [];
+  const visit = (c: number) => {
+    const info = out.get(c);
+    if (!info || info.error) return;
+    if (state.get(c) === 2) return;
+    if (state.get(c) === 1) {
+      for (const x of stack.slice(stack.indexOf(c))) out.set(x, { deps: [], error: { code: "cycle" } });
+      return;
+    }
+    state.set(c, 1);
+    stack.push(c);
+    for (const d of info.deps) visit(d);
+    stack.pop();
+    state.set(c, 2);
+  };
+  for (const c of out.keys()) visit(c);
+  return out;
+}
+
+/** 格子里的数：去掉千分位、货币符号；百分数按小数算（80% 是 0.8）。空的、不是数的返回 null */
+function cellNumber(s: string): number | null {
+  const p = parseNum(s);
+  if (!p) return null;
+  return p.pct ? p.v / 100 : p.v;
+}
+
+/** 计算列的数据行：表头下面到合计行上面 */
+function fxRows(t: Table): [number, number] {
+  return [headRows(t), rowCount(t) - (hasTotal(t) ? 1 : 0)];
+}
+
+/** 先算被别的计算列引用的列 */
+function fxOrder(info: Map<number, FxInfo>): number[] {
+  const order: number[] = [];
+  const seen = new Set<number>();
+  const visit = (c: number) => {
+    if (seen.has(c)) return;
+    seen.add(c);
+    const i = info.get(c);
+    if (i && !i.error) i.deps.forEach(visit);
+    if (i) order.push(c);
+  };
+  for (const c of info.keys()) visit(c);
+  return order;
+}
+
+/** 一行里算第 c 列（cells 是当前的格子）：算不出来返回 FxEmpty */
+function evalRow(t: Table, cells: string[][], info: FxInfo, r: number, idx = nameIndex(t)): number | FxEmpty {
+  try {
+    return evalFormula(info.node!, (name) => {
+      const c = idx.get(name)!;
+      const m = mergeAt(t, r, c);
+      return cellNumber(m ? cells[m.r1][m.c1] : (cells[r]?.[c] ?? ""));
+    });
+  } catch (e) {
+    const why = fxEmptyOf(e);
+    if (why) return why;
+    throw e;
+  }
+}
+
+/** 重算所有计算列（数据变了之后调）：公式出错的列整列留空；没变返回原表 */
+export function computeFormulas(t: Table): Table {
+  if (!t.meta.fx?.some(Boolean)) return t;
+  const info = analyze(t);
+  const [r1, r2] = fxRows(t);
+  const idx = nameIndex(t);
+  let n: Table | null = null;
+  for (const c of fxOrder(info)) {
+    const i = info.get(c)!;
+    for (let r = r1; r < r2; r++) {
+      const m = mergeAt(t, r, c);
+      if (m && (m.r1 !== r || m.c1 !== c)) continue;
+      const cells = (n ?? t).cells;
+      const v = i.error ? "" : evalRow(t, cells, i, r, idx);
+      const text = typeof v === "number" ? formatFx(v, fxPlacesOf(t, c)) : "";
+      if (cells[r][c] !== text) {
+        n ??= cloneTable(t);
+        n.cells[r][c] = text;
+      }
+    }
+  }
+  return n ?? t;
+}
+
+/** 计算列出错的原因（表头的 ƒx 标记用）；没出错返回 null */
+export function formulaError(t: Table, c: number): FxError | null {
+  if (!formulaOf(t, c)) return null;
+  return analyze(t).get(c)?.error ?? null;
+}
+
+/** 计算列的一格为什么是空的（鼠标停上去显示）：公式出错、引用的格子空着、除以 0；有数返回 null */
+export function fxCellNote(t: Table, r: number, c: number): FxError | FxEmpty | null {
+  if (!isFxCell(t, r, c)) return null;
+  const i = analyze(t).get(c);
+  if (!i) return null;
+  if (i.error) return i.error;
+  const v = evalRow(t, t.cells, i, r);
+  return typeof v === "number" ? null : v;
+}
+
+/** 编辑框里检查公式：出错给 error；没错给第一行数据的预览（各列的值、结果或算不出来的原因） */
+export function checkFormula(
+  t: Table,
+  c: number,
+  src: string,
+  places: number | null = null,
+): { error: FxError } | { refs: { name: string; value: number | null }[]; result: string | null; empty?: FxEmpty } {
+  const n = cloneTable(t);
+  const fx = Array.from({ length: colCount(t) }, (_, i) => n.meta.fx?.[i] ?? null);
+  fx[c] = src.trim() || " ";
+  n.meta.fx = fx;
+  const i = analyze(n).get(c)!;
+  if (i.error) return { error: i.error };
+  const [r1, r2] = fxRows(n);
+  const idx = nameIndex(n);
+  const refs = formulaRefs(i.node!).map((name) => {
+    const at = idx.get(name)!;
+    return { name, value: r1 < r2 ? cellNumber(n.cells[r1][at] ?? "") : null };
+  });
+  if (r1 >= r2) return { refs, result: null };
+  const v = evalRow(n, n.cells, i, r1);
+  return typeof v === "number" ? { refs, result: formatFx(v, places) } : { refs, result: null, empty: v };
+}
+
+/** 把第 c 列设成计算列（src 为 null 取消：格子里留着最后算出的数，变回普通的列） */
+export function setFormula(t: Table, c: number, src: string | null, places: number | null = null): Table {
+  if (c < 0 || c >= colCount(t)) return t;
+  const n = cloneTable(t);
+  const len = colCount(t);
+  const fx = Array.from({ length: len }, (_, i) => n.meta.fx?.[i] ?? null);
+  const fxd = Array.from({ length: len }, (_, i) => n.meta.fxd?.[i] ?? null);
+  fx[c] = src?.trim() ? src.trim() : null;
+  fxd[c] = fx[c] && places !== null ? places : null;
+  if (fx.some(Boolean)) n.meta.fx = fx;
+  else delete n.meta.fx;
+  if (fxd.some((x) => x !== null)) n.meta.fxd = fxd;
+  else delete n.meta.fxd;
+  return computeTotals(computeFormulas(n));
+}
+
+/** 改了表头的列名：公式里的旧名换成新名（旧名、新名都得是能引用的、不重名的；列号不变时才比） */
+function followRenames(prev: Table, next: Table): Table {
+  if (next === prev || !next.meta.fx?.some(Boolean)) return next;
+  const a = columnNames(prev);
+  const b = columnNames(next);
+  const ia = nameIndex(prev);
+  const ib = nameIndex(next);
+  let out = next;
+  for (let c = 0; c < Math.min(a.length, b.length); c++) {
+    if (a[c] === b[c] || ia.get(a[c]) !== c || ib.get(b[c]) !== c) continue;
+    const fx = out.meta.fx!.map((f) => (f ? renameInFormula(f, a[c], b[c]) : f));
+    if (fx.every((f, i) => f === out.meta.fx![i])) continue;
+    if (out === next) out = cloneTable(next);
+    out.meta.fx = fx;
+  }
+  return out;
+}
+
+/** 截出来的一块里，引用的列不全在这块里的公式去掉（格子里的数留着），不然贴到别处整列变空 */
+function keepWorkingFormulas(t: Table): Table {
+  if (!t.meta.fx?.some(Boolean)) {
+    delete t.meta.fx;
+    delete t.meta.fxd;
+    return t;
+  }
+  const info = analyze(t);
+  for (const [c, i] of info) {
+    if (!i.error) continue;
+    t.meta.fx[c] = null;
+    if (t.meta.fxd) t.meta.fxd[c] = null;
+  }
+  if (!t.meta.fx.some(Boolean)) delete t.meta.fx;
+  if (!t.meta.fxd?.some((x) => x !== null)) delete t.meta.fxd;
+  return t;
 }
 
 // ---------- 截取一块 ----------
@@ -875,6 +1132,8 @@ export function subTable(t: Table, rect: Rect): Table {
   meta.w = cols(t.meta.w) as TableMeta["w"];
   meta.opts = cols(t.meta.opts) as TableMeta["opts"];
   meta.calc = hasTotal(t) && r2 === rowCount(t) - 1 ? (cols(t.meta.calc) as TableMeta["calc"]) : undefined;
+  meta.fx = cols(t.meta.fx) as TableMeta["fx"];
+  meta.fxd = cols(t.meta.fxd) as TableMeta["fxd"];
   meta.bg = shift(t.meta.bg);
   meta.fg = shift(t.meta.fg);
   meta.fz = shift(t.meta.fz);
@@ -899,10 +1158,11 @@ export function subTable(t: Table, rect: Rect): Table {
     const nc = Math.max(m.c1, c1);
     if ((nr !== m.r1 || nc !== m.c1) && nr <= Math.min(m.r2, r2) && nc <= Math.min(m.c2, c2)) cells[nr - r1][nc - c1] = t.cells[m.r1][m.c1];
   }
-  return {
+  const sub: Table = {
     cells,
     align: t.align.slice(c1, c2 + 1),
     meta,
     style: { ...t.style },
   };
+  return keepWorkingFormulas(sub);
 }

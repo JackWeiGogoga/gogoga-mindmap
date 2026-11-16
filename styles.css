@@ -3067,6 +3067,28 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-search-mark { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .ggt-search-mark > div { position: absolute; border-radius: 2px; box-shadow: 0 0 0 3px var(--text-accent); }
 .ggt .ggt-cell.is-search-hit { box-shadow: inset 0 0 0 2px var(--text-accent); }
+
+/* 计算列：列名那一行表头右边的 ƒx 标记（点一下改公式；公式出错时变红），算出来的格子样子照常 */
+.ggt .ggt-cell.has-fx .ggt-content { padding-right: calc(var(--ggt-pad-x) + 18px); }
+.ggt-fx-badge { position: absolute; top: var(--ggt-pad-y); right: 4px; display: flex; align-items: center; height: 1.5em; padding: 0 3px; border-radius: 4px; color: var(--text-faint); font-style: italic; font-weight: 600; line-height: 1; cursor: pointer; user-select: none; }
+.ggt-fx-badge > span { font-size: 0.75em; }
+.ggt-fx-badge:hover { background: var(--background-modifier-hover); color: var(--text-muted); }
+.ggt-fx-badge.is-error { color: var(--text-error); }
+/* 公式编辑框：挂在表头下面，和菜单同一套底色 */
+.ggt-menu.ggt-fx { display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 10px; font-size: var(--font-ui-small, 13px); }
+.ggt-fx-title { color: var(--text-muted); font-weight: var(--font-semibold, 600); }
+.ggt-fx .ggt-fx-input { width: 100%; box-sizing: border-box; font-family: var(--font-monospace); font-size: var(--font-ui-small, 13px); }
+.ggt-fx-suggest { display: none; max-height: 160px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }
+.ggt-fx-suggest.is-shown { display: block; }
+.ggt-fx-chips, .ggt-fx-places { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ggt-fx-label { margin-right: 2px; color: var(--text-muted); }
+.ggt-fx button.ggt-fx-chip, .ggt-fx button.ggt-fx-place { height: 24px; padding: 0 8px; border: 1px solid var(--background-modifier-border); border-radius: 5px; background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: 12px; cursor: pointer; }
+.ggt-fx button.ggt-fx-chip:hover, .ggt-fx button.ggt-fx-place:hover { background: var(--background-modifier-hover); }
+.ggt-fx button.ggt-fx-place.is-checked { border-color: var(--interactive-accent); color: var(--text-accent); }
+.ggt-fx-hint { color: var(--text-faint); font-size: 12px; }
+.ggt-fx-preview { padding: 6px 8px; border-radius: 6px; background: var(--background-secondary); color: var(--text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ggt-fx-preview.is-error { color: var(--text-error); }
+.ggt-fx-actions { display: flex; justify-content: flex-end; gap: 8px; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

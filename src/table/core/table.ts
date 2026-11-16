@@ -45,6 +45,10 @@ export interface TableMeta {
   va?: (VAlign | null)[];
   /** 每列的合计方式；有任何一列设了，最后一行就是合计行 */
   calc?: (Calc | null)[];
+  /** 计算列：每列的公式（{单价}*{数量} 这样用列名引用），null 是普通列；算出来的数写在格子里 */
+  fx?: (string | null)[];
+  /** 计算列的小数位（0～3），null 是自动 */
+  fxd?: (number | null)[];
   /** 状态列：每列「值 → 颜色」；设了的列，格子画成彩色标签 */
   opts?: (Record<string, CellColor> | null)[];
   /** 第一列当标题列（加底色、加粗） */
@@ -188,6 +192,16 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
     const calc = Array.isArray(raw.calc) ? raw.calc.map((x) => ((CALCS as readonly unknown[]).includes(x) ? (x as Calc) : null)) : [];
     if (calc.some(Boolean)) meta.calc = calc;
     else delete meta.calc;
+  }
+  if (raw.fx !== undefined) {
+    const fx = Array.isArray(raw.fx) ? raw.fx.map((x) => (typeof x === "string" && x.trim() ? x : null)) : [];
+    if (fx.some(Boolean)) meta.fx = fx;
+    else delete meta.fx;
+  }
+  if (raw.fxd !== undefined) {
+    const fxd = Array.isArray(raw.fxd) ? raw.fxd.map((x) => (typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 3 ? x : null)) : [];
+    if (fxd.some((x) => x !== null)) meta.fxd = fxd;
+    else delete meta.fxd;
   }
   if (raw.va !== undefined) {
     const va = Array.isArray(raw.va) ? raw.va.map((x) => ((VALIGNS as readonly unknown[]).includes(x) ? (x as VAlign) : null)) : [];

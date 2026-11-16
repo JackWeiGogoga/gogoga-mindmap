@@ -6,6 +6,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ### Added
 - While focusing on a branch, the › in the breadcrumb is clickable (#42): it lists every topic at that level with the current one checked, and picking one focuses on it right away, so you can jump to a sibling, a parent or a parent's sibling without going back to the whole map first. With the toolbar at the top (breadcrumb at the bottom) the list opens upward.
+- Tables in topics can have calculated columns: column menu → **Make calculated column…** and write a formula with column names (e.g. `{Price} * {Qty}`); every row is calculated (synced from Table).
 
 ### Fixed
 - With glass-style themes such as OnePage, floating surfaces (topic menus, the note popover, the floating toolbar) were see-through and topic text showed behind them. They now sit on a solid layer, blurred like Obsidian's own menus; opaque themes look the same as before.

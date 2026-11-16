@@ -16,6 +16,8 @@
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
 import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula } from "../core/ops";
+import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
@@ -212,6 +214,8 @@ export class TableEditor {
   private marked: HTMLElement[] = [];
   private crossed: HTMLElement[] = [];
   private popover: HTMLElement | null = null;
+  /** 上次提示「计算列不能改」的时间（一直打字时别一直弹） */
+  private fxNoticeAt = 0;
   /** 编辑时的补全列表（[[ 链接、# 标签） */
   private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement } | null = null;
   private resize: { c: number; startX: number; startW: number; col: HTMLElement; fitW: number; scale: number } | null = null;
@@ -793,6 +797,7 @@ export class TableEditor {
         content.className = "ggt-content";
         if (r === all - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
+        if (formulaOf(tb, c)) this.markFx(cell, r, c);
       }
     }
     if (folded) {
@@ -1095,6 +1100,15 @@ export class TableEditor {
     if (!this.sel || this.host.readonly) return;
     const cell = this.cellEl(this.sel);
     if (!cell) return;
+    // 计算列的格子是公式算出来的：不进编辑（打进来的字也不要），提示去列菜单改公式
+    if (isFxCell(this.table, this.sel.r, this.sel.c)) {
+      this.input.reset("");
+      if (Date.now() - this.fxNoticeAt > 1500) {
+        this.fxNoticeAt = Date.now();
+        this.host.notice?.(t("fxLocked"));
+      }
+      return;
+    }
     if (this.anchor) {
       this.anchor = null;
       this.markSel();
@@ -1156,7 +1170,8 @@ export class TableEditor {
     if (next !== this.table) {
       const prev = this.table;
       this.table = next;
-      if (hasTotal(next) || next.meta.opts?.some(Boolean)) this.render();
+      // 合计行、状态列、计算列：别的格子也可能跟着变，整张重画
+      if (hasTotal(next) || next.meta.opts?.some(Boolean) || next.meta.fx?.some(Boolean)) this.render();
       else this.restoreContent(p);
       this.host.onChange(next, prev);
     } else if (pending) {
@@ -3053,6 +3068,12 @@ export class TableEditor {
       { separator: true },
       ...this.calcItems(p.c),
       { title: tb.meta.opts?.[p.c] ? t("statusOff") : t("statusOn"), icon: "tags", run: () => this.apply(setOptionsCol(tb, p.c, !tb.meta.opts?.[p.c]), p) },
+      ...(formulaOf(tb, p.c)
+        ? [
+            { title: t("fxEdit"), icon: "calculator", run: () => this.openFormula(p.c) },
+            { title: t("fxOff"), icon: "calculator", run: () => this.apply(setFormula(tb, p.c, null), p) },
+          ]
+        : [{ title: t("fxOn"), icon: "calculator", run: () => this.openFormula(p.c) }]),
       { separator: true },
       { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow()), p) },
       { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow()), p) },
@@ -3390,6 +3411,212 @@ export class TableEditor {
   private closePopover(): void {
     this.popover?.remove();
     this.popover = null;
+  }
+
+  // ---------- 计算列 ----------
+
+  /** 公式出错 / 某一格算不出来的原因 */
+  private fxText(e: FxError | FxEmpty): string {
+    const key = "code" in e ? `fxErr_${e.code}` : `fxEmpty_${e.reason}`;
+    return t(key as Parameters<typeof t>[0]).replace("{name}", e.name ?? "");
+  }
+
+  /** 计算列：表头（最后一行）挂 ƒx 标记，数据格加上样式，空着的格子鼠标停上去说原因 */
+  private markFx(cell: HTMLElement, r: number, c: number): void {
+    const tb = this.table;
+    if (r === headRows(tb) - 1) {
+      const err = formulaError(tb, c);
+      const badge = cell.appendChild(this.root.ownerDocument.createElement("span"));
+      badge.className = "ggt-fx-badge" + (err ? " is-error" : "");
+      badge.appendChild(this.root.ownerDocument.createElement("span")).textContent = "ƒx";
+      badge.title = err ? this.fxText(err) : t("fxBadgeTitle").replace("{f}", formulaOf(tb, c) ?? "");
+      cell.classList.add("has-fx");
+      if (!this.host.readonly) {
+        badge.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.openFormula(c);
+        });
+      }
+      return;
+    }
+    if (!isFxCell(tb, r, c)) return;
+    cell.classList.add("is-fx");
+    if (!tb.cells[r][c]) {
+      const note = fxCellNote(tb, r, c);
+      if (note) cell.title = this.fxText(note);
+    }
+  }
+
+  /** 计算列的公式编辑框：挂在这一列的表头下面。输入 { 补全列名、点列名插入、边输入边用第一行数据预览 */
+  private openFormula(c: number): void {
+    if (this.host.readonly) return;
+    if (this.editing) this.commit();
+    this.closePopover();
+    const tb = this.table;
+    const doc = this.root.ownerDocument;
+    const names = columnNames(tb);
+    const usable = names.filter((n, i) => i !== c && nameOk(n) && names.indexOf(n) === names.lastIndexOf(n));
+    let places = fxPlacesOf(tb, c);
+    const el = <K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K, cls: string, text?: string) => {
+      const e = parent.appendChild(doc.createElement(tag));
+      e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const pop = doc.body.appendChild(doc.createElement("div"));
+    pop.className = "ggt-menu ggt-fx";
+    el(pop, "div", "ggt-fx-title", `${names[c] || t("fxThisCol")} =`);
+    const input = el(pop, "input", "ggt-fx-input");
+    input.type = "text";
+    input.spellcheck = false;
+    input.value = formulaOf(tb, c) ?? "";
+    input.placeholder = usable.length >= 2 ? `{${usable[0]}} * {${usable[1]}}` : usable.length ? `{${usable[0]}} * 2` : "1 + 2";
+    const list = el(pop, "div", "ggt-fx-suggest");
+    const chips = el(pop, "div", "ggt-fx-chips");
+    el(chips, "span", "ggt-fx-label", usable.length ? t("fxInsert") : t("fxNoNames"));
+    for (const name of usable) {
+      const b = el(chips, "button", "ggt-fx-chip", name);
+      b.type = "button";
+      b.addEventListener("click", () => insert(`{${name}}`));
+    }
+    el(pop, "div", "ggt-fx-hint", t("fxHint"));
+    const placeRow = el(pop, "div", "ggt-fx-places");
+    el(placeRow, "span", "ggt-fx-label", t("fxPlaces"));
+    const placeBtns: HTMLButtonElement[] = [];
+    for (const v of [null, 0, 1, 2, 3]) {
+      const b = el(placeRow, "button", "ggt-fx-place", v === null ? t("fxAuto") : String(v));
+      b.type = "button";
+      b.dataset.v = String(v);
+      b.addEventListener("click", () => {
+        places = v;
+        update();
+        input.focus();
+      });
+      placeBtns.push(b);
+    }
+    const preview = el(pop, "div", "ggt-fx-preview");
+    const actions = el(pop, "div", "ggt-fx-actions");
+    const cancel = el(actions, "button", "ggt-fx-cancel", t("fxCancel"));
+    cancel.type = "button";
+    const ok = el(actions, "button", "ggt-fx-ok mod-cta", t("fxOk"));
+    ok.type = "button";
+
+    // 补全：光标前面有没配对的 {
+    let picks: string[] = [];
+    let active = 0;
+    const brace = () => {
+      const pos = input.selectionStart ?? input.value.length;
+      const before = input.value.slice(0, pos).replace(/｛/g, "{").replace(/｝/g, "}");
+      const i = before.lastIndexOf("{");
+      if (i < 0 || before.lastIndexOf("}") > i) return null;
+      return { start: i, end: pos, q: before.slice(i + 1).trim().toLowerCase() };
+    };
+    const showList = () => {
+      const b = brace();
+      picks = b ? usable.filter((n) => n.toLowerCase().includes(b.q)) : [];
+      active = Math.min(active, Math.max(0, picks.length - 1));
+      list.replaceChildren();
+      list.classList.toggle("is-shown", picks.length > 0);
+      picks.forEach((name, i) => {
+        const it = el(list, "div", "ggt-suggest-item" + (i === active ? " is-active" : ""), name);
+        it.addEventListener("pointerdown", (ev) => {
+          ev.preventDefault();
+          pick(name);
+        });
+      });
+    };
+    const pick = (name: string) => {
+      const b = brace();
+      if (!b) return;
+      let rest = input.value.slice(b.end);
+      if (/^\s*[}｝]/.test(rest)) rest = rest.replace(/^\s*[}｝]/, "");
+      input.value = input.value.slice(0, b.start) + `{${name}}` + rest;
+      const at = b.start + name.length + 2;
+      input.setSelectionRange(at, at);
+      update();
+    };
+    const insert = (text: string) => {
+      const a = input.selectionStart ?? input.value.length;
+      const b = input.selectionEnd ?? a;
+      input.value = input.value.slice(0, a) + text + input.value.slice(b);
+      input.focus();
+      input.setSelectionRange(a + text.length, a + text.length);
+      update();
+    };
+    const update = () => {
+      placeBtns.forEach((b) => b.classList.toggle("is-checked", b.dataset.v === String(places)));
+      const src = input.value;
+      const res = checkFormula(this.table, c, src, places);
+      preview.classList.remove("is-error");
+      if ("error" in res) {
+        ok.disabled = true;
+        preview.textContent = src.trim() ? this.fxText(res.error) : t("fxStart");
+        preview.classList.toggle("is-error", !!src.trim());
+      } else {
+        ok.disabled = false;
+        const vals = new Map(res.refs.map((x) => [x.name, x.value]));
+        const expr = prettyOps(src.trim()).replace(/[{｛]([^}｝]*)[}｝]/g, (_, n: string) => {
+          const v = vals.get(n.trim());
+          return v === null || v === undefined ? t("fxBlank") : formatFx(v, null);
+        });
+        if (headRows(this.table) >= rowCount(this.table) - (hasTotal(this.table) ? 1 : 0)) preview.textContent = t("fxNoRows");
+        else if (res.result !== null) preview.textContent = t("fxPreview").replace("{expr}", expr).replace("{v}", res.result);
+        else preview.textContent = t("fxPreviewEmpty").replace("{why}", res.empty ? this.fxText(res.empty) : "");
+      }
+      showList();
+    };
+    const close = () => {
+      this.closePopover();
+      this.input.focus();
+    };
+    const confirm = () => {
+      if (ok.disabled) return;
+      const src = input.value.trim();
+      this.closePopover();
+      this.apply(setFormula(this.table, c, src, places), this.sel ?? { r: headRows(this.table) - 1, c });
+      this.input.focus();
+    };
+    cancel.addEventListener("click", close);
+    ok.addEventListener("click", confirm);
+    input.addEventListener("input", update);
+    input.addEventListener("click", showList);
+    input.addEventListener("keyup", (ev) => {
+      if (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "Home" || ev.key === "End") showList();
+    });
+    pop.addEventListener("keydown", (ev) => {
+      if (ev.isComposing) return;
+      const listOpen = picks.length > 0 && ev.target === input;
+      if (listOpen && (ev.key === "ArrowDown" || ev.key === "ArrowUp")) {
+        ev.preventDefault();
+        active = (active + (ev.key === "ArrowDown" ? 1 : -1) + picks.length) % picks.length;
+        showList();
+      } else if (listOpen && (ev.key === "Enter" || ev.key === "Tab")) {
+        ev.preventDefault();
+        pick(picks[active]);
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        if (listOpen) {
+          picks = [];
+          list.classList.remove("is-shown");
+        } else close();
+      } else if (ev.key === "Enter" && ev.target === input) {
+        ev.preventDefault();
+        confirm();
+      } else return;
+      ev.stopPropagation();
+    });
+    // 挂在这一列表头（最后一行）下面，放不下就往上、往左挪
+    const anchor = this.cellEl({ r: headRows(tb) - 1, c }) ?? this.root;
+    const ar = anchor.getBoundingClientRect();
+    const vw = doc.documentElement.clientWidth;
+    const vh = doc.documentElement.clientHeight;
+    const pr = pop.getBoundingClientRect();
+    pop.style.left = `${Math.max(8, Math.min(ar.left, vw - pr.width - 8))}px`;
+    pop.style.top = `${ar.bottom + 4 + pr.height > vh - 8 ? Math.max(8, ar.top - 4 - pr.height) : ar.bottom + 4}px`;
+    this.popover = pop;
+    update();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 }
 
