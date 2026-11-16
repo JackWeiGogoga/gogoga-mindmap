@@ -2719,6 +2719,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   .ggt-handle, .ggt-add, .ggt-corner, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-cross-band, .ggt-input { display: none !important; }
   .ggt .ggt-scroll { -webkit-mask-image: none !important; mask-image: none !important; }
   .ggt .ggt-cell.is-selected { box-shadow: none !important; }
+  /* 计算列的 ƒx 标记是编辑时用的，导出不要 */
+  .ggt-fx-badge { display: none !important; }
+  .ggt .ggt-cell.has-fx .ggt-content { padding-right: var(--ggt-pad-x); }
   .ggt-scroll { overflow: visible !important; }
   /* 纸宽有限：表格最宽到页面宽，不让右边被裁掉（设了列宽的表格导出时按比例换成百分比，见 reading.ts） */
   .ggt .ggt-table { max-width: 100% !important; }
@@ -3074,6 +3077,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-fx-badge > span { font-size: 0.75em; }
 .ggt-fx-badge:hover { background: var(--background-modifier-hover); color: var(--text-muted); }
 .ggt-fx-badge.is-error { color: var(--text-error); }
+/* 计算列的格子平时和普通格子一样；能编辑的表格里，鼠标移上去右上角浮出小 ƒx，提示这格是算出来的、不能手动改 */
+.ggt:not(.is-readonly) .ggt-cell.is-fx:hover::after { content: "ƒx"; position: absolute; top: 3px; right: 5px; color: var(--text-faint); font-size: 10px; font-style: italic; font-weight: 600; line-height: 1; pointer-events: none; }
 /* 公式编辑框：挂在表头下面，和菜单同一套底色 */
 .ggt-menu.ggt-fx { display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 10px; font-size: var(--font-ui-small, 13px); }
 .ggt-fx-title { color: var(--text-muted); font-weight: var(--font-semibold, 600); }
