@@ -7,6 +7,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ## [0.78.2] - 2026-11-16
 
 ### Fixed
+- Synced from Table: the Live Preview wrapper around tables no longer scrolls sideways (no extra empty scrollbar with themes that add one).
 - Tables in topics: middle-click autoscroll is no longer blocked (synced from Table).
 
 ## [0.78.1] - 2026-11-16
