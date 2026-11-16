@@ -509,6 +509,11 @@ const en = {
   "settings.theme.desc":
     "Theme for new files. The palette button in the toolbar switches the theme per file and writes the choice to mindmap-theme.",
   "settings.fileNameAsRoot.name": "Use the file name as the central topic",
+  "settings.renameWithRoot.name": "Rename the note with the central topic",
+  "settings.renameWithRoot.desc": "When the central topic is the note's level-1 heading and matches the file name (as in a new mind map), renaming the central topic in the mind map renames the note too. Once they differ, they're left alone.",
+  "notice.rootBadChars": "a file name can't contain \\ / : * ? \" < > | # ^ [ ]",
+  "notice.nameTaken": "a file with that name already exists in this folder",
+  "notice.renameWithRootSkipped": "The note wasn't renamed to \"{name}\": {why}",
   "settings.fileNameAsRoot.desc": "Off: a note's only level-1 heading becomes the central topic. On: the central topic is always the file name and the level-1 heading becomes a first-level branch. Only changes how notes are shown; the file stays the same.",
   "settings.headingLevel.name": "Deepest heading level",
   "settings.headingLevel.desc":
@@ -1267,6 +1272,11 @@ const zh: Record<Key, string> = {
   "settings.theme.name": "默认主题",
   "settings.theme.desc": "新文件用的主题。工具栏的调色盘按钮可以按文件切换，切换结果会写进 mindmap-theme。",
   "settings.fileNameAsRoot.name": "用文件名作中心主题",
+  "settings.renameWithRoot.name": "改中心主题时，和它同名的笔记一起改名",
+  "settings.renameWithRoot.desc": "中心主题是笔记的一级标题、而且和文件名一样时（比如新建的脑图），在脑图里改中心主题，笔记跟着改名。两者不一样了就不再联动。",
+  "notice.rootBadChars": "文件名不能含有 \\ / : * ? \" < > | # ^ [ ]",
+  "notice.nameTaken": "同一个文件夹里已经有同名文件了",
+  "notice.renameWithRootSkipped": "笔记没有跟着改名成「{name}」：{why}",
   "settings.fileNameAsRoot.desc": "关闭时，笔记里唯一的一级标题就是中心主题；打开后中心主题始终是文件名，一级标题作为第一级分支。只改变显示方式，不改文件内容。",
   "settings.headingLevel.name": "标题的最深级别",
   "settings.headingLevel.desc": "新建节点时，比这更深的层级用列表而不是标题写回。已有内容的写法不受影响。",

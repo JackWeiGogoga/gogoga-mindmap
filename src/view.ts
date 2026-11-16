@@ -636,6 +636,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
         if (merged !== this.data) {
           this.data = this.local = merged;
           this.reparse();
+          this.rootSeen = this.doc?.root.text ?? null;
         }
         this.requestSave();
         return;
@@ -645,6 +646,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.data = this.local = data;
     const prev = this.doc;
     this.doc = this.parseText(data);
+    this.rootSeen = this.doc.root.text;
     // 内容变了（不是打开文件）：没变的节点沿用编号，画布只重建改了的
     if (!clear && prev) adoptIds(prev.root, this.doc.root);
     this.lastFolds = foldedSignature(this.doc);
@@ -758,9 +760,37 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   /** 上次保存时折叠着的节点（路径），判断这次改动有没有改折叠 */
   private lastFolds: string | null = null;
 
+  /** 上次看到的中心主题文字：改中心主题时笔记跟着改名，要知道改之前是不是和文件名一样 */
+  private rootSeen: string | null = null;
+
+  /**
+   * 中心主题是一级标题、改之前和文件名一样（新建的图就是这样）：笔记跟着改名（设置「改中心主题时，和它同名的笔记一起改名」）。
+   * 撤销也走这里，改回去时文件名也改回去。新名字不能当文件名、或者重名时，标题照改，只是笔记不改名，提示一下
+   */
+  private followRootRename(): void {
+    const before = this.rootSeen;
+    const doc = this.doc;
+    this.rootSeen = doc ? doc.root.text : null;
+    const file = this.file;
+    if (!file || !doc || !doc.rootFromHeading || !this.plugin.settings.renameWithRoot) return;
+    if (before === null || before.trim() !== file.basename) return;
+    const name = doc.root.text.trim();
+    if (!name || name === file.basename) return;
+    const skip = (why: string): void => {
+      new Notice(t("notice.renameWithRootSkipped", { name, why }));
+    };
+    if (/[\\/:*?"<>|#^[\]]/.test(name)) return skip(t("notice.rootBadChars"));
+    const dir = file.parent && file.parent.path !== "/" ? `${file.parent.path}/` : "";
+    const path = normalizePath(`${dir}${name}.${file.extension}`);
+    const taken = this.app.vault.getAbstractFileByPath(path);
+    if (taken && taken !== file) return skip(t("notice.nameTaken"));
+    this.app.fileManager.renameFile(file, path).catch((e: unknown) => skip(String(e)));
+  }
+
   private onDocChange(doc: MindDoc): void {
     // 中心主题是文件名（不是一级标题）时，改它就是给笔记改名（#27）；它本身不写进文件
     if (this.file && !doc.rootFromHeading && doc.root.text !== this.file.basename) this.renameFromRoot(doc, this.file);
+    if (doc === this.doc) this.followRootRename();
     // 原文里这次没碰到的行保持原样（空行、缩进、行尾空格……），只有改动的地方按插件的格式写
     let next = blankBeforeNodeTables(preserveFormat(this.data, serializeMarkdown(doc), (text) => serializeMarkdown(this.parseText(text))));
     // 设置「列表项下的备注写成引用块」：这次改过的引用块备注后面补空行（合并时会被当成格式差异去掉）
@@ -839,6 +869,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (prev === null) return;
     this.data = this.local = prev;
     this.reparse();
+    this.followRootRename();
     this.imagesChanged();
     this.requestSave();
   }
@@ -849,6 +880,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (next === null) return;
     this.data = this.local = next;
     this.reparse();
+    this.followRootRename();
     this.imagesChanged();
     this.requestSave();
   }

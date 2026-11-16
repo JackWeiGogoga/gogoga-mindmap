@@ -192,6 +192,8 @@ A paragraph here becomes the central topic's note.
 - Fold state is stored in the file too %%fold%%
 ```
 
+When the central topic is the level-1 heading and matches the file name (as in a new mind map), renaming the central topic in the mind map renames the note too, and undo renames it back. Once they differ, they're left alone. Turn off "Rename the note with the central topic" to stop this.
+
 - Color names: `red orange yellow green teal blue purple pink gray`, or `#hex`.
 - On a heading the marker goes on its own line right below it, so the heading text stays clean and `[[note#Heading]]` links keep working; a blank line between them (which plugins like Linter add) is fine. The older style with the marker at the end of the heading line is still read; it is moved to the next line when you change that node in the map, and links elsewhere that included the marker (`[[note#Heading %%fold%%]]`) are updated. List items keep the marker at the end of the line.
 - In the mind map (left and right) structure, dragging a main topic to one side pins it there with `%%left%%` / `%%right%%`, so the other branches stay put.

@@ -172,6 +172,8 @@ export interface MindMapSettings {
   fontScale: number;
   /** 中心主题始终用文件名，唯一的一级标题也只当第一级分支（默认关：一级标题就是中心主题） */
   fileNameAsRoot: boolean;
+  /** 中心主题是一级标题、而且和文件名一样时，在脑图里改中心主题，笔记跟着改名（默认开：新建的图标题和文件名一样） */
+  renameWithRoot: boolean;
   /** 笔记的脑图只把标题当节点，列表都算标题的备注（代码块里的脑图不受影响） */
   headingsOnly: boolean;
   /** 列表项下的备注写成引用块：每行前加 > 写回，读的时候去掉一层（默认关） */
@@ -257,6 +259,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   embedWheel: "click",
   embedToolbarLayout: [],
   fileNameAsRoot: false,
+  renameWithRoot: true,
   headingsOnly: false,
   quoteListNotes: false,
   followActiveNote: false,
@@ -574,6 +577,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           "4": t("settings.indent.spaces", { n: 4 }),
         }),
         toggle("fileNameAsRoot", t("settings.fileNameAsRoot.name"), t("settings.fileNameAsRoot.desc")),
+        toggle("renameWithRoot", t("settings.renameWithRoot.name"), t("settings.renameWithRoot.desc")),
         this.listIconSetting(),
       ]),
       this.customThemesPage(),
