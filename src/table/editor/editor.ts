@@ -222,6 +222,9 @@ export class TableEditor {
   private destroyed = false;
   /** 横向滚动条占的高度（覆盖式滚动条是 0） */
   private scrollbarH = 0;
+  /** 浮在可视区底边的横向滚动条（表格又宽又长、自己的滚动条在屏幕下面时才出来） */
+  private hbar: HTMLElement | null = null;
+  private hbarSync = false;
   /** 列宽按比例缩放时缩了多少（1 = 没缩）；拖列宽时按它换算回文件里的宽度 */
   private fitScale = 1;
   /** 上一次长按开菜单的时间（安卓随后还会来一次右键事件，忽略掉） */
@@ -512,6 +515,8 @@ export class TableEditor {
     this.hideMobileBar();
     if (lastActive === this) lastActive = null;
     this.destroyed = true;
+    this.hbar?.remove();
+    this.hbar = null;
     this.closePopover();
     this.closeSuggest();
     for (const f of this.cleanups) f();
@@ -537,6 +542,7 @@ export class TableEditor {
         this.root.style.setProperty("--ggt-sb", `${bar}px`);
       }
       this.stickHeader();
+      this.placeHBar();
       // 左上角按钮跟着滚动换位置（贴在看得见的边上，滚出去的藏起来）
       this.placeHandles();
       if (this.resizeBar.classList.contains("is-touch")) this.placeTouchResize();
@@ -602,6 +608,61 @@ export class TableEditor {
     if (this.root.parentElement) pro.observe(this.root.parentElement);
     this.cleanups.push(() => pro.disconnect());
     this.cleanups.push(() => ro.disconnect());
+  }
+
+  /**
+   * 又长又宽的表格：横向滚动条在表格最底下，得先翻到底才拖得到（B 站 bili_70604431418）。
+   * 表格比页面宽、底边在可视区下面、上面还有一截露在可视区里时，在可视区底边浮出一条横向滚动条，和表格一起左右滚；
+   * 表格的底边滚进来了就收起，用表格自己那条。被缩放的脑图画布里、触屏上不出（触屏直接左右划）
+   */
+  private placeHBar(): void {
+    const sc = this.scroller;
+    const outer = this.outer;
+    const win = this.root.ownerDocument.defaultView ?? window;
+    const hide = () => this.hbar?.classList.remove("is-shown");
+    if (!outer || !this.root.isConnected || sc.scrollWidth <= sc.clientWidth + 1 || Math.abs(this.scale() - 1) > 0.01 || win.matchMedia?.("(pointer: coarse)").matches) return hide();
+    const o = outer.getBoundingClientRect();
+    const r = sc.getBoundingClientRect();
+    const bottom = Math.min(o.bottom, win.innerHeight);
+    // 表格自己的滚动条已经看得见了，或者表格整个不在可视区里
+    if (r.width === 0 || r.bottom <= bottom || r.top > bottom - 60) return hide();
+    const left = Math.max(r.left, o.left);
+    const right = Math.min(r.right, o.right);
+    if (right - left < 40) return hide();
+    let bar = this.hbar;
+    if (!bar) {
+      const doc = this.root.ownerDocument;
+      bar = doc.body.appendChild(doc.createElement("div"));
+      bar.className = "ggt-hbar";
+      bar.appendChild(doc.createElement("div")).className = "ggt-hbar-inner";
+      bar.addEventListener(
+        "scroll",
+        () => {
+          // 这次是 placeHBar 自己设的位置（跟着表格走），不用反过来再设表格
+          if (this.hbarSync) {
+            this.hbarSync = false;
+            return;
+          }
+          const b = bar!;
+          sc.scrollLeft = (b.scrollLeft / Math.max(1, b.scrollWidth - b.clientWidth)) * (sc.scrollWidth - sc.clientWidth);
+        },
+        { passive: true },
+      );
+      this.hbar = bar;
+    }
+    const inner = bar.firstElementChild as HTMLElement;
+    // 条的宽度对着表格露出来的那段，里面撑开的宽度按比例算，拖到头正好是表格滚到头
+    const w = right - left;
+    inner.style.width = `${Math.round((sc.scrollWidth / sc.clientWidth) * w)}px`;
+    bar.classList.add("is-shown");
+    bar.style.left = `${Math.round(left)}px`;
+    bar.style.width = `${Math.round(w)}px`;
+    bar.style.top = `${Math.round(bottom - bar.offsetHeight)}px`;
+    const target = (sc.scrollLeft / Math.max(1, sc.scrollWidth - sc.clientWidth)) * Math.max(0, bar.scrollWidth - bar.clientWidth);
+    if (Math.abs(bar.scrollLeft - target) > 1) {
+      this.hbarSync = true;
+      bar.scrollLeft = target;
+    }
   }
 
   private outer: HTMLElement | null = null;
@@ -1340,6 +1401,8 @@ export class TableEditor {
       }
       // 下面拦了按下的默认动作，浏览器就不再发 mousedown：Obsidian 的菜单靠它知道点了别处，这里替它收起来（#9）
       this.host.dismissMenus?.();
+      // 中键不拦：留给浏览器的中键滚动（按一下出十字光标，移动鼠标往各个方向滚；B 站 bili_70604431418），和 Obsidian 自己的表格一样
+      if (ev.button === 1) return;
       ev.preventDefault();
       if (ev.button !== 0) return;
       if (ev.shiftKey && this.sel) {

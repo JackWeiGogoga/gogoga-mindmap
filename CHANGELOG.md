@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- Tables in topics: middle-click autoscroll is no longer blocked (synced from Table).
+
 ## [0.78.1] - 2026-11-16
 
 ### Changed

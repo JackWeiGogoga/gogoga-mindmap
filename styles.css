@@ -3097,6 +3097,15 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 
 /* 合计行各列统计方式不一样时，数字前面的小标签（求和、最大、计数……）：只是显示，格子里还是纯数字 */
 .ggt-calc-tag { margin-right: 6px; color: var(--text-faint); font-size: 0.78em; font-weight: normal; }
+
+/* 又长又宽的表格：表格自己的横向滚动条在可视区下面时，可视区底边浮出的那条（和表格一起左右滚）。滚动条一直画出来（macOS 默认的浮动滚动条不滚就看不见） */
+.ggt-hbar { position: fixed; z-index: var(--layer-status-bar, 15); display: none; height: 12px; overflow-x: scroll; overflow-y: hidden; background: color-mix(in srgb, var(--background-primary, #fff) 85%, transparent); }
+.ggt-hbar.is-shown { display: block; }
+.ggt-hbar-inner { height: 1px; }
+.ggt-hbar::-webkit-scrollbar { height: 12px; background: transparent; }
+.ggt-hbar::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 6px; background-clip: padding-box; background-color: var(--scrollbar-thumb-bg, rgba(0, 0, 0, 0.2)); }
+.ggt-hbar::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-active-thumb-bg, rgba(0, 0, 0, 0.35)); }
+@media print { .ggt-hbar { display: none !important; } }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */
