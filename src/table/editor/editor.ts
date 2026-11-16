@@ -390,6 +390,13 @@ export class TableEditor {
         this.apply(duplicateCol(tb, p.c), { r: p.r, c: p.c + 1 });
         return true;
       case "delete-row": {
+        // 只选着表头那一行：删掉它、下一行变成表头（#17）；选了好几行时表头还是删不了
+        if (rows === 1 && r.r1 === 0) {
+          const n = deleteRow(tb, 0);
+          if (n === tb) return false;
+          this.apply(n, { r: 0, c: p.c });
+          return true;
+        }
         if (r.r1 === 0 || rowCount(tb) - rows < 2) return false;
         if (deleteRow(tb, r.r2) === tb) return false;
         let n = tb;
@@ -3034,7 +3041,7 @@ export class TableEditor {
       ...this.colorItems(Array.from({ length: colCount(tb) }, (_, c) => ({ r: p.r, c }))),
       { separator: true },
       // 选中了好几行时和插入一样按选区来
-      this.isMulti() ? this.deleteItems(p)[0] : { title: t("deleteRow"), icon: "trash-2", danger: true, disabled: deleteRow(tb, p.r) === tb, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
+      this.isMulti() ? this.deleteItems(p)[0] : { title: p.r === 0 ? t("deleteHeadRow") : t("deleteRow"), icon: "trash-2", danger: true, disabled: deleteRow(tb, p.r) === tb, run: () => this.apply(deleteRow(tb, p.r), { r: Math.min(p.r, rowCount(tb) - 2), c: p.c }) },
     ];
   }
 
@@ -3093,7 +3100,10 @@ export class TableEditor {
     ];
   }
 
-  /** 删除行 / 列：选区跨了几行（几列）就一次删几行（#4）；表头行不能删，至少留下表头和一行、一列 */
+  /**
+   * 删除行 / 列：选区跨了几行（几列）就一次删几行（#4）；至少留下表头和一行、一列。
+   * 只选着表头那一行时也能删，下一行变成表头（#17）；选了好几行时表头还是删不了
+   */
   private deleteItems(p: Pos): MenuItem[] {
     const tb = this.table;
     const r = (this.isMulti() && this.rangeRect()) || { r1: p.r, c1: p.c, r2: p.r, c2: p.c };
@@ -3101,10 +3111,10 @@ export class TableEditor {
     const cols = r.c2 - r.c1 + 1;
     return [
       {
-        title: rows > 1 ? t("deleteRows").replace("{n}", String(rows)) : t("deleteRow"),
+        title: rows > 1 ? t("deleteRows").replace("{n}", String(rows)) : r.r1 === 0 ? t("deleteHeadRow") : t("deleteRow"),
         icon: "trash-2",
         danger: true,
-        disabled: r.r1 === 0 || rowCount(tb) - rows < 2 || deleteRow(tb, r.r2) === tb,
+        disabled: rows === 1 ? deleteRow(tb, r.r1) === tb : r.r1 === 0 || rowCount(tb) - rows < 2 || deleteRow(tb, r.r2) === tb,
         run: () => this.runCommand("delete-row"),
       },
       {

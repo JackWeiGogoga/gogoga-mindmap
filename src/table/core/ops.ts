@@ -141,13 +141,36 @@ export function insertRow(t: Table, at: number): Table {
 /** 删第 r 行；第一行表头和最后一行数据删不掉（至少留一行数据）。删的是表头区的行，表头跟着少一行 */
 export function deleteRow(t: Table, r: number): Table {
   const h = headRows(t);
-  if (r < 1 || r >= rowCount(t) || (r >= h && rowCount(t) - h <= 1)) return t;
+  if (r === 0 && h === 1) return deleteFirstHeadRow(t);
+  if (r < 0 || r >= rowCount(t) || (r >= h && rowCount(t) - h <= 1)) return t;
   const n = cloneTable(t);
   if (r < h) withHead(n, h - 1);
   if (hasTotal(t) && r === rowCount(t) - 1) delete n.meta.calc;
   n.cells.splice(r, 1);
   remapCells(n.meta, (rr, c) => (rr === r ? null : [rr > r ? rr - 1 : rr, c]));
   remapMerges(n.meta, (rr) => (rr === r ? null : rr > r ? rr - 1 : rr), (c) => c, false);
+  return n;
+}
+
+/**
+ * 删掉唯一的表头行（gogoga-table#17：从别处复制来的表第一行常是空的）：下一行变成表头。
+ * 和删正文的行一样，正文至少留一行（不算合计行）：正文不到两行时不删；
+ * 顶上来以后会横跨表头和正文的合并拆开（字留在各格里）
+ */
+function deleteFirstHeadRow(t: Table): Table {
+  const body = rowCount(t) - 1 - (hasTotal(t) ? 1 : 0);
+  if (body < 2) return t;
+  const n = cloneTable(t);
+  n.cells.splice(0, 1);
+  remapCells(n.meta, (rr, c) => (rr === 0 ? null : [rr - 1, c]));
+  remapMerges(n.meta, (rr) => (rr === 0 ? null : rr - 1), (c) => c, false);
+  if (n.meta.merge) {
+    n.meta.merge = n.meta.merge.filter((m) => {
+      const q = parseRange(m);
+      return !q || !(q.r1 < 1 && q.r2 >= 1);
+    });
+    if (!n.meta.merge.length) delete n.meta.merge;
+  }
   return n;
 }
 

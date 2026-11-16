@@ -4,6 +4,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- With glass-style themes such as OnePage, floating surfaces (topic menus, the note popover, the floating toolbar) were see-through and topic text showed behind them. They now sit on a solid layer, blurred like Obsidian's own menus; opaque themes look the same as before.
+- Tables in topics: the header row can be deleted — right-click a header cell → **Delete header row (the next row becomes the header)** (synced from Table).
+
 ## [0.76.0] - 2026-11-16
 
 ### Added
