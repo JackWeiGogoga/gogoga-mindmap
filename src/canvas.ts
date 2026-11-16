@@ -86,6 +86,12 @@ import {
   renderInline,
   setFrameSize,
   setImageWidth,
+  mapSize,
+  setMapSize,
+  MAP_MAX_H,
+  MAP_MAX_W,
+  MAP_MIN_H,
+  MAP_MIN_W,
   splitMarkers,
   taskState,
   toEditableText,
@@ -139,7 +145,7 @@ export interface CanvasHost {
   /**
    * 节点里的 `![[另一张脑图]]`：链接指向脑图笔记或 .xmind 时，往 el 里挂一张只读预览，返回卸载函数；不是脑图返回 null
    */
-  mapPreview?: (link: string, el: HTMLElement) => (() => void) | null;
+  mapPreview?: (link: string, el: HTMLElement) => { dispose: () => void; fit: () => void } | null;
   /** PDF 截区（PDF++ 的 #rect=）：画进 el，图片好了交回 onImage；画不了返回 false */
   renderPdfCrop?: (link: string, el: HTMLElement, onImage: (img: HTMLImageElement) => void) => boolean;
   /** 原生右键菜单（Obsidian 的 Menu）；没有就用画布自带的 */
@@ -664,7 +670,9 @@ export class MindMapCanvas {
   /** 每个节点当前活着的 iframe，按 id 存，重渲染时复用同一个元素 */
   private frames = new Map<string, HTMLIFrameElement | HTMLMediaElement>();
   /** 节点里嵌入的脑图预览：键是「节点 id|链接|参数」。重画节点时原样搬进新的标签里，不重新加载 */
-  private mapPreviews = new Map<string, { el: HTMLElement; dispose: () => void }>();
+  private mapPreviews = new Map<string, { el: HTMLElement; dispose: () => void; fit: () => void }>();
+  /** 激活着的预览（双击或点「激活」）：能平移、缩放、展开折叠，键同 mapPreviews */
+  private livePreview: string | null = null;
   /** 挡板已经放开的那个节点；跨域 iframe 里点了哪儿看不见，默认全挡住免得误跳转 */
   private liveFrame: string | null = null;
   /** 上次写进去的位置，避免重复写同样的值 */
@@ -754,6 +762,8 @@ export class MindMapCanvas {
   private lastTap: { node: MindNode; time: number } | null = null;
   /** 这次按下是不是落在播放器挡板上；双击挡板是「激活播放器」，不是「编辑文字」 */
   private downOnShield = false;
+  /** 这次按下点在节点里的脑图预览上（双击它是激活，不是编辑） */
+  private downOnPreview: string | null = null;
   /** 按下时落在图片上：双击 / 连点两下就看大图，不进编辑 */
   private downOnImage: HTMLImageElement | null = null;
   private lightbox: HTMLElement | null = null;
@@ -1935,41 +1945,94 @@ export class MindMapCanvas {
   }
 
   /**
-   * 节点里 `![[另一张脑图]]` 的只读预览框（宿主认得是脑图才有）。默认 320 宽、高是宽的 5/8，`![[脑图|400]]` 定宽度。
-   * 预览里的图不能点（交给外面的节点：选中、拖动照常），右上角「打开」按钮打开那张脑图
+   * 节点里 `![[另一张脑图]]` 的只读预览框（宿主认得是脑图才有）。大小见 mapSize（`|400`、`|480x300`），选中节点后右下角手柄能拖。
+   * 平时预览里的图不接鼠标（点、拖都是外面这个节点的）；双击或点「激活」后能平移、缩放、展开折叠（只影响这个预览，不写回那张图），
+   * 点外面或按 Esc 退出。右上角「打开」打开那张脑图
    */
   private mapPreviewFor(node: MindNode, link: string, param: string | undefined, used: Set<string>): HTMLElement | null {
     const host = this.opts.host;
     if (!host?.mapPreview) return null;
-    const key = `${node.id}|${link}|${param ?? ""}`;
+    // 同一个节点里嵌了两次同一张图：按出现的次序区分
+    let n = 0;
+    while (used.has(`${node.id}|${link}|${n}`)) n++;
+    const key = `${node.id}|${link}|${n}`;
+    const size = mapSize(param);
     const old = this.mapPreviews.get(key);
     if (old) {
       used.add(key);
+      // 链接里的大小改了（拖手柄、撤销）：只改框的大小，里面的图不重新加载，大小一变它自己会重新适应
+      old.el.setCssProps({ "--mm-map-w": `${size.w}px`, "--mm-map-h": `${size.h}px` });
       return old.el;
     }
-    const w = param && /^\d+$/.test(param.trim()) ? Math.max(160, Math.min(1200, Number(param))) : 320;
     const box = createDiv({ cls: "mm-map-preview" });
-    box.setCssProps({ "--mm-map-w": `${w}px`, "--mm-map-h": `${Math.round((w * 5) / 8)}px` });
+    box.setCssProps({ "--mm-map-w": `${size.w}px`, "--mm-map-h": `${size.h}px` });
     box.dataset.link = link;
+    box.dataset.key = key;
     const inner = box.createDiv({ cls: "mm-map-preview-body" });
-    const dispose = host.mapPreview(link, inner);
-    if (!dispose) return null;
-    const open = box.createEl("button", { cls: "mm-map-preview-open", text: t("canvas.openMap") });
-    open.type = "button";
-    open.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    open.addEventListener("click", (ev) => {
+    const mounted = host.mapPreview(link, inner);
+    if (!mounted) return null;
+    // 激活着时，预览里的鼠标、滚轮、按键都留在预览里，不让外面的画布拿去选中、拖动、平移
+    for (const type of ["pointerdown", "wheel", "dblclick", "contextmenu", "click"] as const) {
+      inner.addEventListener(type, (ev) => {
+        if (this.livePreview === key) ev.stopPropagation();
+      });
+    }
+    box.addEventListener("keydown", (ev) => {
+      if (this.livePreview !== key) return;
       ev.stopPropagation();
-      host.openLink?.(link, true, ev);
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        this.setLivePreview(null);
+        this.el.focus({ preventScroll: true });
+      }
     });
-    this.mapPreviews.set(key, { el: box, dispose });
+    const bar = box.createDiv({ cls: "mm-map-preview-bar" });
+    const button = (cls: string, text: string, run: (ev: MouseEvent) => void) => {
+      const b = bar.createEl("button", { cls, text });
+      b.type = "button";
+      b.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      b.addEventListener("dblclick", (ev) => ev.stopPropagation());
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        run(ev);
+      });
+      return b;
+    };
+    button("mm-map-preview-live", t("canvas.activateMap"), () => {
+      if (this.livePreview === key) mounted.fit();
+      else this.setLivePreview(key);
+    });
+    button("mm-map-preview-open", t("canvas.openMap"), (ev) => host.openLink?.(link, true, ev));
+    this.mapPreviews.set(key, { el: box, dispose: mounted.dispose, fit: mounted.fit });
     used.add(key);
     return box;
+  }
+
+  /** 激活 / 退出节点里的脑图预览：只改 class，不重画（重画会把预览摘下来） */
+  private setLivePreview(key: string | null): void {
+    if (this.livePreview === key) return;
+    const prev = this.livePreview ? this.mapPreviews.get(this.livePreview) : null;
+    if (prev) {
+      prev.el.classList.remove("is-live");
+      const b = prev.el.querySelector(".mm-map-preview-live");
+      if (b) b.textContent = t("canvas.activateMap");
+    }
+    this.livePreview = key;
+    const cur = key ? this.mapPreviews.get(key) : null;
+    if (!cur) {
+      this.livePreview = null;
+      return;
+    }
+    cur.el.classList.add("is-live");
+    const b = cur.el.querySelector(".mm-map-preview-live");
+    if (b) b.textContent = t("canvas.fitMap");
   }
 
   /** 节点重画完：这次没用到的预览卸掉（链接改了、删了）；不给 keep 就是这个节点的全卸掉 */
   private dropMapPreviews(nodeId: string, keep?: Set<string>): void {
     for (const [key, p] of this.mapPreviews) {
       if (!key.startsWith(`${nodeId}|`) || keep?.has(key)) continue;
+      if (this.livePreview === key) this.livePreview = null;
       p.dispose();
       p.el.remove();
       this.mapPreviews.delete(key);
@@ -4664,6 +4727,7 @@ export class MindMapCanvas {
       if (target.closest(".mm-toolbar, .mm-popover, .mm-nodebar")) return;
       // 双击有两条路（原生 dblclick 和 pointerup 自判定），两条都得知道有没有落在挡板上
       this.downOnShield = !!target.closest(".mm-frame-shield");
+      this.downOnPreview = target.closest<HTMLElement>(".mm-map-preview")?.dataset.key ?? null;
       this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
       const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
       this.cancelTapCenter();
@@ -4816,6 +4880,7 @@ export class MindMapCanvas {
         if (this.lastTap && this.lastTap.node === tapped && now - this.lastTap.time < 400) {
           this.lastTap = null;
           if (this.downOnShield) this.setLiveFrame(tapped.id);
+          else if (this.downOnPreview) this.setLivePreview(this.downOnPreview);
           else if (this.downOnImage) this.openLightbox(this.downOnImage);
           else this.editOnDoubleTap(tapped);
         } else {
@@ -4940,6 +5005,16 @@ export class MindMapCanvas {
       );
     }
 
+    // 激活着的脑图预览：点到它外面（画布上、页面别处）就退出
+    this.on(
+      el.ownerDocument,
+      "pointerdown",
+      (ev) => {
+        const live = this.livePreview ? this.mapPreviews.get(this.livePreview) : null;
+        if (live && !live.el.contains(ev.target as Node)) this.setLivePreview(null);
+      },
+      { capture: true },
+    );
     this.on(el, "dblclick", (ev) => {
       if (this.opts.embedded) ev.stopPropagation();
       const nodeEl = (ev.target as HTMLElement).closest<HTMLElement>(".gg-mm-node");
@@ -4963,6 +5038,12 @@ export class MindMapCanvas {
         return;
       }
       ev.preventDefault();
+      // 双击节点里嵌入的脑图预览：激活它（和视频的挡板一样），不进编辑
+      const preview = (ev.target as HTMLElement).closest<HTMLElement>(".mm-map-preview");
+      if (preview?.dataset.key) {
+        this.setLivePreview(preview.dataset.key);
+        return;
+      }
       const img = this.imageAt(ev.target as HTMLElement, ev.clientX, ev.clientY);
       if ((ev.target as HTMLElement).closest(".mm-frame-shield")) this.setLiveFrame(node.id);
       else if (img) this.openLightbox(img);
@@ -8571,6 +8652,9 @@ export class MindMapCanvas {
     this.imgHandle = null;
     if (!this.opts.editable || !this.primary || this.editing) return;
     const el = this.els.get(this.primary.id);
+    // 嵌入的脑图预览：手柄拖宽高（写成 ![[脑图|宽x高]]）。预览里面的图片、视频不算这个节点的
+    const mapBox = el ? ([...el.querySelectorAll<HTMLElement>(".mm-map-preview")].find((p) => !p.parentElement?.closest(".mm-map-preview")) ?? null) : null;
+    if (el && mapBox) return this.mapResizeHandle(el, mapBox, this.primary);
     const iframe = el?.querySelector<HTMLIFrameElement>("iframe.mm-frame");
     // 视频和图片一样只调宽度（写成 ![[片段.mp4|宽度]]），高度跟着画面比例
     const video = iframe ? null : el?.querySelector<HTMLVideoElement>("video.mm-media");
@@ -8663,6 +8747,61 @@ export class MindMapCanvas {
         return;
       }
       node.text = setImageWidth(node.text, null);
+      this.render();
+      this.notify();
+    });
+    this.imgHandle = handle;
+  }
+
+  /** 节点里嵌入的脑图预览右下角的手柄：宽高随便拖，松手写进链接（![[脑图|480x300]]）；双击恢复默认大小 */
+  private mapResizeHandle(el: HTMLElement, box: HTMLElement, node: MindNode): void {
+    const link = box.dataset.link ?? "";
+    const handle = createDiv();
+    handle.className = "mm-img-handle";
+    this.tip(handle, t("canvas.resizeMap"), "fixed", "right");
+    el.append(handle);
+    this.placeImageHandle(handle, box);
+    let drag: { x: number; y: number; w: number; h: number } | null = null;
+    handle.addEventListener("pointerdown", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      drag = { x: ev.clientX, y: ev.clientY, w: box.offsetWidth, h: box.offsetHeight };
+      this.imgResize = { node, box: box as unknown as HTMLImageElement, frame: false, startX: ev.clientX, startY: ev.clientY, startW: drag.w, startH: drag.h, handle };
+      try {
+        handle.setPointerCapture(ev.pointerId);
+      } catch {
+        // 合成事件
+      }
+    });
+    handle.addEventListener("pointermove", (ev) => {
+      if (!drag) return;
+      ev.stopPropagation();
+      const w = Math.max(MAP_MIN_W, Math.min(MAP_MAX_W, drag.w + (ev.clientX - drag.x) / this.k));
+      const h = Math.max(MAP_MIN_H, Math.min(MAP_MAX_H, drag.h + (ev.clientY - drag.y) / this.k));
+      box.setCssProps({ "--mm-map-w": `${Math.round(w)}px`, "--mm-map-h": `${Math.round(h)}px` });
+      this.reflow();
+      this.placeImageHandle(handle, box);
+    });
+    const finish = (ev: PointerEvent) => {
+      if (!drag) return;
+      ev.stopPropagation();
+      const start = drag;
+      drag = null;
+      this.imgResize = null;
+      const w = box.offsetWidth;
+      const h = box.offsetHeight;
+      if (w === start.w && h === start.h) return;
+      node.text = setMapSize(node.text, link, { w, h });
+      this.render();
+      this.notify();
+    };
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+    handle.addEventListener("dblclick", (ev) => {
+      ev.stopPropagation();
+      const next = setMapSize(node.text, link, null);
+      if (next === node.text) return;
+      node.text = next;
       this.render();
       this.notify();
     });

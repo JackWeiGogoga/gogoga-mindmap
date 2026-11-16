@@ -2239,7 +2239,7 @@ export default class MindMapPlugin extends Plugin {
               const embed = new MindMapEmbed(this, { app: this.app, containerEl: el, sourcePath: sourcePath() }, file, hash < 0 ? "" : link.slice(hash + 1), true);
               component.addChild(embed);
               void embed.loadFile();
-              return () => component.removeChild(embed);
+              return { dispose: () => component.removeChild(embed), fit: () => embed.fitView() };
             },
       claimKeys: (el, onKey) => {
         // Obsidian 的热键在 window 捕获阶段就处理了，画布自己的 keydown 来不及拦：

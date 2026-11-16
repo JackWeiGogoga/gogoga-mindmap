@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ANSWER_MARKER, isAnswer, mayBeMap, mediaKind, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
+import { ANSWER_MARKER, isAnswer, mapSize, mayBeMap, setMapSize, mediaKind, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -229,4 +229,21 @@ test("mediaKind：Obsidian 能播的视频、音频（#40），带 #片段、大
 test("节点里的 ![[…]] 哪些要问宿主是不是脑图：笔记、.md、.xmind；图片、音视频、PDF、网址、别的扩展名不问", () => {
   for (const l of ["子图", "子图#分支", "子图#^abc", "文件夹/子图.md", "竞品分析.xmind", "子图|400"]) assert.equal(mayBeMap(l), true, l);
   for (const l of ["图.png", "图.JPG", "片段.mp4", "声音.mp3", "论文.pdf", "论文.pdf#page=2", "https://a.cn/x", "表格.csv", "白板.canvas", ""]) assert.equal(mayBeMap(l), false, l);
+});
+
+test("嵌入脑图预览的大小：没写 320×200，|400 高按 5:8，|480x300 都定，超出范围夹住", () => {
+  assert.deepEqual(mapSize(undefined), { w: 320, h: 200 });
+  assert.deepEqual(mapSize("80%"), { w: 320, h: 200 });
+  assert.deepEqual(mapSize("400"), { w: 400, h: 250 });
+  assert.deepEqual(mapSize("480x300"), { w: 480, h: 300 });
+  assert.deepEqual(mapSize("480×300"), { w: 480, h: 300 });
+  assert.deepEqual(mapSize("10x5000"), { w: 160, h: 900 });
+});
+
+test("拖完写回链接：只改指向这张图的那个嵌入，去掉大小就是恢复默认", () => {
+  assert.equal(setMapSize("看 ![[子图]] 和 ![[图.png|200]]", "子图", { w: 480, h: 300 }), "看 ![[子图|480x300]] 和 ![[图.png|200]]");
+  assert.equal(setMapSize("![[别的]] ![[子图|400]]", "子图", { w: 500.4, h: 260.6 }), "![[别的]] ![[子图|500x261]]");
+  assert.equal(setMapSize("![[子图|480x300]]", "子图", null), "![[子图]]");
+  assert.equal(setMapSize("![[子图#分支|400]]", "子图#分支", { w: 300, h: 200 }), "![[子图#分支|300x200]]");
+  assert.equal(setMapSize("没有嵌入", "子图", { w: 300, h: 200 }), "没有嵌入");
 });

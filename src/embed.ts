@@ -81,6 +81,11 @@ export class MindMapEmbed extends Component {
     super();
   }
 
+  /** 回到整张图（节点里的预览点「适应」） */
+  fitView(): void {
+    this.canvas?.fit();
+  }
+
   /** 放在白板卡片里：卡片多大就铺多大，而不是按图的大小算高度 */
   private inCanvas(): boolean {
     return this.inNode || !!this.ctx.containerEl.closest(".canvas-node");
@@ -123,7 +128,8 @@ export class MindMapEmbed extends Component {
         edge: edgeFromFrontmatter(fm),
         editable: false,
         embedded: true,
-        embedWheelLock: () => settings.embedWheel !== "always",
+        // 节点里的预览激活了才接鼠标，激活后滚轮直接拿来缩放、平移，不用再点一下
+        embedWheelLock: () => !this.inNode && settings.embedWheel !== "always",
         toolbarPosition: settings.toolbarPosition,
         wheelZoom: () => settings.wheelAction === "zoom",
         notePreview: () => settings.notePreview,

@@ -475,6 +475,40 @@ export function setFrameSize(text: string, size: { w: number; h: number } | null
   return text.slice(0, m.index) + `<iframe ${attrs}>${m[2] ?? ""}` + text.slice(m.index + m[0].length);
 }
 
+/** 节点里嵌入的脑图预览的尺寸 */
+export const MAP_MIN_W = 160;
+export const MAP_MAX_W = 1200;
+export const MAP_MIN_H = 100;
+export const MAP_MAX_H = 900;
+export const MAP_DEFAULT_W = 320;
+export const MAP_DEFAULT_H = 200;
+
+/** `![[脑图|参数]]` 的参数 → 预览大小：`400` 定宽、高按 5:8；`480x300` 宽高都定；别的（没写、80%）是默认 320×200 */
+export function mapSize(param: string | undefined): { w: number; h: number } {
+  const p = (param ?? "").trim();
+  const clampW = (v: number) => Math.max(MAP_MIN_W, Math.min(MAP_MAX_W, Math.round(v)));
+  const clampH = (v: number) => Math.max(MAP_MIN_H, Math.min(MAP_MAX_H, Math.round(v)));
+  const both = /^(\d+)\s*[x×]\s*(\d+)$/i.exec(p);
+  if (both) return { w: clampW(Number(both[1])), h: clampH(Number(both[2])) };
+  if (/^\d+$/.test(p)) {
+    const w = clampW(Number(p));
+    return { w, h: clampH((w * 5) / 8) };
+  }
+  return { w: MAP_DEFAULT_W, h: MAP_DEFAULT_H };
+}
+
+/** 把文字里第一个指向 link 的 `![[…]]` 的大小改成 宽x高（size 为 null 去掉，恢复默认） */
+export function setMapSize(text: string, link: string, size: { w: number; h: number } | null): string {
+  const re = /!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g;
+  for (const m of text.matchAll(re)) {
+    if (m[1].trim() !== link.trim()) continue;
+    const param = size ? `|${Math.round(size.w)}x${Math.round(size.h)}` : "";
+    const idx = m.index ?? 0;
+    return text.slice(0, idx) + `![[${m[1]}${param}]]` + text.slice(idx + m[0].length);
+  }
+  return text;
+}
+
 const FRAME_TAG_RE = /<iframe\s([^>]*?)\/?>(\s*<\/iframe>)?/i;
 
 export const FRAME_MIN = 80;

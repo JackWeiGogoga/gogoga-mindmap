@@ -285,6 +285,9 @@ const en = {
   "canvas.wholeMap": "Whole map",
   "canvas.crumbSiblings": "Focus on another topic at this level",
   "canvas.openMap": "Open",
+  "canvas.activateMap": "Activate",
+  "canvas.fitMap": "Fit",
+  "canvas.resizeMap": "Drag to resize the preview. Double-click to reset to 320×200",
   "canvas.emptyNode": "Empty",
   "canvas.untitled": "Untitled",
 
@@ -1055,6 +1058,9 @@ const zh: Record<Key, string> = {
   "canvas.wholeMap": "全图",
   "canvas.crumbSiblings": "聚焦到这一级的其他主题",
   "canvas.openMap": "打开",
+  "canvas.activateMap": "激活",
+  "canvas.fitMap": "适应",
+  "canvas.resizeMap": "拖动改预览大小，双击恢复 320×200",
   "canvas.emptyNode": "（空）",
   "canvas.untitled": "未命名",
 
