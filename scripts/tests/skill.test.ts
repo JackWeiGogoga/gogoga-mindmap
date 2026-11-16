@@ -14,8 +14,8 @@ test("SKILL.md 的脑图笔记示例：节点、备注、标记都按说明读�
   const doc = parseMarkdown(src, { fallbackTitle: "" });
   assert.equal(doc.root.text, "Product launch");
   assert.equal(doc.root.note, "The launch plan for Q3.");
-  const [goals, timeline, risks, owners] = doc.root.children;
-  assert.deepEqual(doc.root.children.map((n) => n.text), ["Goals", "Timeline", "Risks", "Owners"]);
+  const [goals, timeline, risks, owners, next] = doc.root.children;
+  assert.deepEqual(doc.root.children.map((n) => n.text), ["Goals", "Timeline", "Risks", "Owners", "Next steps"]);
   assert.equal(goals.color, "blue");
   assert.equal(timeline.color, "green");
   assert.equal(timeline.callout, "Dates are tentative");
@@ -27,6 +27,8 @@ test("SKILL.md 的脑图笔记示例：节点、备注、标记都按说明读�
   assert.equal(risks.children[1].children.length, 0);
   assert.equal(unescapeNote(risks.children[1].note), "- Load test in week 2\n- Autoscaling as a fallback");
   assert.equal(owners.summary?.text, "Weekly sync on Mondays");
+  // 有序列表：子节点带编号，写回还是 1. 2. 3.
+  assert.deepEqual(next.children.map((n) => n.text), ["Sign the contract", "Hire a designer", "Book the venue"]);
   assert.equal(serializeMarkdown(doc), src);
 });
 

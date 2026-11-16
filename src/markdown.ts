@@ -100,8 +100,8 @@ export function markerText(s: string): string {
 export function calloutToMarker(s: string): string {
   let open = false;
   return s
-    // 文字颜色、荧光笔的 <span style="…">：属性改用单引号，不然双引号会截断标记（标注也能上颜色，群里反馈）
-    .replace(/<span style="([^"<>]*)">/g, "<span style='$1'>")
+    // 文字颜色 <span style="…">、荧光笔 <mark style="…">：属性改用单引号，不然双引号会截断标记（标注也能上颜色，群里反馈）
+    .replace(/<(span|mark) style="([^"<>]*)">/g, "<$1 style='$2'>")
     .replace(/"/g, () => {
       open = !open;
       return open ? "\u201c" : "\u201d";
@@ -118,7 +118,7 @@ export function calloutToMarker(s: string): string {
 export function calloutFromMarker(s: string): string {
   return s
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<span style='([^'<>]*)'>/g, '<span style="$1">')
+    .replace(/<(span|mark) style='([^'<>]*)'>/g, '<$1 style="$2">')
     .trim();
 }
 
@@ -1060,7 +1060,12 @@ export function convertLevelKind(node: MindNode, kind: NodeKind, style: DocStyle
 export function frontmatterValue(frontmatter: string, key: string): string | null {
   const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:[ \\t]*(.*?)[ \\t]*$`, "m");
   const m = re.exec(frontmatter);
-  return m ? m[1].replace(/^["']|["']$/g, "") : null;
+  if (!m) return null;
+  const raw = m[1];
+  // 带引号的值取引号里面的；不带引号的，按 YAML 的规矩去掉行尾 ` # 注释`（README 的示例就这么写，Obsidian 的属性面板也这样读）
+  const q = /^(["'])(.*)\1(?:[ \t]+#.*)?$/.exec(raw);
+  if (q) return q[2];
+  return raw.replace(/[ \t]+#.*$/, "").replace(/^["']|["']$/g, "");
 }
 
 /** 设置或替换 frontmatter 里的一个标量键 */

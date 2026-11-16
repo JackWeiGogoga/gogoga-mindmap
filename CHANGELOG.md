@@ -4,6 +4,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- A highlighter color inside a callout broke the callout: its quotes were turned into curly quotes when saved. It's now saved like text colors and comes back intact.
+- Frontmatter options with a `# comment` after the value (`mindmap-structure: mindmap   # …`, as in the README) were ignored. The comment is now dropped, as in YAML.
+
 ## [0.75.0] - 2026-11-16
 
 ### Added

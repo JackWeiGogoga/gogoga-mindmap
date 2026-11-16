@@ -873,3 +873,25 @@ test("节点颜色设置：颜色名和色值都认，认不出的忽略，空�
   assert.deepEqual(parseNodeColors(""), [...COLOR_NAMES]);
   assert.deepEqual(parseNodeColors("乱写"), [...COLOR_NAMES]);
 });
+
+test("标注里的文字颜色、荧光笔：写进标记时属性用单引号，读回来原样还原，标记不被截断", async () => {
+  const { calloutToMarker, calloutFromMarker, formatMarker, splitMarker } = await import("../../src/markdown");
+  const text = '<span style="color:#e03e3e">红字</span>和<mark style="background:#ffd43b">荧光</mark>，他说"好"';
+  const m = calloutToMarker(text);
+  assert.equal(m, "<span style='color:#e03e3e'>红字</span>和<mark style='background:#ffd43b'>荧光</mark>，他说“好”");
+  assert.equal(calloutFromMarker(m), '<span style="color:#e03e3e">红字</span>和<mark style="background:#ffd43b">荧光</mark>，他说“好”');
+  const back = splitMarker(`节点${formatMarker({ folded: false, callout: m })}`);
+  assert.equal(back.text, "节点");
+  assert.equal(calloutFromMarker(back.marker.callout ?? ""), '<span style="color:#e03e3e">红字</span>和<mark style="background:#ffd43b">荧光</mark>，他说“好”');
+});
+
+test("frontmatter 的值后面跟 # 注释：按 YAML 去掉注释（README 的示例照抄也能用）", async () => {
+  const { frontmatterValue } = await import("../../src/markdown");
+  const fm = '---\nmindmap-structure: mindmap   # 可选：logic-right | mindmap\nmindmap-theme: "rainbow" # 注释\nmindmap-edge: elbow\ntitle: C# 入门\ntag: "#重点"\n---';
+  assert.equal(frontmatterValue(fm, "mindmap-structure"), "mindmap");
+  assert.equal(frontmatterValue(fm, "mindmap-theme"), "rainbow");
+  assert.equal(frontmatterValue(fm, "mindmap-edge"), "elbow");
+  // # 前面没有空格不是注释；引号里的 # 是值的一部分
+  assert.equal(frontmatterValue(fm, "title"), "C# 入门");
+  assert.equal(frontmatterValue(fm, "tag"), "#重点");
+});
