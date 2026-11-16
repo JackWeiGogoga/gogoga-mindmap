@@ -35,6 +35,10 @@ export interface InlineOptions {
    * 所以视频这类内容必须复用同一个元素，不能每次重渲染都新建。
    */
   reuseFrame?: (src: string) => HTMLElement | null;
+  /**
+   * 节点里的 `![[另一张脑图]]`：宿主认出是脑图（或 .xmind）就返回一个只读预览框，不是返回 null，照常当图片 / 文字处理
+   */
+  mapPreview?: (link: string, param: string | undefined) => HTMLElement | null;
 }
 
 /** 答案标记：背诵模式下带它的节点连同子树整个遮住，点一下揭开；截图题、文字题都能用 */
@@ -600,6 +604,11 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
   if (isPdfCrop(link)) return pdfCrop(link, param, opts);
   const kind = mediaKind(link);
   if (kind) return media(kind, link, param, alt, opts);
+  // 不是图片扩展名的（笔记、.xmind）先问宿主是不是脑图
+  if (opts.mapPreview && mayBeMap(link)) {
+    const preview = opts.mapPreview(link, param);
+    if (preview) return preview;
+  }
   const src = opts.resolveImage ? opts.resolveImage(link) : /^https?:\/\//.test(link) ? link : null;
   if (!src) return wrap("span", alt || link);
   const img = createEl("img");
@@ -619,6 +628,17 @@ function image(link: string, param: string | undefined, alt: string, opts: Inlin
     opts.onImageLoad?.();
   });
   return img;
+}
+
+/** 图片扩展名：这些不用问宿主是不是脑图 */
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico|tiff?|heic)$/i;
+
+/** `![[…]]` 可能指向一张脑图（笔记、.xmind）：不是图片、音视频、PDF、网址 */
+export function mayBeMap(link: string): boolean {
+  const path = link.split(/[#|]/)[0].trim();
+  if (!path || /^[a-z][\w+.-]*:/i.test(path)) return false;
+  if (IMAGE_EXT_RE.test(path) || mediaKind(path) || /\.pdf$/i.test(path)) return false;
+  return !/\.[a-z0-9]+$/i.test(path) || /\.(md|xmind)$/i.test(path);
 }
 
 /** PDF++ 的截区嵌入：链接指向 PDF 里的一块矩形（`#page=1&rect=x1,y1,x2,y2`） */

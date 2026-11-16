@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Embed another mind map in a topic (suggested on Xiaohongshu): `![[Another map]]` or `![[File.xmind]]` in a topic used to show just the name; it now shows a small read-only preview that follows the map as it changes. 320 px wide by default, `![[Map|400]]` sets the width. Clicking the preview is the same as clicking the topic (select, drag), and **Open** in its corner opens that map. Maps embedded inside the preview stay as text; exported images show a card with the map's name instead of the preview.
+
 ## [0.77.0] - 2026-11-16
 
 ### Added

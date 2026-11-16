@@ -61,7 +61,7 @@ export function registerMindMapEmbeds(plugin: MindMapPlugin): void {
   }
 }
 
-class MindMapEmbed extends Component {
+export class MindMapEmbed extends Component {
   private canvas: MindMapCanvas | null = null;
   private wrap: HTMLElement | null = null;
   private lastHeight = 0;
@@ -75,13 +75,15 @@ class MindMapEmbed extends Component {
     private file: TFile,
     /** 嵌入链接里 # 后面的部分：标题路径或 ^块 id，空串为整张图 */
     private subpath = "",
+    /** 挂在另一张脑图的节点里（固定大小的只读预览）：铺满预览框，里面的节点再嵌脑图只显示文字（只嵌一层） */
+    private inNode = false,
   ) {
     super();
   }
 
   /** 放在白板卡片里：卡片多大就铺多大，而不是按图的大小算高度 */
   private inCanvas(): boolean {
-    return !!this.ctx.containerEl.closest(".canvas-node");
+    return this.inNode || !!this.ctx.containerEl.closest(".canvas-node");
   }
 
   onload(): void {
@@ -155,7 +157,7 @@ class MindMapEmbed extends Component {
           this.shownK = state.k;
           this.rememberZoom(state.k);
         },
-        host: this.plugin.canvasHost(() => this.ctx.sourcePath, this),
+        host: this.plugin.canvasHost(() => this.ctx.sourcePath, this, undefined, { mapPreview: !this.inNode }),
         onOpenFile: () => void this.plugin.app.workspace.openLinkText(this.file.path, this.ctx.sourcePath),
         onLayout: (bounds) => {
           this.bounds = bounds;

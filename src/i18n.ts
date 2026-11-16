@@ -284,6 +284,7 @@ const en = {
   "canvas.clearMarkers": "Clear all markers",
   "canvas.wholeMap": "Whole map",
   "canvas.crumbSiblings": "Focus on another topic at this level",
+  "canvas.openMap": "Open",
   "canvas.emptyNode": "Empty",
   "canvas.untitled": "Untitled",
 
@@ -1048,6 +1049,7 @@ const zh: Record<Key, string> = {
   "canvas.clearMarkers": "清除全部标记",
   "canvas.wholeMap": "全图",
   "canvas.crumbSiblings": "聚焦到这一级的其他主题",
+  "canvas.openMap": "打开",
   "canvas.emptyNode": "（空）",
   "canvas.untitled": "未命名",
 

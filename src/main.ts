@@ -72,7 +72,7 @@ import { noteFormatBarExtension } from "./note-format-bar";
 import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
-import { registerMindMapEmbeds } from "./embed";
+import { MindMapEmbed, registerMindMapEmbeds } from "./embed";
 import { AttachmentJanitor } from "./attachment-cleanup";
 import { scrollEditorLineToCenter, scrollParentWithin, scrollWithin } from "./scroll-inside";
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
@@ -2224,8 +2224,23 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
-  canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent): CanvasHost {
+  canvasHost(sourcePath: () => string, component: Component, hoverParent?: HoverParent, opts: { mapPreview?: boolean } = {}): CanvasHost {
     return {
+      // 节点里的 ![[另一张脑图]]：显示成只读预览（预览里的节点再嵌脑图就不展开了，只嵌一层；嵌自己也不展开）
+      mapPreview:
+        opts.mapPreview === false
+          ? undefined
+          : (link, el) => {
+              const hash = link.indexOf("#");
+              const path = hash < 0 ? link : link.slice(0, hash);
+              const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath());
+              if (!file || file.path === sourcePath()) return null;
+              if (file.extension !== "xmind" && !(file.extension === "md" && this.isMindMapFile(file.path))) return null;
+              const embed = new MindMapEmbed(this, { app: this.app, containerEl: el, sourcePath: sourcePath() }, file, hash < 0 ? "" : link.slice(hash + 1), true);
+              component.addChild(embed);
+              void embed.loadFile();
+              return () => component.removeChild(embed);
+            },
       claimKeys: (el, onKey) => {
         // Obsidian 的热键在 window 捕获阶段就处理了，画布自己的 keydown 来不及拦：
         // F2 默认是「重命名文件」，在笔记里嵌入的图上按 F2 会跑去改文件名。

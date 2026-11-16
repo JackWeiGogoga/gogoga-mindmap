@@ -207,6 +207,12 @@ export async function buildSvg(canvas: MindMapCanvas, opts: ExportOptions = {}):
     const zoom = (canvas as unknown as { k: number }).k || 1;
     if (h / zoom <= lh * 1.5) cloneLabels[i].setCssStyles({ whiteSpace: "pre" });
   });
+  // 节点里嵌入的脑图预览：导出时换成一张写着脑图名字的卡片（里面那张图靠插件样式排版，去掉类名后会散掉）；克隆出来的不在页面上量不出尺寸，用预览框上写的宽高
+  clone.querySelectorAll<HTMLElement>(".mm-map-preview").forEach((p) => {
+    const card = createDiv({ text: `🗺 ${(p.dataset.link ?? "").split(/[#|]/)[0].split("/").pop()?.replace(/\.md$/i, "") ?? ""}` });
+    card.setCssStyles({ display: "flex", alignItems: "center", justifyContent: "center", width: p.style.getPropertyValue("--mm-map-w") || "320px", height: p.style.getPropertyValue("--mm-map-h") || "200px", boxSizing: "border-box", border: "1px solid #d0d0d0", borderRadius: "8px", fontSize: "13px", color: "#666" });
+    p.replaceWith(card);
+  });
   clone.querySelectorAll(".mm-toggle:not(.is-folded), .mm-img-handle, .mm-width-handle, .mm-range-handle, .mm-summary-handle, .mm-callout-icon, .mm-callout.is-peek, .mm-note-card-fold, .mm-note-card-resize, .mm-quiz-tag, .mm-pdf-jump, .ggt-corner, .ggt-add, .ggt-handle, .ggt-resize, .ggt-fill, .ggt-fill-preview, .ggt-range-box, .ggt-cross-band, .ggt-input, .ggt-suggest").forEach((t) => t.remove());
   clone.querySelectorAll(".is-selected, .is-drop-target, .mm-rel-label.is-active").forEach((n) => {
     (n as HTMLElement).setCssStyles({ boxShadow: "none" });

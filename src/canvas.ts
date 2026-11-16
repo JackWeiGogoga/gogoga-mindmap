@@ -136,6 +136,10 @@ export interface CanvasHost {
   afterRender?: () => void;
   /** 把图片链接解析成 src */
   resolveImage?: (link: string) => string | null;
+  /**
+   * 节点里的 `![[另一张脑图]]`：链接指向脑图笔记或 .xmind 时，往 el 里挂一张只读预览，返回卸载函数；不是脑图返回 null
+   */
+  mapPreview?: (link: string, el: HTMLElement) => (() => void) | null;
   /** PDF 截区（PDF++ 的 #rect=）：画进 el，图片好了交回 onImage；画不了返回 false */
   renderPdfCrop?: (link: string, el: HTMLElement, onImage: (img: HTMLImageElement) => void) => boolean;
   /** 原生右键菜单（Obsidian 的 Menu）；没有就用画布自带的 */
@@ -659,6 +663,8 @@ export class MindMapCanvas {
   private elContent = new WeakMap<HTMLElement, string>();
   /** 每个节点当前活着的 iframe，按 id 存，重渲染时复用同一个元素 */
   private frames = new Map<string, HTMLIFrameElement | HTMLMediaElement>();
+  /** 节点里嵌入的脑图预览：键是「节点 id|链接|参数」。重画节点时原样搬进新的标签里，不重新加载 */
+  private mapPreviews = new Map<string, { el: HTMLElement; dispose: () => void }>();
   /** 挡板已经放开的那个节点；跨域 iframe 里点了哪儿看不见，默认全挡住免得误跳转 */
   private liveFrame: string | null = null;
   /** 上次写进去的位置，避免重复写同样的值 */
@@ -1481,6 +1487,8 @@ export class MindMapCanvas {
     this.ro?.disconnect();
     this.noteRo?.disconnect();
     for (const id of [...this.tableEds.keys()]) this.dropTable(id);
+    for (const p of this.mapPreviews.values()) p.dispose();
+    this.mapPreviews.clear();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     if (this.notifyTimer !== null) window.clearTimeout(this.notifyTimer);
     if (this.reflowTimer !== null) window.clearTimeout(this.reflowTimer);
@@ -1778,6 +1786,7 @@ export class MindMapCanvas {
       if (!keepChildren) {
         const label = createDiv();
         label.className = "mm-label";
+        const usedPreviews = new Set<string>();
         renderInline(label, node.text || (node.depth === 0 ? t("canvas.centralTopic") : ""), {
           onLink: (href, internal, ev) => {
             this.keepLinkNode(node);
@@ -1801,8 +1810,11 @@ export class MindMapCanvas {
             const f = this.frames.get(node.id);
             return f && f.src === src ? f : null;
           },
+          mapPreview: (link, param) => this.mapPreviewFor(node, link, param, usedPreviews),
         });
-        const frame = label.querySelector<HTMLIFrameElement | HTMLMediaElement>(".mm-frame");
+        this.dropMapPreviews(node.id, usedPreviews);
+        // 嵌入的脑图预览里也可能有视频：只认这个节点自己的
+        const frame = [...label.querySelectorAll<HTMLIFrameElement | HTMLMediaElement>(".mm-frame")].find((f) => !f.closest(".mm-map-preview")) ?? null;
         if (frame) this.frames.set(node.id, frame);
         else this.frames.delete(node.id);
         const shield = label.querySelector<HTMLElement>(".mm-frame-shield");
@@ -1833,7 +1845,7 @@ export class MindMapCanvas {
       if (num) el.classList.add("has-num");
       if (progBelow) el.classList.add("has-progress-below");
       // PDF 截区的图是 PDF++ 之后才异步画进来的：排版这时还没有 <img>，看截区的外框也算图片节点（不然节点最宽 300，拖大了图片伸出框外）
-      if (el.querySelector(".mm-label img, .mm-label .mm-pdf-crop")) el.classList.add("has-image");
+      if (el.querySelector(".mm-label img, .mm-label .mm-pdf-crop, .mm-label .mm-map-preview")) el.classList.add("has-image");
       if (this.frames.has(node.id)) {
         el.classList.add("has-frame");
         if (this.liveFrame === node.id) el.classList.add("is-frame-live");
@@ -1914,11 +1926,54 @@ export class MindMapCanvas {
       this.elSigs.delete(el);
       this.lastPos.delete(el);
       this.frames.delete(id);
+      this.dropMapPreviews(id);
       el.remove();
     }
     this.els = next;
     this.renderCrumbs();
     this.opts.host?.afterRender?.();
+  }
+
+  /**
+   * 节点里 `![[另一张脑图]]` 的只读预览框（宿主认得是脑图才有）。默认 320 宽、高是宽的 5/8，`![[脑图|400]]` 定宽度。
+   * 预览里的图不能点（交给外面的节点：选中、拖动照常），右上角「打开」按钮打开那张脑图
+   */
+  private mapPreviewFor(node: MindNode, link: string, param: string | undefined, used: Set<string>): HTMLElement | null {
+    const host = this.opts.host;
+    if (!host?.mapPreview) return null;
+    const key = `${node.id}|${link}|${param ?? ""}`;
+    const old = this.mapPreviews.get(key);
+    if (old) {
+      used.add(key);
+      return old.el;
+    }
+    const w = param && /^\d+$/.test(param.trim()) ? Math.max(160, Math.min(1200, Number(param))) : 320;
+    const box = createDiv({ cls: "mm-map-preview" });
+    box.setCssProps({ "--mm-map-w": `${w}px`, "--mm-map-h": `${Math.round((w * 5) / 8)}px` });
+    box.dataset.link = link;
+    const inner = box.createDiv({ cls: "mm-map-preview-body" });
+    const dispose = host.mapPreview(link, inner);
+    if (!dispose) return null;
+    const open = box.createEl("button", { cls: "mm-map-preview-open", text: t("canvas.openMap") });
+    open.type = "button";
+    open.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    open.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      host.openLink?.(link, true, ev);
+    });
+    this.mapPreviews.set(key, { el: box, dispose });
+    used.add(key);
+    return box;
+  }
+
+  /** 节点重画完：这次没用到的预览卸掉（链接改了、删了）；不给 keep 就是这个节点的全卸掉 */
+  private dropMapPreviews(nodeId: string, keep?: Set<string>): void {
+    for (const [key, p] of this.mapPreviews) {
+      if (!key.startsWith(`${nodeId}|`) || keep?.has(key)) continue;
+      p.dispose();
+      p.el.remove();
+      this.mapPreviews.delete(key);
+    }
   }
 
   private reflowTimer: number | null = null;

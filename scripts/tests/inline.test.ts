@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ANSWER_MARKER, isAnswer, mediaKind, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
+import { ANSWER_MARKER, isAnswer, mayBeMap, mediaKind, noAutoplay, setFrameSize, taskState, toggleMarker, TOKEN_RE } from "../../src/inline";
 
 /** 把一段文字里所有 token 抓出来：[命中的分组号, 匹配到的文本] */
 function tokens(text: string): [number, string][] {
@@ -224,4 +224,9 @@ test("mediaKind：Obsidian 能播的视频、音频（#40），带 #片段、大
   assert.equal(mediaKind("图.png"), null);
   assert.equal(mediaKind("笔记.md"), null);
   assert.equal(mediaKind("mp4"), null);
+});
+
+test("节点里的 ![[…]] 哪些要问宿主是不是脑图：笔记、.md、.xmind；图片、音视频、PDF、网址、别的扩展名不问", () => {
+  for (const l of ["子图", "子图#分支", "子图#^abc", "文件夹/子图.md", "竞品分析.xmind", "子图|400"]) assert.equal(mayBeMap(l), true, l);
+  for (const l of ["图.png", "图.JPG", "片段.mp4", "声音.mp3", "论文.pdf", "论文.pdf#page=2", "https://a.cn/x", "表格.csv", "白板.canvas", ""]) assert.equal(mayBeMap(l), false, l);
 });
