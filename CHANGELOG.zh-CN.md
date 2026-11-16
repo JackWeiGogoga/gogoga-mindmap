@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.75.1] - 2026-11-16
+
 ### 修复
 - 标注里用荧光笔上色后，保存时引号被换成中文引号，标注就坏了。现在和文字颜色一样存，读回来原样还原。
 - frontmatter 里值后面跟着 `# 注释`（比如 README 里的 `mindmap-structure: mindmap   # …`）时，这一项不生效。现在按 YAML 的规矩去掉注释。
@@ -957,7 +959,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...HEAD
+[0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
 [0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
 [0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
 [0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0

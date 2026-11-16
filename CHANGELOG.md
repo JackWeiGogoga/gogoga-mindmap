@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.75.1] - 2026-11-16
+
 ### Fixed
 - A highlighter color inside a callout broke the callout: its quotes were turned into curly quotes when saved. It's now saved like text colors and comes back intact.
 - Frontmatter options with a `# comment` after the value (`mindmap-structure: mindmap   # …`, as in the README) were ignored. The comment is now dropped, as in YAML.
@@ -957,7 +959,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.1...HEAD
+[0.75.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.75.0...0.75.1
 [0.75.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.74.0...0.75.0
 [0.74.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.73.0...0.74.0
 [0.73.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.72.1...0.73.0
