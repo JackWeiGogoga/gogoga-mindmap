@@ -4279,6 +4279,8 @@ export class MindMapCanvas {
     anchor: HTMLElement | null,
     close: () => void,
     point?: { x: number; y: number },
+    /** 打开它的按钮：点它由按钮自己收起，不算「点外面」 */
+    opener?: HTMLElement,
   ): HTMLElement {
     const menu = createDiv();
     menu.className = "mm-menu";
@@ -4311,7 +4313,7 @@ export class MindMapCanvas {
       menu.style.left = `${clampX(point?.x ?? 0)}px`;
       menu.style.top = `${clampY(point?.y ?? 0)}px`;
     } else this.placeAtAnchor(menu, anchor);
-    cleanup = this.dismissOnOutside(menu, closeAll);
+    cleanup = this.dismissOnOutside(menu, closeAll, opener);
     return menu;
   }
 
@@ -8000,9 +8002,17 @@ export class MindMapCanvas {
     for (let n: MindNode | null = this.focusRoot; n; n = n.parent) chain.unshift(n);
     chain.forEach((n, i) => {
       if (i > 0) {
-        const sepEl = createSpan();
+        // 分隔符是个下拉：列出前一级的全部子主题（下一级的同级），点一个直接聚焦过去（#42）
+        const sepEl = createEl("button");
+        sepEl.type = "button";
         sepEl.className = "mm-crumb-sep";
         sepEl.textContent = "›";
+        sepEl.setAttr("aria-label", t("canvas.crumbSiblings"));
+        const parent = chain[i - 1];
+        sepEl.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.toggleCrumbMenu(sepEl, parent, n);
+        });
         bar.append(sepEl);
       }
       const b = createEl("button");
@@ -8014,6 +8024,37 @@ export class MindMapCanvas {
     });
     this.el.append(bar);
     this.crumbs = bar;
+  }
+
+  private crumbMenu: HTMLElement | null = null;
+  private crumbMenuOpener: HTMLElement | null = null;
+  /** 面包屑分隔符的下拉：parent 的子主题（隐藏的、概要主题不算），current 打勾；面包屑在下面时往上弹 */
+  private toggleCrumbMenu(anchor: HTMLElement, parent: MindNode, current: MindNode): void {
+    if (this.crumbMenu) {
+      const same = this.crumbMenuOpener === anchor;
+      this.closeCrumbMenu();
+      if (same) return;
+    }
+    this.crumbMenuOpener = anchor;
+    const kids = parent.children.filter((c) => !c.hidden || c === current);
+    if (!kids.length) return;
+    const host = this.el.getBoundingClientRect();
+    const r = anchor.getBoundingClientRect();
+    const menu = this.buildMenu(
+      kids.map((c) => ({ label: plainText(c.text) || t("canvas.emptyNode"), active: c === current, run: () => this.focusOn(c) })),
+      null,
+      () => this.closeCrumbMenu(),
+      { x: r.left - host.left, y: r.bottom - host.top + 4 },
+      anchor,
+    );
+    menu.classList.add("mm-crumb-menu");
+    if (r.top - host.top > host.height / 2) menu.style.top = `${Math.max(4, r.top - host.top - 4 - menu.offsetHeight)}px`;
+    this.crumbMenu = menu;
+  }
+
+  private closeCrumbMenu(): void {
+    this.crumbMenu?.remove();
+    this.crumbMenu = null;
   }
 
   // ---------- 拖入与图片粘贴 ----------

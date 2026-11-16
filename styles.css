@@ -513,7 +513,6 @@
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   cursor: default;
@@ -758,7 +757,6 @@
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 12px;
@@ -810,7 +808,6 @@
   /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -940,7 +937,6 @@
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: default;
@@ -1052,7 +1048,6 @@
   /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -1193,7 +1188,6 @@
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: default;
@@ -1251,7 +1245,6 @@
   /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -1663,7 +1656,6 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 12px;
@@ -1686,7 +1678,21 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 }
 .gg-mm-root button.mm-crumb:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
 .gg-mm-root button.mm-crumb.is-current { color: var(--text-normal, #1f1f1f); font-weight: 600; }
-.mm-crumb-sep { color: var(--text-faint, #aaa); }
+/* 分隔符「›」可以点：弹出这一级的其他主题，点一个直接聚焦过去（#42） */
+.gg-mm-root button.mm-crumb-sep {
+  height: auto;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint, #aaa);
+  font-size: 12px;
+  cursor: pointer;
+}
+.gg-mm-root button.mm-crumb-sep:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
+.mm-menu.mm-crumb-menu { max-height: 60vh; overflow-y: auto; max-width: 320px; }
+.mm-menu.mm-crumb-menu .mm-menu-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gg-mm-root[data-toolbar="top"] .mm-crumbs { top: auto; bottom: 12px; }
 
 /* ---------- 标签、标记、任务 ---------- */
@@ -2458,7 +2464,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border-top: 1px solid var(--background-modifier-border);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
   user-select: none;
@@ -2561,7 +2566,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   /* 浮出来的菜单用 Obsidian 菜单的底色（主题的半透明 / 毛玻璃也跟着），主题没给就用页面底色 */
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   backdrop-filter: var(--menu-backdrop-filter, none);
   box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16));
   font-size: var(--font-ui-small, 13px);
@@ -2844,7 +2848,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
   backdrop-filter: var(--menu-backdrop-filter, none);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   user-select: none;
@@ -2966,7 +2969,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   border-radius: 10px;
   /* 玻璃类主题（OnePage 等）的菜单底色是半透明的：垫一层普通背景、模糊跟 Obsidian 自己的菜单一样，背后的字不透出来；不透明的主题看起来不变 */
   background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
-  backdrop-filter: var(--menu-backdrop-filter, none);
   backdrop-filter: var(--menu-backdrop-filter, none);
   border: 1px solid var(--background-modifier-border, #e3e3e3);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
