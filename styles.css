@@ -2518,7 +2518,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   box-shadow: none;
 }
 .ggt-add svg { width: 14px; height: 14px; }
-.ggt:hover button.ggt-add { opacity: 1; }
+.ggt:hover button.ggt-add, .ggt.is-hot button.ggt-add { opacity: 1; }
 .ggt button.ggt-add:hover { background: rgba(var(--mono-rgb-100), 0.06); color: var(--text-normal); }
 .ggt-add-col { top: 10px; bottom: calc(26px + var(--ggt-sb, 0px)); right: 4px; width: 18px; height: auto; }
 .ggt-add-row { left: 14px; right: 26px; bottom: 4px; height: 18px; width: auto; }

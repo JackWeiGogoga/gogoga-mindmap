@@ -9,6 +9,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - Tables in topics can have calculated columns: column menu → **Make calculated column…** and write a formula with column names (e.g. `{Price} * {Qty}`); every row is calculated (synced from Table).
 
 ### Fixed
+- Tables in topics: the + above and to the left of a table couldn't be clicked (crossing the small gap to it made it stop taking clicks); now it can (synced from Table).
 - With glass-style themes such as OnePage, floating surfaces (topic menus, the note popover, the floating toolbar) were see-through and topic text showed behind them. They now sit on a solid layer, blurred like Obsidian's own menus; opaque themes look the same as before.
 - Tables in topics: the header row can be deleted — right-click a header cell → **Delete header row (the next row becomes the header)** (synced from Table).
 

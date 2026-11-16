@@ -276,8 +276,18 @@ export class TableEditor {
       const at = headRows(this.table);
       this.apply(insertRow(this.table, at), { r: at, c: this.sel?.c ?? 0 });
     });
-    this.root.addEventListener("pointerenter", () => this.root.classList.add("is-hot"));
-    this.root.addEventListener("pointerleave", () => this.root.classList.remove("is-hot"));
+    // 上边、左边的加号和表格之间隔着一点空隙：鼠标从表格出来再停一会儿才算离开（0.4 秒），不然移到加号上时它已经不接点击了。
+    // 到了加号上（它也在表格的元素里）就又算进来了
+    let leaveTimer = 0;
+    this.root.addEventListener("pointerenter", () => {
+      window.clearTimeout(leaveTimer);
+      this.root.classList.add("is-hot");
+    });
+    this.root.addEventListener("pointerleave", () => {
+      window.clearTimeout(leaveTimer);
+      leaveTimer = window.setTimeout(() => this.root.classList.remove("is-hot"), 400);
+    });
+    this.cleanups.push(() => window.clearTimeout(leaveTimer));
     this.root.classList.toggle("is-readonly", !!host.readonly);
     parent.appendChild(this.root);
     this.bind();
