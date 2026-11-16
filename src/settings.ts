@@ -1,4 +1,5 @@
 import { AbstractInputSuggest, App, Platform, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
+import type { TaskProgressMode } from "./task-progress";
 import { STRUCTURES, Structure } from "./layout";
 import { COLOR_NAMES, parseNodeColors } from "./markdown";
 import { MINDMAP_LIST_ICON } from "./icon";
@@ -42,6 +43,8 @@ export interface MindMapSettings {
   notesExpanded: boolean;
   /** 展开的备注卡片里显示什么（#31）：全部 / 只显示列表项 / 有序列表 / 无序列表；只管显示，不改文件 */
   noteCardShow: "all" | "list" | "ordered" | "unordered";
+  /** 清单上一级的节点显示任务完成度（默认关） */
+  taskProgress: TaskProgressMode;
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
   /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
@@ -259,6 +262,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   fontScale: 100,
   notesExpanded: false,
   noteCardShow: "all",
+  taskProgress: "off",
   notePreview: false,
   formatBar: false,
   copyPlain: false,
@@ -355,6 +359,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "notesExpanded":
         return syncNotesExpandedAll();
       case "noteCardShow":
+      case "taskProgress":
         return redrawAllCanvases();
       case "toolbarPosition":
         return p.applyToolbarPosition();
@@ -427,6 +432,13 @@ export class MindMapSettingTab extends PluginSettingTab {
           this.scaleSetting("fontScale", t("settings.fontScale.name"), t("settings.fontScale.desc"), 70, 150),
           this.sizeSetting("imageThumbWidth", t("settings.imageThumbWidth.name"), t("settings.imageThumbWidth.desc"), 120, 800, t("settings.resetImageThumb")),
           this.sizeSetting("imageMaxWidth", t("settings.imageMaxWidth.name"), t("settings.imageMaxWidth.desc"), 400, 2000, t("settings.resetImageMax")),
+          dropdown(
+            "taskProgress",
+            t("settings.taskProgress.name"),
+            t("settings.taskProgress.desc"),
+            { off: t("settings.taskProgress.off"), percent: t("settings.taskProgress.percent"), count: t("settings.taskProgress.count"), both: t("settings.taskProgress.both") },
+            ["task", "todo", "checkbox", "progress", "任务", "清单", "待办", "进度", "完成"],
+          ),
         ],
         () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
       ),

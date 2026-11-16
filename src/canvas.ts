@@ -3,6 +3,7 @@
  * 内联编辑、备注编辑、键盘操作。不依赖 obsidian 模块，浏览器调试页和代码块渲染器共用。
  */
 
+import { progressLabel, taskProgress, type TaskProgressMode } from "./task-progress";
 import { noteCardParts, type NoteCardFilter } from "./note-filter";
 import {
   addChild,
@@ -307,6 +308,8 @@ export interface CanvasOptions {
   noteCardFilter?: () => NoteCardFilter;
   /** 用户切换了备注的展开 / 收起 */
   onNotesExpandedChange?: (expanded: boolean) => void;
+  /** 清单上一级的节点显示任务完成度：关、百分比、完成数/总数、两者都显示；不给就是关 */
+  taskProgress?: () => TaskProgressMode;
   /**
    * 每条展开备注单独的状态（单独收起、拖出来的大小）变了，或者节点改名、挪动让文字路径变了：把整份交回去存。
    * 打开文件时由宿主用 setNoteCards 交进来；不接就只在这次打开有效
@@ -1697,7 +1700,10 @@ export class MindMapCanvas {
       const nt = node.table ? noteTable(node.note) : null;
       const tableSig = nt ? `T${this.opts.editable && !this.recite ? "e" : ""}` : "";
       const num = numberLabel(node);
-      const contentSig = [node.text, num ?? "", this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
+      const progMode = this.opts.taskProgress?.() ?? "off";
+      const prog = progMode === "off" ? null : taskProgress(node);
+      const progText = prog ? progressLabel(prog, progMode) : "";
+      const contentSig = [node.text, num ?? "", progText, this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
       const sig = [
         contentSig,
         node.color ?? "",
@@ -1829,6 +1835,16 @@ export class MindMapCanvas {
         el.dataset.link = link.target;
       } else if (el.dataset.link) {
         delete el.dataset.link;
+      }
+
+      // 任务完成度：挂在文字后面的小胶囊，一段进度条加文字，全做完变绿。只是显示，不写进文件
+      if (!keepChildren && prog) {
+        const chip = createSpan({ cls: "mm-progress" + (prog.done === prog.total ? " is-done" : "") });
+        const bar = chip.createSpan({ cls: "mm-progress-bar" });
+        bar.createSpan({ cls: "mm-progress-fill" }).style.width = `${(prog.done / prog.total) * 100}%`;
+        chip.createSpan({ cls: "mm-progress-text", text: progText });
+        chip.setAttr("aria-label", t("canvas.taskProgress", { done: prog.done, total: prog.total }));
+        el.append(chip);
       }
 
       if (!keepChildren && this.noteShown(node)) {

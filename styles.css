@@ -3128,3 +3128,40 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
   height: 100%;
   border-radius: 0;
 }
+
+/* 任务完成度：清单上一级节点文字后面的小胶囊（进度条 + 1/5 · 20%），跟着节点文字颜色走，全做完变绿 */
+.gg-mm-node .mm-progress {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  font-size: 0.72em;
+  font-weight: 500;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+.gg-mm-node .mm-progress-bar {
+  position: relative;
+  width: 30px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.gg-mm-node .mm-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0.7;
+}
+.gg-mm-node .mm-progress-text { opacity: 0.75; }
+.gg-mm-node .mm-progress.is-done { color: var(--color-green); background: color-mix(in srgb, var(--color-green) 14%, transparent); }
+.gg-mm-node .mm-progress.is-done .mm-progress-fill { opacity: 1; }
+.gg-mm-node .mm-progress.is-done .mm-progress-text { opacity: 1; }
+.gg-mm-node.has-table > .mm-progress { grid-row: 1; justify-self: start; }

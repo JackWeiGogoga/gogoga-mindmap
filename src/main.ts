@@ -1941,6 +1941,7 @@ export default class MindMapPlugin extends Plugin {
       dragToFloat: () => this.settings.dragToFloat,
       notesExpanded: () => this.settings.notesExpanded,
       noteCardFilter: () => this.settings.noteCardShow,
+      taskProgress: () => this.settings.taskProgress,
       notePopoverSize: this.notePopoverSize,
     };
   }
