@@ -1182,3 +1182,14 @@ export function foldPlan(
   return { nodeLines: new Set(lines.values()), lineOf, folds, paths };
 }
 
+/** 全局搜索打开文件时传的 { match: { content, matches: [[起, 止], …] } }：第一处匹配在第几行（从 0 数） */
+export function matchLine(state: unknown): number | null {
+  const m = (state as { match?: { content?: unknown; matches?: unknown } } | null)?.match;
+  if (!m || typeof m.content !== "string" || !Array.isArray(m.matches)) return null;
+  const first = m.matches[0] as unknown;
+  const from: unknown = Array.isArray(first) ? (first as unknown[])[0] : null;
+  if (typeof from !== "number" || from < 0 || from > m.content.length) return null;
+  let line = 0;
+  for (let i = m.content.indexOf("\n"); i >= 0 && i < from; i = m.content.indexOf("\n", i + 1)) line++;
+  return line;
+}
