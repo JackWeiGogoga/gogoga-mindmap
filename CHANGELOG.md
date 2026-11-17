@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.78.3] - 2026-11-17
+
+### Changed
+- Tables in topics: the shared table code is synced with gogoga Table 0.17.4 (its fixes for page-wide tables and the Live Preview wrapper). Tables in topics look and work the same as before.
+
 ## [0.78.2] - 2026-11-16
 
 ### Fixed
@@ -994,7 +999,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...HEAD
+[0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2
 [0.78.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...0.78.1
 [0.78.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...0.78.0

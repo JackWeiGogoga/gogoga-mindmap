@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.78.3] - 2026-11-17
+
+### 改进
+- 节点里的表格：共用的表格代码同步到 gogoga Table 0.17.4（它修的是正文里的表格撑满宽度和实时预览外层滚动条），节点里的表格显示和操作都和以前一样。
+
 ## [0.78.2] - 2026-11-16
 
 ### 修复
@@ -994,7 +999,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...HEAD
+[0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2
 [0.78.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...0.78.1
 [0.78.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.77.0...0.78.0
