@@ -1,4 +1,5 @@
 import { type CustomSplit, parseCustomSplits } from "./split";
+import { dailyNote } from "./daily-note";
 import type { QuickSetting } from "./canvas";
 import {
   Component,
@@ -2405,6 +2406,7 @@ export default class MindMapPlugin extends Plugin {
       // 工具栏按钮只有图标：提示别让人等（Obsidian 默认要停一会儿才出）
       setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
       setIcon: (el, name) => setIcon(el, name),
+      dailyNote: () => dailyNote(this.app),
       listTags: () => Object.keys((this.app.metadataCache as unknown as { getTags?: () => Record<string, number> }).getTags?.() ?? {}).map((x) => x.replace(/^#/, "")),
       openLink: (href, internal, ev) => {
         if (!internal) {

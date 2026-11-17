@@ -14,13 +14,18 @@
  */
 
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
-import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
-import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, setOptionsCol, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, type ColType, CURRENCIES, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
+import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { COL_KINDS, type ColKind, colKindOf, colTypeOf, setColKind, setColType } from "../core/ops";
+import { isoDate, readDate, readProgress, splitTags, writeDate, type Ymd } from "../core/coltype";
 import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula, totalsAllSum } from "../core/ops";
 import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
 import { type CellInput, CodeMirrorInput, type Edge, TextareaInput } from "./cell-input";
+
+/** 列类型菜单的图标 */
+const KIND_ICONS: Record<ColKind, string> = { text: "type", status: "tag", multi: "tags", date: "calendar", num: "hash", bar: "percent" };
 
 /** 编辑时按方向键：到了格子边上往哪个格子走 */
 const ARROW_EDGE: Record<string, { edge: Edge; dr: number; dc: number } | undefined> = {
@@ -102,6 +107,8 @@ export interface EditorHost {
   formatColors?(): { text: string[]; highlight: string[] } | null;
   /** 格式栏颜色下拉记住的颜色（上次用的、最近使用）；不给就只记在这次的格式栏里 */
   colorMemory?(): ColorMemory;
+  /** 日期列写成 [[日记]] 时：按日记插件的日期格式写名字、读名字；不给就用 2026-11-17 */
+  dailyNote?(): { name(v: Ymd): string; parse(name: string): Ymd | null } | null;
   readonly?: boolean;
 }
 
@@ -225,7 +232,11 @@ export class TableEditor {
   /** 上次提示「计算列不能改」的时间（一直打字时别一直弹） */
   private fxNoticeAt = 0;
   /** 编辑时的补全列表（[[ 链接、# 标签） */
-  private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement } | null = null;
+  private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement; multi?: { before: string[]; after: string[] } } | null = null;
+  /** 日期列编辑时的日历：view 是正在看的月份，picked 是格子里现在的日期 */
+  private cal: { el: HTMLElement; y: number; m: number; key: string } | null = null;
+  /** 上次弹菜单的位置（列类型的二级菜单在同一处打开） */
+  private menuAt = { x: 0, y: 0 };
   private resize: { c: number; startX: number; startW: number; col: HTMLElement; fitW: number; scale: number } | null = null;
   private destroyed = false;
   /** 横向滚动条占的高度（覆盖式滚动条是 0） */
@@ -877,6 +888,9 @@ export class TableEditor {
         const content = cell.appendChild(doc.createElement("div"));
         content.className = "ggt-content";
         if (r === all - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
+        // 列类型：数字列等宽数字、日期列不折行（样式表按它画）
+        const ty = colTypeOf(tb, c);
+        if (ty && r >= head) cell.dataset.ty = ty.t;
         this.fillCell(content, r, c, m ? mergedText(tb, m) : tb.cells[r][c]);
         if (formulaOf(tb, c)) this.markFx(cell, r, c);
         if (cell.classList.contains("is-total-row")) this.markCalc(cell, content, c);
@@ -913,7 +927,40 @@ export class TableEditor {
   /** 状态列的数据格画成彩色标签，别的照常 */
   private fillCell(el: HTMLElement, r: number, c: number, md: string): void {
     const opts = this.table.meta.opts?.[c];
+    const ty = colTypeOf(this.table, c);
     const isData = r >= headRows(this.table) && !(hasTotal(this.table) && r === rowCount(this.table) - 1);
+    // 多选：每个标签一个彩色标签
+    if (opts && ty?.t === "multi" && isData && md.trim()) {
+      el.replaceChildren();
+      el.classList.remove("is-empty");
+      const wrap = el.appendChild(el.ownerDocument.createElement("span"));
+      wrap.className = "ggt-pills";
+      for (const v of splitTags(md)) {
+        const pill = wrap.appendChild(el.ownerDocument.createElement("span"));
+        pill.className = "ggt-pill";
+        pill.dataset.c = opts[v] ?? "gray";
+        pill.textContent = v;
+      }
+      return;
+    }
+    // 进度条：读得出进度的画成一条，后面写原文；读不出的照常显示
+    const prog = ty?.t === "bar" && isData ? readProgress(md) : null;
+    if (prog !== null) {
+      el.replaceChildren();
+      el.classList.remove("is-empty");
+      const bar = el.appendChild(el.ownerDocument.createElement("span"));
+      bar.className = "ggt-bar";
+      if (prog >= 1) bar.dataset.done = "1";
+      const track = bar.appendChild(el.ownerDocument.createElement("span"));
+      track.className = "ggt-bar-track";
+      const fill = track.appendChild(el.ownerDocument.createElement("span"));
+      fill.className = "ggt-bar-fill";
+      fill.setCssProps({ "--ggt-p": `${Math.round(Math.max(0, Math.min(1, prog)) * 1000) / 10}%` });
+      const label = bar.appendChild(el.ownerDocument.createElement("span"));
+      label.className = "ggt-bar-text";
+      label.textContent = md.trim();
+      return;
+    }
     if (opts && isData && md.trim()) {
       el.replaceChildren();
       el.classList.remove("is-empty");
@@ -1581,7 +1628,7 @@ export class TableEditor {
       // 点手机工具条的按钮：同上
       if (this.mobileBar?.contains(target)) return;
       // 点补全列表（状态、[[ 链接、# 标签）：它挂在 body 上，不能当成点到表格外面，不然先按原样退出编辑、列表也关了
-      if (this.suggest?.el.contains(target)) return;
+      if (this.suggest?.el.contains(target) || this.cal?.el.contains(target)) return;
       if (this.popover && !this.popover.contains(target)) this.closePopover();
       // 点到表格外面：取消选中
       if (this.sel && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
@@ -2150,8 +2197,34 @@ export class TableEditor {
       query = tag[1];
       start = before.length - tag[1].length;
     }
+    const dataRow = !!this.sel && this.sel.r >= headRows(this.table) && !(hasTotal(this.table) && this.sel.r === rowCount(this.table) - 1);
+    // 日期列：编辑时弹日历（正在输 [[ 链接、# 标签时让给补全）
+    if (!kind && dataRow && this.sel && colTypeOf(this.table, this.sel.c)?.t === "date") {
+      this.closeSuggestList();
+      this.showCalendar();
+      return;
+    }
+    this.closeCalendar();
     // 状态列：编辑时列出这一列已有的状态，按输入过滤
-    const opts = this.sel && this.sel.r >= headRows(this.table) ? this.table.meta.opts?.[this.sel.c] : null;
+    const opts = dataRow && this.sel ? this.table.meta.opts?.[this.sel.c] : null;
+    // 多选：只看光标所在的那一段（逗号隔开），已经选了的不再列
+    let multi: { before: string[]; after: string[] } | undefined;
+    if (!kind && opts && this.sel && colTypeOf(this.table, this.sel.c)?.t === "multi") {
+      const caret = el.selectionStart;
+      const v = el.value;
+      const segStart = Math.max(v.lastIndexOf(",", caret - 1), v.lastIndexOf("，", caret - 1), v.lastIndexOf("、", caret - 1)) + 1;
+      const restSep = v.slice(caret).search(/[,，、]/);
+      const segEnd = restSep < 0 ? v.length : caret + restSep;
+      multi = { before: splitTags(v.slice(0, segStart)), after: splitTags(v.slice(segEnd)) };
+      const q = v.slice(segStart, segEnd).trim();
+      const chosen = new Set([...multi.before, ...multi.after]);
+      const left = Object.keys(opts).filter((x) => !chosen.has(x));
+      // 光标停在一个完整的标签后面（刚开始编辑）：列出还没选的
+      const items = !q || opts[q] ? left.filter((x) => x !== q) : left.filter((x) => x.toLowerCase().includes(q.toLowerCase()));
+      if (!items.length) return this.closeSuggest();
+      this.openSuggestList("option", segStart, items, multi);
+      return;
+    }
     if (!kind && opts) {
       kind = "option";
       query = el.value.trim();
@@ -2169,13 +2242,19 @@ export class TableEditor {
               : Object.keys(opts).filter((x) => x.toLowerCase().includes(query.toLowerCase()))
             : [];
     if (!kind || !items.length) return this.closeSuggest();
+    this.openSuggestList(kind, start, items);
+  }
+
+  /** 补全列表：multi（多选列）时默认不选中任何一项，Enter 照常完成编辑，按 ↓ 才挑 */
+  private openSuggestList(kind: "link" | "tag" | "option", start: number, items: string[], multi?: { before: string[]; after: string[] }): void {
     const doc = this.root.ownerDocument;
     const box = this.suggest?.el ?? doc.body.appendChild(doc.createElement("div"));
     box.className = "ggt-suggest";
     box.replaceChildren();
+    const first = multi ? -1 : 0;
     items.forEach((it, i) => {
       const row = box.appendChild(doc.createElement("div"));
-      row.className = "ggt-suggest-item" + (i === 0 ? " is-active" : "");
+      row.className = "ggt-suggest-item" + (i === first ? " is-active" : "");
       row.textContent = kind === "tag" ? `#${it}` : it;
       row.addEventListener("pointerdown", (e) => {
         e.preventDefault();
@@ -2186,7 +2265,7 @@ export class TableEditor {
     const cell = this.sel && this.cellEl(this.sel);
     const r = (cell ?? this.input.el).getBoundingClientRect();
     box.setAttribute("style", `left:${Math.round(r.left)}px;top:${Math.round(r.bottom + 4)}px`);
-    this.suggest = { kind, start, items, index: 0, el: box };
+    this.suggest = { kind, start, items, index: first, el: box, multi };
   }
 
   /** 补全列表开着时的按键：上下选、Enter / Tab 确认、Esc 关掉。处理了返回 true */
@@ -2194,11 +2273,16 @@ export class TableEditor {
     const sg = this.suggest;
     if (!sg) return false;
     if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
-      sg.index = (sg.index + (ev.key === "ArrowDown" ? 1 : -1) + sg.items.length) % sg.items.length;
+      sg.index = sg.index < 0 && ev.key === "ArrowUp" ? sg.items.length - 1 : (sg.index + (ev.key === "ArrowDown" ? 1 : -1) + sg.items.length) % sg.items.length;
       Array.from(sg.el.children).forEach((c, i) => c.classList.toggle("is-active", i === sg.index));
       return true;
     }
     if (ev.key === "Enter" || ev.key === "Tab") {
+      // 多选列表还没挑：交给 Enter / Tab 原来的作用（完成编辑、走格）
+      if (sg.index < 0) {
+        this.closeSuggest();
+        return false;
+      }
       this.acceptSuggest();
       return true;
     }
@@ -2218,6 +2302,15 @@ export class TableEditor {
     const pick = sg.items[sg.index];
     let insert = pick;
     let rest = v.slice(caret);
+    if (sg.kind === "option" && sg.multi) {
+      const tags = [...sg.multi.before, pick, ...sg.multi.after];
+      el.value = tags.join(", ") + ", ";
+      el.setSelectionRange(el.value.length, el.value.length);
+      this.closeSuggest();
+      this.autosize();
+      this.updateSuggest();
+      return;
+    }
     if (sg.kind === "option") {
       el.value = pick;
       el.setSelectionRange(pick.length, pick.length);
@@ -2238,8 +2331,124 @@ export class TableEditor {
   }
 
   private closeSuggest(): void {
+    this.closeSuggestList();
+    this.closeCalendar();
+  }
+
+  private closeSuggestList(): void {
     this.suggest?.el.remove();
     this.suggest = null;
+  }
+
+  // ---------- 日期列的日历 ----------
+
+  private dailyNote() {
+    return this.host.dailyNote?.() ?? null;
+  }
+
+  /** 编辑日期列的格子时在格子下面弹日历：格子里的日期选中、看它那个月；输入了新日期就跟着跳过去 */
+  private showCalendar(): void {
+    if (!this.sel) return;
+    const daily = this.dailyNote();
+    const picked = readDate(this.input.value, daily ? (n) => daily.parse(n) : undefined);
+    const key = picked ? isoDate(picked) : "";
+    const now = new Date();
+    if (!this.cal) {
+      const doc = this.root.ownerDocument;
+      const el = doc.body.appendChild(doc.createElement("div"));
+      el.className = "ggt-cal";
+      // 点日历不让编辑框失焦（失焦就提交了）
+      el.addEventListener("pointerdown", (e) => e.preventDefault());
+      el.addEventListener("mousedown", (e) => e.preventDefault());
+      this.cal = { el, y: picked?.y ?? now.getFullYear(), m: picked?.m ?? now.getMonth() + 1, key };
+    } else if (key !== this.cal.key) {
+      this.cal.key = key;
+      if (picked) {
+        this.cal.y = picked.y;
+        this.cal.m = picked.m;
+      }
+    }
+    this.renderCalendar(picked);
+  }
+
+  private renderCalendar(picked: Ymd | null): void {
+    const cal = this.cal;
+    if (!cal) return;
+    const doc = this.root.ownerDocument;
+    const el = cal.el;
+    el.replaceChildren();
+    const btn = (parent: HTMLElement, cls: string, text: string, run: () => void, label?: string) => {
+      const b = parent.appendChild(doc.createElement("button"));
+      b.type = "button";
+      b.className = cls;
+      b.textContent = text;
+      if (label) b.setAttribute("aria-label", label);
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        run();
+      });
+      return b;
+    };
+    const shift = (k: number) => {
+      const d = new Date(cal.y, cal.m - 1 + k, 1);
+      cal.y = d.getFullYear();
+      cal.m = d.getMonth() + 1;
+      this.renderCalendar(picked);
+    };
+    const head = el.appendChild(doc.createElement("div"));
+    head.className = "ggt-cal-head";
+    btn(head, "ggt-cal-nav", "‹", () => shift(-1), t("calPrev"));
+    const title = head.appendChild(doc.createElement("span"));
+    title.className = "ggt-cal-title";
+    title.textContent = t("calMonth").replace("{y}", String(cal.y)).replace("{m}", String(cal.m)).replace("{M}", new Date(cal.y, cal.m - 1, 1).toLocaleString("en", { month: "long" }));
+    btn(head, "ggt-cal-nav", "›", () => shift(1), t("calNext"));
+    const grid = el.appendChild(doc.createElement("div"));
+    grid.className = "ggt-cal-grid";
+    const weekStart = Number(t("calWeekStart"));
+    const names = t("calWeekdays").split(",");
+    for (let i = 0; i < 7; i++) grid.appendChild(doc.createElement("span")).textContent = names[(i + weekStart) % 7];
+    for (const s of Array.from(grid.children)) (s as HTMLElement).className = "ggt-cal-wd";
+    const first = new Date(cal.y, cal.m - 1, 1);
+    const lead = (first.getDay() - weekStart + 7) % 7;
+    const now = new Date();
+    const today = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(cal.y, cal.m - 1, 1 - lead + i);
+      const v = { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+      const b = btn(grid, "ggt-cal-day", String(v.d), () => this.pickDate(v), isoDate(v));
+      if (v.m !== cal.m) b.classList.add("is-other");
+      if (isoDate(v) === isoDate(today)) b.classList.add("is-today");
+      if (picked && isoDate(v) === isoDate(picked)) b.classList.add("is-picked");
+    }
+    const foot = el.appendChild(doc.createElement("div"));
+    foot.className = "ggt-cal-foot";
+    btn(foot, "ggt-cal-btn", t("calToday"), () => this.pickDate(today));
+    btn(foot, "ggt-cal-btn", t("calClear"), () => this.pickDate(null));
+    // 放在格子下面，下面放不下就放上面
+    const cell = this.sel && this.cellEl(this.sel);
+    const r = (cell ?? this.input.el).getBoundingClientRect();
+    const vw = doc.documentElement.clientWidth;
+    const vh = doc.documentElement.clientHeight;
+    const box = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.left, vw - box.width - 8));
+    const top = r.bottom + 4 + box.height > vh - 8 && r.top - 4 - box.height > 8 ? r.top - 4 - box.height : r.bottom + 4;
+    el.setAttribute("style", `left:${Math.round(left)}px;top:${Math.round(top)}px`);
+  }
+
+  /** 日历里点了一天（null 是清空）：按列的写法写进格子并完成编辑 */
+  private pickDate(v: Ymd | null): void {
+    if (!this.editing || !this.sel) return;
+    const ty = colTypeOf(this.table, this.sel.c);
+    const daily = ty?.t === "date" && ty.f === "link" ? this.dailyNote() : null;
+    this.input.value = v ? writeDate(v, ty?.t === "date" ? ty.f : undefined, daily ? (x) => daily.name(x) : undefined) : "";
+    this.commit();
+    this.input.focus();
+  }
+
+  private closeCalendar(): void {
+    this.cal?.el.remove();
+    this.cal = null;
   }
 
   // ---------- 下拉填充 ----------
@@ -3157,7 +3366,7 @@ export class TableEditor {
       { title: t("duplicateCol"), icon: "copy-plus", run: () => this.apply(duplicateCol(tb, p.c), { r: p.r, c: p.c + 1 }) },
       { separator: true },
       ...this.calcItems(p.c),
-      { title: tb.meta.opts?.[p.c] ? t("statusOff") : t("statusOn"), icon: "tags", run: () => this.apply(setOptionsCol(tb, p.c, !tb.meta.opts?.[p.c]), p) },
+      { title: t("colType").replace("{v}", t(`kind_${colKindOf(tb, p.c)}`)), icon: KIND_ICONS[colKindOf(tb, p.c)], run: () => this.openTypeMenu(p) },
       ...(formulaOf(tb, p.c)
         ? [
             { title: t("fxEdit"), icon: "calculator", run: () => this.openFormula(p.c) },
@@ -3266,16 +3475,67 @@ export class TableEditor {
     ];
   }
 
+  /** 列类型的二级菜单：普通、状态、多选、日期、数字、进度条，下面是这种类型的选项（日期写法、数字格式） */
+  private openTypeMenu(p: Pos): void {
+    const { x, y } = this.menuAt;
+    // 在原菜单的位置重开，选完选项留在这里接着调
+    const again = (next: Table) => {
+      this.apply(next, p);
+      this.openTypeMenu(p);
+    };
+    this.openMenu(this.typeItems(p, again), x, y);
+  }
+
+  private typeItems(p: Pos, again: (t: Table) => void): MenuItem[] {
+    const tb = this.table;
+    const c = p.c;
+    const kind = colKindOf(tb, c);
+    const fx = !!formulaOf(tb, c);
+    const kinds = fx ? (["text", "num"] as ColKind[]) : COL_KINDS;
+    const items: MenuItem[] = [{ title: fx ? t("colTypeFx") : t("colTypeTitle") }];
+    for (const k of kinds) items.push({ title: t(`kind_${k}`), icon: KIND_ICONS[k], checked: kind === k, run: () => (k === "text" || k === "status" || k === "multi" ? this.apply(setColKind(tb, c, k), p) : again(setColKind(tb, c, k))) });
+    const ty = colTypeOf(tb, c);
+    if (ty?.t === "date") {
+      const set = (f: "slash" | "link" | undefined) => again(setColType(tb, c, f ? { t: "date", f } : { t: "date" }));
+      items.push({ separator: true }, { title: t("dateStyle") });
+      items.push({ title: "2026-11-17", checked: !ty.f, run: () => set(undefined) });
+      items.push({ title: "2026/11/17", checked: ty.f === "slash", run: () => set("slash") });
+      items.push({ title: t("dateLink"), checked: ty.f === "link", run: () => set("link") });
+    }
+    if (ty?.t === "num") {
+      const set = (patch: Partial<Extract<ColType, { t: "num" }>>) => {
+        const n: Record<string, unknown> = { ...ty, ...patch };
+        for (const k of Object.keys(n)) if (n[k] === undefined) delete n[k];
+        again(setColType(tb, c, n as ColType));
+      };
+      items.push({ separator: true }, { title: t("numFormat") });
+      items.push({ title: t("numGroup"), checked: !!ty.g, run: () => set({ g: ty.g ? undefined : 1 }) });
+      items.push({ title: t("numPercent"), checked: !!ty.p, run: () => set({ p: ty.p ? undefined : 1, u: undefined }) });
+      items.push({ rowLabel: t("numCurrency"), chipText: t("numNone"), title: t("numNone"), checked: !ty.u, run: () => set({ u: undefined }) });
+      // 选货币时顺手开千分位、两位小数（和 Excel 的货币格式一样），之后还能改
+      for (const u of CURRENCIES) items.push({ chipText: u, title: u, checked: ty.u === u, run: () => set(ty.u ? { u } : { u, p: undefined, g: 1, d: ty.d ?? 2 }) });
+      // 计算列的小数位在公式里设
+      if (!fx) {
+        items.push({ separator: true });
+        items.push({ rowLabel: t("numDecimals"), chipText: t("numAuto"), title: t("numAuto"), checked: ty.d === undefined, run: () => set({ d: undefined }) });
+        for (const d of [0, 1, 2, 3]) items.push({ chipText: String(d), title: String(d), checked: ty.d === d, run: () => set({ d }) });
+      }
+    }
+    return items;
+  }
+
   /** 状态列的格子：改这个状态的颜色（整列同一个状态一起变） */
   private statusColorItems(p: Pos): MenuItem[] {
-    const v = this.table.cells[p.r][p.c].trim();
+    const raw = this.table.cells[p.r][p.c];
     const opts = this.table.meta.opts?.[p.c];
-    if (!opts || !v || p.r < headRows(this.table)) return [];
-    return [
+    if (!opts || !raw.trim() || p.r < headRows(this.table)) return [];
+    // 多选的格子：每个标签一排色块（最多前三个，菜单不至于太长）
+    const values = colTypeOf(this.table, p.c)?.t === "multi" ? splitTags(raw).slice(0, 3) : [raw.trim()];
+    return values.flatMap((v): MenuItem[] => [
       { title: t("statusColor").replace("{v}", v) },
       ...CELL_COLORS.map((color): MenuItem => ({ swatch: color, title: t(color), checked: opts[v] === color, run: () => this.applyKeepRange(setOptionColor(this.table, p.c, v, color)) })),
       { separator: true },
-    ];
+    ]);
   }
 
   /** 合计：这一列怎么算（求和、平均……），勾着的是现在的 */
@@ -3374,6 +3634,7 @@ export class TableEditor {
   /** 自己画的弹出菜单：样式统一，色块能排成一行，手机上也好点 */
   private openMenu(items: MenuItem[], x: number, y: number): void {
     this.closePopover();
+    this.menuAt = { x, y };
     const doc = this.root.ownerDocument;
     const pop = doc.body.appendChild(doc.createElement("div"));
     pop.className = "ggt-menu";

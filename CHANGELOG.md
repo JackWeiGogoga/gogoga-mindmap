@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Tables in nodes (synced from gogoga Table): the column menu's **Column type** offers Status (single select), Multi-select tags, Date, Number and Progress bar. Date cells open a calendar and can be written as `2026-11-17`, `2026/11/17` or a daily note link; number columns apply thousands separators, percent, currency and decimals, including calculated results and the total row; progress columns draw `60%` or `3/5` as a bar; multi-select columns draw comma-separated values as colored tags. Cells stay plain text.
+
 ## [0.80.0] - 2026-11-17
 
 ### Added

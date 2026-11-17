@@ -2782,6 +2782,38 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-pill[data-c="purple"] { background: rgba(var(--color-purple-rgb), 0.16); color: var(--color-purple); }
 .ggt-pill[data-c="gray"] { background: rgba(var(--mono-rgb-100), 0.08); color: var(--text-muted); }
 
+/* 多选标签：一格里几个标签，放不下折行 */
+.ggt-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: top; }
+
+/* 数字列：等宽数字，上下行的位数对得齐 */
+.ggt .ggt-cell[data-ty="num"] { font-variant-numeric: tabular-nums; }
+.ggt .ggt-cell[data-ty="date"] .ggt-content { white-space: nowrap; }
+
+/* 进度条：细条 + 原文，满了变绿 */
+.ggt-bar { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 112px; }
+.ggt-bar-track { position: relative; flex: 1 1 auto; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(var(--mono-rgb-100), 0.1); }
+.ggt-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--ggt-p, 0%); border-radius: 3px; background: var(--interactive-accent); transition: width 0.2s ease; }
+.ggt-bar[data-done] .ggt-bar-fill { background: var(--color-green); }
+.ggt-bar-text { flex: none; font-size: 0.92em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* 日期列的日历：和补全列表一样的浮层 */
+.ggt-cal { position: fixed; z-index: var(--layer-menu, 65); width: 248px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff); backdrop-filter: var(--menu-backdrop-filter, none); box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16)); font-size: var(--font-ui-small, 13px); user-select: none; }
+.ggt-cal button { margin: 0; padding: 0; border: none; box-shadow: none; background: none; color: inherit; font: inherit; height: auto; cursor: pointer; }
+.ggt-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.ggt-cal-title { font-weight: 600; }
+.ggt-cal .ggt-cal-nav { width: 26px; height: 26px; border-radius: 5px; font-size: 16px; line-height: 1; color: var(--text-muted); }
+.ggt-cal .ggt-cal-nav:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.ggt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.ggt-cal-wd { text-align: center; font-size: 11px; color: var(--text-faint); padding: 2px 0 4px; }
+.ggt-cal .ggt-cal-day { height: 30px; border-radius: 6px; text-align: center; font-variant-numeric: tabular-nums; }
+.ggt-cal .ggt-cal-day:hover { background: var(--background-modifier-hover); }
+.ggt-cal .ggt-cal-day.is-other { color: var(--text-faint); }
+.ggt-cal .ggt-cal-day.is-today { color: var(--interactive-accent); font-weight: 700; }
+.ggt-cal .ggt-cal-day.is-picked { background: var(--interactive-accent); color: var(--text-on-accent); font-weight: 600; }
+.ggt-cal-foot { display: flex; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--background-modifier-border); }
+.ggt-cal .ggt-cal-btn { padding: 3px 8px; border-radius: 5px; color: var(--text-muted); }
+.ggt-cal .ggt-cal-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+
 /* 格子里的列表：缩进收窄到一个字左右，去掉上下间距（Obsidian 正文的列表缩进放在格子里太宽） */
 .ggt .ggt-cell .ggt-content ul, .ggt .ggt-cell .ggt-content ol { margin: 0; padding-inline-start: 1.3em; }
 .ggt-content ul ul, .ggt-content ol ol, .ggt-content ul ol, .ggt-content ol ul { padding-inline-start: 1.1em; }

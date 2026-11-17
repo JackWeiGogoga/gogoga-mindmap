@@ -3,8 +3,9 @@
  * 增删、移动行列时，注释里按坐标记的东西（底色）和按列记的东西（列宽）跟着挪。
  */
 
-import { type Align, type Calc, type CellColor, cellFromSource, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
+import { type Align, type Calc, type CellColor, type ColType, cellFromSource, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
 import { fillSeries } from "./fill";
+import { formatNumber, joinTags, type NumFmt, reformatDate, reformatNumber, splitTags } from "./coltype";
 import { evalFormula, type FxEmpty, type FxError, type FxNode, formatFx, formulaRefs, fxEmptyOf, fxErrorOf, nameOk, parseFormula, renameInFormula } from "./formula";
 
 export function cloneTable(t: Table): Table {
@@ -26,6 +27,7 @@ function cloneMeta(m: TableMeta): TableMeta {
   if (m.fx) out.fx = m.fx.slice();
   if (m.fxd) out.fxd = m.fxd.slice();
   if (m.opts) out.opts = m.opts.map((o) => (o ? { ...o } : null));
+  if (m.ty) out.ty = m.ty.map((x) => (x ? { ...x } : null));
   if (m.merge) out.merge = m.merge.slice();
   return out;
 }
@@ -100,7 +102,7 @@ function remapMerges(meta: TableMeta, fr: (r: number) => number | null, fc: (c: 
 }
 
 /** 按列记的设置（列宽、合计方式、状态选项）：插、删、挪列时一起改 */
-const COL_KEYS = ["w", "calc", "opts", "va", "fx", "fxd"] as const;
+const COL_KEYS = ["w", "calc", "opts", "va", "fx", "fxd", "ty"] as const;
 function spliceCols(meta: TableMeta, n: number, op: (a: unknown[]) => void): void {
   for (const key of COL_KEYS) {
     const src = meta[key] as unknown[] | undefined;
@@ -669,6 +671,13 @@ export function duplicateCol(t: Table, c: number): Table {
   const w = widthOf(t, c);
   if (w) n = setWidth(n, c + 1, w);
   // 计算列复制出来还是计算列（列名重名了，要引用它得先改个名）
+  if (colTypeOf(t, c)) n = setColType(n, c + 1, colTypeOf(t, c));
+  if (t.meta.opts?.[c]) {
+    n = cloneTable(n);
+    const opts = Array.from({ length: colCount(n) }, (_, i) => n.meta.opts?.[i] ?? null);
+    opts[c + 1] = { ...t.meta.opts[c] };
+    n.meta.opts = opts;
+  }
   if (formulaOf(t, c)) n = setFormula(n, c + 1, formulaOf(t, c), fxPlacesOf(t, c));
   for (const key of ["bg", "fg", "fz"] as const) {
     const m: Record<string, unknown> = { ...(n.meta[key] ?? {}) };
@@ -795,7 +804,9 @@ export function computeTotals(t: Table): Table {
   let n: Table | null = null;
   t.meta.calc?.forEach((how, c) => {
     if (!how || c >= colCount(t)) return;
-    const v = calcColumn(t, c, how);
+    const raw = calcColumn(t, c, how);
+    const nf = how === "count" ? null : numFmtOf(t, c);
+    const v = nf && raw ? reformatNumber(raw, nf) : raw;
     if (t.cells[last][c] !== v) {
       n ??= cloneTable(t);
       n.cells[last][c] = v;
@@ -813,9 +824,10 @@ const OPT_COLORS: CellColor[] = ["blue", "green", "orange", "purple", "red", "ye
 function optionValues(t: Table, c: number): string[] {
   const end = rowCount(t) - (hasTotal(t) ? 1 : 0);
   const out: string[] = [];
+  const multi = t.meta.ty?.[c]?.t === "multi";
   for (let r = headRows(t); r < end; r++) {
-    const v = (t.cells[r]?.[c] ?? "").trim();
-    if (v && !out.includes(v)) out.push(v);
+    const raw = t.cells[r]?.[c] ?? "";
+    for (const v of multi ? splitTags(raw) : [raw.trim()]) if (v && !out.includes(v)) out.push(v);
   }
   return out;
 }
@@ -864,7 +876,88 @@ export function optionsOf(t: Table, c: number): string[] {
 
 /** 交给宿主之前统一整理：状态列的新值分颜色、计算列重算、合计行重算 */
 export function normalize(t: Table): Table {
-  return computeTotals(computeFormulas(syncOptions(t)));
+  return computeTotals(computeFormulas(syncOptions(applyColTypes(t))));
+}
+
+// ---------- 列类型（日期、数字、进度条、多选） ----------
+
+/** 第 c 列的类型（ty 里的那项）；普通列、状态列是 null */
+export function colTypeOf(t: Table, c: number): ColType | null {
+  return t.meta.ty?.[c] ?? null;
+}
+
+/** 菜单里的「列类型」：状态列只看 opts，别的看 ty */
+export type ColKind = "text" | "status" | "multi" | "date" | "num" | "bar";
+export const COL_KINDS: readonly ColKind[] = ["text", "status", "multi", "date", "num", "bar"];
+
+export function colKindOf(t: Table, c: number): ColKind {
+  const ty = colTypeOf(t, c);
+  if (ty) return ty.t;
+  return t.meta.opts?.[c] ? "status" : "text";
+}
+
+/** 只设 ty 的第 c 项（null 去掉），不碰 opts */
+export function setColType(t: Table, c: number, ty: ColType | null): Table {
+  if (c < 0 || c >= colCount(t)) return t;
+  const n = cloneTable(t);
+  const a = Array.from({ length: colCount(n) }, (_, i) => n.meta.ty?.[i] ?? null);
+  a[c] = ty ? { ...ty } : null;
+  if (a.some(Boolean)) n.meta.ty = a;
+  else delete n.meta.ty;
+  return applyColTypes(n);
+}
+
+/**
+ * 换列类型。状态、多选要 opts（原来有的颜色留着）；别的类型去掉 opts。同类型的选项（日期写法、数字格式）留着。
+ * 计算列只能是普通或数字（算出来的结果按数字格式写）
+ */
+export function setColKind(t: Table, c: number, kind: ColKind): Table {
+  if (c < 0 || c >= colCount(t) || colKindOf(t, c) === kind) return t;
+  if (formulaOf(t, c) && kind !== "text" && kind !== "num") return t;
+  const cur = colTypeOf(t, c);
+  const ty: ColType | null = kind === "text" || kind === "status" ? null : cur?.t === kind ? cur : { t: kind };
+  let n = setColType(t, c, ty);
+  const wantOpts = kind === "status" || kind === "multi";
+  if (wantOpts !== !!n.meta.opts?.[c]) n = setOptionsCol(n, c, wantOpts);
+  return normalize(n);
+}
+
+/** 数据行（表头下面、合计行上面）里第 c 列能写的格子（合并格只算左上角） */
+function dataCells(t: Table, c: number): number[] {
+  const out: number[] = [];
+  const end = rowCount(t) - (hasTotal(t) ? 1 : 0);
+  for (let r = headRows(t); r < end; r++) {
+    const m = mergeAt(t, r, c);
+    if (m && (m.r1 !== r || m.c1 !== c)) continue;
+    out.push(r);
+  }
+  return out;
+}
+
+/** 按列类型整理格子：数字列按格式重写、日期列统一写法、多选列写成「甲, 乙」；计算列由公式写，不动。没变返回原表 */
+export function applyColTypes(t: Table): Table {
+  if (!t.meta.ty?.some(Boolean)) return t;
+  let n: Table | null = null;
+  t.meta.ty.forEach((ty, c) => {
+    if (!ty || c >= colCount(t) || formulaOf(t, c)) return;
+    const fix = ty.t === "num" ? (s: string) => reformatNumber(s, ty) : ty.t === "date" ? (s: string) => reformatDate(s, ty.f) : ty.t === "multi" ? (s: string) => joinTags(splitTags(s)) : null;
+    if (!fix) return;
+    for (const r of dataCells(t, c)) {
+      const v = (n ?? t).cells[r][c];
+      const next = fix(v);
+      if (next !== v) {
+        n ??= cloneTable(t);
+        n.cells[r][c] = next;
+      }
+    }
+  });
+  return n ?? t;
+}
+
+/** 数字列的格式；不是数字列返回 null */
+function numFmtOf(t: Table, c: number): NumFmt | null {
+  const ty = colTypeOf(t, c);
+  return ty?.t === "num" ? ty : null;
 }
 
 // ---------- 计算列 ----------
@@ -1017,7 +1110,8 @@ export function computeFormulas(t: Table): Table {
       if (m && (m.r1 !== r || m.c1 !== c)) continue;
       const cells = (n ?? t).cells;
       const v = i.error ? "" : evalRow(t, cells, i, r, idx);
-      const text = typeof v === "number" ? formatFx(v, fxPlacesOf(t, c)) : "";
+      const nf = numFmtOf(t, c);
+      const text = typeof v !== "number" ? "" : nf ? formatNumber(v, nf, fxPlacesOf(t, c) ?? nf.d ?? null) : formatFx(v, fxPlacesOf(t, c));
       if (cells[r][c] !== text) {
         n ??= cloneTable(t);
         n.cells[r][c] = text;
@@ -1080,7 +1174,11 @@ export function setFormula(t: Table, c: number, src: string | null, places: numb
   else delete n.meta.fx;
   if (fxd.some((x) => x !== null)) n.meta.fxd = fxd;
   else delete n.meta.fxd;
-  return computeTotals(computeFormulas(n));
+  // 计算列只能是数字格式：日期、进度条、多选去掉
+  let m = n;
+  if (fx[c] && colTypeOf(n, c) && colTypeOf(n, c)!.t !== "num") m = setColType(n, c, null);
+  if (fx[c] && m.meta.opts?.[c]) m = setOptionsCol(m, c, false);
+  return computeTotals(computeFormulas(m));
 }
 
 /** 改了表头的列名：公式里的旧名换成新名（旧名、新名都得是能引用的、不重名的；列号不变时才比） */
@@ -1149,6 +1247,7 @@ export function subTable(t: Table, rect: Rect): Table {
   else delete meta.head;
   meta.w = cols(t.meta.w) as TableMeta["w"];
   meta.opts = cols(t.meta.opts) as TableMeta["opts"];
+  meta.ty = cols(t.meta.ty) as TableMeta["ty"];
   meta.calc = hasTotal(t) && r2 === rowCount(t) - 1 ? (cols(t.meta.calc) as TableMeta["calc"]) : undefined;
   meta.fx = cols(t.meta.fx) as TableMeta["fx"];
   meta.fxd = cols(t.meta.fxd) as TableMeta["fxd"];

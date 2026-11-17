@@ -173,6 +173,8 @@ export interface CanvasHost {
   setIcon?: (el: HTMLElement, name: string) => void;
   /** 库里已有的标签（不带 #）：节点表格的格子里输入 # 时补全 */
   listTags?: () => string[];
+  /** 节点表格的日期列写成 [[日记]] 时：按日记插件的日期格式写名字、读名字 */
+  dailyNote?: () => { name(v: { y: number; m: number; d: number }): string; parse(name: string): { y: number; m: number; d: number } | null };
   /** 用宿主的样式显示提示（Obsidian 的 setTooltip）；没有就退回原生 title */
   setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement) => void;
 }
@@ -9043,6 +9045,7 @@ export class MindMapCanvas {
             return host.listTags!().filter((x) => x.toLowerCase().includes(q)).slice(0, 12);
           }
         : undefined,
+      dailyNote: host?.dailyNote,
       readonly: !editable,
       // 表格菜单「复制整张表格」「复制为 Markdown 表格」完成后的提示
       notice: host?.notice,

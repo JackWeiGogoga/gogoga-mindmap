@@ -24,6 +24,23 @@ export type Calc = (typeof CALCS)[number];
 export const VALIGNS = ["middle", "bottom"] as const;
 export type VAlign = (typeof VALIGNS)[number];
 
+/** 货币符号（数字格式里能选的） */
+export const CURRENCIES = ["¥", "$", "€", "£"] as const;
+
+/**
+ * 列类型（注释里的 "ty"，每列一项，null 是普通列）。格子里永远是看得懂的文字，类型只决定怎么编辑、怎么画：
+ * - date：点格子弹日历，写成 2026-11-17；f 是 "slash"（2026/11/17）或 "link"（[[日记]]，按日记插件的日期格式）
+ * - num：提交时把数写成统一的样子：g 千分位、u 货币符号、p 百分比、d 小数位（不写是照打的）
+ * - bar：60%、3/5 这样的格子画成进度条
+ * - multi：多选标签（颜色和状态列一样存在 opts 里），格子里用逗号隔开
+ * 状态列（单选）仍然只看 opts，不写 ty
+ */
+export type ColType =
+  | { t: "date"; f?: "slash" | "link" }
+  | { t: "num"; g?: 1; u?: (typeof CURRENCIES)[number]; p?: 1; d?: number }
+  | { t: "bar" }
+  | { t: "multi" };
+
 export const TABLE_STYLES = ["default", "zebra", "minimal", "academic"] as const;
 export type TableStyle = (typeof TABLE_STYLES)[number];
 export const TABLE_DENSITIES = ["comfortable", "compact"] as const;
@@ -51,6 +68,8 @@ export interface TableMeta {
   fxd?: (number | null)[];
   /** 状态列：每列「值 → 颜色」；设了的列，格子画成彩色标签 */
   opts?: (Record<string, CellColor> | null)[];
+  /** 列类型（日期、数字、进度条、多选），见 ColType */
+  ty?: (ColType | null)[];
   /** 第一列当标题列（加底色、加粗） */
   headerCol?: boolean;
   /** 冻结标题列：左右滚动时第一列固定在左边（只在 headerCol 开着时有用） */
@@ -177,6 +196,24 @@ export function parseMetaLine(line: string): TableMeta | null {
   }
 }
 
+/** 一列的类型：认不出的丢掉（当普通列），多余的字段去掉 */
+function cleanColType(x: unknown): ColType | null {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return null;
+  const o = x as Record<string, unknown>;
+  if (o.t === "date") return o.f === "slash" || o.f === "link" ? { t: "date", f: o.f } : { t: "date" };
+  if (o.t === "bar") return { t: "bar" };
+  if (o.t === "multi") return { t: "multi" };
+  if (o.t === "num") {
+    const n: ColType = { t: "num" };
+    if (o.g === 1) n.g = 1;
+    if ((CURRENCIES as readonly unknown[]).includes(o.u)) n.u = o.u as (typeof CURRENCIES)[number];
+    if (o.p === 1) n.p = 1;
+    if (typeof o.d === "number" && Number.isInteger(o.d) && o.d >= 0 && o.d <= 4) n.d = o.d;
+    return n;
+  }
+  return null;
+}
+
 /** 认识的键检查一遍类型，不对的丢掉（不让坏数据影响显示）；不认识的键原样留着 */
 function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
   const meta: TableMeta = { ...raw };
@@ -207,6 +244,11 @@ function sanitizeMeta(raw: Record<string, unknown>): TableMeta {
     const va = Array.isArray(raw.va) ? raw.va.map((x) => ((VALIGNS as readonly unknown[]).includes(x) ? (x as VAlign) : null)) : [];
     if (va.some(Boolean)) meta.va = va;
     else delete meta.va;
+  }
+  if (raw.ty !== undefined) {
+    const ty = Array.isArray(raw.ty) ? raw.ty.map(cleanColType) : [];
+    if (ty.some(Boolean)) meta.ty = ty;
+    else delete meta.ty;
   }
   if (raw.opts !== undefined) {
     const opts = Array.isArray(raw.opts)
@@ -360,7 +402,7 @@ export function metaToWrite(meta: TableMeta, cols: number): TableMeta | null {
   if (out.fg && !Object.keys(out.fg).length) delete out.fg;
   if (out.fz && !Object.keys(out.fz).length) delete out.fz;
   if (out.fs === 1) delete out.fs;
-  for (const key of ["calc", "opts", "va"] as const) {
+  for (const key of ["calc", "opts", "va", "ty"] as const) {
     const a = out[key] as unknown[] | undefined;
     if (!a) continue;
     const b = a.slice(0, cols);
