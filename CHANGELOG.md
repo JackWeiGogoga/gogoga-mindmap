@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-11-17
+
 ### Added
 - Tables in nodes (synced from gogoga Table): the column menu's **Column type** offers Status (single select), Multi-select tags, Date, Number and Progress bar. Date cells open a calendar and can be written as `2026-11-17`, `2026/11/17` or a daily note link; number columns apply thousands separators, percent, currency and decimals, including calculated results and the total row; progress columns draw `60%` or `3/5` as a bar; multi-select columns draw comma-separated values as colored tags. Cells stay plain text.
 
@@ -1021,7 +1023,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...HEAD
+[0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
 [0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4

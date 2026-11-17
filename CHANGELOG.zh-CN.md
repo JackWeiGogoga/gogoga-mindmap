@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-11-17
+
 ### 新增
 - 节点里的表格（同步 gogoga Table）：列菜单「列类型」可以选状态（单选）、多选标签、日期、数字、进度条。日期列编辑时弹日历，能写成 `2026-11-17`、`2026/11/17` 或日记链接；数字列按千分位、百分比、货币、小数位写好，计算列的结果和合计行也跟着格式写；进度条列把 `60%`、`3/5` 画成进度条；多选列把逗号隔开的值画成彩色标签。格子里仍然是普通文字。
 
@@ -1021,7 +1023,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...HEAD
+[0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
 [0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
