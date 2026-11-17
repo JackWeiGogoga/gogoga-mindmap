@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-11-17
+
 ### Added
 - Spaced review (suggested by 踏雪 in the user group: review your maps the Anki way): questions written for recite mode become flashcards, scheduled with FSRS, the algorithm Anki uses, with Anki's review screen, buttons and shortcuts.
   - Right-click the central topic or a branch → **More ▸ Spaced review ▸ Add the whole map to review / Add only this branch to review**. A whole map can also be added with the command **Add this mind map to review**, or by right-clicking the note in the file list → **Add to spaced review** (maps already in review offer **Review this map** and **Remove from spaced review** there). Each kind of question becomes a card: `==highlights==` in a node are cloze cards, a node whose children are `[x]` / `[ ]` is a multiple-choice card, and a 🙈 node is a question-and-answer card with its parent as the front. Adding writes a deck id to the note's frontmatter (`mindmap-review`) and a `%%rv=…%%` to each question's node; a branch added on its own gets `%%review%%`. Reviewing never changes the note again: schedules are kept in the plugin folder under `review/`, one file per map.
@@ -1034,7 +1036,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...HEAD
+[0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
 [0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
 [0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0

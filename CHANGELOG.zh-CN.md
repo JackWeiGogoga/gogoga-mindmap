@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-11-17
+
 ### 新增
 - 间隔复习（群里踏雪的建议：脑图整理完想按 Anki 的方式复习）：背诵模式里写的题直接变成复习卡片，按 Anki 现在用的 FSRS 算法排期，复习界面、按钮和快捷键照 Anki 做。
   - 右键中心主题或分支「更多 ▸ 间隔复习 ▸ 把整张图加入复习 / 只把这个分支加入复习」；整张图也可以用命令「把当前脑图加入复习」，或者在文件列表里右键笔记「加入间隔复习」（加入了的再右键有「复习这张图」「移出间隔复习」）。三种写法各成一种卡：节点里的 `==高亮==` 是填空卡，子节点是 `[x]` / `[ ]` 的是选择题，带 🙈 的节点是问答卡（正面是它的上级）。加入时笔记的 frontmatter 记一个牌组 id（`mindmap-review`），每道题的节点补一个 `%%rv=…%%`；只加入分支的在分支节点写 `%%review%%`。之后复习都不改笔记，排期存在插件文件夹的 `review/` 里，一张图一个文件。
@@ -1034,7 +1036,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...HEAD
+[0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
 [0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
 [0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
