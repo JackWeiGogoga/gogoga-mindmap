@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.78.4] - 2026-11-17
+
+### 改进
+- 节点里的表格（同步 Table 0.17.5）：编辑格子时光标到了边上再按方向键，存好这一格、跳到旁边的格子，在字中间时照常挪光标；拖过的列最窄能到 40px（以前至少 80px）。
+
 ## [0.78.3] - 2026-11-17
 
 ### 改进
@@ -999,7 +1004,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...HEAD
+[0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2
 [0.78.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...0.78.1

@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.78.4] - 2026-11-17
+
+### Changed
+- Tables in topics (synced from Table 0.17.5): while editing a cell, once the cursor is at the edge of the cell, the arrow key saves it and moves to the next cell; in the middle of the text it still moves the cursor. A column you've dragged can now be as narrow as 40px (it used to stay at least 80px).
+
 ## [0.78.3] - 2026-11-17
 
 ### Changed
@@ -999,7 +1004,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...HEAD
+[0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2
 [0.78.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.0...0.78.1
