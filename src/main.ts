@@ -2361,6 +2361,7 @@ export default class MindMapPlugin extends Plugin {
               item.setDisabled(!!e.disabled);
               if (e.submenu) {
                 const sub = (item as unknown as { setSubmenu: () => Menu }).setSubmenu();
+                fixNestedSubmenu(sub);
                 fill(sub, e.submenu);
               } else {
                 item.onClick(() => e.run?.());
@@ -2616,3 +2617,30 @@ function joinPath(folder: string, name: string): string {
   return folder && folder !== "/" ? `${folder}/${name}` : name;
 }
 
+/**
+ * Obsidian（1.15.1）的二级菜单里再套子菜单时，开着一个三级菜单就切不到另一个：Menu.openSubmenu 里
+ * `parentMenu.selected !== this.parentMenu.items.indexOf(e)` 拿二级菜单的项去父菜单里找下标，永远是 -1，
+ * 直接 return —— 旧的不关、新的不开，看着像卡住（「更多」里的拆成子节点、分支结构、文字颜色之间来回移）。
+ * 第一层菜单没有 parentMenu，不受影响。这里给我们建的二级菜单换掉打开子菜单的两个方法：要开的不是现在这个就先关掉，
+ * 再交给原来的逻辑；延迟和原来一样 250ms。都是内部方法，拿不到就不动
+ */
+function fixNestedSubmenu(menu: Menu): void {
+  type Item = { submenu?: Menu; disabled?: boolean };
+  type Soon = ((item: Item) => void) & { cancel: () => void };
+  const m = menu as unknown as { openSubmenu?: (item: Item) => void; openSubmenuSoon?: Soon; closeSubmenu?: () => void; currentSubmenu?: Menu | null };
+  const open = m.openSubmenu;
+  const close = m.closeSubmenu;
+  if (typeof open !== "function" || typeof close !== "function" || typeof m.openSubmenuSoon?.cancel !== "function") return;
+  const fixed = (item: Item) => {
+    if (m.currentSubmenu && item.submenu && m.currentSubmenu !== item.submenu && !item.disabled) close.call(menu);
+    open.call(menu, item);
+  };
+  let timer = 0;
+  const soon = ((item: Item) => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => fixed(item), 250);
+  }) as Soon;
+  soon.cancel = () => window.clearTimeout(timer);
+  m.openSubmenu = fixed;
+  m.openSubmenuSoon = soon;
+}
