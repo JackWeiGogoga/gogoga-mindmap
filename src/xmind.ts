@@ -4,7 +4,8 @@
  */
 
 import { t } from "./i18n";
-import { createNode, DocStyle, MindDoc, MindNode } from "./model";
+import { type BranchLayout, createNode, DocStyle, MindDoc, MindNode } from "./model";
+import { isFishbone, isTimeline, isTimelineH, type Structure } from "./layout";
 import { DEFAULT_STYLE, serializeMarkdown } from "./markdown";
 
 export interface XmindTopic {
@@ -26,7 +27,51 @@ export interface XmindTopic {
   callout?: string;
   /** 主题上的图片：src 是包里的路径（去掉 xap: 前缀），after 为真时图片排在文字后面 */
   image?: { src: string; width?: number; after?: boolean };
+  /** XMind 的结构（structureClass / structure-class），原样留着，转换时再对应到插件的结构 */
+  structure?: string;
   children: XmindTopic[];
+}
+
+/**
+ * XMind 的结构 → 插件的结构。标识符照 XMind 官方 xmind-model 的 STRUCTURECLASS。
+ * 插件没有的方向（逻辑图向左、组织结构图向上、树形图向左）换成最接近的；横向时间轴不带 up / down 的是上下交错，
+ * 带的是都在一侧（插件只有朝下的一侧）；纵向时间轴按左右交错。电子表格这类插件没有的不认（跟随上级）
+ */
+const XMIND_STRUCTURES: Record<string, Structure> = {
+  "org.xmind.ui.logic.right": "logic-right",
+  "org.xmind.ui.logic.left": "logic-right",
+  "org.xmind.ui.logic-chart.right": "logic-right",
+  "org.xmind.ui.logic-chart.left": "logic-right",
+  "org.xmind.ui.map": "mindmap",
+  "org.xmind.ui.map.unbalanced": "mindmap",
+  "org.xmind.ui.map.clockwise": "mindmap",
+  "org.xmind.ui.map.anticlockwise": "mindmap",
+  "org.xmind.ui.map.floating": "mindmap",
+  "org.xmind.ui.map.floating.clockwise": "mindmap",
+  "org.xmind.ui.map.floating.anticlockwise": "mindmap",
+  "org.xmind.ui.org-chart.down": "org-down",
+  "org.xmind.ui.org-chart.up": "org-down",
+  "org.xmind.ui.tree.right": "tree-right",
+  "org.xmind.ui.tree.left": "tree-right",
+  "org.xmind.ui.timeline.horizontal": "timeline-h-alt",
+  "org.xmind.ui.timeline.horizontal.down": "timeline-h",
+  "org.xmind.ui.timeline.horizontal.up": "timeline-h",
+  "org.xmind.ui.timeline.vertical": "timeline-v-alt",
+  "org.xmind.ui.fishbone.leftHeaded": "fishbone-left",
+  "org.xmind.ui.fishbone.rightHeaded": "fishbone-right",
+};
+
+/** 整张图（中心主题）的结构；认不出返回 undefined */
+export function xmindRootStructure(cls: string | undefined): Structure | undefined {
+  return cls ? XMIND_STRUCTURES[cls] : undefined;
+}
+
+/** 分支的结构：左右分布的脑图只给中心主题，分支上不认；鱼骨图在分支上不分鱼头朝向 */
+export function xmindBranchLayout(cls: string | undefined): BranchLayout | undefined {
+  const s = xmindRootStructure(cls);
+  if (!s || s === "mindmap") return undefined;
+  if (s === "fishbone-left" || s === "fishbone-right") return "fishbone";
+  return s;
 }
 
 /** 插件还不支持、打开和转换时会丢掉的内容，按条数统计，用来提示用户 */
@@ -161,6 +206,7 @@ interface JsonTopic {
   notes?: { plain?: { content?: string } };
   image?: { src?: string; width?: number; height?: number; align?: string };
   children?: { attached?: JsonTopic[]; detached?: JsonTopic[]; summary?: JsonTopic[]; callout?: JsonTopic[] };
+  structureClass?: string;
   position?: { x?: number; y?: number };
   branch?: string;
   style?: { properties?: Record<string, string> };
@@ -210,6 +256,7 @@ function fromJsonTopic(t: JsonTopic, lost: XmindLost = noLoss(), isRoot = false)
     folded: t.branch === "folded" || undefined,
     callout: calloutText((t.children?.callout ?? []).map((c) => c.title)),
     image: imageOf(t.image?.src, t.image?.width, t.image?.align),
+    structure: t.structureClass || undefined,
     children: [
       ...(t.children?.attached ?? []).map((c) => fromJsonTopic(c, lost)),
       ...(isRoot ? detached.map((d, i) => ({ ...fromJsonTopic(d, lost), float: floatPos(d.position?.x, d.position?.y, i) })) : []),
@@ -370,6 +417,7 @@ function fromXmlTopic(el: XEl, lost: XmindLost = noLoss(), isRoot = false): Xmin
     image: img ? imageOf(img.attrs["xhtml:src"] ?? img.attrs["src"], Number(img.attrs["svg:width"]), img.attrs["align"]) : undefined,
     folded: el.attrs["branch"] === "folded" || undefined,
     callout: calloutText(callouts),
+    structure: el.attrs["structure-class"] || undefined,
     children,
   };
   for (const bs of childrenByName(el, "boundaries")) {
@@ -499,8 +547,27 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
   const st: DocStyle = { ...DEFAULT_STYLE, ...style };
   const maxHeading = Math.min(6, Math.max(1, st.maxHeadingLevel));
   const byId = new Map<string, MindNode>();
-  const build = (t: XmindTopic, parent: MindNode | null, depth: number): MindNode => {
+  const rootStructure = xmindRootStructure(sheet.root.structure);
+  /**
+   * 分支的结构（%%layout=…%%）：和它在父节点那一层本来就是的结构一样时不写；
+   * 时间轴、鱼骨图的主主题插件里还不能单独设，也不写（自由主题可以）。
+   * inner：t 的子节点按什么排；axis：t 是时间轴 / 鱼骨图的根（它的子节点是主主题）
+   */
+  const layoutOf = (t: XmindTopic, inner: Structure, axis: boolean, float: boolean): BranchLayout | undefined => {
+    const own = xmindBranchLayout(t.structure);
+    if (!own || (axis && !float)) return undefined;
+    const same = own === inner || (own === "fishbone" && isFishbone(inner));
+    return same ? undefined : own;
+  };
+  /** s 排在 t 上时，t 下面再往下一层按什么排：时间轴、鱼骨图的分支里面是树形图 / 逻辑图 */
+  const below = (s: Structure): Structure => (isTimelineH(s) || isFishbone(s) ? "tree-right" : isTimeline(s) ? "logic-right" : s === "mindmap" ? "logic-right" : s);
+  const axisOf = (s: Structure) => isTimeline(s) || isFishbone(s);
+  const build = (t: XmindTopic, parent: MindNode | null, depth: number, inner: Structure = rootStructure ?? "logic-right", axis = false): MindNode => {
     const asHeading = depth + 1 <= maxHeading;
+    const isFloat = !!(parent && !parent.parent && t.float);
+    // 自由主题跟着整张图的结构单独排（组织结构图、树形图照旧，其余按逻辑图）
+    const ctx: Structure = isFloat ? (inner === "org-down" || inner === "tree-right" ? inner : "logic-right") : inner;
+    const layout = parent ? layoutOf(t, ctx, axis, isFloat) : undefined;
     const node = createNode({
       parent,
       text: withImage(t.title, t.image, t.image && imageLink ? imageLink(t.image.src) : null),
@@ -512,11 +579,16 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
       summary: t.summary && (t.summary.topic ? { span: t.summary.span, text: "", topic: build(t.summary.topic, parent, depth) } : { span: t.summary.span, text: t.summary.text }),
       float: parent && !parent.parent && t.float ? { ...t.float } : undefined,
       callout: t.callout,
+      layout,
       kind: asHeading ? "heading" : "list",
       level: asHeading ? depth + 1 : 0,
     });
     if (t.id) byId.set(t.id, node);
-    node.children = t.children.map((c) => build(c, node, depth + 1));
+    // 子节点：中心主题下按整张图的结构；设了自己结构的按它的；其余往下一层（时间轴、鱼骨图的分支里面换成树形图 / 逻辑图）
+    const mine: Structure | undefined = !parent ? (rootStructure ?? "logic-right") : layout ? (layout === "fishbone" ? "fishbone-left" : layout) : undefined;
+    const kidsInner = mine ?? (axis ? below(inner) : ctx);
+    const kidsAxis = !!mine && axisOf(mine);
+    node.children = t.children.map((c) => build(c, node, depth + 1, kidsInner, kidsAxis));
     return node;
   };
   const root = build(sheet.root, null, 0);
@@ -529,7 +601,9 @@ export function xmindSheetToDoc(sheet: XmindSheet, style: Partial<DocStyle> = {}
     to.anchor ??= `r${++n}`;
     (from.rels ??= []).push({ to: to.anchor, label: r.title.replace(/["%]/g, "").trim() });
   }
-  return { root, frontmatter: "---\nmindmap: true\n---", preamble: "", rootFromHeading: true, style: st };
+  // XMind 里设了整张图的结构：记进 frontmatter（和在结构菜单里选的一样）
+  const fm = rootStructure ? `---\nmindmap: true\nmindmap-structure: ${rootStructure}\n---` : "---\nmindmap: true\n---";
+  return { root, frontmatter: fm, preamble: "", rootFromHeading: true, style: st };
 }
 
 export function xmindSheetToMarkdown(sheet: XmindSheet, style: Partial<DocStyle> = {}, imageLink?: (src: string) => string | null): string {

@@ -232,6 +232,17 @@ export function branchStructure(layout: BranchLayout, leftward: boolean): { stru
   return { structure: layout, leftward: false, toggle: layout === "org-down" || layout.startsWith("timeline-v") ? "down" : "right" };
 }
 
+/**
+ * 设了自己结构的分支（自由主题也是）单独排时的选项。分支根到它子节点的间距按普通层级算，不用中心主题那么宽；
+ * 但分支根要放折叠按钮（离节点 10px、16px 见方）：时间轴、鱼骨图沿主轴的间距照主主题之间的算
+ * （第一个主主题紧贴着根会压住按钮），组织结构图下面那一排照普通层级（gapLevel + 8）
+ */
+function branchOptions(opts: LayoutOptions, b: { structure: Structure; leftward: boolean }): LayoutOptions {
+  const axis = isTimeline(b.structure) || isFishbone(b.structure);
+  const gapRoot = b.structure === "org-down" ? Math.ceil((opts.gapLevel + 8) / 0.6) : opts.gapLevel;
+  return { ...opts, structure: b.structure, leftward: b.leftward, gapRoot, gapMain: axis ? opts.gapMain : opts.gapSibling };
+}
+
 /** 挪动一段线：先（可选）水平镜像，再平移 */
 function moveSeg(sg: Segment, mapX: (x: number) => number, dy: number): Segment {
   return { x1: mapX(sg.x1), y1: sg.y1 + dy, x2: mapX(sg.x2), y2: sg.y2 + dy };
@@ -492,11 +503,7 @@ export function layoutTree(
     let o = ownCache.get(key);
     if (!o) {
       const b = branchStructure(n.layout, leftward);
-      // 分支根到它子节点的间距按普通层级算，不用中心主题那么宽（和自由主题一样）；但分支根要放折叠按钮（离节点 10px、16px 见方）：
-      // 时间轴、鱼骨图沿主轴的间距照主主题之间的算（第一个主主题紧贴着根会压住按钮），组织结构图下面那一排照普通层级（gapLevel + 8）
-      const axis = isTimeline(b.structure) || isFishbone(b.structure);
-      const gapRoot = b.structure === "org-down" ? Math.ceil((opts.gapLevel + 8) / 0.6) : opts.gapLevel;
-      const sub = layoutTree(n, measure, { ...opts, structure: b.structure, leftward: b.leftward, gapRoot, gapMain: axis ? opts.gapMain : opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+      const sub = layoutTree(n, measure, branchOptions(opts, b), measureSummary, undefined, measureCallout, measureNote);
       o = { sub, rb: sub.bounds, toggle: b.toggle };
       ownCache.set(key, o);
     }
@@ -1216,14 +1223,19 @@ export function layoutMap(
   let bounds = main.bounds;
   for (const f of floats) {
     // 自由主题是主主题那一层：它和子节点之间按普通层级的间距，不用中心主题那么宽
-    const sub = layoutTree(f, measure, { ...opts, structure, gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
-    const mirror = opts.structure === "mindmap" && f.float!.x < 0;
+    // 左右分布时摆在中心主题左边的：向左展开（镜像）；自由主题设了自己的结构就按它排（朝左的按它自己的朝左排法，不镜像）
+    const left = opts.structure === "mindmap" && f.float!.x < 0;
+    const own = f.layout ? branchStructure(f.layout, left) : null;
+    const sub = layoutTree(f, measure, own ? branchOptions(opts, own) : { ...opts, structure, gapRoot: opts.gapLevel, gapMain: opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+    const mirror = !own && left;
     const dx = f.float!.x;
     const dy = f.float!.y;
     const mx = (x: number, w: number) => (mirror ? -(x + w) : x) + dx;
     const flip = (side: Side): Side => (mirror && side === "right" ? "left" : side);
     const mapX = (x: number) => (mirror ? -x : x) + dx;
-    for (const p of sub.placed.values()) main.placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side), ...(p.bone ? { bone: moveSeg(p.bone, mapX, dy) } : {}) });
+    for (const p of sub.placed.values()) {
+      main.placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side), ...(p.bone ? { bone: moveSeg(p.bone, mapX, dy) } : {}), ...(own && p.node === f ? { toggle: own.toggle } : {}) });
+    }
     for (const sp of allSpines(sub)) (main.spines ??= []).push(moveSpine(sp, mapX, dy));
     for (const b of sub.boxes) main.boxes.push({ ...b, x: mx(b.x, b.w), y: b.y + dy, side: flip(b.side) });
     for (const c of sub.callouts) main.callouts.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });

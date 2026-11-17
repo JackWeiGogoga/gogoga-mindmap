@@ -3,7 +3,7 @@ import { MindMapCanvas } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { t } from "./i18n";
 import { indentString } from "./settings";
-import { describeLost, imageExt, parseXmind, sheetImageUrls, XmindSheet, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
+import { describeLost, imageExt, parseXmind, sheetImageUrls, XmindSheet, xmindRootStructure, xmindSheetToDoc, xmindSheetToMarkdown } from "./xmind";
 import { VIEW_TYPE_MINDMAP } from "./view";
 import type MindMapPlugin from "./main";
 
@@ -90,7 +90,10 @@ export class XmindView extends FileView {
     }
     const urls = sheetImageUrls(sheet);
     this.releaseImages = urls.revoke;
-    this.canvas.setDoc(xmindSheetToDoc(sheet, this.docStyle(), urls.link));
+    const doc = xmindSheetToDoc(sheet, this.docStyle(), urls.link);
+    // XMind 里设了整张图的结构就按它画，没设按设置里的默认结构
+    this.canvas.setStructure(xmindRootStructure(sheet.root.structure) ?? this.plugin.settings.defaultStructure);
+    this.canvas.setDoc(doc);
     prev?.();
     const lost = describeLost(sheet.lost);
     if (lost) {

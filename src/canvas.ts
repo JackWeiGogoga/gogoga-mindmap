@@ -4423,7 +4423,9 @@ export class MindMapCanvas {
   private branchLayoutBlocked(node: MindNode): string | null {
     const base = this.focusRoot ?? this.doc?.root;
     if (!node.parent || node === base) return t("menu.branchLayoutRoot");
-    if (isSummaryTopic(node) || this.isFloating(node)) return t("menu.branchLayoutTopic");
+    if (isSummaryTopic(node)) return t("menu.branchLayoutTopic");
+    // 自由主题单独排，可以设自己的结构（不受中心主题是时间轴、鱼骨图的限制）
+    if (this.isFloating(node)) return null;
     const p = node.parent;
     // 父节点设的结构没生效（它自己就不能设）时不算
     const ps: Structure | undefined = p === base ? this.baseStructure() : p.layout && !this.branchLayoutBlocked(p) ? branchStructure(p.layout, false).structure : undefined;

@@ -267,3 +267,19 @@ test("混合结构：父节点连到分支根的线不从分支里穿过去", ()
     }
   }
 });
+
+test("混合结构：自由主题按自己的结构排，左边的朝左", () => {
+  const doc = parseMarkdown("---\nmindmap-structure: mindmap\n---\n# 根\n\n- 甲\n- 右边自由 %%float x=500 y=0 layout=org-down%%\n\t- 一\n\t- 二\n- 左边自由 %%float x=-500 y=0 layout=fishbone%%\n\t- 原因一\n\t- 原因二\n");
+  const res = layoutMap(doc.root, measure, { ...DEFAULT_LAYOUT, structure: "mindmap" });
+  const [, r, l] = doc.root.children;
+  const pr = res.placed.get(r.id)!;
+  for (const c of r.children) assert.ok(res.placed.get(c.id)!.y > pr.y + pr.h, `${c.text} 在右边自由主题下面`);
+  assert.equal(pr.toggle, "down");
+  const pl = res.placed.get(l.id)!;
+  for (const c of l.children) {
+    const q = res.placed.get(c.id)!;
+    assert.ok(q.x + q.w <= pl.x + pl.w, `${c.text} 在左边自由主题（鱼头）左边`);
+  }
+  assert.equal(pl.toggle, "left");
+  assert.ok(allSpines(res).some((s) => s.segs.has(l.children[0].id)), "左边自由主题有自己的主骨");
+});

@@ -339,3 +339,58 @@ mindmap: true
   assert.match(xmindSheetToMarkdown(s2, {}, link), /^## !\[\[附件\/p\.png\|200\]\]$/m);
   assert.match(xmindSheetToMarkdown(s2, {}, link), /^## 缺$/m);
 });
+
+test("结构：整张图的 structureClass 记进 frontmatter，分支的转成 %%layout=…%%（和上级一样的不写）", async () => {
+  const content = [
+    {
+      title: "表一",
+      rootTopic: {
+        id: "r",
+        title: "根",
+        structureClass: "org.xmind.ui.logic.right",
+        children: {
+          attached: [
+            { id: "a", title: "进度", structureClass: "org.xmind.ui.timeline.horizontal", children: { attached: [{ id: "a1", title: "一月", structureClass: "org.xmind.ui.fishbone.structure.NE.normal" }, { id: "a2", title: "二月" }] } },
+            { id: "b", title: "原因", structureClass: "org.xmind.ui.fishbone.rightHeaded", children: { attached: [{ id: "b1", title: "人" }] } },
+            { id: "c", title: "同上级", structureClass: "org.xmind.ui.logic.right", children: { attached: [{ id: "c1", title: "子", structureClass: "org.xmind.ui.org-chart.down", children: { attached: [{ id: "c2", title: "孙" }] } }] } },
+            { id: "d", title: "表格", structureClass: "org.xmind.ui.spreadsheet", children: { attached: [{ id: "d1", title: "格" }] } },
+          ],
+          detached: [{ id: "f", title: "自由", structureClass: "org.xmind.ui.tree.right", position: { x: 300, y: 200 }, children: { attached: [{ id: "f1", title: "自由子" }] } }],
+        },
+      },
+    },
+  ];
+  const [sheet] = await parseXmind(makeZip({ "content.json": JSON.stringify(content) }));
+  const md = xmindSheetToMarkdown(sheet);
+  assert.match(md, /^---\nmindmap: true\nmindmap-structure: logic-right\n---/);
+  assert.match(md, /## 进度\n%%layout=timeline-h-alt%%/, "横向时间轴（不带 up / down）= 上下交错");
+  assert.match(md, /## 原因\n%%layout=fishbone%%/, "鱼骨图在分支上不分鱼头朝向");
+  assert.doesNotMatch(md, /一月[^\n]*\n%%layout/, "时间轴的主主题不单独设（XMind 自动加的鱼骨细分结构也不认）");
+  assert.doesNotMatch(md, /## 同上级\n%%layout/, "和上级一样的不写");
+  assert.match(md, /### 子\n%%layout=org-down%%/);
+  assert.doesNotMatch(md, /## 表格\n%%layout/, "插件没有的结构跟随上级");
+  assert.match(md, /## 自由\n%%float[^%]*layout=tree-right|## 自由\n%%[^%]*layout=tree-right/, "自由主题也能带自己的结构");
+});
+
+test("结构：content.xml（XMind 8）的 structure-class；没有结构的文件照旧", async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" version="2.0">
+  <sheet id="s1"><title>表一</title>
+    <topic id="t1" structure-class="org.xmind.ui.map.unbalanced"><title>根</title>
+      <children><topics type="attached">
+        <topic id="t2" structure-class="org.xmind.ui.org-chart.down"><title>甲</title>
+          <children><topics type="attached"><topic id="t3"><title>甲一</title></topic></topics></children>
+        </topic>
+      </topics></children>
+    </topic>
+  </sheet>
+</xmap-content>`;
+  const [sheet] = await parseXmind(makeZip({ "content.xml": xml }));
+  const md = xmindSheetToMarkdown(sheet);
+  assert.match(md, /mindmap-structure: mindmap/);
+  assert.match(md, /## 甲\n%%layout=org-down%%/);
+  const plain = await parseXmind(makeZip({ "content.json": JSON.stringify([{ title: "t", rootTopic: { id: "r", title: "根", children: { attached: [{ id: "a", title: "甲" }] } } }]) }));
+  const pm = xmindSheetToMarkdown(plain[0]);
+  assert.match(pm, /^---\nmindmap: true\n---/);
+  assert.doesNotMatch(pm, /layout=|mindmap-structure/);
+});
