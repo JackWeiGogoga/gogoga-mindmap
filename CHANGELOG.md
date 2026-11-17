@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-11-17
+
+### Added
+- Mixed structures (suggested in a Bilibili message): a branch can have its own structure, so one map can hold, say, a timeline, a fishbone and an org chart under different topics. Right-click a topic → **More ▸ Branch structure** and pick Logic chart, Org chart, Tree, a horizontal or vertical Timeline, or Fishbone; **Same as parent** turns it off. The branch is laid out as a block in its own structure, joined to its parent with the parent's kind of line; a fishbone branch always faces its head toward the parent, and a logic chart branch on the left half of a balanced map grows to the left. Arrow keys follow the branch's own structure inside it and the parent's outside it, the fold button sits where the branch's children grow, and topics can be dragged onto a fishbone branch's spine. Boxes and summaries can wrap such branches. Saved as `%%layout=…%%` on the topic (hidden in Obsidian's reading view); notes without it are unchanged. Main topics of a timeline or fishbone, the central topic, summary topics and floating topics can't have their own structure yet; a horizontal timeline isn't offered on the left half of a balanced map.
+
+### Fixed
+- In the right-click menu's **More**, once a submenu such as **Split into children** was open, moving to another item with a submenu (**Branch structure**, **Text color**) kept showing the old one, as if the menu were stuck. This came from how Obsidian handles a submenu inside a submenu; the mind map's own menus now switch normally.
+
 ## [0.78.4] - 2026-11-17
 
 ### Changed
@@ -1004,7 +1012,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...HEAD
+[0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2

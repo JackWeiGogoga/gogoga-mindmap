@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-11-17
+
+### 新增
+- 混合结构（B站私信建议）：分支可以单独设结构，一张图里不同主题下面可以分别是时间轴、鱼骨图、组织结构图。右键主题 →「更多 ▸ 分支结构」，选逻辑图、组织结构图、树形图、横向或纵向时间轴、鱼骨图；「跟随上级」取消。这个分支按自己的结构整块排好，和父节点之间还是父节点那种连线；鱼骨图的鱼头总是朝着父节点，左右分布脑图左半边的逻辑图分支往左长。方向键在分支里按它自己的结构走、出了分支按父节点那一层走，折叠按钮放在子节点长的那一边，也能把主题拖到鱼骨分支的主骨上。外框、概要可以框住这样的分支。存成主题上的 `%%layout=…%%`（阅读视图里看不到）；没有这个标记的笔记不受影响。时间轴、鱼骨图的主主题，以及中心主题、概要主题、自由主题暂时不能单独设；左右分布脑图的左半边不提供横向时间轴。
+
+### 修复
+- 右键菜单「更多」里，打开一个子菜单（比如「拆成子节点」）后，移到另一个带子菜单的项（「分支结构」「文字颜色」）还是显示原来那个，像卡住了。这是 Obsidian 处理「子菜单里再套子菜单」的问题，脑图自己的菜单现在能正常切换。
+
 ## [0.78.4] - 2026-11-17
 
 ### 改进
@@ -1004,7 +1012,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...HEAD
+[0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
 [0.78.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.1...0.78.2
