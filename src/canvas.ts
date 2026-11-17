@@ -222,6 +222,27 @@ export interface ReviewHooks {
   unsuspend(reviewId: string): void;
 }
 
+/** 原地复习（在脑图里一道道过）：排期由宿主管，画布只管遮、揭开、选中、画按钮 */
+export interface MapReviewDriver {
+  /**
+   * 下一张。card：卡片挂的节点（rv）和类型、底栏的三个数（current 是正在出的这张属于哪一类）。
+   * 没有了返回 done：wait 是学习中下一张到点的时刻（没有为 null），note 是学完的小结
+   */
+  next():
+    | { reviewId: string; kind: "cloze" | "choice" | "answer"; counts: [number, number, number]; current: 0 | 1 | 2 }
+    | { done: true; wait: number | null; note: string };
+  /** 翻面后四个按钮上方的间隔文字 */
+  intervals(): [string, string, string, string];
+  grade(g: 1 | 2 | 3 | 4): Promise<void>;
+  /** 撤销上一次评分；撤销了返回 true */
+  undo(): Promise<boolean>;
+  /** 这张找不到节点了（删了）：今天先不出，接着下一张 */
+  skip(): Promise<void>;
+  /** 换到复习标签页接着复习 */
+  openTab(): void;
+  finish(): void;
+}
+
 /** 快捷设置面板的一项：value 是布尔就画开关，否则按 options 画几选一 */
 export interface QuickSetting {
   label: string;
@@ -736,6 +757,19 @@ export class MindMapCanvas {
   private calloutButton: HTMLElement | null = null;
   private hiddenButton: HTMLElement | null = null;
   private reviewButton: HTMLElement | null = null;
+  /** 原地复习进行中 */
+  private mapReview: {
+    driver: MapReviewDriver;
+    node: MindNode | null;
+    kind: "cloze" | "choice" | "answer" | null;
+    shown: boolean;
+    prevRecite: boolean;
+    unfolded: MindNode[];
+    bar: HTMLElement;
+    pop: HTMLElement;
+    start: number;
+    timer: number;
+  } | null = null;
   /** 展开的备注：卡片是 nodes 层里的 HTML（按节点 id 复用），放到分支下面离得远时引线画在 svg 里 */
   private noteLayer!: SVGGElement;
   private relLayer!: SVGGElement;
@@ -1520,6 +1554,7 @@ export class MindMapCanvas {
   }
 
   destroy(): void {
+    if (this.mapReview) this.endMapReview();
     liveCanvases.delete(this);
     this.sizeCheckCleanup?.();
     for (const t of this.sizeCheckTimers) window.clearTimeout(t);
@@ -1744,6 +1779,15 @@ export class MindMapCanvas {
     const next = new Map<string, HTMLElement>();
 
     this.nodeById.clear();
+    // 在复习范围里：整张图加入了，或者在加入的分支下面
+    const deck = !!this.doc && !!deckIdOf(this.doc.frontmatter);
+    const branched = deck && !!this.doc && !!reviewBranches(this.doc);
+    const inReview = (n: MindNode): boolean => {
+      if (!deck) return false;
+      if (!branched) return true;
+      for (let p: MindNode | null = n; p; p = p.parent) if (p.review) return true;
+      return false;
+    };
     const visit = (node: MindNode) => {
       this.nodeById.set(node.id, node);
       // 事件里用的节点按编号现查：重新解析后没变的节点沿用编号、DOM 留着，事件绑定时的 node 已经不在树里了
@@ -1756,8 +1800,9 @@ export class MindMapCanvas {
       const tableSig = nt ? `T${this.opts.editable && !this.recite ? "e" : ""}` : "";
       const num = numberLabel(node);
       // 背诵模式下带 [x] / [ ] 子节点的是选择题：显示「2/4」等于把正确选项有几个说出来了，不显示
+      // 加入了间隔复习的选择题：[x] 是答案不是待办，也不显示
       const progMode = this.recite ? "off" : this.opts.taskProgress?.() ?? "off";
-      const prog = progMode === "off" ? null : taskProgress(node);
+      const prog = progMode === "off" || inReview(node) ? null : taskProgress(node);
       const progText = prog ? progressLabel(prog, progMode) : "";
       const progBelow = !!prog && this.opts.taskProgressPos?.() === "below";
       const contentSig = [node.text, num ?? "", progText + (progBelow ? "\u0002" : ""), this.noteShown(node) ? "n" : "", tableSig, node.folded ? "f" : "", node.children.length, this.opts.theme, node.callout && this.calloutsHidden ? "c" : "", node.hidden ? "h" : ""].join("\u0001");
@@ -3597,6 +3642,14 @@ export class MindMapCanvas {
     this.opts.review?.changed();
   }
 
+  /** 原地复习开始前：出题的节点还没有 rv（新写的题）就补上，写回文件 */
+  ensureReviewIds(): void {
+    if (!this.doc || !this.opts.editable) return;
+    if (!assignReviewIds(this.doc)) return;
+    this.render();
+    this.notify();
+  }
+
   /** 命令、文件菜单：整张图加入 / 移出复习（和右键菜单一样，能撤销） */
   setWholeReview(on: boolean): void {
     if (!this.doc) return;
@@ -4166,6 +4219,7 @@ export class MindMapCanvas {
     this.holdLayer();
     this.updateZoomLabel();
     this.positionNodebar();
+    this.positionMapReview();
     this.closePopover();
     this.opts.onViewChange?.(this.getViewState());
   }
@@ -4508,6 +4562,21 @@ export class MindMapCanvas {
     const down = this.reciteDown;
     if (down && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > DRAG_THRESHOLD) return;
     const target = ev.target as HTMLElement;
+    // 原地复习：点当前这道题被遮住的地方（高亮、答案、选择题标签）= 「显示答案」，评分按钮跟着出来；翻面后不再盖回去
+    const r = this.mapReview;
+    if (r?.node) {
+      const curEl = this.els.get(r.node.id);
+      const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
+      const hitNode = nodeEl ? this.nodeFromEl(nodeEl) : null;
+      const onCurrent =
+        (r.kind === "cloze" && !!curEl && !!target.closest(".mm-label mark") && curEl.contains(target)) ||
+        (r.kind === "answer" && !!hitNode && (hitNode === r.node || isAncestor(r.node, hitNode))) ||
+        (r.kind === "choice" && !!target.closest(".mm-quiz-tag") && hitNode === r.node);
+      if (onCurrent) {
+        this.revealReviewCard();
+        return;
+      }
+    }
     const mark = target.closest<HTMLElement>(".mm-label mark");
     if (mark) {
       mark.classList.toggle("is-revealed");
@@ -4854,6 +4923,255 @@ export class MindMapCanvas {
       if (v) this.el.style.setProperty("--mm-bottom-inset", v);
       else this.el.style.removeProperty("--mm-bottom-inset");
     }
+  }
+
+  // ---------- 原地复习 ----------
+
+  isMapReviewing(): boolean {
+    return !!this.mapReview;
+  }
+
+  /**
+   * 原地复习：进背诵模式（高亮、答案、选择题都遮着），到期的题一道道选中、移到中间，
+   * 节点下面浮出「显示答案」，揭开后换成四个评分按钮。顶上一条显示剩余数和退出
+   */
+  startMapReview(driver: MapReviewDriver): void {
+    if (this.mapReview) this.endMapReview();
+    const prevRecite = this.recite;
+    if (!prevRecite) this.setRecite(true);
+    const bar = this.el.createDiv({ cls: "mm-review-bar" });
+    const pop = this.el.createDiv({ cls: "mm-review-pop" });
+    for (const el of [bar, pop]) {
+      // 按下按钮不抢焦点：按钮点完就重画掉了，焦点跟着丢，后面的空格、1–4 就送不到画布
+      el.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      });
+      el.addEventListener("mousedown", (ev) => ev.preventDefault());
+      el.addEventListener("dblclick", (ev) => ev.stopPropagation());
+      el.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
+    }
+    this.el.classList.add("is-map-review");
+    this.mapReview = { driver, node: null, kind: null, shown: false, prevRecite, unfolded: [], bar, pop, start: Date.now(), timer: 0 };
+    this.el.focus({ preventScroll: true });
+    void this.nextReviewCard();
+  }
+
+  endMapReview(): void {
+    const r = this.mapReview;
+    if (!r) return;
+    this.mapReview = null;
+    window.clearTimeout(r.timer);
+    r.bar.remove();
+    r.pop.remove();
+    this.el.classList.remove("is-map-review");
+    for (const el of this.el.querySelectorAll(".is-review-current")) el.classList.remove("is-review-current");
+    // 为了出题临时展开的分支折回去（只改了内存，没写文件）
+    for (const n of r.unfolded) n.folded = true;
+    if (r.unfolded.length) this.render();
+    if (!r.prevRecite) this.setRecite(false);
+    else this.coverAll();
+    r.driver.finish();
+  }
+
+  /** 揭开过的都盖回去 */
+  private coverAll(): void {
+    this.revealedAnswers.clear();
+    this.revealedQuestions.clear();
+    for (const m of this.el.querySelectorAll(".mm-label mark.is-revealed")) m.classList.remove("is-revealed");
+    this.applyRecite();
+    if (this.layout) {
+      this.drawCallouts();
+      this.drawNotes();
+    }
+  }
+
+  private async nextReviewCard(): Promise<void> {
+    const r = this.mapReview;
+    if (!r || !this.doc) return;
+    window.clearTimeout(r.timer);
+    if (r.node) this.els.get(r.node.id)?.classList.remove("is-review-current");
+    this.coverAll();
+    const next = r.driver.next();
+    if ("done" in next) {
+      r.node = null;
+      r.kind = null;
+      this.paintReviewDone(next.wait, next.note);
+      return;
+    }
+    let hit: MindNode | null = null;
+    const find = (n: MindNode) => {
+      if (hit) return;
+      if (n.reviewId === next.reviewId) hit = n;
+      n.children.forEach(find);
+      if (n.summary?.topic) find(n.summary.topic);
+    };
+    find(this.doc.root);
+    const node = hit as MindNode | null;
+    if (!node) {
+      await r.driver.skip();
+      return this.nextReviewCard();
+    }
+    // 藏在折叠里的：临时展开（只改内存），退出时折回去；聚焦在别的分支上就退出聚焦
+    if (this.focusRoot && node !== this.focusRoot && !isAncestor(this.focusRoot, node)) this.exitFocus(false);
+    let unfolded = false;
+    for (let p = node.parent; p; p = p.parent)
+      if (p.folded) {
+        p.folded = false;
+        r.unfolded.push(p);
+        unfolded = true;
+      }
+    if (unfolded) this.render();
+    r.node = node;
+    r.kind = next.kind;
+    r.shown = false;
+    r.start = Date.now();
+    this.select(node);
+    this.els.get(node.id)?.classList.add("is-review-current");
+    this.centerOn(node, true);
+    this.paintReviewBar(next.counts, next.current);
+    this.paintReviewPop();
+  }
+
+  private paintReviewBar(counts: [number, number, number], current: 0 | 1 | 2): void {
+    const r = this.mapReview;
+    if (!r) return;
+    r.bar.replaceChildren();
+    r.bar.createSpan({ cls: "mm-review-bar-title", text: t("mapReview.title") });
+    const c = r.bar.createSpan({ cls: "mm-review-counts" });
+    const tips = [t("review.tipNew", { n: counts[0] }), t("review.tipLearn", { n: counts[1] }), t("review.tipReview", { n: counts[2] })];
+    counts.forEach((n, i) => {
+      if (i) c.appendText(" + ");
+      const s = c.createSpan({ cls: `is-c${i}${i === current ? " is-current" : ""}`, text: String(n) });
+      this.tip(s, i === current ? `${tips[i]}\n${t("review.tipCurrent")}` : tips[i], "fixed", "bottom");
+    });
+    const tab = r.bar.createEl("button", { cls: "mm-review-bar-btn", text: t("mapReview.openTab") });
+    tab.addEventListener("click", () => {
+      const d = r.driver;
+      this.endMapReview();
+      d.openTab();
+    });
+    const exit = r.bar.createEl("button", { cls: "mm-review-bar-btn", text: t("mapReview.exit") });
+    exit.addEventListener("click", () => this.endMapReview());
+  }
+
+  /** 节点下面的浮层：翻面前「显示答案」，翻面后四个评分按钮 */
+  private paintReviewPop(): void {
+    const r = this.mapReview;
+    if (!r) return;
+    const pop = r.pop;
+    pop.replaceChildren();
+    pop.classList.remove("is-done");
+    const btn = (cls: string, label: string, sub: string | null, run: () => void) => {
+      const b = pop.createEl("button", { cls: `mm-review-btn ${cls}` });
+      if (sub !== null) b.createSpan({ cls: "mm-review-iv", text: sub });
+      b.createSpan({ cls: "mm-review-name", text: label });
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        run();
+      });
+      return b;
+    };
+    if (!r.shown) {
+      const b = btn("is-show", t("review.showAnswer"), null, () => this.revealReviewCard());
+      // 电脑上写上按键（和复习标签页一样），手机上没有键盘不写
+      if (!this.el.ownerDocument.body.classList.contains("is-mobile")) b.createSpan({ cls: "mm-review-kbd", text: t("review.space") });
+    }
+    else {
+      const iv = r.driver.intervals();
+      const names = [t("review.again"), t("review.hard"), t("review.good"), t("review.easy")];
+      names.forEach((name, i) => btn(`is-g${i + 1}`, name, iv[i], () => void this.gradeReviewCard((i + 1) as 1 | 2 | 3 | 4)));
+    }
+    this.positionMapReview();
+  }
+
+  private paintReviewDone(wait: number | null, note: string): void {
+    const r = this.mapReview;
+    if (!r) return;
+    this.select(null);
+    r.bar.querySelector(".mm-review-counts")?.remove();
+    const pop = r.pop;
+    pop.replaceChildren();
+    pop.classList.add("is-done");
+    pop.createDiv({ cls: "mm-review-done-title", text: wait ? t("mapReview.waiting") : t("review.doneTitle") });
+    if (note) pop.createDiv({ cls: "mm-review-done-note", text: note });
+    const row = pop.createDiv({ cls: "mm-review-done-row" });
+    const exit = row.createEl("button", { cls: "mm-review-btn is-show", text: t("mapReview.exit") });
+    exit.addEventListener("click", () => this.endMapReview());
+    // 学习中的卡到了提前出的时间（离到点 20 分钟内）自动接着出
+    if (wait) r.timer = window.setTimeout(() => void this.nextReviewCard(), Math.max(1000, wait - Date.now() - 20 * 60_000 + 1000));
+    this.positionMapReview();
+  }
+
+  private revealReviewCard(): void {
+    const r = this.mapReview;
+    if (!r?.node || r.shown) return;
+    r.shown = true;
+    const n = r.node;
+    if (r.kind === "cloze") for (const m of this.els.get(n.id)?.querySelectorAll(".mm-label mark") ?? []) m.classList.add("is-revealed");
+    else if (r.kind === "answer") this.revealedAnswers.add(n.id);
+    else this.revealedQuestions.add(n.id);
+    this.applyRecite();
+    if (this.layout) {
+      this.drawCallouts();
+      this.drawNotes();
+    }
+    this.paintReviewPop();
+  }
+
+  private async gradeReviewCard(g: 1 | 2 | 3 | 4): Promise<void> {
+    const r = this.mapReview;
+    if (!r?.node || !r.shown) return;
+    await r.driver.grade(g);
+    await this.nextReviewCard();
+  }
+
+  /** 浮层跟着节点：放在节点下面，下面放不下放上面；顶栏贴着画布顶 */
+  private positionMapReview(): void {
+    const r = this.mapReview;
+    if (!r) return;
+    const pop = r.pop;
+    const w = this.el.clientWidth;
+    const h = this.el.clientHeight;
+    const pw = pop.offsetWidth;
+    const ph = pop.offsetHeight;
+    const rect = r.node ? this.screenRectOf(r.node) : null;
+    let x = w / 2 - pw / 2;
+    let y = h / 2 - ph / 2;
+    if (rect) {
+      x = rect.left + rect.width / 2 - pw / 2;
+      y = rect.bottom + 10;
+      if (y + ph > h - 8) y = rect.top - ph - 10;
+    }
+    pop.style.left = `${Math.round(Math.max(8, Math.min(x, w - pw - 8)))}px`;
+    pop.style.top = `${Math.round(Math.max(8, Math.min(y, h - ph - 8)))}px`;
+  }
+
+  /** 原地复习时的按键（照 Anki）：空格 / 回车翻面，翻面后 = 良好；1–4 评分；⌘Z 撤销；Esc 退出。处理了返回 true */
+  private onMapReviewKey(ev: KeyboardEvent): boolean {
+    const r = this.mapReview;
+    if (!r) return false;
+    const mod = ev.metaKey || ev.ctrlKey;
+    const done = (fn: () => void) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      fn();
+      return true;
+    };
+    if (ev.key === "Escape") return done(() => this.endMapReview());
+    if (mod && !ev.shiftKey && ev.key.toLowerCase() === "z")
+      return done(() => {
+        void r.driver.undo().then((ok) => {
+          if (ok) void this.nextReviewCard();
+        });
+      });
+    if (mod || ev.altKey) return false;
+    if (!r.node) return ev.key === " " ? done(() => undefined) : false;
+    if (ev.key === " " || ev.key === "Enter") return done(() => (r.shown ? void this.gradeReviewCard(3) : this.revealReviewCard()));
+    if (r.shown && /^[1-4]$/.test(ev.key)) return done(() => void this.gradeReviewCard(Number(ev.key) as 1 | 2 | 3 | 4));
+    // 别的键（方向键挪选中、/ 折叠……）在原地复习时都不处理，免得改到图
+    if (ev.key.length === 1 || ev.key.startsWith("Arrow") || ev.key === "Tab" || ev.key === "Delete" || ev.key === "Backspace" || ev.key === "F2") return done(() => undefined);
+    return false;
   }
 
   private positionNodebar(): void {
@@ -5476,6 +5794,8 @@ export class MindMapCanvas {
     // 输入法组字中的回车、Esc、Tab 归输入法（回车上屏英文、Esc 取消组字）；
     // 这时提交编辑会把拼音里的分隔符（自带输入法的空格、搜狗的 '）一起存进去
     if (ev.isComposing || ev.keyCode === 229) return;
+    // 原地复习：空格、1–4、⌘Z、Esc 归复习
+    if (this.mapReview && target.tagName !== "TEXTAREA" && this.onMapReviewKey(ev)) return;
     // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
     if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {

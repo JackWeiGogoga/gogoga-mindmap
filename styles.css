@@ -2364,6 +2364,35 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .is-mobile .ggmm-rv-grades { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .is-mobile .ggmm-rv-grade { min-width: 0; padding: 8px 0 !important; }
 .is-mobile .ggmm-rv-body { font-size: 1.15em; }
+/* 原地复习：顶上一条（剩余数、换到标签页、退出），节点下面的浮层（显示答案 / 四个评分按钮），正在出的节点一圈强调色 */
+.gg-mm-root .mm-review-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; padding: 5px 6px 5px 14px; border-radius: 999px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); white-space: nowrap; }
+.gg-mm-root .mm-review-bar-title { font-weight: 600; color: var(--text-normal); }
+.gg-mm-root .mm-review-counts { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.gg-mm-root .mm-review-counts .is-c0 { color: var(--color-blue); }
+.gg-mm-root .mm-review-counts .is-c1 { color: var(--color-red); }
+.gg-mm-root .mm-review-counts .is-c2 { color: var(--color-green); }
+.gg-mm-root .mm-review-counts .is-current { text-decoration: underline; text-underline-offset: 3px; }
+.gg-mm-root .mm-review-bar-btn { height: 26px; padding: 0 10px; border-radius: 999px; font-size: var(--font-ui-smaller); box-shadow: none; background: var(--background-secondary); color: var(--text-muted); cursor: pointer; }
+.gg-mm-root .mm-review-bar-btn:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.gg-mm-root .mm-review-pop { position: absolute; z-index: 30; display: flex; gap: 6px; padding: 8px; border-radius: 12px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-l); }
+.gg-mm-root .mm-review-pop.is-done { flex-direction: column; align-items: center; gap: 8px; padding: 14px 18px; max-width: 320px; text-align: center; }
+.gg-mm-root .mm-review-done-title { font-weight: 600; }
+.gg-mm-root .mm-review-done-note { color: var(--text-muted); font-size: var(--font-ui-small); }
+.gg-mm-root .mm-review-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: auto; min-height: 34px; min-width: 64px; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: var(--font-ui-small); }
+.gg-mm-root .mm-review-btn.is-show { background: var(--interactive-accent); color: var(--text-on-accent); font-weight: 600; padding: 4px 18px; }
+.gg-mm-root .mm-review-btn.is-show { flex-direction: row; gap: 8px; }
+.gg-mm-root .mm-review-kbd { font-size: 10px; font-family: var(--font-monospace); opacity: 0.75; font-weight: 400; }
+.gg-mm-root .mm-review-iv { font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.gg-mm-root .mm-review-name { font-weight: 600; }
+.gg-mm-root .mm-review-btn.is-g1 .mm-review-name { color: var(--color-red); }
+.gg-mm-root .mm-review-btn.is-g2 .mm-review-name { color: var(--color-orange); }
+.gg-mm-root .mm-review-btn.is-g3 .mm-review-name { color: var(--color-green); }
+.gg-mm-root .mm-review-btn.is-g4 .mm-review-name { color: var(--color-blue); }
+.gg-mm-root .mm-review-btn.is-g3 { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-green) 35%, transparent); }
+.gg-mm-root.is-map-review .gg-mm-node.is-review-current { box-shadow: 0 0 0 3px var(--interactive-accent), 0 0 0 7px color-mix(in srgb, var(--interactive-accent) 22%, transparent) !important; }
+/* 原地复习时浮动的节点工具栏不出来，免得挡住按钮 */
+.gg-mm-root.is-map-review .mm-nodebar { display: none !important; }
+
 /* 状态栏、脑图工具栏的数字、到期节点的小绿点 */
 .mm-review-status { cursor: pointer; }
 .mm-tool[data-tool="review"] { width: auto; min-width: 28px; padding: 0 5px; box-sizing: border-box; gap: 2px; }

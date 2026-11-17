@@ -4,7 +4,10 @@ import { buildSvg, svgToPdf, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
 import { under } from "./review/service";
 import { blankBeforeNodeTables } from "./node-table";
-import { MindMapCanvas, NodeCommand } from "./canvas";
+import { type MapReviewDriver, MindMapCanvas, NodeCommand } from "./canvas";
+import { formatInterval, type Grade } from "./review/core/schedule";
+import { Session } from "./review/core/session";
+import { deckIdOf, extractCards } from "./review/mindmap-cards";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { parseColorList, type InlineFormat } from "./format";
 import { t } from "./i18n";
@@ -332,9 +335,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       review: {
         due: () => this.reviewDue,
         dueIn: (path) => (this.reviewDue?.paths ?? []).filter((p) => under(p, path)).length,
-        study: (branch) => {
-          if (this.file) void this.plugin.openReview({ file: this.file, branch });
-        },
+        // 工具栏「复习 N」、右键「复习这个分支」：在脑图里原地复习
+        study: (branch) => void this.startMapReview(branch),
         changed: () => this.plugin.review.changed(),
         dots: () => this.plugin.settings.reviewDueDots,
         previousDeck: () => (this.file ? this.plugin.review.previousDeck(this.file.path) : null),
@@ -502,6 +504,63 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (seq !== this.reviewSeq) return;
     this.reviewDue = due;
     this.canvas?.refreshReview();
+  }
+
+  /**
+   * 原地复习：排期和复习标签页同一套（同一个牌组文件），画布负责遮、揭开、选中和画按钮。
+   * 卡片从画布里的这张图直接读（不读磁盘：刚补的 rv 可能还没存）
+   */
+  async startMapReview(branch: string | null): Promise<void> {
+    const file = this.file;
+    const canvas = this.canvas;
+    if (!file || !canvas || !this.doc || canvas.reviewState() === "none") return;
+    canvas.ensureReviewIds();
+    const doc = this.doc;
+    const deckId = deckIdOf(doc.frontmatter);
+    if (!deckId) return;
+    const svc = this.plugin.review;
+    const data = await svc.store.deck(deckId, file.path);
+    const cards = extractCards(doc).filter((c) => c.id && (branch === null || under(pathOf(c.node), branch)));
+    const kindOf = new Map(cards.map((c) => [c.id!, c.kind]));
+    const session = new Session([{ deckId, data, cards: cards.map((c) => ({ deckId, id: c.id!, order: c.order })) }], svc.prefs(), svc.scheduler(), Date.now(), false);
+    const units = { m: t("review.unitM"), h: t("review.unitH"), d: t("review.unitD"), mo: t("review.unitMo"), y: t("review.unitY") };
+    let shownAt = Date.now();
+    const driver: MapReviewDriver = {
+      next: () => {
+        const ref = session.next(Date.now());
+        if (!ref) return { done: true, wait: session.nextLearnAt(), note: session.done ? t("review.doneStats", { n: session.done, min: Math.max(1, Math.round(session.spent / 60000)) }) : "" };
+        shownAt = Date.now();
+        const c = session.counts();
+        const k = session.currentKind();
+        return { reviewId: ref.id.split(":")[0], kind: kindOf.get(ref.id) ?? "cloze", counts: [c.new, c.learn, c.review], current: k === "new" ? 0 : k === "learn" ? 1 : 2 };
+      },
+      intervals: () => {
+        const now = Date.now();
+        const p = session.preview(now);
+        return ([1, 2, 3, 4] as Grade[]).map((g) => (p ? formatInterval(p[g].due - now, units) : "")) as [string, string, string, string];
+      },
+      grade: async (g) => {
+        const now = Date.now();
+        session.grade(g, now, Math.min(now - shownAt, 60_000));
+        await svc.store.save(deckId);
+        svc.changed();
+      },
+      undo: async () => {
+        if (!session.canUndo()) return false;
+        session.current = null;
+        if (!session.undo()) return false;
+        await svc.store.save(deckId);
+        svc.changed();
+        return true;
+      },
+      skip: async () => {
+        session.setAside("bury", Date.now());
+        await svc.store.save(deckId);
+      },
+      openTab: () => void this.plugin.openReview({ file, branch }),
+      finish: () => svc.changed(),
+    };
+    canvas.startMapReview(driver);
   }
 
   /** 命令、文件菜单：整张图加入 / 移出复习（走画布，能撤销） */
