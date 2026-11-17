@@ -392,7 +392,8 @@ export function blankAfterQuotedNotes(text: string, original: string): string {
     if (next === undefined || !LIST_RE.test(next)) continue;
     let j = i;
     while (j > 0 && quote(lines[j - 1])) j--;
-    if (lines.slice(j, i + 1).some((x) => !old.has(x)) || !old.has(next)) out.push("");
+    // 补的是和引用块同样缩进的空白行，不是真正的空行（见 serializeMarkdown 里的说明）
+    if (lines.slice(j, i + 1).some((x) => !old.has(x)) || !old.has(next)) out.push(l.match(/^[ \t]*/)![0]);
   }
   return out.join("\n");
 }
@@ -433,7 +434,7 @@ export function subtreeToList(node: MindNode, indent = "\t", plain = false): str
     if (n.note) {
       const note = normalizeNote(n.note);
       for (const l of note.split("\n")) lines.push(l === "" ? "" : `${indent.repeat(depth + 1)}${l}`);
-      if (isEscapedNote(note)) lines.push("");
+      if (isEscapedNote(note)) lines.push(indent.repeat(depth + 1));
     }
     for (const c of withTopics(n.children)) walk(c, depth + 1);
   };
@@ -875,7 +876,9 @@ export function serializeMarkdown(doc: MindDoc): string {
   normalizeKinds(doc);
   const out: string[] = [];
   const ensureBlank = () => {
-    if (out.length && out[out.length - 1] !== "") out.push("");
+    // 列表最后一项后面的 listGap 空白行：列表到这里结束了，换成真正的空行
+    if (out.length && out[out.length - 1].trim() === "") out[out.length - 1] = "";
+    else if (out.length) out.push("");
   };
   const pushBlock = (text: string) => {
     if (!text) return;
@@ -973,11 +976,14 @@ export function serializeMarkdown(doc: MindDoc): string {
       const plainNote = note;
       if (doc.style.quoteListNotes && !(node.table && note.startsWith("|"))) note = quoteListNote(note);
       const quoted = note !== plainNote;
+      const noteIndent = style.indent.repeat(depth + 1);
       // 节点里的表格（%%table%%）：列表项和表格之间空一行，没装表格插件时 Obsidian 的阅读视图才认得出是表格
-      if (node.table && note.startsWith("|")) out.push("");
-      for (const l of note.split("\n")) out.push(l === "" ? "" : `${style.indent.repeat(depth + 1)}${l}`);
+      // 插件自己插进列表中间的空行都写成「只有备注缩进的空白行」（listGap）：Markdown 里一样是空行，
+      // 但 Outliner 这类插件把真正的空行当列表结束，上下移动跨不过去
+      if (node.table && note.startsWith("|")) out.push(noteIndent);
+      for (const l of note.split("\n")) out.push(l === "" ? "" : `${noteIndent}${l}`);
       // 包成标注块、引用块的备注后面空一行：实时预览会把缩进的引用块后面紧跟的列表项（子节点、兄弟）也算进引用块
-      if (isEscapedNote(note) || quoted) out.push("");
+      if (isEscapedNote(note) || quoted) out.push(noteIndent);
     }
     for (const c of fileChildren(node)) emitList(c, depth + 1);
     if (node.tail) emitBlock(node.tail, depth + 1);
@@ -1006,7 +1012,7 @@ export function serializeMarkdown(doc: MindDoc): string {
     for (const c of headingKids) emitHeading(c, Math.min(level, 6));
   }
 
-  while (out.length && out[out.length - 1] === "") out.pop();
+  while (out.length && out[out.length - 1].trim() === "") out.pop();
   return out.join("\n") + "\n";
 }
 

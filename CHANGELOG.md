@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- With the Outliner plugin, blank lines the mind map inserts inside a list split the list, so Outliner's move up/down shortcuts couldn't cross them (reported in the chat group). The mind map leaves a blank line after blockquote notes (with **Write notes under list items as blockquotes** on), after notes wrapped in `> [!note]`, and before node tables; that line is now written as whitespace with the same indent as the note. Markdown still treats it as a blank line, so nothing looks different, and Outliner no longer splits the list there. Blank lines already in your files stay as they are until you edit that note in the mind map.
+
 ## [0.81.0] - 2026-11-17
 
 ### Added

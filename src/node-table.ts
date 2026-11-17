@@ -101,7 +101,8 @@ export function blankBeforeNodeTables(text: string): string {
     if (FENCE_LINE.test(l)) fence = !fence;
     if (fence || !TABLE_ITEM.test(l)) continue;
     const next = lines[i + 1];
-    if (next !== undefined && /^\s+\|/.test(next)) out.push("");
+    // 补和表格同样缩进的空白行：Markdown 里是空行，Outliner 不会把列表从这里断开
+    if (next !== undefined && /^\s+\|/.test(next)) out.push(next.match(/^[ \t]*/)![0]);
   }
   return out.join("\n");
 }

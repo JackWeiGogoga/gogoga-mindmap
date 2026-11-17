@@ -17,7 +17,7 @@ test("包成标注块的列表备注后面空一行：子节点、兄弟、上�
   const md = serializeMarkdown(doc);
   assert.equal(
     md,
-    "# T\n\n- 根\n\t- A\n\t\t> [!note]\n\t\t> - 列表备注\n\n\t- A 兄弟\n\t\t- 子\n\t\t\t> [!note]\n\t\t\t> # 标题备注\n\n\t- 上一层\n- 顶层\n\t> [!note]\n\t> - y\n\n\t- 顶层子\n",
+    "# T\n\n- 根\n\t- A\n\t\t> [!note]\n\t\t> - 列表备注\n\t\t\n\t- A 兄弟\n\t\t- 子\n\t\t\t> [!note]\n\t\t\t> # 标题备注\n\t\t\t\n\t- 上一层\n- 顶层\n\t> [!note]\n\t> - y\n\t\n\t- 顶层子\n",
   );
   // 读回来结构、备注都不变，空行不进备注；再写一遍一字不差
   const back = parseMarkdown(md, { fallbackTitle: "" });
@@ -46,5 +46,5 @@ test("已有笔记没有这个空行：没改到的地方原样保留", () => {
 test("复制节点：剪贴板里的标注块备注后面也空一行", () => {
   const doc = parseMarkdown("- A\n\t- B\n", { fallbackTitle: "" });
   doc.root.children[0].note = "- x";
-  assert.equal(subtreeToList(doc.root.children[0]), "- A\n\t> [!note]\n\t> - x\n\n\t- B\n");
+  assert.equal(subtreeToList(doc.root.children[0]), "- A\n\t> [!note]\n\t> - x\n\t\n\t- B\n");
 });
