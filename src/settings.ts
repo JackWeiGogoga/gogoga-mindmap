@@ -1,5 +1,6 @@
 import { AbstractInputSuggest, App, Platform, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
 import type { TaskProgressMode } from "./task-progress";
+import { DEFAULT_REVIEW_PREFS, type ReviewPrefs } from "./review/core/schedule";
 import { STRUCTURES, Structure } from "./layout";
 import { COLOR_NAMES, parseNodeColors } from "./markdown";
 import { MINDMAP_LIST_ICON } from "./icon";
@@ -158,6 +159,14 @@ export interface MindMapSettings {
   followExpand: boolean;
   /** Markdown 跟着脑图折叠：编辑器和阅读视图里对应的节点按脑图的折叠状态折起来（默认关） */
   foldFollow: boolean;
+  /** 间隔复习的选项（照 Anki 的牌组选项） */
+  review: ReviewPrefs;
+  /** 有到期题的节点右上角标小绿点（默认开） */
+  reviewDueDots: boolean;
+  /** 复习时顶栏显示计时（默认关，Anki 默认也不显示） */
+  reviewTimer: boolean;
+  /** 卡片上方显示题目在脑图里的路径（默认开） */
+  reviewCrumb: boolean;
   /** 自定义标记（设置里原样存用户填的文字，用时再解析） */
   customMarkers: string;
   customMarkersExclusive: boolean;
@@ -251,6 +260,10 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   splitMapSide: "right",
   followExpand: false,
   foldFollow: false,
+  review: { ...DEFAULT_REVIEW_PREFS },
+  reviewDueDots: true,
+  reviewTimer: false,
+  reviewCrumb: true,
   customMarkers: "",
   customMarkersExclusive: false,
   rememberView: true,
@@ -391,6 +404,11 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "colorsInNotes":
       case "markersInNotes":
         return p.applyNoteTags();
+      case "reviewDueDots":
+      case "reviewTimer":
+      case "reviewCrumb":
+        p.review?.changed();
+        return;
       case "foldFollow":
         if (value) p.syncFolds();
         return;
@@ -580,6 +598,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         toggle("renameWithRoot", t("settings.renameWithRoot.name"), t("settings.renameWithRoot.desc")),
         this.listIconSetting(),
       ]),
+      this.reviewPage(),
       this.customThemesPage(),
       {
         name: t("settings.support.name"),
@@ -589,6 +608,83 @@ export class MindMapSettingTab extends PluginSettingTab {
         },
       },
     ];
+  }
+
+  /** 间隔复习：数字、阶段这些存在 settings.review 里，自己画输入框 */
+  private reviewPage(): SettingDefinitionItem {
+    const prefs = () => this.plugin.settings.review;
+    const save = async () => {
+      await this.plugin.saveSettings();
+      this.plugin.review?.changed();
+    };
+    const num = (key: "newPerDay" | "reviewPerDay" | "dayStartHour", name: string, desc: string, min: number, max: number): SettingDefinition => ({
+      name,
+      desc,
+      aliases: ["anki", "复习", "review", "flashcard", "卡片"],
+      render: (setting) => {
+        setting.addText((tx) => {
+          tx.inputEl.type = "number";
+          tx.inputEl.min = String(min);
+          tx.inputEl.max = String(max);
+          tx.inputEl.addClass("mm-settings-number");
+          tx.setValue(String(prefs()[key])).onChange(async (v) => {
+            const n = Math.round(Number(v));
+            if (!Number.isFinite(n) || n < min || n > max) return;
+            prefs()[key] = n;
+            await save();
+          });
+        });
+      },
+    });
+    const steps = (key: "learningSteps" | "relearningSteps", name: string, desc: string): SettingDefinition => ({
+      name,
+      desc,
+      aliases: ["anki", "复习", "review", "step", "阶段"],
+      render: (setting) => {
+        setting.addText((tx) =>
+          tx
+            .setPlaceholder(DEFAULT_REVIEW_PREFS[key])
+            .setValue(prefs()[key])
+            .onChange(async (v) => {
+              prefs()[key] = v.trim() || DEFAULT_REVIEW_PREFS[key];
+              await save();
+            }),
+        );
+      },
+    });
+    const toggle = (key: "reviewDueDots" | "reviewTimer" | "reviewCrumb", name: string, desc: string): SettingDefinition => ({ name, desc, control: { type: "toggle", key } });
+    return {
+      type: "page",
+      name: t("settings.review.heading"),
+      desc: t("settings.review.intro"),
+      items: [
+        num("newPerDay", t("settings.review.newPerDay.name"), t("settings.review.newPerDay.desc"), 0, 9999),
+        num("reviewPerDay", t("settings.review.reviewPerDay.name"), t("settings.review.reviewPerDay.desc"), 0, 99999),
+        steps("learningSteps", t("settings.review.learningSteps.name"), t("settings.review.learningSteps.desc")),
+        steps("relearningSteps", t("settings.review.relearningSteps.name"), t("settings.review.relearningSteps.desc")),
+        {
+          name: t("settings.review.retention.name"),
+          desc: t("settings.review.retention.desc"),
+          aliases: ["anki", "fsrs", "retention", "记忆率"],
+          render: (setting) => {
+            setting.addSlider((sl) =>
+              sl
+                .setLimits(0.7, 0.99, 0.01)
+                .setValue(prefs().retention)
+                .onChange(async (v) => {
+                  prefs().retention = Math.round(v * 100) / 100;
+                  await save();
+                }),
+            );
+          },
+        },
+        num("dayStartHour", t("settings.review.dayStart.name"), t("settings.review.dayStart.desc"), 0, 23),
+        toggle("reviewDueDots", t("settings.review.dueDots.name"), t("settings.review.dueDots.desc")),
+        toggle("reviewCrumb", t("settings.review.crumb.name"), t("settings.review.crumb.desc")),
+        toggle("reviewTimer", t("settings.review.timer.name"), t("settings.review.timer.desc")),
+      ],
+      displayValue: () => t("settings.review.perDay", { n: this.plugin.settings.review.newPerDay }),
+    };
   }
 
   /** 节点间距、字号：滑块加一个恢复 100% 的按钮（声明式的滑块没有按钮，自己画） */

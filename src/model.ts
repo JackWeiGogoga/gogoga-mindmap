@@ -56,6 +56,10 @@ export interface MindNode {
    * 没有就跟随上级。中心主题的结构在 frontmatter（mindmap-structure），不用这个
    */
   layout?: BranchLayout;
+  /** 间隔复习：只把这个分支加入复习（%%review%%）。整张图加入写在 frontmatter（mindmap-review），不用这个 */
+  review?: boolean;
+  /** 间隔复习的卡片 id（%%rv=k3j9x2%%）：这个节点生成的卡片按它记排期，改字、挪位置都跟着 */
+  reviewId?: string;
   /**
    * 自由主题：中心主题的直接子节点才有效，不和中心主题连线，摆在相对中心主题中心 (x, y) 的位置
    * （自由主题根节点的中心点）。%%float x=320 y=-80%%
@@ -207,6 +211,8 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     width: init.width,
     side: init.side,
     layout: init.layout,
+    review: init.review,
+    reviewId: init.reviewId,
     float: init.float,
     callout: init.callout,
     calloutColor: init.callout === undefined ? undefined : init.calloutColor,
@@ -917,6 +923,8 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     width: node.width,
     side: node.side,
     layout: node.layout,
+    review: node.review,
+    reviewId: node.reviewId,
     float: node.float && { ...node.float },
     callout: node.callout,
     calloutColor: node.calloutColor,

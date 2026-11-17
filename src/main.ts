@@ -64,6 +64,10 @@ import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, Mi
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, useFallbackViewType, VIEW_TYPE_MINDMAP, VIEW_TYPE_MINDMAP_FALLBACK } from "./view";
+import { ReviewService } from "./review/service";
+import { ReviewView, VIEW_TYPE_REVIEW } from "./review/view";
+import { DEFAULT_REVIEW_PREFS } from "./review/core/schedule";
+import { REVIEW_KEY } from "./review/mindmap-cards";
 import { mediaKind, parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
@@ -184,6 +188,10 @@ function previewLineAt(view: MarkdownView, target: HTMLElement): number | null {
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
+  /** 间隔复习：牌组、复习数据、状态栏的数字 */
+  review!: ReviewService;
+  private reviewStatus: HTMLElement | null = null;
+  private reviewTimer = 0;
   /** PDF 自动摘录：同一时间只有一张脑图接 PDF++ 复制的内容 */
   readonly pdfExcerpt = new PdfExcerpt(this.app);
   /** 删除节点时清理不再使用的图片（设置项 cleanAttachments） */
@@ -210,6 +218,7 @@ export default class MindMapPlugin extends Plugin {
     setTableLanguage(getLanguage());
     registerMindMapIcon();
     await this.loadSettings();
+    this.createReviewService();
     this.register(() => this.pdfExcerpt.stop());
     this.applyCustomThemes();
     this.applyCustomMarkers(false);
@@ -255,6 +264,7 @@ export default class MindMapPlugin extends Plugin {
       this.registerView(VIEW_TYPE_MINDMAP, (leaf) => new MindMapView(leaf, this));
     }
     this.registerView(VIEW_TYPE_XMIND, (leaf) => new XmindView(leaf, this));
+    this.setupReview();
     try {
       this.registerExtensions(["xmind"], VIEW_TYPE_XMIND);
     } catch (e) {
@@ -367,6 +377,8 @@ export default class MindMapPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const raw = ((await this.loadData()) as (Partial<MindMapSettings> & LegacyFileState) | null) ?? {};
     this.settings = { ...DEFAULT_SETTINGS, ...raw };
+    // 复习选项是嵌套的：缺的项用默认值补上，也别和默认值共用一个对象
+    this.settings.review = { ...DEFAULT_REVIEW_PREFS, ...(raw.review ?? {}) };
     // 嵌套的对象要自己一份，不能和默认值共用（记颜色时会改它）
     this.settings.colorMemory = { last: { ...raw.colorMemory?.last }, recent: { ...raw.colorMemory?.recent } };
     this.fileState = new FileStateStore(this.app.vault.adapter, `${this.manifest.dir}/state.json`);
@@ -1540,6 +1552,193 @@ export default class MindMapPlugin extends Plugin {
     if (path !== null && leaf.view instanceof MindMapView) leaf.view.revealPath(path, true);
   }
 
+  // ---------- 间隔复习 ----------
+
+  /** 复习服务要在注册脑图视图之前建好：Obsidian 注册视图时就会恢复开着的脑图，它们一打开就要用 */
+  private createReviewService(): void {
+    this.review = new ReviewService({
+      app: this.app,
+      dir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
+      prefs: () => this.settings.review,
+      rootRule: () => this.rootRule(),
+      style: () => ({ maxHeadingLevel: this.settings.headingsOnly ? 6 : this.settings.maxHeadingLevel, indent: indentString(this.settings.indent) }),
+    });
+  }
+
+  private setupReview(): void {
+    this.registerView(
+      VIEW_TYPE_REVIEW,
+      (leaf) =>
+        new ReviewView(leaf, {
+          service: this.review,
+          settings: () => this.settings,
+          openNode: (file, rv, path) => this.openReviewNode(file, rv, path),
+          openSettings: () => {
+            const s = (this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } }).setting;
+            s?.open();
+            s?.openTabById(this.manifest.id);
+          },
+        }),
+    );
+    this.addRibbonIcon("layers", t("command.openReview"), () => void this.openReview());
+    this.addCommand({ id: "open-review", name: t("command.openReview"), callback: () => void this.openReview() });
+    this.addCommand({
+      id: "add-map-to-review",
+      name: t("command.reviewAdd"),
+      checkCallback: (checking) => {
+        const file = this.reviewTarget();
+        if (!file || this.review.isDeck(file.path)) return false;
+        if (!checking) void this.setReviewFor(file, true);
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "remove-map-from-review",
+      name: t("command.reviewRemove"),
+      checkCallback: (checking) => {
+        const file = this.reviewTarget();
+        if (!file || !this.review.isDeck(file.path)) return false;
+        if (!checking) void this.setReviewFor(file, false);
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "review-map",
+      name: t("command.reviewMap"),
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || !this.review.isDeck(file.path)) return false;
+        if (!checking) void this.openReview({ file, branch: null });
+        return true;
+      },
+    });
+    // 状态栏：全库今天要复习多少，点了打开复习
+    const status = this.addStatusBarItem();
+    status.addClass("mm-review-status", "mod-clickable");
+    status.addEventListener("click", () => void this.openReview());
+    this.reviewStatus = status;
+    this.register(this.review.onChange(() => this.updateReviewStatusSoon()));
+    // 笔记改了（加入、移出复习，改了题）：缓存作废、数字重算
+    this.registerEvent(
+      this.app.metadataCache.on("changed", (file) => {
+        const fm: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.[REVIEW_KEY];
+        if (fm === undefined && !this.reviewKnown.has(file.path)) return;
+        if (fm === undefined) this.reviewKnown.delete(file.path);
+        else this.reviewKnown.add(file.path);
+        this.review.forget(file.path);
+        this.review.changed();
+      }),
+    );
+    this.registerEvent(this.app.vault.on("rename", (f, old) => void this.review.renamed(old, f.path)));
+    this.registerEvent(this.app.vault.on("delete", (f) => this.review.forget(f.path)));
+    // 学习中的卡到点、换天：每分钟重算一次
+    this.registerInterval(window.setInterval(() => this.review.changed(), 60_000));
+    this.app.workspace.onLayoutReady(() => {
+      for (const f of this.review.deckFiles()) this.reviewKnown.add(f.path);
+      void this.review.loadIndex();
+      this.updateReviewStatusSoon();
+    });
+  }
+
+  private reviewKnown = new Set<string>();
+
+  /** 命令作用的脑图：当前开着的笔记，是脑图（脑图视图里，或 frontmatter 标了 mindmap）才算 */
+  private reviewTarget(): TFile | null {
+    const view = this.app.workspace.getActiveViewOfType(MindMapView);
+    if (view?.file) return view.file;
+    const file = this.app.workspace.getActiveFile();
+    return file && file.extension === "md" && this.isMindMapFile(file.path) ? file : null;
+  }
+
+  /** 整张图加入 / 移出复习：脑图开着就走画布（能撤销），没开就直接改笔记 */
+  async setReviewFor(file: TFile, on: boolean): Promise<void> {
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => l.view instanceof MindMapView && l.view.file === file);
+    if (leaf && leaf.view instanceof MindMapView && leaf.view.setWholeReview(on)) {
+      new Notice(t(on ? "notice.reviewAdded" : "notice.reviewRemoved", { name: file.basename }));
+      return;
+    }
+    await this.review.setFileReview(file, on);
+    new Notice(t(on ? "notice.reviewAdded" : "notice.reviewRemoved", { name: file.basename }));
+  }
+
+  private updateReviewStatusSoon(): void {
+    window.clearTimeout(this.reviewTimer);
+    this.reviewTimer = window.setTimeout(() => void this.updateReviewStatus(), 300);
+  }
+
+  private async updateReviewStatus(): Promise<void> {
+    const el = this.reviewStatus;
+    if (!el) return;
+    if (!this.review.deckFiles().length) {
+      el.hide();
+      return;
+    }
+    const n = await this.review.totalDue();
+    el.setText(t("review.statusbar", { n }));
+    el.show();
+  }
+
+  /** 打开复习标签页：给了图就到这张图（或它的一个分支）的概览，否则到复习主页 */
+  async openReview(target?: { file: TFile; branch: string | null }): Promise<void> {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_REVIEW)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: VIEW_TYPE_REVIEW, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view;
+    if (!(view instanceof ReviewView)) return;
+    if (!target) return view.show({ kind: "home" });
+    const title = target.branch ? `${target.file.basename} › ${await this.branchTitle(target.file, target.branch)}` : target.file.basename;
+    await view.show({ kind: "overview", scope: { files: [target.file], branch: target.branch ?? undefined, title } });
+  }
+
+  private async branchTitle(file: TFile, path: string): Promise<string> {
+    const parsed = await this.review.read(file);
+    let n = parsed.doc.root;
+    for (const i of path.split("/").filter(Boolean)) n = n.children[Number(i)] ?? n;
+    return n.text.replace(/[*_=~`<>]/g, "").slice(0, 30);
+  }
+
+  /** 复习时按「编辑」：在脑图里打开这张图，选中这道题（已经开着就切过去） */
+  private async openReviewNode(file: TFile, reviewId: string | undefined, path: string): Promise<void> {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => l.view instanceof MindMapView && l.view.file === file);
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await this.openAsMindMap(file, leaf, false);
+    }
+    await this.app.workspace.revealLeaf(leaf);
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    // 图刚打开时还没画好：等一会儿再定位
+    for (let i = 0; i < 20; i++) {
+      const v = leaf.view;
+      if (v instanceof MindMapView && v.revealReview(reviewId, path)) return;
+      await new Promise((r) => window.setTimeout(r, 100));
+    }
+  }
+
+  /** 这道题（节点的 rv）有暂停的卡没有：右键「恢复这道题的复习」 */
+  reviewSuspended(file: TFile, reviewId: string): boolean {
+    const deckId = this.deckIdOfFile(file);
+    const deck = deckId ? this.review.store.cached(deckId) : null;
+    if (!deck) return false;
+    return Object.entries(deck.cards).some(([id, r]) => id.startsWith(`${reviewId}:`) && r.susp);
+  }
+
+  async reviewUnsuspend(file: TFile, reviewId: string): Promise<void> {
+    const deckId = this.deckIdOfFile(file);
+    if (!deckId) return;
+    const deck = await this.review.store.deck(deckId, file.path);
+    for (const [id, r] of Object.entries(deck.cards)) if (id.startsWith(`${reviewId}:`)) delete r.susp;
+    await this.review.store.save(deckId);
+    this.review.changed();
+  }
+
+  private deckIdOfFile(file: TFile): string | null {
+    const v: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.[REVIEW_KEY];
+    return typeof v === "string" && /^[a-z0-9]{4,32}$/i.test(v) ? v : null;
+  }
+
   // ---------- 命令 ----------
 
   private registerCommands(): void {
@@ -1721,6 +1920,12 @@ export default class MindMapPlugin extends Plugin {
         .setIcon("columns-2")
         .onClick(() => void this.openSideBySide(file, shown ?? undefined)),
     );
+    // 间隔复习：脑图笔记才有。加入了的给「复习这张图」「移出」，没加入的给「加入」
+    if (!isMap) return;
+    if (this.review.isDeck(file.path)) {
+      menu.addItem((item) => item.setTitle(t("menu.fileReviewStudy")).setIcon("layers").onClick(() => void this.openReview({ file, branch: null })));
+      menu.addItem((item) => item.setTitle(t("menu.fileReviewRemove")).setIcon("x").onClick(() => void this.setReviewFor(file, false)));
+    } else menu.addItem((item) => item.setTitle(t("menu.fileReviewAdd")).setIcon("layers").onClick(() => void this.setReviewFor(file, true)));
   }
 
   /** 不传文件夹就按 Obsidian 的新建笔记位置设置来 */

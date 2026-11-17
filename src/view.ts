@@ -2,6 +2,7 @@ import { HoverPopover, Menu, normalizePath, Notice, Platform, Scope, TextFileVie
 import { mergeLayout, nodebarDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 import { buildSvg, svgToPdf, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
+import { under } from "./review/service";
 import { blankBeforeNodeTables } from "./node-table";
 import { MindMapCanvas, NodeCommand } from "./canvas";
 import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
@@ -288,6 +289,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   async onOpen(): Promise<void> {
+    this.unsubReview = this.plugin.review.onChange(() => void this.refreshReview());
     this.contentEl.addClass("mm-view-content");
     this.addAction(MARKDOWN_ICON, t("menu.openAsMarkdown"), () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
@@ -326,6 +328,20 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       onViewChange: () => this.rememberViewportSoon(),
       onRevealInMarkdown: () => {
         if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
+      },
+      review: {
+        due: () => this.reviewDue,
+        dueIn: (path) => (this.reviewDue?.paths ?? []).filter((p) => under(p, path)).length,
+        study: (branch) => {
+          if (this.file) void this.plugin.openReview({ file: this.file, branch });
+        },
+        changed: () => this.plugin.review.changed(),
+        dots: () => this.plugin.settings.reviewDueDots,
+        previousDeck: () => (this.file ? this.plugin.review.previousDeck(this.file.path) : null),
+        suspended: (rv) => !!this.file && this.plugin.reviewSuspended(this.file, rv),
+        unsuspend: (rv) => {
+          if (this.file) void this.plugin.reviewUnsuspend(this.file, rv);
+        },
       },
       onToggleOutline: () => void this.toggleOutline(),
       onSideBySide: () => {
@@ -473,7 +489,35 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     return super.onUnloadFile(file);
   }
 
+  /** 今天这张图的到期数（工具栏「复习 N」、小绿点、右键「复习这个分支」用） */
+  private reviewDue: { ids: Set<string>; count: number; paths: string[] } | null = null;
+  private unsubReview: (() => void) | null = null;
+  private reviewSeq = 0;
+
+  async refreshReview(): Promise<void> {
+    const file = this.file;
+    const seq = ++this.reviewSeq;
+    const on = !!file && file.extension === "md" && this.canvas?.reviewState() !== "none";
+    const due = on && file ? await this.plugin.review.dueNodes(file).catch(() => null) : null;
+    if (seq !== this.reviewSeq) return;
+    this.reviewDue = due;
+    this.canvas?.refreshReview();
+  }
+
+  /** 命令、文件菜单：整张图加入 / 移出复习（走画布，能撤销） */
+  setWholeReview(on: boolean): boolean {
+    if (!this.canvas) return false;
+    this.canvas.setWholeReview(on);
+    return true;
+  }
+
+  /** 复习时按「编辑」跳回来：选中这道题的节点 */
+  revealReview(reviewId: string | undefined, path: string): boolean {
+    return this.canvas?.revealReview(reviewId, path) ?? false;
+  }
+
   async onClose(): Promise<void> {
+    this.unsubReview?.();
     // FileView.onClose 会 loadFile(null) → onUnloadFile → TextFileView.save(true)，
     // 这是视图被替换（切 Markdown 视图、同一标签页打开别的笔记）时最后一次写盘的机会，不能漏掉 super
     this.canvas?.flush();
@@ -601,6 +645,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.flushImageSweep();
     this.applyViewData(data, clear);
     this.usedImages = this.file ? this.plugin.janitor.images(this.data, this.file.path) : null;
+    void this.refreshReview();
   }
 
   /** 打开文件时把按路径记下的状态放到画布上，返回记下的视口（选中节点要等图建好再用） */

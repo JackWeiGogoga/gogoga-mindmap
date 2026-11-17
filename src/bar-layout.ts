@@ -40,6 +40,7 @@ export const TOOLBAR_DEFAULT = [
   "notes",
   "hidden",
   "recite",
+  "review",
   "layers",
   "quick",
 ];

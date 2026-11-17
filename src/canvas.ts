@@ -112,12 +112,13 @@ import { Key, paletteText, t } from "./i18n";
 import { alignedTiers, tierOf } from "./custom-theme";
 import { clampCard, NOTE_CARD_MAX, type NoteCards, type NoteCardState } from "./state";
 import { TableEditor, type EditorHost } from "./table/editor/editor";
+import { assignReviewIds, deckIdOf, newReviewId, REVIEW_KEY, reviewBranches } from "./review/mindmap-cards";
 import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { isWebUrl, linkDestination } from "./paste-link";
 import { addTable, noteOnlyTable, noteRest, noteTable, tableSource, withoutTable, withTable } from "./node-table";
 import { type CustomSplit, type SplitRule, splitText } from "./split";
-import { calloutFromMarker, calloutToMarker, COLOR_NAMES, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
+import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 嵌入的图拿到焦点时，截下会和画布按键撞车的 Obsidian 全局热键交给 onKey；返回注销函数 */
@@ -201,6 +202,24 @@ export interface MenuEntry {
   separator?: boolean;
   /** 二级菜单；host 拿不到二级菜单时平铺在这一项的位置 */
   submenu?: MenuEntry[];
+}
+
+/** 间隔复习的宿主接口：数字由宿主异步算好，画布同步取 */
+export interface ReviewHooks {
+  /** 今天到期的卡挂在哪些节点（rv）、这张图今天一共要复习几张；还没算好返回 null */
+  due(): { ids: Set<string>; count: number } | null;
+  /** 这个分支（节点路径）下今天要复习几张 */
+  dueIn(path: string): number;
+  /** 打开复习：null 是整张图，否则只复习这个分支 */
+  study(branchPath: string | null): void;
+  /** 加入、移出复习了：宿主重算数字 */
+  changed(): void;
+  /** 小绿点开着没有 */
+  dots(): boolean;
+  /** 这篇笔记以前用过的牌组 id：移出复习再加回来时沿用，排期接着用 */
+  previousDeck(): string | null;
+  suspended(reviewId: string): boolean;
+  unsuspend(reviewId: string): void;
 }
 
 /** 快捷设置面板的一项：value 是布尔就画开关，否则按 options 画几选一 */
@@ -342,6 +361,8 @@ export interface CanvasOptions {
   notePopoverSize?: { get: () => PopoverSize | undefined; set: (size: PopoverSize) => void };
   /** 提供则节点右键菜单有「在 Markdown 中定位」：切到 Markdown 并跳到选中节点那一行 */
   onRevealInMarkdown?: () => void;
+  /** 间隔复习：右键「间隔复习」、工具栏「复习 N」、到期节点的小绿点。不给就没有这些 */
+  review?: ReviewHooks;
   /** 嵌在别的笔记里（代码块）：阻止事件冒泡到编辑器，工具栏带「编辑」开关，备注不做实时同步 */
   embedded?: boolean;
   /** 嵌入的脑图：先点一下脑图，滚轮才拿来平移（#35，默认这样）；没点过时滚轮交给页面滚动，⌘ / Ctrl + 滚轮照样缩放 */
@@ -482,6 +503,7 @@ const ICONS: Record<string, string> = {
   highlighter: '<svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>',
   eraser: '<svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>',
   // 虚线框里一只眼睛：把藏起来的节点显示出来
+  review: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="14" rx="2"/><path d="M7 3h11a2 2 0 0 1 2 2v12"/><path d="M7 14l2.5 2.5L13 12"/></svg>',
   hiddenNodes: '<svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M6 12s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="12" cy="12" r="1.5"/></svg>',
   recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
@@ -713,6 +735,7 @@ export class MindMapCanvas {
   private peekCallout: MindNode | null = null;
   private calloutButton: HTMLElement | null = null;
   private hiddenButton: HTMLElement | null = null;
+  private reviewButton: HTMLElement | null = null;
   /** 展开的备注：卡片是 nodes 层里的 HTML（按节点 id 复用），放到分支下面离得远时引线画在 svg 里 */
   private noteLayer!: SVGGElement;
   private relLayer!: SVGGElement;
@@ -1668,6 +1691,7 @@ export class MindMapCanvas {
     this.updateCalloutButton();
     this.updateNotesButton();
     this.updateHiddenButton();
+    this.applyReviewDots();
     // 背诵模式的「单选 / 多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
@@ -3468,6 +3492,134 @@ export class MindMapCanvas {
     this.render();
   }
 
+  // ---------- 间隔复习 ----------
+
+  /** 这张图在不在复习里：没加入、整张图、只有几个分支 */
+  reviewState(): "none" | "whole" | "branch" {
+    if (!this.doc || deckIdOf(this.doc.frontmatter) === null) return "none";
+    return reviewBranches(this.doc) ? "branch" : "whole";
+  }
+
+  /** 宿主算好了今天的到期数（复习了、换天了）：刷新工具栏的数字和小绿点 */
+  refreshReview(): void {
+    this.updateReviewButton();
+    this.applyReviewDots();
+  }
+
+  private updateReviewButton(): void {
+    const b = this.reviewButton;
+    if (!b) return;
+    const on = this.reviewState() !== "none";
+    const n = on ? (this.opts.review?.due()?.count ?? 0) : 0;
+    b.classList.toggle("is-hidden", !on);
+    const c = b.querySelector<HTMLElement>(".mm-tool-count");
+    if (c) c.textContent = n ? String(n) : "";
+    this.tip(b, t("canvas.review", { n }), "toolbar");
+  }
+
+  /** 今天有卡片到期的节点：右上角一个小绿点（设置里可以关） */
+  private applyReviewDots(): void {
+    if (!this.doc) return;
+    const hooks = this.opts.review;
+    const ids = hooks && hooks.dots() && this.reviewState() !== "none" ? (hooks.due()?.ids ?? null) : null;
+    walkMap(this.doc.root, (n) => {
+      const el = this.els.get(n.id);
+      if (!el) return;
+      const due = !!ids && !!n.reviewId && ids.has(n.reviewId);
+      if (el.classList.contains("has-review-due") !== due) el.classList.toggle("has-review-due", due);
+    });
+  }
+
+  /** 右键「间隔复习 ▸」：按这张图现在的状态给加入、移出、复习这个分支 */
+  private reviewMenu(node: MindNode): MenuEntry[] {
+    const hooks = this.opts.review;
+    if (!hooks || !this.doc) return [];
+    const editable = this.opts.editable;
+    const state = this.reviewState();
+    const out: MenuEntry[] = [];
+    const isRoot = node === this.doc.root;
+    let inBranch = false;
+    for (let p: MindNode | null = node; p; p = p.parent) if (p.review) inBranch = true;
+    const studyable = state === "whole" || (state === "branch" && inBranch);
+    if (studyable) out.push({ title: t("menu.reviewStudyBranch", { n: hooks.dueIn(pathOf(node)) }), icon: "play", run: () => hooks.study(isRoot ? null : pathOf(node)) });
+    if (editable) {
+      if (state === "none") {
+        out.push({ title: t("menu.reviewJoinAll"), icon: "layers", run: () => this.setReview("all-in", node) });
+        if (!isRoot) out.push({ title: t("menu.reviewJoinBranch"), icon: "git-branch", run: () => this.setReview("branch-in", node) });
+      } else if (state === "whole") {
+        out.push({ title: t("menu.reviewLeaveAll"), icon: "x", run: () => this.setReview("all-out", node) });
+      } else {
+        if (node.review) out.push({ title: t("menu.reviewLeaveBranch"), icon: "x", run: () => this.setReview("branch-out", node) });
+        else if (!inBranch && !isRoot) out.push({ title: t("menu.reviewAddBranch"), icon: "git-branch", run: () => this.setReview("branch-in", node) });
+        out.push({ title: t("menu.reviewJoinAll"), icon: "layers", run: () => this.setReview("all-in", node) });
+        out.push({ title: t("menu.reviewLeaveAll"), icon: "x", run: () => this.setReview("all-out", node) });
+      }
+      if (node.reviewId && hooks.suspended(node.reviewId)) out.push({ separator: true }, { title: t("menu.reviewUnsuspend"), icon: "play-circle", run: () => hooks.unsuspend(node.reviewId!) });
+    }
+    return out;
+  }
+
+  /**
+   * 加入 / 移出复习：整张图写 frontmatter 的 mindmap-review（牌组 id），只加入分支的再在分支节点写 %%review%%。
+   * 移出时卡片的 rv 留着，再加回来排期接着用
+   */
+  private setReview(how: "all-in" | "branch-in" | "all-out" | "branch-out", node: MindNode): void {
+    const doc = this.doc;
+    if (!doc || !this.opts.editable) return;
+    const clearFlags = (n: MindNode) => {
+      n.review = undefined;
+      n.children.forEach(clearFlags);
+      if (n.summary?.topic) clearFlags(n.summary.topic);
+    };
+    const ensureDeck = () => {
+      if (!deckIdOf(doc.frontmatter)) doc.frontmatter = setFrontmatterValue(doc.frontmatter, REVIEW_KEY, this.opts.review?.previousDeck() ?? newReviewId(new Set()));
+    };
+    if (how === "all-in") {
+      ensureDeck();
+      clearFlags(doc.root);
+    } else if (how === "branch-in") {
+      const whole = this.reviewState() === "whole";
+      ensureDeck();
+      if (whole) clearFlags(doc.root);
+      // 下面已经单独加入的分支并进来
+      clearFlags(node);
+      node.review = true;
+    } else if (how === "all-out") {
+      doc.frontmatter = setFrontmatterValue(doc.frontmatter, REVIEW_KEY, null);
+      clearFlags(doc.root);
+    } else {
+      node.review = undefined;
+      if (!reviewBranches(doc)) doc.frontmatter = setFrontmatterValue(doc.frontmatter, REVIEW_KEY, null);
+    }
+    if (how.endsWith("-in")) assignReviewIds(doc);
+    this.render();
+    this.notify();
+    this.opts.review?.changed();
+  }
+
+  /** 命令、文件菜单：整张图加入 / 移出复习（和右键菜单一样，能撤销） */
+  setWholeReview(on: boolean): void {
+    if (!this.doc) return;
+    this.setReview(on ? "all-in" : "all-out", this.doc.root);
+  }
+
+  /** 复习时按「编辑」跳回来：按卡片的 rv 找节点（找不到按路径），展开、选中、移到中间 */
+  revealReview(reviewId: string | undefined, path: string): boolean {
+    if (!this.doc) return false;
+    let hit: MindNode | null = null;
+    if (reviewId) {
+      const find = (n: MindNode) => {
+        if (hit) return;
+        if (n.reviewId === reviewId) hit = n;
+        n.children.forEach(find);
+        if (n.summary?.topic) find(n.summary.topic);
+      };
+      find(this.doc.root);
+    }
+    if (hit) return this.revealNode(hit);
+    return path ? this.revealPathFlash(path) : false;
+  }
+
   private updateHiddenButton(): void {
     const b = this.hiddenButton;
     if (!b || !this.doc) return;
@@ -4218,6 +4370,13 @@ export class MindMapCanvas {
     // 只在图里有隐藏的节点时出现
     this.hiddenButton = btn("hiddenNodes", t("canvas.showHidden"), () => this.opts.onToggleHidden?.());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
+    // 只在这张图加入了间隔复习时出现，旁边写今天要复习几张
+    if (this.opts.review) {
+      const hooks = this.opts.review;
+      this.reviewButton = btn("review", "", () => hooks.study(null));
+      this.reviewButton.createSpan({ cls: "mm-tool-count" });
+      this.updateReviewButton();
+    }
     this.reciteButton.classList.toggle("is-active", this.recite);
     const layers = btn("layers", t("canvas.foldLevels"), () => this.toggleFoldMenu(layers));
     if (this.opts.quickSettings) {
@@ -7972,6 +8131,9 @@ export class MindMapCanvas {
         ],
       });
     }
+    // 间隔复习放在「更多」最前面：第一层菜单不能再长了（矮窗口里放不下）；常用的「复习」在工具栏上
+    const review = this.reviewMenu(node);
+    if (review.length) more.unshift({ title: t("menu.reviewGroup"), icon: "layers", submenu: review }, sep);
     entries.push({ title: t("menu.more"), icon: "more-horizontal", submenu: more });
     if (editable && node.parent) {
       entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
