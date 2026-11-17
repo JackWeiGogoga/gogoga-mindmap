@@ -10,6 +10,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 ### Changed
 - Choice questions in maps or branches added to spaced review no longer show task progress ("2/4"): their `[x]` marks are answers, not to-dos.
 
+### Fixed
+- Clicking a global search result now selects the matching node in the mind map (it often didn't before, reported by zhiqiang); nodes inside folded branches are unfolded in view.
+
 ## [0.82.0] - 2026-11-17
 
 ### Added
