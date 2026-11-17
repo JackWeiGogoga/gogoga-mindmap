@@ -5,6 +5,24 @@
 
 export type NodeKind = "heading" | "list";
 
+/**
+ * 分支能单独设的结构（混合结构）。左右分布的脑图只给中心主题；鱼骨图不分鱼头朝向，排版时让鱼头朝着父节点
+ */
+export type BranchLayout =
+  | "logic-right"
+  | "org-down"
+  | "tree-right"
+  | "timeline-h"
+  | "timeline-h-alt"
+  | "timeline-v-right"
+  | "timeline-v-left"
+  | "timeline-v-alt"
+  | "fishbone";
+export const BRANCH_LAYOUTS: readonly BranchLayout[] = ["logic-right", "org-down", "tree-right", "timeline-h", "timeline-h-alt", "timeline-v-right", "timeline-v-left", "timeline-v-alt", "fishbone"];
+export function isBranchLayout(s: unknown): s is BranchLayout {
+  return (BRANCH_LAYOUTS as readonly unknown[]).includes(s);
+}
+
 export interface MindNode {
   /** 会话内稳定的 id，重新解析后会变；跨解析请用 pathOf() */
   id: string;
@@ -33,6 +51,11 @@ export interface MindNode {
   width?: number;
   /** 思维导图结构里主主题固定在哪一边；%%left%% / %%right%%，没有就按数量自动分 */
   side?: "left" | "right";
+  /**
+   * 这个分支自己的结构（混合结构）：子节点按它排，不跟随上级；%%layout=fishbone%%。
+   * 没有就跟随上级。中心主题的结构在 frontmatter（mindmap-structure），不用这个
+   */
+  layout?: BranchLayout;
   /**
    * 自由主题：中心主题的直接子节点才有效，不和中心主题连线，摆在相对中心主题中心 (x, y) 的位置
    * （自由主题根节点的中心点）。%%float x=320 y=-80%%
@@ -183,6 +206,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     summary: init.summary,
     width: init.width,
     side: init.side,
+    layout: init.layout,
     float: init.float,
     callout: init.callout,
     calloutColor: init.callout === undefined ? undefined : init.calloutColor,
@@ -892,6 +916,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     summary: node.summary && { ...node.summary },
     width: node.width,
     side: node.side,
+    layout: node.layout,
     float: node.float && { ...node.float },
     callout: node.callout,
     calloutColor: node.calloutColor,

@@ -13,7 +13,7 @@
  */
 
 import { t } from "./i18n";
-import { boxGroups, MindNode, summaryGroups, visibleChildren } from "./model";
+import { boxGroups, type BranchLayout, isSummaryTopic, MindNode, summaryGroups, visibleChildren } from "./model";
 
 export type Structure =
   | "logic-right"
@@ -77,6 +77,8 @@ export interface LayoutOptions {
   gapSibling: number;
   /** 主主题之间的距离 */
   gapMain: number;
+  /** 混合结构内部用：逻辑图整块朝左长（分支挂在父节点左边时） */
+  leftward?: boolean;
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
@@ -119,6 +121,17 @@ export interface Placed {
   stem?: number;
   /** 鱼骨图的主主题：它那根斜骨（从主骨上的点到主题）；子主题的小骨横着接到这根线上 */
   bone?: Segment;
+  /**
+   * 折叠按钮放在哪一边（子节点长的方向）。不写就按 side：left 在左、down 在下、up 在上、其余在右。
+   * 设了自己结构的分支根节点、鱼头向右的鱼骨图的二级主题和 side 推出来的不一样，才写
+   */
+  toggle?: "right" | "left" | "down" | "up";
+  /**
+   * 设了自己结构的分支根节点：整块朝父节点那条边的位置（right / left 是 x，down / tree 不用、down 是 y）。
+   * 根节点不在这条边上时（比如向左的纵向时间轴，分支伸到根节点左边），连线先弯到这条边，再直着接进根节点，
+   * 不从分支里穿过去
+   */
+  entry?: number;
 }
 
 export interface Bounds {
@@ -182,7 +195,51 @@ export interface LayoutResult {
    * end 是最后一个主主题后面带箭头的那一段。
    * 鱼骨图也用它：segs 是各主主题的斜骨，end 是从鱼尾通到鱼头的主骨（plain：不跟分支配色）
    */
-  spine?: { segs: Map<string, Segment>; end: Segment | null; plain?: boolean };
+  spine?: Spine;
+  /**
+   * 混合结构：设了自己结构（时间轴、鱼骨图）的分支各自的主轴，坐标已经挪到整张图里。
+   * 和 spine 一样画：segs 代替分支根和主主题之间的连线，end 画成带箭头（鱼骨图是主骨）的那一段
+   */
+  spines?: Spine[];
+}
+
+export interface Spine {
+  segs: Map<string, Segment>;
+  end: Segment | null;
+  plain?: boolean;
+}
+
+/** 设了自己结构的分支单独排出来的一块：rb 是整块相对分支根节点中心的范围（镜像后） */
+interface OwnBlock {
+  sub: LayoutResult;
+  rb: Bounds;
+  toggle: "right" | "left" | "down" | "up";
+}
+
+/** 整张图里所有的主轴：中心主题那一条和各个分支自己的 */
+export function allSpines(r: Pick<LayoutResult, "spine" | "spines">): Spine[] {
+  return [...(r.spine ? [r.spine] : []), ...(r.spines ?? [])];
+}
+
+/**
+ * 混合结构：分支自己的结构 → 排它那一块用的整图结构。leftward：分支挂在父节点左边（朝左长）。
+ * 鱼骨图让鱼头朝着父节点；逻辑图朝左时子节点往左排（和左右分布的左半边一样）；
+ * 其余（组织结构图、树形图、时间轴）方向不变，整块贴着父节点那一侧放。toggle：分支根节点的折叠按钮放哪边
+ */
+export function branchStructure(layout: BranchLayout, leftward: boolean): { structure: Structure; leftward: boolean; toggle: "right" | "left" | "down" | "up" } {
+  if (layout === "fishbone") return leftward ? { structure: "fishbone-right", leftward: false, toggle: "left" } : { structure: "fishbone-left", leftward: false, toggle: "right" };
+  if (layout === "logic-right") return { structure: layout, leftward, toggle: leftward ? "left" : "right" };
+  return { structure: layout, leftward: false, toggle: layout === "org-down" || layout.startsWith("timeline-v") ? "down" : "right" };
+}
+
+/** 挪动一段线：先（可选）水平镜像，再平移 */
+function moveSeg(sg: Segment, mapX: (x: number) => number, dy: number): Segment {
+  return { x1: mapX(sg.x1), y1: sg.y1 + dy, x2: mapX(sg.x2), y2: sg.y2 + dy };
+}
+function moveSpine(sp: Spine, mapX: (x: number) => number, dy: number): Spine {
+  const segs = new Map<string, Segment>();
+  for (const [k, v] of sp.segs) segs.set(k, moveSeg(v, mapX, dy));
+  return { segs, end: sp.end && moveSeg(sp.end, mapX, dy), ...(sp.plain ? { plain: true } : {}) };
 }
 
 export interface Segment {
@@ -421,6 +478,55 @@ export function layoutTree(
     collect(summaryRuns, summaryOf, parent, list, side);
   }
 
+  // ---- 混合结构：设了自己结构的分支（不是这次排布的根）整块单独排，坐标相对分支根节点的中心 ----
+  /** 嵌套分支（连同里面再嵌套的）的主轴，已经挪到这张图里 */
+  const nestedSpines: Spine[] = [];
+  const ownCache = new Map<string, OwnBlock>();
+  /**
+   * n 设了自己的结构：按它排好的那一块（rb 是整块相对 n 中心的范围）。
+   * leftward 只影响左右（鱼骨图鱼头朝向、逻辑图往左排），上下的范围两边一样，算高度时传 false 就行
+   */
+  function ownOf(n: MindNode, leftward: boolean): OwnBlock | null {
+    if (n === root || !n.layout || isSummaryTopic(n)) return null;
+    const key = `${n.id}/${leftward ? "l" : "r"}`;
+    let o = ownCache.get(key);
+    if (!o) {
+      const b = branchStructure(n.layout, leftward);
+      // 分支根到它子节点的间距按普通层级算，不用中心主题那么宽（和自由主题一样）；但分支根要放折叠按钮（离节点 10px、16px 见方）：
+      // 时间轴、鱼骨图沿主轴的间距照主主题之间的算（第一个主主题紧贴着根会压住按钮），组织结构图下面那一排照普通层级（gapLevel + 8）
+      const axis = isTimeline(b.structure) || isFishbone(b.structure);
+      const gapRoot = b.structure === "org-down" ? Math.ceil((opts.gapLevel + 8) / 0.6) : opts.gapLevel;
+      const sub = layoutTree(n, measure, { ...opts, structure: b.structure, leftward: b.leftward, gapRoot, gapMain: axis ? opts.gapMain : opts.gapSibling }, measureSummary, undefined, measureCallout, measureNote);
+      o = { sub, rb: sub.bounds, toggle: b.toggle };
+      ownCache.set(key, o);
+    }
+    return o;
+  }
+  /** 把排好的那一块挪到 (cx, cy)（分支根节点的中心）；side 是分支根节点和父节点之间连线的方向 */
+  function placeOwn(n: MindNode, o: OwnBlock, cx: number, cy: number, side: Side): void {
+    const { sub } = o;
+    const mapX = (x: number) => x + cx;
+    const at = <T extends Bounds>(b: T): T => ({ ...b, x: b.x + cx, y: b.y + cy });
+    for (const q of sub.placed.values()) {
+      const moved: Placed = { ...at(q), ...(q.bone ? { bone: moveSeg(q.bone, mapX, cy) } : {}) };
+      if (q.node === n) {
+        moved.side = side;
+        moved.toggle = o.toggle;
+        const edge = side === "right" ? o.rb.x + cx : side === "left" ? o.rb.x + o.rb.w + cx : side === "down" ? o.rb.y + cy : undefined;
+        const at0 = side === "right" ? moved.x : side === "left" ? moved.x + moved.w : moved.y;
+        if (edge !== undefined && Math.abs(edge - at0) > 1) moved.entry = edge;
+      }
+      placed.set(q.node.id, moved);
+    }
+    for (const x of sub.callouts) addCallout(x.node, at(x), x.dir);
+    for (const x of sub.notes) addNote(x.node, at(x), x.far);
+    for (const x of sub.boxes) branchBoxes.push(at(x));
+    for (const x of sub.summaries) branchSummaries.push({ ...x, brace: at(x.brace), label: x.label && at(x.label) });
+    for (const sp of allSpines(sub)) nestedSpines.push(moveSpine(sp, mapX, cy));
+    // 整块（含主轴、外框、概要）都算进这个分支的范围：外层外框、后面的兄弟按它让开
+    branchExtra.set(n.id, at(sub.bounds));
+  }
+
   const rs = sizeOf(root);
   const vertical = opts.structure === "org-down" || opts.structure === "tree-right" || (isTimeline(opts.structure) && !isTimelineH(opts.structure));
   placed.set(root.id, { node: root, x: -rs.w / 2, y: -rs.h / 2, w: rs.w, h: rs.h, side: "right", stem: vertical ? stemOf(root) : undefined });
@@ -446,7 +552,7 @@ export function layoutTree(
     // 左侧顺时针：从下往上排，所以堆叠顺序取反
     placeColumn(root, left.reverse(), "left", 0);
   } else {
-    placeColumn(root, kids, "right", 0);
+    placeColumn(root, kids, opts.leftward ? "left" : "right", 0);
   }
 
   // ---- 时间轴：每个主主题连同分支先单独排好，再沿主轴依次往后放，不和已经放好的部分重叠 ----
@@ -549,8 +655,11 @@ export function layoutTree(
         let side: Side;
         if (own(p.node)) side = horiz ? (up ? "up" : "down") : mirror ? "left" : "right";
         else side = up && p.node.parent === c ? "tree-up" : flip(p.side);
-        placed.set(p.node.id, { ...p, ...at(p, p.node), side });
+        const bone = p.bone && moveSeg(p.bone, (x) => (mirror ? -x : x) + dx, dy + (own(p.node) ? 0 : restDy));
+        placed.set(p.node.id, { ...p, ...at(p, p.node), side, ...(bone ? { bone } : {}) });
       }
+      // 分支里设了自己结构的子分支：它们的主轴跟着分支一起挪
+      for (const sp of allSpines(sub)) nestedSpines.push(moveSpine(sp, (x) => (mirror ? -x : x) + dx, dy + restDy));
       for (const x of sub.callouts) addCallout(x.node, at(x, x.node), x.dir);
       for (const x of subNotes) addNote(x.node, at(x, x.node), x.far);
       for (const x of sub.boxes) branchBoxes.push({ ...x, ...at(x), side: flip(x.side) });
@@ -674,8 +783,12 @@ export function layoutTree(
       const bone = { x1: sx, y1: 0, x2: sx + tipX, y2: tipY };
       for (const p of sub.placed.values()) {
         const side: Side = own(p.node) ? (up ? "up" : "down") : p.node.parent === c ? "rib" : p.side;
-        placed.set(p.node.id, { ...p, ...at(p, p.node), side, ...(own(p.node) ? { bone } : {}) });
+        const inner = !own(p.node) && p.bone ? moveSeg(p.bone, (x) => x + restDx + sx, restDy) : undefined;
+        // 鱼头向右：二级主题的小骨从右边（靠斜骨那侧）接进来，折叠按钮放到左边
+        const toggle = side === "rib" && d < 0 ? ({ toggle: "left" } as const) : {};
+        placed.set(p.node.id, { ...p, ...at(p, p.node), side, ...toggle, ...(own(p.node) ? { bone } : inner ? { bone: inner } : {}) });
       }
+      for (const sp of allSpines(sub)) nestedSpines.push(moveSpine(sp, (x) => x + restDx + sx, restDy));
       for (const x of sub.callouts) addCallout(x.node, at(x, x.node), x.dir);
       for (const x of sub.notes) addNote(x.node, at(x, x.node), x.far);
       for (const x of sub.boxes) branchBoxes.push({ ...x, ...at(x) });
@@ -714,6 +827,12 @@ export function layoutTree(
   function halves(n: MindNode): { up: number; down: number; kids: number; wide: boolean; noteFar: boolean } {
     const cached = halfCache.get(n.id);
     if (cached) return cached;
+    const ob = ownOf(n, false);
+    if (ob) {
+      const own = { up: -ob.rb.y, down: ob.rb.y + ob.rb.h, kids: 0, wide: false, noteFar: false };
+      halfCache.set(n.id, own);
+      return own;
+    }
     const s = sizeOf(n);
     const k = visibleChildren(n);
     const kids = k.length ? extentOfList(k, gapFor(n)) / 2 : 0;
@@ -756,21 +875,27 @@ export function layoutTree(
       const e = v.up + v.down;
       const ccy = y + v.up;
       const x = side === "right" ? p.x + p.w + gapH : p.x - gapH - s.w;
-      placed.set(c.id, { node: c, x, y: ccy - s.h / 2, w: s.w, h: s.h, side });
-      const co = calloutOf(c);
-      if (co) {
-        // 右侧左对齐、左侧右对齐：气泡不伸到连向父节点的那一侧
-        const cx = side === "left" ? x + s.w - co.w : x;
-        const top = v.wide ? ccy - Math.max(s.h / 2, v.kids) : ccy - s.h / 2;
-        addCallout(c, { x: cx, y: top - CALLOUT_GAP - co.h, w: co.w, h: co.h }, "up");
+      const ob = ownOf(c, side === "left");
+      if (ob) {
+        // 自己的结构：整块朝父节点的那条边贴着这一列（右边左对齐、左边右对齐）
+        placeOwn(c, ob, side === "left" ? p.x - gapH - (ob.rb.x + ob.rb.w) : p.x + p.w + gapH - ob.rb.x, ccy, side);
+      } else {
+        placed.set(c.id, { node: c, x, y: ccy - s.h / 2, w: s.w, h: s.h, side });
+        const co = calloutOf(c);
+        if (co) {
+          // 右侧左对齐、左侧右对齐：气泡不伸到连向父节点的那一侧
+          const cx = side === "left" ? x + s.w - co.w : x;
+          const top = v.wide ? ccy - Math.max(s.h / 2, v.kids) : ccy - s.h / 2;
+          addCallout(c, { x: cx, y: top - CALLOUT_GAP - co.h, w: co.w, h: co.h }, "up");
+        }
+        const no = noteOf(c);
+        if (no) {
+          const nx = side === "left" ? x + s.w - no.w : x;
+          const bottom = v.noteFar ? ccy + Math.max(s.h / 2, v.kids) : ccy + s.h / 2;
+          addNote(c, { x: nx, y: bottom + NOTE_GAP, w: no.w, h: no.h }, v.noteFar);
+        }
+        placeColumn(c, visibleChildren(c), side, ccy);
       }
-      const no = noteOf(c);
-      if (no) {
-        const nx = side === "left" ? x + s.w - no.w : x;
-        const bottom = v.noteFar ? ccy + Math.max(s.h / 2, v.kids) : ccy + s.h / 2;
-        addNote(c, { x: nx, y: bottom + NOTE_GAP, w: no.w, h: no.h }, v.noteFar);
-      }
-      placeColumn(c, visibleChildren(c), side, ccy);
       y += e + after[i];
       const end = tr.find((r) => r.last === i);
       if (end) topicCenter.set(end.start.id, (runTop + y) / 2);
@@ -790,6 +915,12 @@ export function layoutTree(
   function wHalves(n: MindNode): { left: number; right: number } {
     const cached = wHalfCache.get(n.id);
     if (cached) return cached;
+    const ob = ownOf(n, false);
+    if (ob) {
+      const own = { left: -ob.rb.x, right: ob.rb.x + ob.rb.w };
+      wHalfCache.set(n.id, own);
+      return own;
+    }
     const s = sizeOf(n);
     const k = visibleChildren(n);
     const half = k.length ? Math.max(s.w / 2, (k.reduce((sum, c, i) => sum + extentW(c) + (i > 0 ? hGapFor(n) : 0), 0) + sidePads(k)) / 2) : s.w / 2;
@@ -834,12 +965,17 @@ export function layoutTree(
       const v = wHalves(c);
       const e = v.left + v.right;
       const ccx = x + v.left;
-      placed.set(c.id, { node: c, x: ccx - s.w / 2, y, w: s.w, h: s.h, side: "down", stem: stemOf(c) });
-      const co = calloutOf(c);
-      if (co) addCallout(c, { x: ccx + s.w / 2 + CALLOUT_GAP, y, w: co.w, h: co.h }, "right");
-      const no = noteOf(c);
-      if (no) addNote(c, { x: ccx - no.w / 2, y: y + s.h + noteLift(c) + NOTE_GAP, w: no.w, h: no.h });
-      layoutDown(c, visibleChildren(c));
+      const ob = ownOf(c, false);
+      // 自己的结构：整块的顶边对齐这一排
+      if (ob) placeOwn(c, ob, ccx, y - ob.rb.y, "down");
+      else {
+        placed.set(c.id, { node: c, x: ccx - s.w / 2, y, w: s.w, h: s.h, side: "down", stem: stemOf(c) });
+        const co = calloutOf(c);
+        if (co) addCallout(c, { x: ccx + s.w / 2 + CALLOUT_GAP, y, w: co.w, h: co.h }, "right");
+        const no = noteOf(c);
+        if (no) addNote(c, { x: ccx - no.w / 2, y: y + s.h + noteLift(c) + NOTE_GAP, w: no.w, h: no.h });
+        layoutDown(c, visibleChildren(c));
+      }
       x += e + (gs[i] && gs[i] !== gs[i + 1] ? BOX_PAD : 0);
       const end = tr.find((r) => r.last === i);
       if (end) {
@@ -854,6 +990,11 @@ export function layoutTree(
   function treeExtent(n: MindNode): number {
     const cached = extents.get(n.id);
     if (cached !== undefined) return cached;
+    const ob = ownOf(n, false);
+    if (ob) {
+      extents.set(n.id, ob.rb.h);
+      return ob.rb.h;
+    }
     const k = visibleChildren(n);
     const co = calloutOf(n);
     const e = (co ? co.h + CALLOUT_GAP : 0) + sizeOf(n).h + (stemOf(n) ?? 0) + k.reduce((sum, c) => sum + opts.gapSibling + treeExtent(c), 0) + padTotal(k);
@@ -873,14 +1014,19 @@ export function layoutTree(
       if (tr.some((r) => r.first === i)) runTop = y;
       y += before[i];
       const s = sizeOf(c);
-      // 标注占这个节点前面的一段，节点往下让
-      const co = calloutOf(c);
-      const top = co ? y + co.h + CALLOUT_GAP : y;
-      if (co) addCallout(c, { x, y, w: co.w, h: co.h }, "up");
-      placed.set(c.id, { node: c, x, y: top, w: s.w, h: s.h, side: "tree", stem: stemOf(c) });
-      const no = noteOf(c);
-      if (no) addNote(c, { x, y: top + s.h + NOTE_GAP, w: no.w, h: no.h });
-      layoutTreeRight(c, visibleChildren(c));
+      const ob = ownOf(c, false);
+      // 自己的结构：整块左上角放在这一格
+      if (ob) placeOwn(c, ob, x - ob.rb.x, y - ob.rb.y, "tree");
+      else {
+        // 标注占这个节点前面的一段，节点往下让
+        const co = calloutOf(c);
+        const top = co ? y + co.h + CALLOUT_GAP : y;
+        if (co) addCallout(c, { x, y, w: co.w, h: co.h }, "up");
+        placed.set(c.id, { node: c, x, y: top, w: s.w, h: s.h, side: "tree", stem: stemOf(c) });
+        const no = noteOf(c);
+        if (no) addNote(c, { x, y: top + s.h + NOTE_GAP, w: no.w, h: no.h });
+        layoutTreeRight(c, visibleChildren(c));
+      }
       y += treeExtent(c) + after[i];
       const end = tr.find((r) => r.last === i);
       if (end) topicCenter.set(end.start.id, (runTop + y) / 2);
@@ -974,7 +1120,9 @@ export function layoutTree(
     }
     const mx = (x: number, w: number) => (mirror ? -(x + w) : x) + dx;
     const flip = (s: Side): Side => (mirror && s === "right" ? "left" : s);
-    for (const p of sub.placed.values()) placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side) });
+    const mapX = (x: number) => (mirror ? -x : x) + dx;
+    for (const p of sub.placed.values()) placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side), ...(p.bone ? { bone: moveSeg(p.bone, mapX, dy) } : {}) });
+    for (const sp of allSpines(sub)) nestedSpines.push(moveSpine(sp, mapX, dy));
     for (const x of sub.boxes) boxes.push({ ...x, x: mx(x.x, x.w), y: x.y + dy, side: flip(x.side) });
     for (const c of sub.callouts) callouts.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });
     for (const n of sub.notes) notes.push({ ...n, x: mx(n.x, n.w), y: n.y + dy });
@@ -1044,7 +1192,7 @@ export function layoutTree(
     addNote(root, rect, far);
     all = union(all, rect)!;
   }
-  return { placed, boxes, summaries, callouts, notes, bounds: all, ...(spine ? { spine } : {}) };
+  return { placed, boxes, summaries, callouts, notes, bounds: all, ...(spine ? { spine } : {}), ...(nestedSpines.length ? { spines: nestedSpines } : {}) };
 }
 
 /**
@@ -1074,7 +1222,9 @@ export function layoutMap(
     const dy = f.float!.y;
     const mx = (x: number, w: number) => (mirror ? -(x + w) : x) + dx;
     const flip = (side: Side): Side => (mirror && side === "right" ? "left" : side);
-    for (const p of sub.placed.values()) main.placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side) });
+    const mapX = (x: number) => (mirror ? -x : x) + dx;
+    for (const p of sub.placed.values()) main.placed.set(p.node.id, { ...p, x: mx(p.x, p.w), y: p.y + dy, side: flip(p.side), ...(p.bone ? { bone: moveSeg(p.bone, mapX, dy) } : {}) });
+    for (const sp of allSpines(sub)) (main.spines ??= []).push(moveSpine(sp, mapX, dy));
     for (const b of sub.boxes) main.boxes.push({ ...b, x: mx(b.x, b.w), y: b.y + dy, side: flip(b.side) });
     for (const c of sub.callouts) main.callouts.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });
     for (const c of sub.notes) main.notes.push({ ...c, x: mx(c.x, c.w), y: c.y + dy });

@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { attachSummaryTopics, orderedBullet, walkAll, fileChildren, fixTopics, isSummaryTopic, withTopics, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { attachSummaryTopics, type BranchLayout, isBranchLayout, orderedBullet, walkAll, fileChildren, fixTopics, isSummaryTopic, withTopics, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -67,6 +67,7 @@ interface Marker {
   summary?: Summary;
   width?: number;
   side?: "left" | "right";
+  layout?: BranchLayout;
   float?: FloatPos;
   callout?: string;
   calloutColor?: string;
@@ -166,6 +167,11 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       marker.width = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, Number(lower.slice(2))));
     } else if (lower === "left" || lower === "right") {
       marker.side = lower;
+    } else if (/^layout=/.test(lower)) {
+      const v = lower.slice(7);
+      // 不认识的结构名：整段当普通文字（和别的标记一样，不是我们写的就不碰）
+      if (!isBranchLayout(v)) return { text: text.trimEnd(), marker: { folded: false } };
+      marker.layout = v;
     } else if (lower === "float") {
       isFloat = true;
     } else if (/^[xy]=-?\d{1,6}$/.test(lower)) {
@@ -202,7 +208,7 @@ const spanOf = (g: { span: number; raw?: HiddenSpan }) => (g.raw && g.raw.visibl
 
 /** noTopic：概要主题单独复制出去时不带 summary-topic（粘到别处就是普通节点） */
 export function formatMarker(
-  node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "float" | "callout" | "calloutColor" | "hidden" | "table" | "numbered" | "anchor" | "rels" | "topicOf" | "topicSpan"> & { children?: MindNode[] },
+  node: Pick<MindNode, "color" | "folded" | "box" | "summary" | "width" | "side" | "layout" | "float" | "callout" | "calloutColor" | "hidden" | "table" | "numbered" | "anchor" | "rels" | "topicOf" | "topicSpan"> & { children?: MindNode[] },
   noTopic = false,
 ): string {
   const parts: string[] = [];
@@ -215,6 +221,7 @@ export function formatMarker(
   if (node.numbered && (!kids.length || kids.some((c) => c.kind === "heading"))) parts.push("num");
   if (node.width) parts.push(`w=${Math.round(node.width)}`);
   if (node.side) parts.push(node.side);
+  if (node.layout) parts.push(`layout=${node.layout}`);
   if (node.box) {
     const title = node.box.title.replace(/["%]/g, "").trim();
     const span = spanOf(node.box);
@@ -719,7 +726,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
         if (markerGap) node.markerGap = markerGap;
         parent.children.push(node);
         headingStack.push(node);
@@ -742,7 +749,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
       const { text: withoutId, blockId } = splitBlockId(tok.text);
       const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);
