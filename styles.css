@@ -2341,6 +2341,10 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt.is-full .ggt-table { width: 100% !important; min-width: 0 !important; max-width: none !important; }
 /* 设置「列宽按比例缩放」：设过列宽、比正文宽的表，各列按比例缩到正好放下（列宽由编辑器按比例算好写在 col 上） */
 .ggt.is-fit .ggt-table { table-layout: fixed; }
+/* 拖过宽度的列按拖到的宽度画（最窄 40px，拖动时限制）；没拖过的列最少 80px（见 .ggt-cell），新表格不会挤成一团 */
+.ggt .ggt-cell.is-set-width { min-width: 0; }
+/* 编辑时量光标在第几行用的影子（照着输入框排一份文字，量完就删） */
+.ggt-caret-mirror { position: absolute !important; visibility: hidden; left: -9999px; top: 0; white-space: pre-wrap !important; height: auto !important; }
 .ggt.is-fit .ggt-cell { min-width: 0; }
 .ggt .ggt-cell {
   position: relative;

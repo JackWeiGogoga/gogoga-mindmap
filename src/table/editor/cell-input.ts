@@ -13,6 +13,8 @@ import { EditorView, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, redo, undo } from "@codemirror/commands";
 import { formatPreview, insertFormatBreak, visibleSelection } from "../core/cm-format";
 
+export type Edge = "up" | "down" | "left" | "right";
+
 export interface CellInputHandlers {
   keydown(ev: KeyboardEvent): void;
   copy(ev: ClipboardEvent): void;
@@ -41,6 +43,11 @@ export interface CellInput {
   setSelectionRange(start: number, end: number): void;
   /** 选中的字（去掉两头藏起来的标记符）：加格式用 */
   visibleSelection(): { from: number; to: number };
+  /**
+   * 光标（没选中字时）已经在这个方向的边上：左 = 最前、右 = 最后、上 = 第一行、下 = 最后一行（按折行后看到的行算）。
+   * 编辑时按方向键到了边上就跳到旁边的格子（B站反馈），和 Obsidian 自己的表格一样
+   */
+  atEdge(dir: Edge): boolean;
   focus(): void;
   hasFocus(): boolean;
   contains(node: Node | null): boolean;
@@ -90,6 +97,29 @@ export class TextareaInput implements CellInput {
   }
   visibleSelection(): { from: number; to: number } {
     return { from: this.el.selectionStart, to: this.el.selectionEnd };
+  }
+  atEdge(dir: Edge): boolean {
+    const ta = this.el;
+    const pos = ta.selectionStart;
+    if (pos !== ta.selectionEnd) return false;
+    if (dir === "left") return pos === 0;
+    if (dir === "right") return pos === ta.value.length;
+    // 上下：textarea 拿不到光标坐标，照着它的样子排一份文字，量光标那一行在不在第一行 / 最后一行
+    const doc = ta.ownerDocument;
+    const cs = (doc.defaultView ?? window).getComputedStyle(ta);
+    const m = doc.body.appendChild(doc.createElement("div"));
+    for (const p of ["box-sizing", "width", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-style", "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "line-height", "text-transform", "word-spacing", "tab-size", "text-indent", "word-break", "overflow-wrap"])
+      m.style.setProperty(p, cs.getPropertyValue(p));
+    m.className = "ggt-caret-mirror";
+    m.append(ta.value.slice(0, pos));
+    const mark = m.appendChild(doc.createElement("span"));
+    mark.textContent = "\u200b";
+    m.append(ta.value.slice(pos) || "\u200b");
+    const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 20;
+    const top = mark.offsetTop - parseFloat(cs.paddingTop) - parseFloat(cs.borderTopWidth);
+    const height = m.scrollHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    m.remove();
+    return dir === "up" ? top < lh / 2 : top + lh * 1.5 > height;
   }
   focus(): void {
     this.el.focus({ preventScroll: true });
@@ -267,6 +297,19 @@ export class CodeMirrorInput implements CellInput {
   }
   visibleSelection(): { from: number; to: number } {
     return visibleSelection(this.view);
+  }
+  atEdge(dir: Edge): boolean {
+    const v = this._view;
+    if (!v) return true;
+    const r = v.state.selection.main;
+    if (!r.empty) return false;
+    // 再往这个方向挪一下：挪不动、或者上下挪到了别的位置但还在同一行（第一行按上会跳到行首）就是到边了
+    if (dir === "left" || dir === "right") return v.moveByChar(r, dir === "right").head === r.head;
+    const next = v.moveVertically(r, dir === "down");
+    if (next.head === r.head) return true;
+    const a = v.coordsAtPos(r.head);
+    const b = v.coordsAtPos(next.head);
+    return !!a && !!b && Math.abs(a.top - b.top) < 2;
   }
   focus(): void {
     this.syncRoot();

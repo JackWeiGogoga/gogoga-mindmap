@@ -20,7 +20,15 @@ import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlace
 import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { applyInlineFormat, type InlineFormat } from "../core/format";
-import { type CellInput, CodeMirrorInput, TextareaInput } from "./cell-input";
+import { type CellInput, CodeMirrorInput, type Edge, TextareaInput } from "./cell-input";
+
+/** 编辑时按方向键：到了格子边上往哪个格子走 */
+const ARROW_EDGE: Record<string, { edge: Edge; dr: number; dc: number } | undefined> = {
+  ArrowUp: { edge: "up", dr: -1, dc: 0 },
+  ArrowDown: { edge: "down", dr: 1, dc: 0 },
+  ArrowLeft: { edge: "left", dr: 0, dc: -1 },
+  ArrowRight: { edge: "right", dr: 0, dc: 1 },
+};
 import { t } from "./i18n";
 
 export interface MenuItem {
@@ -864,6 +872,8 @@ export class TableEditor {
         if (freeze && c === 0 && (!m || m.c2 === 0)) cell.classList.add("is-frozen");
         // 没拖过宽度的列：宿主可以给它设个最宽（脑图节点里最宽 240，超出换行）
         if (!m && !widthOf(tb, c)) cell.classList.add("is-auto-width");
+        // 拖过宽度的列：按拖到的宽度画，可以比没拖过的列（最少 80px）更窄（B站反馈：序号、勾选这类窄列占地方）
+        else if (!m) cell.classList.add("is-set-width");
         const content = cell.appendChild(doc.createElement("div"));
         content.className = "ggt-content";
         if (r === all - 1 && r >= head && hasTotal(tb)) cell.classList.add("is-total-row");
@@ -1597,7 +1607,13 @@ export class TableEditor {
         ev.stopPropagation();
         return;
       }
-      if (ev.key === "Enter" && !ev.shiftKey && !ev.altKey && !mod) {
+      const arrow = ARROW_EDGE[ev.key];
+      if (arrow && !ev.shiftKey && !ev.altKey && !mod && this.input.atEdge(arrow.edge)) {
+        // 光标到了格子边上再按方向键：存好这一格、跳到旁边的格子（B站反馈）；在字中间照常挪光标
+        ev.preventDefault();
+        this.commit();
+        this.move(arrow.dr, arrow.dc);
+      } else if (ev.key === "Enter" && !ev.shiftKey && !ev.altKey && !mod) {
         ev.preventDefault();
         this.commit();
         this.move(1, 0);
