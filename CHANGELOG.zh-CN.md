@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-11-17
+
+### 新增
+- 混合结构（续）：打开 `.xmind` 文件时，整张图和各个分支按 XMind 里设的结构画（逻辑图、组织结构图、树形图、时间轴、鱼骨图）；转成笔记时整张图的结构写进 frontmatter，分支的写成 `%%layout=…%%`。插件没有的方向（逻辑图向左、组织结构图向上、树形图向左）换成最接近的；没指定朝向的横向时间轴按上下交错；电子表格这类插件没有的结构跟随上级。
+- 自由主题也能单独设结构（右键 →「更多 ▸ 分支结构」），中心主题是时间轴、鱼骨图时也可以。
+
 ## [0.79.0] - 2026-11-17
 
 ### 新增
@@ -1012,7 +1018,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...HEAD
+[0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3

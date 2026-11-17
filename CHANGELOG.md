@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-11-17
+
+### Added
+- Mixed structures, continued: opening an `.xmind` file now uses the structure set in XMind for the whole map and for each branch (logic chart, org chart, tree, timeline, fishbone). Converting it to a note writes the map's structure into the frontmatter and each branch's as `%%layout=…%%`. XMind directions the mind map doesn't have (logic chart to the left, org chart upward, tree to the left) use the closest one; a horizontal timeline without a side becomes the alternating one. Structures it doesn't have, such as spreadsheet, follow the parent.
+- Floating topics can have their own structure too (right-click → **More ▸ Branch structure**), also when the central topic is a timeline or fishbone.
+
 ## [0.79.0] - 2026-11-17
 
 ### Added
@@ -1012,7 +1018,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...HEAD
+[0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
 [0.79.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.4...0.79.0
 [0.78.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.3...0.78.4
 [0.78.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.78.2...0.78.3
