@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-11-17
+
 ### Added
 - Spaced review, part two: review right in the mind map (like MarginNote's "recall first, then reveal"). The **Review N** toolbar button and **More ▸ Spaced review ▸ Review this branch** now review in the map instead of switching to the review tab: due questions are selected one by one, moved to the middle and outlined, covered the same way as recite mode. **Show answer** appears under the node and turns into **Again / Hard / Good / Easy** with the next interval above each. Keys match the review tab: Space shows the answer and then means Good, 1–4 answer, ⌘Z undoes and Esc exits. A bar at the top shows the new, learning and due cards left, and **Review in tab** continues in the review tab. Questions inside folded branches are unfolded just for the review and folded back afterwards, without changing the file; schedules are shared with the review tab. Clicking the covered part of the current question (a highlight, the hidden answer or the choice tag) also shows the answer.
 
@@ -1045,7 +1047,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...HEAD
+[0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0
 [0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
 [0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
 [0.80.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.79.0...0.80.0
