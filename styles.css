@@ -2334,9 +2334,11 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt[style*="--ggt-fs"] .ggt-table .ggt-cell,
 .ggt .ggt-table .ggt-cell[style*="--ggt-fz"] { font-size: calc(var(--table-text-size, 1em) * var(--ggt-fs, 1) * var(--ggt-fz, 1)); }
 .ggt-table col { min-width: 40px; }
-/* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动 */
-.ggt.is-full { width: auto; }
-.ggt.is-full .ggt-table { width: 100%; }
+/* 设置「表格默认撑满页面宽度」：没设过列宽的表铺满，各列按内容比例分；内容更宽时照样横向滚动。
+   表格右边和正文右边对齐（差 4px，和表格菜单里的「撑满页面宽度」一样）：.ggt 左边往外挪了 14px、右边留了 26px 放加号，所以外层比父元素宽 36px。
+   表格宽度要 !important：Minimal 给编辑区 / 阅读视图里所有 table 写了 width: var(--table-width)（默认 auto），6 个类的选择器会盖掉这里（#19） */
+.ggt.is-full { width: calc(100% + 36px); max-width: none; }
+.ggt.is-full .ggt-table { width: 100% !important; min-width: 0 !important; max-width: none !important; }
 /* 设置「列宽按比例缩放」：设过列宽、比正文宽的表，各列按比例缩到正好放下（列宽由编辑器按比例算好写在 col 上） */
 .ggt.is-fit .ggt-table { table-layout: fixed; }
 .ggt.is-fit .ggt-cell { min-width: 0; }
