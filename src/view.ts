@@ -11,7 +11,7 @@ import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
 import { isStructure, Structure } from "./layout";
-import { blankAfterQuotedNotes, frontmatterValue, parseMarkdown, parseNodeColors, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
+import { blankAfterQuotedNotes, frontmatterValue, parseMarkdown, parseNodeColors, matchLine, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
 import { pathOf, walk, type MindDoc, adoptIds } from "./model";
 import type { EdgeOptions, ThemeId } from "./theme";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
@@ -421,10 +421,12 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       else this.pendingSubpath = sub;
       return;
     }
-    // 按行号跳过来的（PDF++ 点标注回到笔记里引用它的那一行、反向链接、搜索结果）：选中这一行所在的节点
-    if (typeof st?.line === "number" && st.line >= 0) {
-      if (this.doc && this.canvas) this.revealLine(st.line);
-      else this.pendingLine = st.line;
+    // 按行号跳过来的（PDF++ 点标注回到笔记里引用它的那一行、反向链接）：选中这一行所在的节点
+    // 全局搜索、反向链接里的「未链接提及」不带行号，带的是 match：当时的全文 + 匹配的字符位置，换算成行号（用户反馈：点搜索结果定位不到节点）
+    const line = typeof st?.line === "number" && st.line >= 0 ? st.line : matchLine(state);
+    if (line !== null) {
+      if (this.doc && this.canvas) this.revealLine(line);
+      else this.pendingLine = line;
     }
   }
 
