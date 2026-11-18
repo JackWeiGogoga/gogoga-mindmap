@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-11-18
+
 ### Added
 - "Open the user guide" command: puts the plugin's user guide, and the code block example it links to, in a "Mind Map examples" folder at the vault root and opens the guide as a mind map (the notes are in Chinese). If the vault already has a note by that name (say you copied the `examples/` folder), that note opens instead; nothing is overwritten or created twice. Before, these examples were only in the GitHub repository, out of sight for anyone installing from Community plugins.
 
@@ -1098,7 +1100,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...HEAD
+[0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0

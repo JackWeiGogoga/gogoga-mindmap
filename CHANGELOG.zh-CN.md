@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-11-18
+
 ### 新增
 - 命令「打开使用指南」：把插件自带的使用指南和它链接到的代码块示例放进库根目录的「脑图示例」文件夹，再用脑图打开指南。库里已经有同名笔记（比如复制过 `examples/` 文件夹）就直接打开那篇，不会覆盖或重复创建。以前这些示例只在 GitHub 仓库里，从插件市场安装的人看不到。
 
@@ -1098,7 +1100,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...HEAD
+[0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
