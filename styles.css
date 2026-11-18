@@ -3421,3 +3421,45 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .gg-mm-node:hover .mm-map-preview-bar, .gg-mm-node.is-selected .mm-map-preview-bar, .mm-map-preview.is-live .mm-map-preview-bar { opacity: 1; }
 .mm-map-preview-bar button { height: auto; padding: 2px 8px; border: 1px solid var(--background-modifier-border, #e3e3e3); border-radius: 5px; background: var(--background-primary, #fff); box-shadow: none; color: var(--text-muted); font-size: 12px; line-height: 1.5; cursor: pointer; }
 .mm-map-preview-bar button:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+
+/* ---------- 禅模式（#43）：只留脑图本身 ---------- */
+.gg-mm-root.is-zen .mm-toolbar,
+.gg-mm-root.is-zen .mm-nodebar,
+.gg-mm-root.is-zen .mm-wheel-hint,
+.gg-mm-zen .mm-outline,
+.gg-mm-zen .mm-format-bar,
+body:has(.gg-mm-root.is-zen) > .mm-format-bar { display: none !important; }
+/* 面包屑平时看不见，鼠标移上去才出来（聚焦时还要用 ‹ ›） */
+.gg-mm-root.is-zen .mm-crumbs { opacity: 0; transition: opacity 0.2s; }
+.gg-mm-root.is-zen .mm-crumbs:hover, .gg-mm-root.is-zen .mm-crumbs:focus-within, .gg-mm-root.is-zen:has(.mm-crumb-menu) .mm-crumbs { opacity: 1; }
+.mm-zen-exit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border, #e3e3e3);
+  background: var(--background-primary, #fff);
+  color: var(--text-muted, #888);
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  cursor: pointer;
+}
+.gg-mm-root button.mm-zen-exit { box-shadow: none; height: auto; }
+.mm-zen-exit.is-shown, .mm-zen-exit:hover { opacity: 0.85; pointer-events: auto; }
+.mm-zen-exit:hover { color: var(--text-normal, #1f1f1f); }
+.mm-zen-exit .mm-icon { font-size: 14px; }
+body.is-mobile .mm-zen-exit { opacity: 0.5; pointer-events: auto; }
+/* 一起收起 Obsidian 的界面：左边的功能区、标签栏、视图标题栏、状态栏 */
+body.gg-mm-zen-app .workspace-ribbon,
+body.gg-mm-zen-app .workspace-split.mod-root .workspace-tab-header-container,
+body.gg-mm-zen-app .status-bar,
+.workspace-leaf-content.gg-mm-zen > .view-header { display: none !important; }
+/* macOS 隐藏标题栏时，标签栏收起后左上角是红绿灯：面包屑往右让开 */
+body.gg-mm-zen-app.mod-macos.is-hidden-frameless:not(.is-fullscreen) .gg-mm-root.is-zen .mm-crumbs { left: 84px; }

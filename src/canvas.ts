@@ -300,6 +300,8 @@ export interface CanvasOptions {
   onToggleOutline?: () => void;
   /** 提供则空白处右键菜单里有「Markdown 和思维导图分屏对照」（只在脑图视图里，嵌入的没有） */
   onSideBySide?: () => void;
+  /** 禅模式开关（#43）：视图收起 / 还原 Obsidian 自己的界面；嵌入的脑图不给，就没有禅模式 */
+  onZen?: (on: boolean) => void;
   /** 提供则工具栏出现「锁定编辑」按钮：锁住后只能看（缩放、平移、折叠），参数是锁上之后的状态 */
   onLockChange?: (locked: boolean) => void;
   /** 「显示隐藏的节点」现在开着没有（开着时带 %%hide%% 的节点半透明地留在图里） */
@@ -530,6 +532,7 @@ const ICONS: Record<string, string> = {
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
   prev: '<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+  minimize: '<svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>',
   next: '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
   down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
@@ -1558,6 +1561,7 @@ export class MindMapCanvas {
 
   destroy(): void {
     if (this.mapReview) this.endMapReview();
+    if (this.zen) this.setZen(false);
     liveCanvases.delete(this);
     this.sizeCheckCleanup?.();
     for (const t of this.sizeCheckTimers) window.clearTimeout(t);
@@ -4936,6 +4940,59 @@ export class MindMapCanvas {
 
   // ---------- 原地复习 ----------
 
+  // ---------- 禅模式（#43） ----------
+
+  private zen: { exit: HTMLElement; timer: number; onMove: () => void } | null = null;
+
+  isZen(): boolean {
+    return !!this.zen;
+  }
+
+  /**
+   * 禅模式：工具栏、节点浮动栏、格式栏、大纲面板都藏起来（CSS 按 is-zen），面包屑平时透明、移到上面才出来；
+   * 键盘、右键菜单照常。鼠标一动右上角淡淡出一个「退出禅模式」，停 2 秒隐去（手机上常驻半透明）。只在这个标签页里、不记住
+   */
+  setZen(on: boolean): void {
+    if (!this.opts.onZen || on === !!this.zen) return;
+    if (on) {
+      this.closeQuickSettings();
+      this.closeFoldMenu();
+      const exit = this.el.createEl("button", { cls: "mm-zen-exit", attr: { type: "button" } });
+      exit.append(icon("minimize"));
+      exit.createSpan({ text: t("canvas.zenExit") });
+      exit.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      exit.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.setZen(false);
+      });
+      const z = {
+        exit,
+        timer: 0,
+        onMove: () => {
+          exit.classList.add("is-shown");
+          window.clearTimeout(z.timer);
+          z.timer = window.setTimeout(() => exit.classList.remove("is-shown"), 2000);
+        },
+      };
+      this.zen = z;
+      this.el.addEventListener("pointermove", z.onMove);
+      this.el.classList.add("is-zen");
+      this.updateBottomInset();
+    } else {
+      const z = this.zen;
+      if (!z) return;
+      this.zen = null;
+      window.clearTimeout(z.timer);
+      this.el.removeEventListener("pointermove", z.onMove);
+      z.exit.remove();
+      this.el.classList.remove("is-zen");
+      this.updateBottomInset();
+      this.positionNodebar();
+    }
+    this.opts.onZen(on);
+    this.el.focus({ preventScroll: true });
+  }
+
   isMapReviewing(): boolean {
     return !!this.mapReview;
   }
@@ -5960,6 +6017,11 @@ export class MindMapCanvas {
       this.closeMarkerPicker();
       if (!this.selected.size && this.focusRoot) {
         this.exitFocus();
+        return;
+      }
+      // 禅模式排在最后：没有选中、没有聚焦了，再按 Esc 才退出
+      if (!this.selected.size && !this.activeGroup && !this.activeRel && this.zen) {
+        this.setZen(false);
         return;
       }
       this.select(null, "replace");
@@ -7678,6 +7740,16 @@ export class MindMapCanvas {
         }
         panel.append(row);
       }
+      // 禅模式只管这个标签页，不是插件设置：点了就关面板进去
+      if (this.opts.onZen) {
+        const row = panel.createDiv({ cls: "mm-quick-row" });
+        row.createSpan({ cls: "mm-quick-label", text: t("canvas.zen") });
+        const sw = row.createEl("button", { cls: "mm-quick-toggle", attr: { type: "button", role: "switch", "aria-checked": "false", "aria-label": t("canvas.zen") } });
+        sw.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.setZen(true);
+        });
+      }
     };
     fill();
     this.el.append(panel);
@@ -8489,6 +8561,7 @@ export class MindMapCanvas {
       { title: t("menu.fit"), icon: "maximize", run: () => this.userFit() },
     );
     if (this.focusRoot) entries.push({ separator: true }, { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() });
+    if (this.opts.onZen) entries.push({ separator: true }, this.zen ? { title: t("canvas.zenExit"), icon: "minimize", run: () => this.setZen(false) } : { title: t("canvas.zen"), icon: "maximize-2", run: () => this.setZen(true) });
     const side = this.opts.onSideBySide;
     if (side) entries.push({ separator: true }, { title: t("command.openPreview"), icon: "columns-2", run: () => side() });
     return entries;

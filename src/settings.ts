@@ -114,6 +114,8 @@ export interface MindMapSettings {
   toolbarPosition: ToolbarPosition;
   /** 选中节点时显示浮动工具栏 */
   showNodebar: boolean;
+  /** 禅模式时一起收起 Obsidian 的侧栏、标签栏、状态栏 */
+  zenHideObsidian: boolean;
   /** 浮动工具栏、主工具栏的按钮顺序和显示（bar-layout.ts）；空数组 = 默认 */
   nodebarLayout: string[];
   toolbarLayout: string[];
@@ -237,6 +239,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineWrap: false,
   toolbarPosition: "bottom",
   showNodebar: true,
+  zenHideObsidian: true,
   nodebarLayout: [],
   toolbarLayout: [],
   nodeColors: DEFAULT_NODE_COLORS,
@@ -526,6 +529,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         [
           dropdown("toolbarPosition", t("settings.toolbar.name"), t("settings.toolbar.desc"), Object.fromEntries(TOOLBAR_POSITIONS.map((x) => [x.id, x.label]))),
           toggle("showNodebar", t("settings.showNodebar.name"), t("settings.showNodebar.desc")),
+          toggle("zenHideObsidian", t("settings.zenHideObsidian.name"), t("settings.zenHideObsidian.desc")),
           this.barLayoutPage("nodebarLayout"),
           this.barLayoutPage("toolbarLayout"),
           this.barLayoutPage("embedToolbarLayout"),

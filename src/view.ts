@@ -207,6 +207,42 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.plugin.setLocked(this.file.path, this.canvas.isLocked());
   }
 
+  // ---------- 禅模式（#43）：画布藏自己的工具栏，这里收起 Obsidian 的侧栏、标签栏、状态栏 ----------
+
+  private zenUndo: (() => void) | null = null;
+
+  toggleZen(): void {
+    this.canvas?.setZen(!this.canvas.isZen());
+  }
+
+  private zenChrome(on: boolean): void {
+    this.zenUndo?.();
+    this.zenUndo = null;
+    if (!on) return;
+    this.containerEl.addClass("gg-mm-zen");
+    const undo: (() => void)[] = [() => this.containerEl.removeClass("gg-mm-zen")];
+    // 手机上侧栏本来就是抽屉，底部导航栏也别藏（藏了不好回来），只藏插件自己的
+    if (this.plugin.settings.zenHideObsidian && !Platform.isMobile) {
+      const ws = this.app.workspace;
+      const left = !ws.leftSplit.collapsed;
+      const right = !ws.rightSplit.collapsed;
+      if (left) ws.leftSplit.collapse();
+      if (right) ws.rightSplit.collapse();
+      document.body.addClass("gg-mm-zen-app");
+      undo.push(() => {
+        document.body.removeClass("gg-mm-zen-app");
+        if (left) ws.leftSplit.expand();
+        if (right) ws.rightSplit.expand();
+      });
+    }
+    // 切到别的标签页（快捷键、命令）：标签栏这些是全局藏的，先退出禅模式
+    const ref = this.app.workspace.on("active-leaf-change", (leaf) => {
+      if (leaf && leaf !== this.leaf) this.canvas?.setZen(false);
+    });
+    undo.push(() => this.app.workspace.offref(ref));
+    this.zenUndo = () => undo.reverse().forEach((f) => f());
+  }
+
   toggleRecite(): void {
     this.canvas?.setRecite(!this.canvas.isRecite());
   }
@@ -346,6 +382,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
         },
       },
       onToggleOutline: () => void this.toggleOutline(),
+      onZen: (on) => this.zenChrome(on),
       onSideBySide: () => {
         if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
       },
@@ -579,6 +616,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   async onClose(): Promise<void> {
     this.unsubReview?.();
+    this.canvas?.setZen(false);
     // FileView.onClose 会 loadFile(null) → onUnloadFile → TextFileView.save(true)，
     // 这是视图被替换（切 Markdown 视图、同一标签页打开别的笔记）时最后一次写盘的机会，不能漏掉 super
     this.canvas?.flush();

@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Zen mode: only the mind map stays on screen. The toolbar, node toolbar, format bar and outline panel are hidden, and Obsidian's sidebars, tab bar and status bar are collapsed too, restored on exit (a setting limits it to the mind map's own toolbars). Keyboard and right-click menus work as usual; while focused on a branch the breadcrumb appears on hover. Turn it on from the **Toggle zen mode** command (bind a hotkey if you like), the quick settings panel or the right-click menu on the blank canvas; moving the mouse shows **Exit zen mode** at the top right, and Esc exits too (after deselecting and leaving focus). It applies to the current tab only, isn't remembered, and turns off when you switch tabs (#43).
+
 ## [0.84.0] - 2026-11-18
 
 ### Added

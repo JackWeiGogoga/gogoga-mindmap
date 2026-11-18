@@ -1819,6 +1819,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-summary", t("command.toggleSummary"), async (v) => v.toggleSummaryOnSelected());
     exportCommand("toggle-numbering", t("command.toggleNumbering"), async (v) => v.toggleNumberingOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
+    exportCommand("toggle-zen", t("command.toggleZen"), async (v) => v.toggleZen());
     exportCommand("toggle-pdf-excerpt", t("command.togglePdfExcerpt"), async (v) => this.pdfExcerpt.toggle(v));
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());
     exportCommand("toggle-notes", t("command.toggleNotes"), async (v) => v.toggleNotes());
