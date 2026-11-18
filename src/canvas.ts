@@ -8067,20 +8067,14 @@ export class MindMapCanvas {
     // 设置里打开「复制时去掉脑图标记」：剪贴板里放干净的 Markdown，带标记的完整版记在本地，
     // 粘回脑图时认出是同一份就用完整版，宽度、标注这些不丢
     const plain = this.opts.copyPlain?.() ? nodes.map((n) => subtreeToList(n, "\t", true)).join("") : text;
-    // 编辑节点文字时粘贴：只要文字，不要列表的「- 」和标记，这里记下每个节点的标题（按文档顺序，含子节点）
-    const titles: string[] = [];
-    const walk = (n: MindNode) => {
-      titles.push(n.text);
-      n.children.forEach(walk);
-    };
-    nodes.forEach(walk);
-    lastCopy = { plain, full: text, titles };
+    // 编辑节点文字时粘贴：只要复制的这几个节点自己的文字（不带子节点），不要列表的「- 」和标记
+    lastCopy = { plain, full: text, titles: nodes.map((n) => n.text) };
     void navigator.clipboard?.writeText(plain).catch(() => undefined);
     return plain;
   }
 
   /**
-   * 编辑节点文字时粘贴的文字：剪贴板里是刚复制的节点，换成各节点的文字（多个节点一行一个）；
+   * 编辑节点文字时粘贴的文字：剪贴板里是刚复制的节点，换成这几个节点自己的文字（不带子节点，多个节点一行一个）；
    * 是一行列表项（「- 文字」，比如重启后剪贴板里还留着的节点）就去掉列表符号。别的照常粘，返回 null
    */
   private nodePasteText(clip: string): string | null {
