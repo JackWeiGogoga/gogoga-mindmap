@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.86.0] - 2026-11-18
+
 ### 改进
 - 右键「更多」里加了「复制节点链接（带别名）」（也有同名命令）：复制出来是 `[[笔记#^id|节点的内容]]`，粘到别处显示的是内容（zhiqiang 反馈）。
 - 设置「链接的笔记已经开着时直接跳到那里」也管 Markdown 笔记里点的链接了：Markdown 跳脑图、Markdown 跳 Markdown，块链接和标题链接都一样，不再在当前标签页重开一份（zhiqiang 反馈）。
@@ -1072,7 +1074,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...HEAD
+[0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0
 [0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0
 [0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
 [0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0

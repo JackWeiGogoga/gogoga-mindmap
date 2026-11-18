@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.86.0] - 2026-11-18
+
 ### Changed
 - **Copy node link with alias** under More in the right-click menu (and as a command) copies `[[note#^id|node text]]`, so the pasted link shows the text (reported by zhiqiang).
 - The setting **Jump to the note if it's already open** now also covers links clicked in Markdown notes: Markdown to mind map and Markdown to Markdown, block and heading links alike, instead of opening another copy in the current tab (reported by zhiqiang).
@@ -1072,7 +1074,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...HEAD
+[0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0
 [0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0
 [0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
 [0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0
