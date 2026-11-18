@@ -17,7 +17,7 @@ import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintCo
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, type ColType, CURRENCIES, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
 import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { COL_KINDS, type ColKind, colKindOf, colTypeOf, setColKind, setColType } from "../core/ops";
-import { isoDate, readDate, readProgress, splitTags, writeDate, type Ymd } from "../core/coltype";
+import { isoDate, parseLooseDate, readDate, readProgress, splitTags, writeDate, type Ymd } from "../core/coltype";
 import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula, totalsAllSum } from "../core/ops";
 import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
@@ -109,6 +109,8 @@ export interface EditorHost {
   colorMemory?(): ColorMemory;
   /** 日期列写成 [[日记]] 时：按日记插件的日期格式写名字、读名字；不给就用 2026-11-17 */
   dailyNote?(): { name(v: Ymd): string; parse(name: string): Ymd | null } | null;
+  /** 日期列手打的 1/5、2026年1月5日、今天 这些，提交时换成这一列的写法；不给当成开着 */
+  smartDate?(): boolean;
   readonly?: boolean;
 }
 
@@ -235,6 +237,8 @@ export class TableEditor {
   private suggest: { kind: "link" | "tag" | "option"; start: number; items: string[]; index: number; el: HTMLElement; multi?: { before: string[]; after: string[] } } | null = null;
   /** 日期列编辑时的日历：view 是正在看的月份，picked 是格子里现在的日期 */
   private cal: { el: HTMLElement; y: number; m: number; key: string } | null = null;
+  /** 这次编辑里打过字（日期列「自动识别日期写法」只换打过字的格子） */
+  private typed = false;
   /** 上次弹菜单的位置（列类型的二级菜单在同一处打开） */
   private menuAt = { x: 0, y: 0 };
   private resize: { c: number; startX: number; startW: number; col: HTMLElement; fitW: number; scale: number } | null = null;
@@ -450,7 +454,7 @@ export class TableEditor {
       case "sort-asc":
       case "sort-desc":
         if (!canSortRows(tb)) return false;
-        this.apply(sortRows(tb, p.c, id === "sort-desc", this.hasTotalRow()), p);
+        this.apply(sortRows(tb, p.c, id === "sort-desc", this.hasTotalRow(), this.dateParser()), p);
         return true;
       case "merge-cells":
         if (!this.isMulti()) return false;
@@ -971,6 +975,12 @@ export class TableEditor {
       return;
     }
     this.fill(el, md);
+    // 日期列里读不出日子的（待定、2 月 30 日）：画一条波浪线，悬停说明。只是显示，不改文件
+    const daily = ty?.t === "date" && isData && md.trim() ? this.dailyNote() : null;
+    const notDate = ty?.t === "date" && isData && !!md.trim() && !readDate(md, daily ? (n) => daily.parse(n) : undefined);
+    el.classList.toggle("is-not-date", notDate);
+    if (notDate) el.title = t("notDate");
+    else if (el.title === t("notDate")) el.removeAttribute("title");
   }
 
   private fill(el: HTMLElement, md: string): void {
@@ -1243,6 +1253,7 @@ export class TableEditor {
       this.markSel();
     }
     this.editing = true;
+    this.typed = false;
     cell.classList.add("is-editing");
     this.fillHandle.classList.remove("is-shown");
     this.showMobileBar();
@@ -1290,9 +1301,9 @@ export class TableEditor {
     const p = this.sel;
     this.editing = false;
     this.cellEl(p)?.classList.remove("is-editing");
-    const text = this.input.value.replace(/\r\n?/g, "\n");
+    const text = this.smartDate(p, this.input.value.replace(/\r\n?/g, "\n").replace(/^\s+|\s+$/g, ""));
     this.input.reset("");
-    const edited = editCell(this.table, p.r, p.c, text.replace(/^\s+|\s+$/g, ""));
+    const edited = editCell(this.table, p.r, p.c, text);
     const next = edited === this.table ? edited : normalize(edited);
     const pending = this.pending;
     this.pending = null;
@@ -1307,6 +1318,21 @@ export class TableEditor {
       this.table = pending;
       this.render();
     } else this.restoreContent(p);
+  }
+
+  /**
+   * 日期列里改过的一格：整格是 1/5、2026年1月5日、20260105、今天 这类写法时，换成这一列的写法（日记链接列写成 [[日记]]）。
+   * 这次没打过字的不动：以前存的「今天」进编辑再按 Enter，不会被换成那一天
+   */
+  private smartDate(p: Pos, text: string): string {
+    const ty = colTypeOf(this.table, p.c);
+    if (ty?.t !== "date" || this.host.smartDate?.() === false || !text || !this.typed) return text;
+    if (p.r < headRows(this.table) || (hasTotal(this.table) && p.r === rowCount(this.table) - 1) || formulaOf(this.table, p.c)) return text;
+    const now = new Date();
+    const v = parseLooseDate(text, { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() });
+    if (!v) return text;
+    const daily = ty.f === "link" ? this.dailyNote() : null;
+    return writeDate(v, ty.f, daily ? (x) => daily.name(x) : undefined);
   }
 
   private cancel(): void {
@@ -1410,6 +1436,7 @@ export class TableEditor {
       input: () => {
         if (!this.editing) this.startEdit(false);
         else this.autosize();
+        this.typed = true;
         this.updateSuggest();
         this.updateFormatBar();
       },
@@ -2346,6 +2373,12 @@ export class TableEditor {
     return this.host.dailyNote?.() ?? null;
   }
 
+  /** 排序日期列时读日记链接用 */
+  private dateParser(): ((name: string) => Ymd | null) | undefined {
+    const daily = this.dailyNote();
+    return daily ? (n) => daily.parse(n) : undefined;
+  }
+
   /** 编辑日期列的格子时在格子下面弹日历：格子里的日期选中、看它那个月；输入了新日期就跟着跳过去 */
   private showCalendar(): void {
     if (!this.sel) return;
@@ -2441,7 +2474,8 @@ export class TableEditor {
     if (!this.editing || !this.sel) return;
     const ty = colTypeOf(this.table, this.sel.c);
     const daily = ty?.t === "date" && ty.f === "link" ? this.dailyNote() : null;
-    this.input.value = v ? writeDate(v, ty?.t === "date" ? ty.f : undefined, daily ? (x) => daily.name(x) : undefined) : "";
+    // 用 reset 换文字：直接赋值在 CodeMirror 编辑框里算一次输入，提交完它又让这格进入编辑（空的），下一下就把日期清掉了
+    this.input.reset(v ? writeDate(v, ty?.t === "date" ? ty.f : undefined, daily ? (x) => daily.name(x) : undefined) : "");
     this.commit();
     this.input.focus();
   }
@@ -3374,8 +3408,8 @@ export class TableEditor {
           ]
         : [{ title: t("fxOn"), icon: "calculator", run: () => this.openFormula(p.c) }]),
       { separator: true },
-      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow()), p) },
-      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow()), p) },
+      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
+      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
       { separator: true },
       { title: t("moveColLeft"), icon: "arrow-left", disabled: p.c === 0, run: () => this.apply(moveCol(tb, p.c, p.c - 1), { r: p.r, c: p.c - 1 }) },
       { title: t("moveColRight"), icon: "arrow-right", disabled: p.c >= colCount(tb) - 1, run: () => this.apply(moveCol(tb, p.c, p.c + 1), { r: p.r, c: p.c + 1 }) },

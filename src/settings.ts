@@ -50,6 +50,8 @@ export interface MindMapSettings {
   taskProgressPos: "end" | "below";
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
+  /** 编辑备注时所见即所得：嵌入 Obsidian 的实时预览编辑器（默认开）；关掉是普通输入框 */
+  noteLiveEdit: boolean;
   /** 编辑节点文字时，选中一段文字弹出格式栏（默认关） */
   formatBar: boolean;
   /** 选中节点时把它平滑移到画布中间（默认关） */
@@ -286,6 +288,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   taskProgress: "off",
   taskProgressPos: "end",
   notePreview: false,
+  noteLiveEdit: true,
   formatBar: false,
   copyPlain: false,
   pasteLinkTitle: false,
@@ -555,6 +558,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
         this.sizeSetting("tableMaxWidth", t("settings.tableMaxWidth.name"), t("settings.tableMaxWidth.desc"), 320, 1600, t("settings.resetTableWidth")),
         this.sizeSetting("tableMaxHeight", t("settings.tableMaxHeight.name"), t("settings.tableMaxHeight.desc"), 160, 1200, t("settings.resetTableHeight")),
+        toggle("noteLiveEdit", t("settings.noteLiveEdit.name"), t("settings.noteLiveEdit.desc"), ["所见即所得", "WYSIWYG", "实时预览", "live preview", "编辑器"]),
         toggle("notePreview", t("settings.notePreview.name"), t("settings.notePreview.desc")),
       ]),
       page(t("settings.group.markdown"), t("settings.page.markdown"), [

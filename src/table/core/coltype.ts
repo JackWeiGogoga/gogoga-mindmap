@@ -138,6 +138,27 @@ export function reformatDate(text: string, f: "slash" | "link" | undefined): str
   return writeDate({ y: +m[1], m: +m[2], d: +m[3] }, f);
 }
 
+const RELATIVE_DAYS: Record<string, number> = { 前天: -2, 昨天: -1, 今天: 0, 明天: 1, 后天: 2, yesterday: -1, today: 0, tomorrow: 1 };
+
+/**
+ * 手打进日期列的一整格，尽量读成一个日子（设置里「自动识别日期写法」开着时，提交那一格用）：
+ * 2026-1-5、2026/1/5、2026.1.5、2026年1月5日（号）、20260105；没写年的 1/5、11-17、1月5日 算今年；
+ * 今天、明天、昨天、后天、前天（today / tomorrow / yesterday）按 today 算。
+ * 带别的字、日子不存在（2 月 30 日）、两位数的年份（26-1-5，分不清年月日的顺序）读不出，返回 null
+ */
+export function parseLooseDate(text: string, today: Ymd): Ymd | null {
+  const s = text.trim().toLowerCase();
+  if (s in RELATIVE_DAYS) {
+    const d = new Date(Date.UTC(today.y, today.m - 1, today.d + RELATIVE_DAYS[s]));
+    return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+  }
+  let m = /^(\d{4})\s*(?:[-/.]\s*(\d{1,2})\s*[-/.]|年\s*(\d{1,2})\s*月)\s*(\d{1,2})\s*(?:日|号)?$/.exec(s);
+  let v: Ymd | null = m ? { y: +m[1], m: +(m[2] ?? m[3]), d: +m[4] } : null;
+  if (!v && (m = /^(\d{4})(\d{2})(\d{2})$/.exec(s))) v = { y: +m[1], m: +m[2], d: +m[3] };
+  if (!v && (m = /^(\d{1,2})\s*(?:[-/.]|月)\s*(\d{1,2})\s*(?:日|号)?$/.exec(s))) v = { y: today.y, m: +m[1], d: +m[2] };
+  return v && validYmd(v.y, v.m, v.d) ? v : null;
+}
+
 // ---------- 进度 ----------
 
 /**

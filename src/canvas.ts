@@ -73,6 +73,8 @@ import {
   STRUCTURES,
 } from "./layout";
 import { applyInlineFormat, type InlineFormat } from "./format";
+import { formatLines } from "./note-lines";
+import type { LiveNoteEditor, LiveNoteEditorOptions } from "./live-note-editor";
 import { type ColorKind, type ColorMemory, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
 import { colorFormat, colorTitle, createFormatBar, highlightFormat } from "./format-bar";
 import { InlineEditor } from "./inline-editor";
@@ -116,7 +118,7 @@ import { assignReviewIds, deckIdOf, newReviewId, REVIEW_KEY, reviewBranches } fr
 import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { isWebUrl, linkDestination } from "./paste-link";
-import { addTable, noteOnlyTable, noteRest, noteTable, tableSource, withoutTable, withTable } from "./node-table";
+import { addTable, noteOnlyTable, noteRest, noteTable, splitNoteTables, tableSource, withoutTable, withTable } from "./node-table";
 import { type CustomSplit, type SplitRule, splitText } from "./split";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
@@ -130,6 +132,8 @@ export interface CanvasHost {
    * 不给就没有分栏预览
    */
   notePreviewScope?: () => { render: (el: HTMLElement, markdown: string) => void; dispose: () => void };
+  /** 编辑备注用 Obsidian 自己的实时预览编辑器（所见即所得）；建不起来返回 null，画布退回普通输入框 */
+  createNoteEditor?: (parent: HTMLElement, o: Omit<LiveNoteEditorOptions, "file">) => LiveNoteEditor | null;
   openLink?: (href: string, internal: boolean, ev: MouseEvent) => void;
   /** 内部链接悬停：Obsidian 用来弹页面预览 */
   hoverLink?: (ev: MouseEvent, linktext: string, targetEl: HTMLElement) => void;
@@ -315,6 +319,8 @@ export interface CanvasOptions {
   wheelZoom?: () => boolean;
   /** 编辑备注时分栏预览；每次打开编辑时读取 */
   notePreview?: () => boolean;
+  /** 编辑备注时所见即所得（嵌入 Obsidian 的编辑器）；关掉是普通输入框 */
+  noteLiveEdit?: () => boolean;
   /** 复制节点时剪贴板里不带 %%…%% 标记 */
   copyPlain?: () => boolean;
   /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
@@ -894,6 +900,10 @@ export class MindMapCanvas {
   private disposers: (() => void)[] = [];
   private opts: CanvasOptions;
   private formatBar: HTMLElement | null = null;
+  /** 正在编辑备注时：格式命令、快捷键改的是备注里选中的字，不是节点 */
+  private noteFormat: ((fmt: InlineFormat) => void) | null = null;
+  /** 备注卡片、查看备注窗口里画出来的表格（只读）：卡片或窗口没了就销毁 */
+  private noteTableEds = new Set<{ el: HTMLElement; ed: TableEditor }>();
   /** 正在编辑的节点文字的编辑框（CodeMirror），和 editing 同生同灭 */
   private nodeEditor: InlineEditor | null = null;
   /** 正在编辑的标注的编辑框：文字颜色、高亮、加粗这些格式也能用在标注上（群里反馈） */
@@ -1573,6 +1583,8 @@ export class MindMapCanvas {
     this.ro?.disconnect();
     this.noteRo?.disconnect();
     for (const id of [...this.tableEds.keys()]) this.dropTable(id);
+    for (const t of this.noteTableEds) t.ed.destroy();
+    this.noteTableEds.clear();
     for (const p of this.mapPreviews.values()) p.dispose();
     this.mapPreviews.clear();
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
@@ -4588,7 +4600,8 @@ export class MindMapCanvas {
         return;
       }
     }
-    const mark = target.closest<HTMLElement>(".mm-label mark");
+    // 节点文字里的、展开的备注卡片和查看备注窗口里的 ==高亮==：点一下揭开，再点盖回
+    const mark = target.closest<HTMLElement>(".mm-label mark, .mm-note-card-body mark, .mm-popover.is-view .mm-popover-body mark");
     if (mark) {
       mark.classList.toggle("is-revealed");
       return;
@@ -8618,6 +8631,10 @@ export class MindMapCanvas {
    */
   formatText(fmt: InlineFormat): void {
     if (!this.opts.editable) return;
+    if (this.noteFormat) {
+      this.noteFormat(fmt);
+      return;
+    }
     if (this.editing || this.calloutEditor) {
       this.formatEditing(fmt);
       return;
@@ -9878,6 +9895,11 @@ export class MindMapCanvas {
     el.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     el.addEventListener("click", (ev) => {
       ev.stopPropagation();
+      // 背诵模式下点备注里遮住的高亮：揭开 / 盖回（卡片的点击不冒到画布，要自己转过去）
+      if (this.recite && (ev.target as HTMLElement).closest("mark")) {
+        this.onReciteClick(ev);
+        return;
+      }
       const n = this.noteNode.get(el);
       if (!n) return;
       this.select(n);
@@ -10192,6 +10214,10 @@ export class MindMapCanvas {
     pop.addEventListener("dragstart", () => (this.dragFromPopover = true));
     pop.addEventListener("dragend", () => (this.dragFromPopover = false));
     const editable = this.opts.editable && (edit || !node.note);
+    if (editable && this.opts.noteLiveEdit?.() && this.opts.host?.createNoteEditor && this.openLiveNote(node, pop, nodeEl, keep)) {
+      this.popover = pop;
+      return;
+    }
     if (editable) {
       const ta = createEl("textarea");
       ta.className = "mm-note-editor";
@@ -10214,10 +10240,14 @@ export class MindMapCanvas {
         return true;
       };
       let saved = false;
+      let noteBar: HTMLElement | null = null;
       const save = () => {
         if (saved) return;
         saved = true;
         this.popoverApply = null;
+        this.noteFormat = null;
+        noteBar?.remove();
+        noteBar = null;
         window.clearTimeout(previewTimer);
         scope?.dispose();
         apply();
@@ -10310,6 +10340,72 @@ export class MindMapCanvas {
         ev.preventDefault();
         void insertImages(files);
       });
+      // 颜色、荧光笔、加粗：只改选中的字，按行分开套（** 跨行在 Markdown 里不算加粗）；没选字不动（不给整段备注上格式）
+      const formatNote = (fmt: InlineFormat, sel?: { from: number; to: number }) => {
+        const from = sel?.from ?? ta.selectionStart;
+        const to = sel?.to ?? ta.selectionEnd;
+        const text = ta.isConnected ? ta.value : unescapeNote(node.note);
+        const r = formatLines(text, from, to, fmt);
+        if (!r || r.text === text) return;
+        if (!ta.isConnected) {
+          // 取色时弹窗已经关了（系统取色器抢走焦点）：直接改存好的备注
+          node.note = this.storeNote(node, r.text.replace(/\s+$/, ""));
+          this.render();
+          this.notify();
+          return;
+        }
+        ta.focus({ preventScroll: true });
+        // 整段换掉也留在输入框自己的撤销记录里：⌘Z 能撤回这次上色
+        ta.setSelectionRange(0, ta.value.length);
+        if (!this.el.ownerDocument.execCommand("insertText", false, r.text)) ta.value = r.text;
+        ta.setSelectionRange(r.start, r.end);
+        ta.dispatchEvent(new Event("input"));
+      };
+      this.noteFormat = (fmt) => formatNote(fmt);
+      ta.addEventListener("keydown", (ev) => {
+        const mod = ev.metaKey || ev.ctrlKey;
+        if (!mod || ev.altKey || ev.isComposing) return;
+        const k = ev.key.toLowerCase();
+        const fmt: InlineFormat | null = !ev.shiftKey && k === "b" ? { kind: "bold" } : !ev.shiftKey && k === "i" ? { kind: "italic" } : !ev.shiftKey && k === "u" ? { kind: "underline" } : ev.shiftKey && k === "h" ? { kind: "highlight" } : ev.shiftKey && k === "x" ? { kind: "strike" } : null;
+        if (!fmt) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        formatNote(fmt);
+      });
+      // 选中文字时浮出格式栏（不看「选中文字时显示格式栏」设置，备注里一律有）：输入框量不出选区的位置，放在弹窗上方
+      const placeBar = () => {
+        const has = ta.isConnected && this.el.ownerDocument.activeElement === ta && ta.selectionStart !== ta.selectionEnd;
+        if (!has) {
+          noteBar?.remove();
+          noteBar = null;
+          return;
+        }
+        if (!noteBar) {
+          noteBar = createFormatBar(this.el.ownerDocument, {
+            textColors: this.opts.textColors?.() ?? [],
+            highlightColors: this.opts.highlightColors?.() ?? [],
+            underlineKey: sc("Mod", "U"),
+            icon,
+            tip: (el, text) => this.tip(el, text),
+            onFormat: (fmt) => formatNote(fmt),
+            memory: this.colorMemory(),
+            onCustom: () => {
+              const sel = { from: ta.selectionStart, to: ta.selectionEnd };
+              return (fmt) => formatNote(fmt, sel);
+            },
+          });
+          noteBar.classList.add("mm-note-float-bar");
+          this.el.append(noteBar);
+        }
+        const host = this.el.getBoundingClientRect();
+        const r = pop.getBoundingClientRect();
+        const w = noteBar.offsetWidth;
+        const h = noteBar.offsetHeight;
+        const above = r.top - host.top - h - 6;
+        noteBar.style.left = `${Math.round(Math.max(4, Math.min(host.width - w - 4, r.left - host.left)))}px`;
+        noteBar.style.top = `${Math.round(above >= 4 ? above : r.bottom - host.top + 6)}px`;
+      };
+      for (const type of ["select", "keyup", "mouseup", "input"]) ta.addEventListener(type, placeBar);
       this.popoverSave = save;
       this.popoverApply = apply;
       if (scope) {
@@ -10383,6 +10479,167 @@ export class MindMapCanvas {
     this.popover = pop;
   }
 
+  /**
+   * 编辑备注：Obsidian 自己的实时预览编辑器（设置「编辑备注时所见即所得」，默认开）。
+   * 和普通输入框一样：边打边存、点到外面或 Esc / ⌘↵ 关掉、顶上一排格式按钮、⌘B ⌘⇧H 这些只改选中的字、粘贴拖入图片存成附件。
+   * 编辑器建不起来（Obsidian 改了内部结构）返回 false，调用方用普通输入框
+   */
+  private openLiveNote(node: MindNode, pop: HTMLElement, nodeEl: HTMLElement, keep: { left: string; top: string; w: number; h: number } | null): boolean {
+    const host = this.opts.host!;
+    const initial = node.note;
+    let ed: LiveNoteEditor | null = null;
+    const apply = () => {
+      if (!ed) return false;
+      const next = this.storeNote(node, ed.value.replace(/\s+$/, ""));
+      if (next === node.note) return false;
+      node.note = next;
+      return true;
+    };
+    let saved = false;
+    const save = () => {
+      if (saved) return;
+      saved = true;
+      this.popoverApply = null;
+      this.noteFormat = null;
+      doc.removeEventListener("pointerdown", outside, true);
+      apply();
+      ed?.destroy();
+      if (node.note !== initial) {
+        this.render();
+        this.notify();
+      }
+    };
+    const formatNote = (fmt: InlineFormat, sel?: { from: number; to: number }) => {
+      const live = ed && ed.el.isConnected ? ed : null;
+      const text = live ? live.value : unescapeNote(node.note);
+      const { from, to } = sel ?? live?.selection ?? { from: 0, to: 0 };
+      const r = formatLines(text, from, to, fmt);
+      if (!r || r.text === text) return;
+      if (!live) {
+        node.note = this.storeNote(node, r.text.replace(/\s+$/, ""));
+        this.render();
+        this.notify();
+        return;
+      }
+      live.replace(r.text, r.start, r.end);
+      live.focus();
+    };
+    const insertImages = async (files: File[]) => {
+      const links: string[] = [];
+      for (const f of files) {
+        const link = await this.saveImageFile(f);
+        if (link) links.push(`![[${link}]]`);
+      }
+      if (!links.length) return;
+      if (ed && ed.el.isConnected) {
+        ed.focus();
+        ed.insert(links.join("\n"));
+        return;
+      }
+      node.note = this.storeNote(node, [unescapeNote(node.note), ...links].filter(Boolean).join("\n"));
+      this.render();
+      this.notify();
+    };
+    const close = () => {
+      if (this.popover === pop) this.closePopover();
+      this.el.focus({ preventScroll: true });
+    };
+    // 选中文字浮出的格式栏由宿主挂在编辑器上（和 Markdown 笔记里同一份）
+    pop.classList.add("is-live");
+    ed = host.createNoteEditor!(pop, {
+      text: unescapeNote(node.note),
+      onChange: () => {
+        if (apply() && !this.opts.embedded) this.scheduleNotify();
+      },
+      onKey: (ev) => {
+        if (ev.isComposing) return false;
+        const mod = ev.metaKey || ev.ctrlKey;
+        if (ev.key === "Escape" || (ev.key === "Enter" && mod)) {
+          ev.preventDefault();
+          close();
+          return true;
+        }
+        if (!mod || ev.altKey) return false;
+        const k = ev.key.toLowerCase();
+        const fmt: InlineFormat | null = !ev.shiftKey && k === "b" ? { kind: "bold" } : !ev.shiftKey && k === "i" ? { kind: "italic" } : !ev.shiftKey && k === "u" ? { kind: "underline" } : ev.shiftKey && k === "h" ? { kind: "highlight" } : ev.shiftKey && k === "x" ? { kind: "strike" } : null;
+        if (!fmt) return false;
+        ev.preventDefault();
+        formatNote(fmt);
+        return true;
+      },
+      onPaste: (ev) => {
+        const files = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!files.length) return false;
+        ev.preventDefault();
+        void insertImages(files);
+        return true;
+      },
+      onDragOver: (ev) => {
+        if (ev.dataTransfer?.types.includes("Files") || host.getDraggedFiles?.()?.length) {
+          ev.preventDefault();
+          ev.dataTransfer!.dropEffect = "copy";
+          return true;
+        }
+        return false;
+      },
+      onDrop: (ev) => {
+        const vaultFiles = host.getDraggedFiles?.() ?? null;
+        if (vaultFiles?.length) {
+          ev.preventDefault();
+          ed?.insert(vaultFiles.map((f) => (f.isImage ? `![[${f.linktext}]]` : `[[${f.linktext}]]`)).join("\n"));
+          return true;
+        }
+        const files = [...(ev.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+        if (!files.length) return false;
+        ev.preventDefault();
+        void insertImages(files);
+        return true;
+      },
+    });
+    if (!ed) {
+      pop.classList.remove("is-live");
+      return false;
+    }
+    // 关掉的时机：在 Obsidian 主界面里（画布、侧栏、别的标签页）按下鼠标、又不在这个弹窗里。
+    // 不按失焦关：斜杠菜单、插入表格的行列对话框、格式栏的取色板、表格的菜单都会抢走焦点，它们挂在主界面外面
+    const doc = this.el.ownerDocument;
+    const outside = (ev: PointerEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target || pop.contains(target) || !target.closest(".app-container")) return;
+      if (this.popover === pop) this.closePopover();
+    };
+    doc.addEventListener("pointerdown", outside, true);
+    // 编辑框里的按键、拖放归编辑框，不冒到画布（画布会当成节点快捷键、新建节点）
+    for (const type of ["keyup", "keypress", "dragover", "drop", "dblclick", "contextmenu"]) ed.el.addEventListener(type, (ev) => ev.stopPropagation());
+    // 光标在编辑框里的表格格子上（格子是另一个小编辑器，外层的按键处理收不到）：Esc、⌘↵ 没人处理就关掉备注
+    // Obsidian 自己的表格格子会把 Esc 标成处理过、其实什么都不做，这种照样关；gogoga 表格（.ggt）的格子 Esc 是退出格子编辑，尊重它
+    ed.el.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.isComposing) return;
+      const target = ev.target as HTMLElement;
+      const nativeCell = ev.key === "Escape" && !!target.closest("table") && !target.closest(".ggt");
+      if (ev.defaultPrevented && !nativeCell) return;
+      if (ev.key === "Escape" || (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey))) {
+        ev.preventDefault();
+        close();
+      }
+    });
+    this.noteFormat = (fmt) => formatNote(fmt);
+    this.popoverSave = save;
+    this.popoverApply = apply;
+    this.el.append(pop);
+    // 所见即所得的编辑框要地方：默认比普通输入框大一些，沿用查看窗口的位置大小
+    const room = this.el.getBoundingClientRect();
+    pop.classList.add("is-sized");
+    if (keep) pop.setCssStyles({ width: `${Math.max(keep.w, 320)}px`, height: `${Math.max(keep.h, 200)}px`, left: keep.left, top: keep.top });
+    else {
+      pop.setCssStyles({ width: `${Math.round(Math.max(200, Math.min(460, room.width - 16)))}px`, height: `${Math.round(Math.max(140, Math.min(320, room.height - 16)))}px` });
+      this.placePopover(pop, nodeEl);
+    }
+    ed.focus();
+    return true;
+  }
+
   /** 备注正文里的双链、图片：弹窗和展开的卡片共用 */
   private wireNoteBody(body: HTMLElement): void {
     // 备注里的图片太小，单击（或双击）就全屏看原图
@@ -10410,9 +10667,41 @@ export class MindMapCanvas {
   }
 
   private fillNoteBody(body: HTMLElement, note: string): void {
-    if (this.opts.host?.renderNote) {
+    // 换掉了的卡片、关掉的窗口里的表格：销毁（表格编辑器在文档上挂着监听）
+    for (const t of this.noteTableEds) {
+      if (t.el.isConnected && !body.contains(t.el)) continue;
+      t.ed.destroy();
+      this.noteTableEds.delete(t);
+    }
+    const host = this.opts.host;
+    if (host?.renderNote) {
       body.classList.add("markdown-rendered");
-      this.opts.host.renderNote(body, unescapeNote(note));
+      const parts = splitNoteTables(unescapeNote(note));
+      if (parts.length === 1 && "md" in parts[0]) {
+        host.renderNote(body, parts[0].md);
+        return;
+      }
+      // 带 gogoga-table 注释的表格用脑图的表格组件画（只读）：合并单元格、底色、列宽和节点表格一样显示
+      for (const part of parts) {
+        if ("md" in part) {
+          host.renderNote(body.createDiv({ cls: "mm-note-part" }), part.md);
+          continue;
+        }
+        const wrap = body.createDiv({ cls: "mm-node-table mm-note-table" });
+        // 格子里的链接由表格自己打开，不再冒到备注上再开一次
+        wrap.addEventListener("click", (ev) => {
+          if ((ev.target as HTMLElement).closest("a")) ev.stopPropagation();
+        });
+        const ed = new TableEditor(wrap, part.table, {
+          readonly: true,
+          onChange: () => {},
+          renderMarkdown: (cell, md) => host.renderNote!(cell, md),
+          setIcon: host.setIcon,
+          openLink: host.openLink ? (href, ev) => host.openLink!(href, true, ev) : undefined,
+          hoverLink: host.hoverLink,
+        });
+        this.noteTableEds.add({ el: wrap, ed });
+      }
     } else {
       body.classList.add("is-plain");
       body.textContent = unescapeNote(note);

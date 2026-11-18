@@ -993,6 +993,14 @@
   resize: both;
 }
 .mm-popover.is-sized .mm-note-editor { flex: 1; width: auto; max-width: none; min-height: 0; resize: none; }
+/* 所见即所得的备注编辑框（Obsidian 的实时预览编辑器）：铺满弹窗、自己滚动；字号跟着设置里的备注字号 */
+.mm-popover.is-live { overflow: hidden; padding: 6px 4px 8px 4px; }
+.mm-popover.is-live .mm-note-live { flex: 1; min-height: 0; overflow: auto; font-size: var(--mm-note-size, 13px); background: transparent; }
+.mm-popover.is-live .mm-note-live .cm-editor { min-height: 100%; background: transparent; }
+.mm-popover.is-live .mm-note-live .cm-scroller { padding: 0; font-size: inherit; }
+/* 左边留出表格的行手柄、「在左边加列」按钮的位置（gogoga Table 把它们画在表格外面，编辑区自己滚动会裁掉） */
+.mm-popover.is-live .mm-note-live .cm-content { padding: 0 6px 24px 30px; max-width: none; }
+.mm-popover.is-live .mm-note-live .cm-sizer { max-width: none; margin: 0; padding: 0; }
 /* 分栏预览：左边写、右边实时渲染；弹窗窄于 460px 时改成上下排 */
 .mm-popover.has-preview { container-type: inline-size; overflow: hidden; }
 .mm-note-split { flex: 1; display: flex; gap: 12px; min-height: 0; }
@@ -2033,13 +2041,14 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 /* 复习时用不上编辑工具栏，点题目也不让它盖住选项 */
 .gg-mm-root.is-recite .mm-nodebar { visibility: hidden; }
 /* ==高亮== 遮住文字、保留原来的高亮颜色（彩色高亮、荧光笔各是各的颜色），底下一道横线，点一下揭开 */
-.gg-mm-root.is-recite .mm-label mark:not(.is-revealed) {
+/* 备注里（展开的卡片、查看备注窗口）的 ==高亮== 一样遮 */
+.gg-mm-root.is-recite :is(.mm-label, .mm-note-card-body, .mm-popover.is-view .mm-popover-body) mark:not(.is-revealed) {
   color: transparent;
   box-shadow: inset 0 -1.5px 0 var(--mm-selection);
   cursor: pointer;
 }
-.gg-mm-root.is-recite .mm-label mark:not(.is-revealed) * { visibility: hidden; }
-.gg-mm-root.is-recite .mm-label mark.is-revealed { cursor: pointer; }
+.gg-mm-root.is-recite :is(.mm-label, .mm-note-card-body, .mm-popover.is-view .mm-popover-body) mark:not(.is-revealed) * { visibility: hidden; }
+.gg-mm-root.is-recite :is(.mm-label, .mm-note-card-body, .mm-popover.is-view .mm-popover-body) mark.is-revealed { cursor: pointer; }
 /* 选择题：没揭晓时所有选项都像没勾；揭晓后正确的变绿、错误的变淡 */
 .gg-mm-root.is-recite .mm-task { cursor: default; }
 .gg-mm-root.is-recite .gg-mm-node.is-option:not(.is-option-shown) .mm-task.is-done { background: none; opacity: 0.7; }
@@ -2925,6 +2934,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--ggt-p, 0%); border-radius: 3px; background: var(--interactive-accent); transition: width 0.2s ease; }
 .ggt-bar[data-done] .ggt-bar-fill { background: var(--color-green); }
 .ggt-bar-text { flex: none; font-size: 0.92em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* 日期列里读不出日子的格子：淡淡的波浪线，悬停有说明（只是显示） */
+.ggt-cell .is-not-date { text-decoration: underline wavy color-mix(in srgb, var(--text-warning) 55%, transparent); text-decoration-skip-ink: none; text-underline-offset: 3px; }
 
 /* 日期列的日历：和补全列表一样的浮层 */
 .ggt-cal { position: fixed; z-index: var(--layer-menu, 65); width: 248px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m, 8px); background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff); backdrop-filter: var(--menu-backdrop-filter, none); box-shadow: var(--shadow-l, 0 8px 24px rgba(0, 0, 0, 0.16)); font-size: var(--font-ui-small, 13px); user-select: none; }

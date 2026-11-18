@@ -72,6 +72,34 @@ export function addTable(note: string, inList: boolean, rows = 3, cols = 3): str
   return normalizeNote(rest.trim() ? [...block, "", rest].join("\n") : block.join("\n"), inList);
 }
 
+/** 备注拆成几段：表格那段交给脑图的表格组件画（合并、底色、列宽才显示得出来），其余照常当 Markdown 渲染 */
+export type NotePart = { md: string } | { table: Table };
+
+/**
+ * 备注（已去掉标注块包装）里顶格的表格单独拿出来，和节点表格一样用 gogoga 表格的样子画；
+ * 列表里的表格留在 Markdown 里交给 Obsidian（拆出来会把列表断开）。没有要拿的就返回一整段
+ */
+export function splitNoteTables(md: string): NotePart[] {
+  if (!md.includes("|")) return [{ md }];
+  const lines = md.split("\n");
+  const out: NotePart[] = [];
+  let from = 0;
+  const pushMd = (to: number) => {
+    const text = lines.slice(from, to).join("\n");
+    if (text.trim()) out.push({ md: text });
+  };
+  for (const b of findTables(lines)) {
+    if (b.indent) continue;
+    const table = blockTable(lines, b);
+    if (!table) continue;
+    pushMd(b.start);
+    out.push({ table });
+    from = b.stop;
+  }
+  pushMd(lines.length);
+  return out.length ? out : [{ md }];
+}
+
 /** 表格的 Markdown（比较是不是同一张用） */
 export function tableSource(table: Table): string {
   return serializeBlock(table, []).join("\n");

@@ -16,6 +16,8 @@ import { canShowFormatBar, formatSelection } from "./note-format-core";
 export interface NoteFormatBarOptions {
   /** 每次显示前取：颜色列表跟着设置走 */
   bar: () => Omit<FormatBarOptions, "onFormat">;
+  /** 这个编辑器不出（脑图备注编辑框自己挂一份，Markdown 笔记的这份就跳过它，免得出两个） */
+  skip?: (view: EditorView) => boolean;
 }
 
 export function noteFormatBarExtension(o: NoteFormatBarOptions): Extension {
@@ -54,7 +56,7 @@ export function noteFormatBarExtension(o: NoteFormatBarOptions): Extension {
         view.requestMeasure({
           read: () => {
             const state = view.state;
-            if (!view.hasFocus || !state.field(editorLivePreviewField, false) || !canShowFormatBar(state)) return null;
+            if (!view.hasFocus || o.skip?.(view) || !state.field(editorLivePreviewField, false) || !canShowFormatBar(state)) return null;
             const sel = state.selection.main;
             const a = view.coordsAtPos(sel.from, 1);
             const b = view.coordsAtPos(sel.to, -1);

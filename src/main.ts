@@ -1,5 +1,6 @@
 import { type CustomSplit, parseCustomSplits } from "./split";
 import { dailyNote } from "./daily-note";
+import { createLiveNoteEditor } from "./live-note-editor";
 import type { QuickSetting } from "./canvas";
 import {
   Component,
@@ -75,6 +76,7 @@ import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
 import { noteMarkersExtension } from "./note-markers";
 import { noteFormatBarExtension } from "./note-format-bar";
+import type { FormatBarOptions } from "./format-bar";
 import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
@@ -543,22 +545,8 @@ export default class MindMapPlugin extends Plugin {
     }
     if (refresh) this.rerenderReadingViews();
     if (this.settings.formatBarInNotes && !Platform.isMobile) {
-      this.noteTagExt.push(
-        noteFormatBarExtension({
-          bar: () => ({
-            textColors: parseColorList(this.settings.textColors),
-            highlightColors: parseColorList(this.settings.highlightColors, true),
-            memory: this.colorMemory,
-            underlineKey: Platform.isMacOS ? "⌘U" : "Ctrl+U",
-            icon: (name) => {
-              const span = createSpan({ cls: "mm-icon" });
-              setIcon(span, name);
-              return span;
-            },
-            tip: (el, text) => setTooltip(el, text, { placement: "top" }),
-          }),
-        }),
-      );
+      // 脑图备注的编辑框自己挂了一份（不看设置），这里跳过它
+      this.noteTagExt.push(noteFormatBarExtension({ bar: () => this.noteBarOptions(), skip: (view) => !!view.dom.closest(".mm-note-live") }));
     }
     if (this.settings.markersInNotes !== "show") {
       // 只在实时预览、只在脑图笔记（frontmatter 有 mindmap）里
@@ -2180,6 +2168,22 @@ export default class MindMapPlugin extends Plugin {
       }
   }
 
+  /** 选中文字时浮出的格式栏（Markdown 笔记里、脑图备注编辑框里）：颜色跟着设置 */
+  noteBarOptions(): Omit<FormatBarOptions, "onFormat"> {
+    return {
+      textColors: parseColorList(this.settings.textColors),
+      highlightColors: parseColorList(this.settings.highlightColors, true),
+      memory: this.colorMemory,
+      underlineKey: Platform.isMacOS ? "⌘U" : "Ctrl+U",
+      icon: (name) => {
+        const span = createSpan({ cls: "mm-icon" });
+        setIcon(span, name);
+        return span;
+      },
+      tip: (el, text) => setTooltip(el, text, { placement: "top" }),
+    };
+  }
+
   /** 把新的块内容写回宿主笔记：文件在编辑器里打开就走编辑器，否则直接改文件 */
   /** 代码块嵌入和大窗口编辑共用的画布设置 */
   private blockCanvasOptions(): Partial<CanvasOptions> {
@@ -2187,6 +2191,7 @@ export default class MindMapPlugin extends Plugin {
       toolbarPosition: this.settings.toolbarPosition,
       wheelZoom: () => this.settings.wheelAction === "zoom",
       notePreview: () => this.settings.notePreview,
+      noteLiveEdit: () => this.settings.noteLiveEdit,
       formatBar: () => this.settings.formatBar,
       split: () => this.splitPrefs(),
       keepBlankLines: () => this.settings.keepBlankLines,
@@ -2545,6 +2550,11 @@ export default class MindMapPlugin extends Plugin {
           el.removeEventListener("focusout", onOut);
           pop();
         };
+      },
+      createNoteEditor: (parent, o) => {
+        const f = this.app.vault.getAbstractFileByPath(sourcePath());
+        // 选中文字浮出格式栏：备注里一律有，不看「选中文字时显示格式栏」这些设置
+        return createLiveNoteEditor(this.app, parent, { ...o, file: f instanceof TFile ? f : null, extensions: [noteFormatBarExtension({ bar: () => this.noteBarOptions() })] });
       },
       notePreviewScope: () => {
         const scope = new Component();

@@ -5,7 +5,7 @@
 
 import { type Align, type Calc, type CellColor, type ColType, cellFromSource, cellRef, parseRange, parseRef, rangeRef, type Rect, type Table, type TableDensity, type TableMeta, type TableStyle, type VAlign } from "./table";
 import { fillSeries } from "./fill";
-import { formatNumber, joinTags, type NumFmt, reformatDate, reformatNumber, splitTags } from "./coltype";
+import { formatNumber, joinTags, type NumFmt, readDate, reformatDate, reformatNumber, splitTags, type Ymd } from "./coltype";
 import { evalFormula, type FxEmpty, type FxError, type FxNode, formatFx, formulaRefs, fxEmptyOf, fxErrorOf, nameOk, parseFormula, renameInFormula } from "./formula";
 
 export function cloneTable(t: Table): Table {
@@ -621,15 +621,34 @@ export function canSortRows(t: Table): boolean {
 }
 
 /**
- * 按第 c 列给数据行排序（表头不动）；底色跟着行走。lastFixed：最后一行不参与（合计行）。
- * 一样的保持原来的先后
+ * 日期列排序：读得出日子的按时间（倒序就倒过来），读不出的（待定、2 月 30 日）跟在后面、按文字排，空的最后。
+ * 读不出的和空的，正序倒序都在后面
  */
-export function sortRows(t: Table, c: number, desc: boolean, lastFixed = false): Table {
+function dateSortKey(text: string, parseNote?: (name: string) => Ymd | null): { g: number; d: number } {
+  if (!text.trim()) return { g: 2, d: 0 };
+  const v = readDate(text, parseNote);
+  return v ? { g: 0, d: Date.UTC(v.y, v.m - 1, v.d) } : { g: 1, d: 0 };
+}
+
+/**
+ * 按第 c 列给数据行排序（表头不动）；底色跟着行走。lastFixed：最后一行不参与（合计行）。
+ * 日期列按日子排（parseNote 读日记链接）。一样的保持原来的先后
+ */
+export function sortRows(t: Table, c: number, desc: boolean, lastFixed = false, parseNote?: (name: string) => Ymd | null): Table {
   if (!canSortRows(t)) return t;
   const last = rowCount(t) - (lastFixed ? 1 : 0);
   const h = headRows(t);
   const idx = Array.from({ length: Math.max(0, last - h) }, (_, i) => i + h);
+  const isDate = colTypeOf(t, c)?.t === "date" && !formulaOf(t, c);
+  const keys = isDate ? new Map(idx.map((r) => [r, dateSortKey(t.cells[r][c], parseNote)])) : null;
   const sorted = [...idx].sort((x, y) => {
+    if (keys) {
+      const a = keys.get(x)!;
+      const b = keys.get(y)!;
+      if (a.g !== b.g) return a.g - b.g || x - y;
+      const d = a.g === 0 ? a.d - b.d : a.g === 1 ? compareCells(t.cells[x][c], t.cells[y][c]) : 0;
+      return (desc ? -d : d) || x - y;
+    }
     const d = compareCells(t.cells[x][c], t.cells[y][c]);
     const empty = !t.cells[x][c].trim() || !t.cells[y][c].trim();
     return (desc && !empty ? -d : d) || x - y;
