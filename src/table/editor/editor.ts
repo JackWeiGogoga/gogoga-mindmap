@@ -1667,7 +1667,8 @@ export class TableEditor {
   }
 
   private onKey(ev: KeyboardEvent): void {
-    if (ev.isComposing || ev.keyCode === 229) return;
+    // 输入法组字：组字中 isComposing；开始组字前那一下按键 key 是 "Process"
+    if (ev.isComposing || ev.key === "Process") return;
     // ⌘ 或 Ctrl 都算（不去判断平台）：Mac 上 Ctrl+Z 本来也没有别的用处
     const mod = ev.metaKey || ev.ctrlKey;
     if (this.editing) {

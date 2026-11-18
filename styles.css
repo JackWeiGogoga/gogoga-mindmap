@@ -829,6 +829,9 @@
 }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) img { max-width: 100%; height: auto; cursor: zoom-in; -webkit-user-drag: none; }
 .mm-popover-body.is-plain { white-space: pre-wrap; }
+/* 备注里的表格（查看时脑图画的，编辑时装了 gogoga Table 由它画的）：和原生表格一样不超出备注框，长文字换行，
+   拖宽、拖窄备注框表格跟着变；列太多、实在放不下时才横向滚动。表格组件默认按内容排宽（width: max-content） */
+.mm-note-table .ggt-table, .mm-note-live .ggt-table { width: auto; max-width: 100%; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) { font-size: var(--mm-note-size, 13px); line-height: 1.55; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :first-child { margin-top: 0; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :last-child { margin-bottom: 0; }
@@ -994,12 +997,17 @@
 }
 .mm-popover.is-sized .mm-note-editor { flex: 1; width: auto; max-width: none; min-height: 0; resize: none; }
 /* 所见即所得的备注编辑框（Obsidian 的实时预览编辑器）：铺满弹窗、自己滚动；字号跟着设置里的备注字号 */
-.mm-popover.is-live { overflow: hidden; padding: 6px 4px 8px 4px; }
+/* 边距、行高和查看时（.mm-popover 的 10px 12px、1.55）一样：从查看切到编辑，字留在原地、换行位置不变 */
+.mm-popover.is-live { overflow: hidden; padding: 10px 0 8px 0; }
 .mm-popover.is-live .mm-note-live { flex: 1; min-height: 0; overflow: auto; font-size: var(--mm-note-size, 13px); background: transparent; }
-.mm-popover.is-live .mm-note-live .cm-editor { min-height: 100%; background: transparent; }
+/* Obsidian 的编辑器里面还套着一层 markdown-source-view，字号是正文字号（--font-text-size），要跟回备注字号 */
+.mm-popover.is-live .mm-note-live .markdown-source-view { font-size: inherit; }
+.mm-popover.is-live .mm-note-live .cm-editor { min-height: 100%; background: transparent; font-size: inherit; }
 .mm-popover.is-live .mm-note-live .cm-scroller { padding: 0; font-size: inherit; }
-/* 左边留出表格的行手柄、「在左边加列」按钮的位置（gogoga Table 把它们画在表格外面，编辑区自己滚动会裁掉） */
-.mm-popover.is-live .mm-note-live .cm-content { padding: 0 6px 24px 30px; max-width: none; }
+.mm-popover.is-live .mm-note-live .cm-content { padding: 0 12px 24px 12px; max-width: none; line-height: 1.55; }
+.mm-popover.is-live .mm-note-live .cm-line { line-height: inherit; }
+/* 备注里有表格：左边留出表格的行手柄、「在左边加列」按钮的位置（gogoga Table 把它们画在表格外面，编辑区自己滚动会裁掉） */
+.mm-popover.is-live.has-table .mm-note-live .cm-content { padding-left: 30px; }
 .mm-popover.is-live .mm-note-live .cm-sizer { max-width: none; margin: 0; padding: 0; }
 /* 分栏预览：左边写、右边实时渲染；弹窗窄于 460px 时改成上下排 */
 .mm-popover.has-preview { container-type: inline-size; overflow: hidden; }
@@ -3227,6 +3235,11 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 /* 选中格所在列的表头淡色高亮（选了一片时不要） */
 .ggt.ggt.is-strict .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: linear-gradient(var(--ggt-sel-soft), var(--ggt-sel-soft)) !important; }
 .ggt.ggt.is-strict.has-range .ggt-table thead .ggt-cell.is-sel-head:not([data-bg]) { background-image: none !important; }
+
+/* 导出 PDF、Export Image：设了列宽的表格按比例缩到页面宽（reading.ts 的 applyFit 写变量、加类）。
+   !important 是要盖过编辑器写在 col 上的像素宽度（内联样式），和原来直接写内联样式的效果一样 */
+.ggt-table.ggt-fitted { table-layout: fixed !important; width: min(100%, var(--ggt-fit-w)) !important; }
+.ggt-table.ggt-fitted > colgroup > col { width: var(--ggt-fit-col) !important; }
 
 /* Export Image 插件导出图片：它复制编辑器里画好的表格去截图，复制件没有脚本，拖过列宽的表格按记下的比例缩到图片宽（#7） */
 .export-image-root .ggt-table[style*="--ggt-total"] {

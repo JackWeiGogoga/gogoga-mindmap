@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.88.1] - 2026-11-18
+
+### Fixed
+- Tables in notes with a lot of text didn't fit the note (reported by a user, after 0.87.0): the table was as wide as its longest line, so long text ran off to the side and dragging the note narrower or wider didn't change it. Tables in the note popover, expanded note cards and the note editor (when gogoga Table is installed) now fit the note's width like Obsidian's own tables, wrapping long text and following the note as you resize it. A table with too many columns to fit still scrolls sideways.
+- Double-clicking a note to edit it (in the note popover or an expanded note card) moved the text and lost your place (reported by the same user): the editor used a larger font and wider margins than the note you were reading, and put the cursor at the end, so in a long note you had to find your spot again. Now the cursor lands on the word you double-clicked, that line stays where it was on screen, and the editor uses the same font size, line spacing and margins as the note (it leaves extra room on the left only when the note has a table, for the table's controls). This applies to the plain text box too.
+
 ## [0.88.0] - 2026-11-18
 
 ### Added
@@ -1100,7 +1106,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...HEAD
+[0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1

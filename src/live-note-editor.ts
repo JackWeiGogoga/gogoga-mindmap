@@ -37,6 +37,10 @@ export interface LiveNoteEditorOptions {
   onPaste: (ev: ClipboardEvent) => boolean;
   onDrop: (ev: DragEvent) => boolean;
   onDragOver: (ev: DragEvent) => boolean;
+  /** 光标放在原文的这个位置（双击查看中的备注进来时是双击的那个字），不给就放在最后 */
+  caret?: number;
+  /** 把光标那一行滚到屏幕上这个高度（双击时鼠标的位置），眼睛看着的地方不跳 */
+  caretY?: number;
 }
 
 interface BaseEditor {
@@ -134,8 +138,20 @@ export function createLiveNoteEditor(app: App, parent: HTMLElement, o: LiveNoteE
     owner.editMode = ed;
     ed.set(o.text, true);
     const cm = ed.editor.cm;
-    // 和普通输入框一样，光标放在最后接着写
-    cm.dispatch({ selection: { anchor: cm.state.doc.length } });
+    // 光标：双击进来的放在双击的字那里，否则和普通输入框一样放在最后接着写
+    const len = cm.state.doc.length;
+    const anchor = o.caret !== undefined ? Math.max(0, Math.min(len, o.caret)) : len;
+    cm.dispatch({ selection: { anchor }, effects: o.caretY !== undefined ? EditorView.scrollIntoView(anchor, { y: "center" }) : [] });
+    // 排好版后把光标那一行挪到鼠标原来的高度：滚动的是外面包着编辑器的那层（box），编辑器自己不滚
+    if (o.caretY !== undefined) {
+      const y = o.caretY;
+      cm.requestMeasure({
+        read: () => cm.coordsAtPos(anchor),
+        write: (c) => {
+          if (c) box.scrollTop += (c.top + c.bottom) / 2 - y;
+        },
+      });
+    }
     let destroyed = false;
     return {
       el: box,

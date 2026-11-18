@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.88.1] - 2026-11-18
+
+### 修复
+- 备注里内容多的表格放不下（群友反馈，0.87.0 起）：表格按最长的一行排开，一整行字看不全，拖宽拖窄备注框也不跟着变。现在查看备注的窗口、画布上展开的备注卡片、编辑备注时（装了 gogoga Table 时由它画）的表格都和 Obsidian 原生表格一样不超出备注框，长文字换行，拖动备注框大小时跟着变；列太多实在放不下时才横向滚动。
+- 双击备注进编辑时文字乱跳、找不到刚才看到哪（同一位群友反馈）：编辑框的字号比查看时大、左边多空出一块，光标又放在最后，长备注里要重新找。现在双击查看窗口或展开的备注卡片进编辑，光标就落在双击的字上，那一行留在屏幕上原来的高度，字号、行距、边距和查看时一样（备注里有表格时左边才多留出表格按钮的位置）。普通输入框也一样把光标放在双击的地方。
+
 ## [0.88.0] - 2026-11-18
 
 ### 新增
@@ -1100,7 +1106,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...HEAD
+[0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1

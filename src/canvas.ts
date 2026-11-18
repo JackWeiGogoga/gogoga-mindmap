@@ -118,6 +118,7 @@ import { assignReviewIds, deckIdOf, newReviewId, REVIEW_KEY, reviewBranches } fr
 import type { Table } from "./table/core/table";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { isWebUrl, linkDestination } from "./paste-link";
+import { spotInSource } from "./note-spot";
 import { addTable, noteOnlyTable, noteRest, noteTable, splitNoteTables, tableSource, withoutTable, withTable } from "./node-table";
 import { type CustomSplit, type SplitRule, splitText } from "./split";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, MARKER_RE, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
@@ -9940,7 +9941,8 @@ export class MindMapCanvas {
     el.addEventListener("dblclick", (ev) => {
       ev.stopPropagation();
       const n = this.noteNode.get(el);
-      if (n && this.opts.editable && !this.recite) this.editNoteCard(n, el);
+      const body = el.querySelector<HTMLElement>(".mm-note-card-body");
+      if (n && this.opts.editable && !this.recite) this.editNoteCard(n, el, body ? this.noteSpot(body, ev, n) : undefined);
     });
     el.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
@@ -10011,14 +10013,20 @@ export class MindMapCanvas {
   }
 
   /** 在卡片原位打开编辑框：和弹窗编辑是同一套（粘贴图片、拖入笔记都能用），起码留出能写字的大小 */
-  private editNoteCard(node: MindNode, card: HTMLElement): void {
+  /** 双击渲染好的备注：双击的字在原文里的位置和鼠标高度（见 toggleNotePopover 的 spot）；对不上返回 undefined，光标照旧放在最后 */
+  private noteSpot(body: HTMLElement, ev: MouseEvent, node: MindNode): { at: number; y: number } | undefined {
+    const at = spotInSource(body, ev.clientX, ev.clientY, unescapeNote(node.note));
+    return at === null ? undefined : { at, y: ev.clientY };
+  }
+
+  private editNoteCard(node: MindNode, card: HTMLElement, spot?: { at: number; y: number }): void {
     const r = card.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
     const w = Math.min(Math.max(r.width, 260), Math.max(160, host.width - 16));
     const h = Math.min(Math.max(r.height, 140), Math.max(80, host.height - 16));
     const left = Math.max(8, Math.min(r.left - host.left, host.width - w - 8));
     const top = Math.max(8, Math.min(r.top - host.top, host.height - h - 8));
-    this.toggleNotePopover(node, true, { left: `${left}px`, top: `${top}px`, w, h });
+    this.toggleNotePopover(node, true, { left: `${left}px`, top: `${top}px`, w, h }, spot);
   }
 
   /** 内容超出卡片、还没滚到底时，底部渐隐提示下面还有 */
@@ -10224,7 +10232,11 @@ export class MindMapCanvas {
 
   // ---------- 备注弹层 ----------
 
-  private toggleNotePopover(node: MindNode, edit = false, at?: { left: string; top: string; w: number; h: number }): void {
+  /**
+   * spot：双击查看中的备注进来时，双击的字在原文里的位置和鼠标的高度。编辑框打开后光标放在那里、那一行留在鼠标原来的高度，
+   * 不用在长备注里重新找刚才看到哪
+   */
+  private toggleNotePopover(node: MindNode, edit = false, at?: { left: string; top: string; w: number; h: number }, spot?: { at: number; y: number }): void {
     const sameNode = this.popover?.dataset.id === node.id;
     const alreadyEditing = !!this.popover?.querySelector("textarea");
     // 再点一次图标就收起；但「编辑」请求要把查看态切成编辑态，不能当成收起
@@ -10246,7 +10258,7 @@ export class MindMapCanvas {
     pop.addEventListener("dragstart", () => (this.dragFromPopover = true));
     pop.addEventListener("dragend", () => (this.dragFromPopover = false));
     const editable = this.opts.editable && (edit || !node.note);
-    if (editable && this.opts.noteLiveEdit?.() && this.opts.host?.createNoteEditor && this.openLiveNote(node, pop, nodeEl, keep)) {
+    if (editable && this.opts.noteLiveEdit?.() && this.opts.host?.createNoteEditor && this.openLiveNote(node, pop, nodeEl, keep, spot)) {
       this.popover = pop;
       return;
     }
@@ -10478,7 +10490,14 @@ export class MindMapCanvas {
         this.placePopover(pop, nodeEl);
       }
       ta.focus();
-      ta.setSelectionRange(ta.value.length, ta.value.length);
+      const caret = spot ? Math.min(spot.at, ta.value.length) : ta.value.length;
+      ta.setSelectionRange(caret, caret);
+      if (spot) {
+        // 普通输入框量不出某个字在哪一行：按光标前的行数估一下，把那一行挪到鼠标原来的高度
+        const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+        const row = ta.value.slice(0, caret).split("\n").length - 1;
+        ta.scrollTop = Math.max(0, row * lineH - (spot.y - ta.getBoundingClientRect().top));
+      }
     } else {
       pop.classList.add("is-view");
       const body = createDiv();
@@ -10499,7 +10518,7 @@ export class MindMapCanvas {
           ev.preventDefault();
           ev.stopPropagation();
           if (this.recite) return;
-          this.toggleNotePopover(node, true);
+          this.toggleNotePopover(node, true, undefined, this.noteSpot(body, ev, node));
         });
       }
       this.el.append(pop);
@@ -10516,7 +10535,7 @@ export class MindMapCanvas {
    * 和普通输入框一样：边打边存、点到外面或 Esc / ⌘↵ 关掉、顶上一排格式按钮、⌘B ⌘⇧H 这些只改选中的字、粘贴拖入图片存成附件。
    * 编辑器建不起来（Obsidian 改了内部结构）返回 false，调用方用普通输入框
    */
-  private openLiveNote(node: MindNode, pop: HTMLElement, nodeEl: HTMLElement, keep: { left: string; top: string; w: number; h: number } | null): boolean {
+  private openLiveNote(node: MindNode, pop: HTMLElement, nodeEl: HTMLElement, keep: { left: string; top: string; w: number; h: number } | null, spot?: { at: number; y: number }): boolean {
     const host = this.opts.host!;
     const initial = node.note;
     let ed: LiveNoteEditor | null = null;
@@ -10578,10 +10597,16 @@ export class MindMapCanvas {
     };
     // 选中文字浮出的格式栏由宿主挂在编辑器上（和 Markdown 笔记里同一份）
     pop.classList.add("is-live");
+    // 有表格时左边多留出表格手柄的位置（styles.css）；边写边看，插进表格、删掉表格都跟着变
+    const markTable = (text: string) => pop.classList.toggle("has-table", /^[ \t]*\|.*\|[ \t]*$/m.test(text));
+    markTable(unescapeNote(node.note));
     ed = host.createNoteEditor!(pop, {
       text: unescapeNote(node.note),
+      caret: spot?.at,
+      caretY: spot?.y,
       onChange: () => {
         if (apply() && !this.opts.embedded) this.scheduleNotify();
+        if (ed) markTable(ed.value);
       },
       onKey: (ev) => {
         if (ev.isComposing) return false;
