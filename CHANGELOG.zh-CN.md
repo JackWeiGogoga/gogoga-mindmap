@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-11-18
+
 ### 新增
 - 聚焦分支时，面包屑后面多了「‹ ›」两个按钮，切到上一个 / 下一个同级分支，像翻 PPT；也可以按 PageUp / PageDown（#43）。
 
@@ -1058,7 +1060,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...HEAD
+[0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
 [0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0
 [0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
 [0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0

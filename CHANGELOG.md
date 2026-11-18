@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-11-18
+
 ### Added
 - When focused on a branch, **‹ ›** buttons after the breadcrumb go to the previous or next sibling branch, like flipping slides; PageUp / PageDown work too (#43).
 
@@ -1058,7 +1060,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...HEAD
+[0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
 [0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0
 [0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
 [0.81.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.80.0...0.81.0
