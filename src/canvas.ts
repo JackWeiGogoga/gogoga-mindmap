@@ -120,7 +120,7 @@ import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, vis
 import { isWebUrl, linkDestination } from "./paste-link";
 import { addTable, noteOnlyTable, noteRest, noteTable, splitNoteTables, tableSource, withoutTable, withTable } from "./node-table";
 import { type CustomSplit, type SplitRule, splitText } from "./split";
-import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
+import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, MARKER_RE, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
   /** 嵌入的图拿到焦点时，截下会和画布按键撞车的 Obsidian 全局热键交给 onKey；返回注销函数 */
@@ -605,7 +605,7 @@ export function colorLabel(color: string): string {
 }
 
 /** 最近一次复制的节点：剪贴板里放的版本和带标记的完整版（各个脑图共用，跨图粘贴也能还原） */
-let lastCopy: { plain: string; full: string } | null = null;
+let lastCopy: { plain: string; full: string; titles: string[] } | null = null;
 
 /** 设置页里画工具栏按钮的图标用 */
 export function toolIcon(name: string): HTMLElement {
@@ -7352,8 +7352,16 @@ export class MindMapCanvas {
       // 编辑节点文字时粘贴图片：标题里放不了，存成附件追加到这个节点的备注（正文）里
       onPaste: (ev) => {
         const imgs = [...(ev.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
-        if (!imgs.length) return false;
-        void this.addImagesToNote(node, imgs);
+        if (imgs.length) {
+          void this.addImagesToNote(node, imgs);
+          return true;
+        }
+        // 粘的是复制来的节点（剪贴板里是「- 文字」的列表）：只粘文字
+        const plain = this.nodePasteText(ev.clipboardData?.getData("text/plain") ?? "");
+        const ed = this.nodeEditor;
+        if (plain === null || !ed) return false;
+        const { from, to } = ed.selection;
+        ed.replace(from, to, plain, from + plain.length);
         return true;
       },
       onChange: () => {
@@ -8059,9 +8067,28 @@ export class MindMapCanvas {
     // 设置里打开「复制时去掉脑图标记」：剪贴板里放干净的 Markdown，带标记的完整版记在本地，
     // 粘回脑图时认出是同一份就用完整版，宽度、标注这些不丢
     const plain = this.opts.copyPlain?.() ? nodes.map((n) => subtreeToList(n, "\t", true)).join("") : text;
-    lastCopy = { plain, full: text };
+    // 编辑节点文字时粘贴：只要文字，不要列表的「- 」和标记，这里记下每个节点的标题（按文档顺序，含子节点）
+    const titles: string[] = [];
+    const walk = (n: MindNode) => {
+      titles.push(n.text);
+      n.children.forEach(walk);
+    };
+    nodes.forEach(walk);
+    lastCopy = { plain, full: text, titles };
     void navigator.clipboard?.writeText(plain).catch(() => undefined);
     return plain;
+  }
+
+  /**
+   * 编辑节点文字时粘贴的文字：剪贴板里是刚复制的节点，换成各节点的文字（多个节点一行一个）；
+   * 是一行列表项（「- 文字」，比如重启后剪贴板里还留着的节点）就去掉列表符号。别的照常粘，返回 null
+   */
+  private nodePasteText(clip: string): string | null {
+    const text = clip.replace(/\r/g, "");
+    if (lastCopy && (text === lastCopy.plain || text === lastCopy.full)) return lastCopy.titles.map((t) => this.toEdit(t)).join("\n");
+    const one = /^[ \t]*[-*+][ \t]+(?:\[[ xX]\][ \t]+)?(.*?)\s*$/.exec(text.replace(/\n+$/, ""));
+    const title = one?.[1].replace(MARKER_RE, "");
+    return title ? this.toEdit(title) : null;
   }
 
   cutSelection(): void {
