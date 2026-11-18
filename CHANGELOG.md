@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.87.2] - 2026-11-18
+
+### Changed
+- Styles no longer use the CSS `:has()` selector, which the Obsidian plugin review flags for performance. The few places that used it (strikethrough on completed tasks, underline on colored link text, hiding the format bar and keeping the breadcrumb visible in Zen mode, the number box next to sliders in the custom theme editor, Reading view tables) now get class names from the plugin instead, and the review's warnings about a system font name and column gaps are gone too. Nothing looks or works differently.
+
 ## [0.87.1] - 2026-11-18
 
 ### Fixed
@@ -1090,7 +1095,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...HEAD
+[0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
 [0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0

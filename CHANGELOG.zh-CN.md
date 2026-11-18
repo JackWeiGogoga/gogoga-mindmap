@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.87.2] - 2026-11-18
+
+### 改进
+- 样式里不再用 `:has()` 选择器（Obsidian 插件审核提示它有性能隐患）。原来用到它的几处：完成任务的删除线、带颜色文字链接的下划线、禅模式下藏格式栏和保持面包屑显示、自定义主题里滑块旁的数字框、阅读视图里的表格，改由插件加类名来标记；审核里系统字体和列间距这两类 CSS 提示也一并消掉。外观和用法都不变。
+
 ## [0.87.1] - 2026-11-18
 
 ### 修复
@@ -1090,7 +1095,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...HEAD
+[0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
 [0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
 [0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0

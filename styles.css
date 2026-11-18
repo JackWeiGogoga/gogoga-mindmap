@@ -482,7 +482,7 @@
 .mm-has-editor img.cm-widgetBuffer { display: none; }
 .mm-label strong { font-weight: 700; }
 .mm-label code {
-  font-family: var(--font-monospace, ui-monospace, Menlo, monospace);
+  font-family: var(--font-monospace, Menlo, monospace);
   font-size: 0.9em;
   padding: 0 0.3em;
   border-radius: 3px;
@@ -2011,7 +2011,7 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 .mm-theme-controls .setting-item { padding: 8px 0; }
 .mm-theme-section { margin: 14px 0 4px; font-size: var(--font-ui-small, 13px); color: var(--text-muted); }
 .mm-theme-controls input.mm-theme-num { width: 64px; text-align: right; }
-.mm-theme-controls .setting-item-control:has(.mm-theme-num) .slider-value { display: none; }
+.mm-theme-controls .setting-item-control.mm-has-num .slider-value { display: none; }
 .mm-theme-tiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
 .mm-theme-tiers button.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
 .mm-theme-preview {
@@ -2224,7 +2224,7 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 
 /* 节点里的表格（%%table%%）：标题在上、表格在下，表格自己一块底色，节点配了深色也看得清 */
 /* 用网格不用折行的 flex：折行 flex 容器按「排成一行」算 max-content，节点会多出标题那么宽的空白 */
-.gg-mm-node.has-table { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; align-items: center; column-gap: 6px; max-width: none; }
+.gg-mm-node.has-table { display: grid; grid-template-columns: repeat(4, max-content); justify-content: start; align-items: center; gap: 0 6px; max-width: none; }
 .gg-mm-root .gg-mm-node.has-table.has-width { max-width: none; }
 .gg-mm-node .mm-node-table {
   grid-column: 1 / -1;
@@ -2291,7 +2291,7 @@ body.gg-mm-embed-toolbar-autohide :is(.markdown-source-view, .canvas-node) .gg-m
 .mm-outline-text .mm-num { color: var(--text-muted); }
 
 /* 完成的任务显示删除线（设置打开时；背诵模式里勾选框是答案，不加） */
-body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done) { text-decoration: line-through; color: var(--text-muted); }
+body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-decoration: line-through; color: var(--text-muted); }
 
 /* ---------- 间隔复习（照 Anki：内容居中，底栏三段；新卡蓝、学习中红、待复习绿） ---------- */
 .ggmm-review { --rv-new: var(--color-blue); --rv-learn: var(--color-red); --rv-review: var(--color-green); padding: 0 !important; outline: none; }
@@ -3084,8 +3084,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .ggt .ggt-input-cm .ggt-ed-mark[data-highlight="purple"] { background: var(--highlight-background-purple, rgba(var(--color-purple-rgb, 120, 82, 238), 0.3)); }
 
 /* 阅读视图：Obsidian 给表格套的 .el-table 会横向滚动、裁掉超出的部分，骑在表格左边线上的行手柄、左上角按钮会被切掉半边。
-   接管了的表格横向滚动由 .ggt-scroll 自己负责，这一层不用滚动（这样长表格在阅读视图里也能用原生吸顶）。Obsidian 在它上面写了内联的 overflow-x: auto，要 !important 才盖得住 */
-.markdown-rendered .el-table:has(> .ggt-reading) { overflow: visible !important; }
+   接管了的表格横向滚动由 .ggt-scroll 自己负责，这一层不用滚动（这样长表格在阅读视图里也能用原生吸顶）。Obsidian 在它上面写了内联的 overflow-x: auto，要 !important 才盖得住。
+   ggt-el-table 是接管表格时加在这一层上的类（reading.ts） */
+.markdown-rendered .el-table.ggt-el-table { overflow: visible !important; }
 
 /* 双击格子里的图片看大图 */
 .ggt-lightbox {
@@ -3338,7 +3339,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .mm-setting-bar-row.is-dragging .mm-setting-bar-grip { cursor: grabbing; }
 
 /* 带颜色的文字做成链接：保持文字原来的颜色，下划线表示是链接（脑图画布里、脑图笔记用 Markdown 打开时） */
-.gg-mm-root .mm-color .mm-link, .gg-mm-root .mm-link:has(.mm-color) { text-decoration: underline; text-underline-offset: 2px; }
+.gg-mm-root .mm-color .mm-link, .gg-mm-root .mm-link.has-color { text-decoration: underline; text-underline-offset: 2px; }
 .gg-mm-root .mm-color .mm-link { color: inherit; }
 .gg-mm-note span[style*="color"] a.internal-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
@@ -3414,7 +3415,7 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .gg-mm-node.has-table > .mm-progress { grid-row: 1; justify-self: start; }
 /* 完成度放下面：节点改成两行的网格，文字和图标在第一行、胶囊在第二行靠左。
    节点宽度取两行里宽的那一行（用换行的 flex 会按排成一行量宽度，短标题被撑得很宽） */
-.gg-mm-node.has-progress-below:not(.has-table) { display: grid; grid-auto-flow: column; grid-auto-columns: auto; justify-content: start; align-items: center; column-gap: 6px; row-gap: 3px; }
+.gg-mm-node.has-progress-below:not(.has-table) { display: grid; grid-auto-flow: column; grid-auto-columns: auto; justify-content: start; align-items: center; gap: 3px 6px; }
 .gg-mm-node.has-progress-below:not(.has-table) > * { grid-row: 1; }
 .gg-mm-node.has-progress-below > .mm-progress-break { display: none; }
 .gg-mm-node.has-progress-below:not(.has-table) > .mm-progress { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
@@ -3439,10 +3440,10 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label:has(> .mm-task.is-done
 .gg-mm-root.is-zen .mm-wheel-hint,
 .gg-mm-zen .mm-outline,
 .gg-mm-zen .mm-format-bar,
-body:has(.gg-mm-root.is-zen) > .mm-format-bar { display: none !important; }
+body.gg-mm-has-zen > .mm-format-bar { display: none !important; }
 /* 面包屑平时看不见，鼠标移上去才出来（聚焦时还要用 ‹ ›） */
 .gg-mm-root.is-zen .mm-crumbs { opacity: 0; transition: opacity 0.2s; }
-.gg-mm-root.is-zen .mm-crumbs:hover, .gg-mm-root.is-zen .mm-crumbs:focus-within, .gg-mm-root.is-zen:has(.mm-crumb-menu) .mm-crumbs { opacity: 1; }
+.gg-mm-root.is-zen .mm-crumbs:hover, .gg-mm-root.is-zen .mm-crumbs:focus-within, .gg-mm-root.is-zen.has-crumb-menu .mm-crumbs { opacity: 1; }
 .mm-zen-exit {
   position: absolute;
   top: 12px;

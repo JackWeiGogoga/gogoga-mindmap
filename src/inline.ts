@@ -317,6 +317,8 @@ export function renderInline(el: HTMLElement, text: string, opts: InlineOptions 
     if (i > 0) el.appendChild(createEl("br"));
     renderSegment(el, seg, opts);
   });
+  // 完成的任务（「完成的任务加删除线」用）：样式按这个类，不用 :has
+  el.classList.toggle("has-done-task", !!el.querySelector(":scope > .mm-task.is-done"));
 }
 
 function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, nested = false): void {
@@ -365,6 +367,8 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
       const href = internal ? noteHref(m[9]) : m[9];
       const a = link("", href, internal, opts);
       renderSegment(a, m[8], opts, true);
+      // 文字带颜色的链接加下划线：样式按这个类，不用 :has
+      if (a.querySelector(".mm-color")) a.classList.add("has-color");
       el.appendChild(a);
     } else if (m[10] !== undefined || m[11] !== undefined) {
       el.appendChild(nest("strong", m[10] ?? m[11], opts));

@@ -253,6 +253,8 @@ export class CustomThemeModal extends Modal {
           num.max = String(max);
           num.step = "any";
           num.addClass("mm-theme-num");
+          // 有数字框的这一格不显示滑块自带的数值（样式按这个类，不用 :has）
+          num.parentElement?.addClass("mm-has-num");
           num.value = String(get());
           const commit = () => {
             const raw = Number(num!.value);

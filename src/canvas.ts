@@ -4969,6 +4969,12 @@ export class MindMapCanvas {
    * 禅模式：工具栏、节点浮动栏、格式栏、大纲面板都藏起来（CSS 按 is-zen），面包屑平时透明、移到上面才出来；
    * 键盘、右键菜单照常。鼠标一动右上角淡淡出一个「退出禅模式」，停 2 秒隐去（手机上常驻半透明）。只在这个标签页里、不记住
    */
+  /** 格式栏挂在 body 上：body 上记着这个窗口里有没有开着禅模式的脑图，样式按它藏格式栏（不用 :has） */
+  private markZenBody(): void {
+    const doc = this.el.ownerDocument;
+    doc.body.classList.toggle("gg-mm-has-zen", !!doc.querySelector(".gg-mm-root.is-zen"));
+  }
+
   setZen(on: boolean): void {
     if (!this.opts.onZen || on === !!this.zen) return;
     if (on) {
@@ -4994,6 +5000,7 @@ export class MindMapCanvas {
       this.zen = z;
       this.el.addEventListener("pointermove", z.onMove);
       this.el.classList.add("is-zen");
+      this.markZenBody();
       this.updateBottomInset();
     } else {
       const z = this.zen;
@@ -5003,6 +5010,7 @@ export class MindMapCanvas {
       this.el.removeEventListener("pointermove", z.onMove);
       z.exit.remove();
       this.el.classList.remove("is-zen");
+      this.markZenBody();
       this.updateBottomInset();
       this.positionNodebar();
     }
@@ -8984,6 +8992,8 @@ export class MindMapCanvas {
       anchor,
     );
     menu.classList.add("mm-crumb-menu");
+    // 禅模式下菜单开着时面包屑一直显示：样式按这个类，不用 :has
+    this.el.classList.add("has-crumb-menu");
     if (r.top - host.top > host.height / 2) menu.style.top = `${Math.max(4, r.top - host.top - 4 - menu.offsetHeight)}px`;
     this.crumbMenu = menu;
   }
@@ -8991,6 +9001,7 @@ export class MindMapCanvas {
   private closeCrumbMenu(): void {
     this.crumbMenu?.remove();
     this.crumbMenu = null;
+    this.el.classList.remove("has-crumb-menu");
   }
 
   // ---------- 拖入与图片粘贴 ----------
