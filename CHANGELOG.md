@@ -4,7 +4,15 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.87.0] - 2026-11-18
+
+### Added
+- Edit notes as they look (requested by a user): notes are now edited in Obsidian's own Live Preview editor, the same as writing in a note, so lists, headings, images, links, highlights and colors show as formatted while you type. With gogoga Table installed, tables in notes show their merges and colors and can be edited cell by cell. Changes save as you type; Esc, Mod+Enter or clicking outside closes the editor. Dialogs such as the rows-and-columns picker from inserting a gogoga table with the / menu, or the command palette, no longer close the note, and you can keep writing after them. Pasted or dropped images are still saved as attachments. The setting "Edit notes as they look (WYSIWYG)" is on by default; turn it off to get the plain text box back ("Preview notes while editing" applies only to the plain text box). If a future Obsidian version changes its internals and the editor can't be created, the plain text box is used automatically.
+- Format text in notes (requested by a user who keeps large notes for annotation and memorization instead of splitting them into child nodes): selecting text while editing a note shows the format bar (always in notes, regardless of the format bar settings), so you can make it bold, color it, highlight it or underline it. Mod+B, Mod+I, Mod+U, Mod+Shift+H (highlight) and Mod+Shift+X (strikethrough) work too, and Mod+Z undoes. Only the selected text changes; a selection across lines is wrapped line by line, leaving list, quote and heading markers out, and nothing happens without a selection. These shortcuts used to format the node text while you were editing a note; they now format the note.
+- Recite mode covers notes too: `==highlights==` in expanded note cards and in the note popover are hidden, click to reveal and click again to hide.
+
 ### Fixed
+- Tables in notes didn't show merged cells (reported by a user). Tables in the note popover and in expanded note cards are now drawn with the same component as node tables, so they look like node tables and show merges, colors and widths. Tables indented inside lists are still rendered by Obsidian, since taking them out would break the list.
 - On Windows and Linux, the Exit Zen mode button in the top-right corner overlapped the window's minimize, maximize and close buttons (reported by 德米安). It now moves left of them.
 
 ## [0.86.0] - 2026-11-18
@@ -1077,7 +1085,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...HEAD
+[0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
 [0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0
 [0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0
 [0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
