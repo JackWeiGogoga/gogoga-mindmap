@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.87.1] - 2026-11-18
+
+### Fixed
+- Pasting a copied node while editing another node's text added a leading `- ` (reported by Alien). Now only the text of the copied node goes in, without the list marker, mind map markers or child nodes; several copied nodes go in one per line. A single list line copied from elsewhere (`- text`) loses its marker too, and other text pastes as before. Pasting while not editing still adds the nodes as children with their structure.
+
 ## [0.87.0] - 2026-11-18
 
 ### Added
@@ -1085,7 +1090,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...HEAD
+[0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
 [0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0
 [0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0

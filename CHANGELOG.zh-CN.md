@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.87.1] - 2026-11-18
+
+### 修复
+- 复制节点后，在另一个节点编辑文字时粘贴会多出一个「- 」（Alien 反馈）。现在只粘复制的节点自己的文字，不带列表符号、脑图标记和子节点；复制了几个节点就一行一个。从别处复制的一行列表（`- 文字`）也去掉列表符号，别的文字照原样粘。没在编辑时粘贴，照旧粘成带结构的子节点。
+
 ## [0.87.0] - 2026-11-18
 
 ### 新增
@@ -1085,7 +1090,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...HEAD
+[0.87.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.0...0.87.1
 [0.87.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.86.0...0.87.0
 [0.86.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...0.86.0
 [0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0
