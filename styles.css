@@ -3463,3 +3463,5 @@ body.gg-mm-zen-app .status-bar,
 .workspace-leaf-content.gg-mm-zen > .view-header { display: none !important; }
 /* macOS 隐藏标题栏时，标签栏收起后左上角是红绿灯：面包屑往右让开 */
 body.gg-mm-zen-app.mod-macos.is-hidden-frameless:not(.is-fullscreen) .gg-mm-root.is-zen .mm-crumbs { left: 84px; }
+/* Windows / Linux 隐藏标题栏时，右上角是最小化、最大化、关闭按钮：在右上角那组标签页里的脑图，「退出禅模式」往左让开（宽度用 Obsidian 自己的 --frame-right-space，macOS 是 0） */
+body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-top-right-space .gg-mm-root.is-zen .mm-zen-exit { right: calc(12px + var(--frame-right-space, 0px)); }

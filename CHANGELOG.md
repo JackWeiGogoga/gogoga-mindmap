@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- On Windows and Linux, the Exit Zen mode button in the top-right corner overlapped the window's minimize, maximize and close buttons (reported by 德米安). It now moves left of them.
+
 ## [0.86.0] - 2026-11-18
 
 ### Changed
