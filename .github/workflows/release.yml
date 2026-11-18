@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: write
+  # 构建来源证明（artifact attestation）：用户和插件市场可以验证 Release 里的文件是这个仓库的 CI 构建的
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -23,6 +26,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/main.js
+            manifest.json
+            styles.css
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
