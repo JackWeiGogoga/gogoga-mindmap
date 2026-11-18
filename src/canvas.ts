@@ -529,6 +529,8 @@ const ICONS: Record<string, string> = {
   recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
+  prev: '<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
   down: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
@@ -536,8 +538,9 @@ const ICONS: Record<string, string> = {
   split: '<svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
   outline: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
-  child: '<svg viewBox="0 0 24 24"><path d="M4 6h6M4 12h4M12 12h8M16 8v8"/></svg>',
-  sibling: '<svg viewBox="0 0 24 24"><path d="M4 7h8M4 12h8M4 17h8M18 10v4M16 12h4"/></svg>',
+  // 加下级 / 加同级（#44）：方框是主题，虚线框是要加的那个；下级在右边连一条短横，同级在下面用「[」连起来
+  child: '<svg viewBox="0 0 24 24"><rect x="2" y="8" width="7" height="8" rx="1.5"/><rect x="15" y="8" width="7" height="8" rx="1.5" stroke-dasharray="2.5 2.5"/><path d="M9 12h6"/></svg>',
+  sibling: '<svg viewBox="0 0 24 24"><rect x="10" y="3" width="11" height="6" rx="1.5"/><rect x="10" y="15" width="11" height="6" rx="1.5" stroke-dasharray="2.5 2.5"/><path d="M10 6H6v12h4"/></svg>',
   undo: '<svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>',
   redo: '<svg viewBox="0 0 24 24"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>',
   marker: '<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.3l6-.8z"/></svg>',
@@ -4711,7 +4714,7 @@ export class MindMapCanvas {
 
   /** 工具栏上方的小菜单，点外面自动关闭 */
   private buildMenu(
-    items: { label: string; active?: boolean; run: () => void }[],
+    items: { label: string; active?: boolean; run: () => void; color?: string | null }[],
     anchor: HTMLElement | null,
     close: () => void,
     point?: { x: number; y: number },
@@ -4733,7 +4736,13 @@ export class MindMapCanvas {
       const b = createEl("button");
       b.type = "button";
       b.className = "mm-menu-item" + (it.active ? " is-active" : "");
-      b.textContent = it.label;
+      // 面包屑的同级列表：主题有颜色时前面一个色点，和大纲面板一样（#43）
+      if (it.color) {
+        const dot = b.createSpan({ cls: "mm-outline-dot" });
+        dot.dataset.color = it.color;
+        if (!/^[a-z]+$/.test(it.color)) dot.style.background = it.color;
+      }
+      b.appendText(it.label);
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
         closeAll();
@@ -5796,6 +5805,12 @@ export class MindMapCanvas {
     if (ev.isComposing || ev.keyCode === 229) return;
     // 原地复习：空格、1–4、⌘Z、Esc 归复习
     if (this.mapReview && target.tagName !== "TEXTAREA" && this.onMapReviewKey(ev)) return;
+    // 聚焦分支时 PageUp / PageDown 切到上一个 / 下一个同级分支（像翻 PPT，#43）
+    if (this.focusRoot && !this.editing && target.tagName !== "TEXTAREA" && !ev.metaKey && !ev.ctrlKey && !ev.altKey && (ev.key === "PageUp" || ev.key === "PageDown")) {
+      ev.preventDefault();
+      this.focusStep(ev.key === "PageUp" ? -1 : 1);
+      return;
+    }
     // 用户把这个键绑给了本插件的命令（比如 ⌘↵ = 在前面插入）：画布不抢，命令自己会先提交编辑
     if (!this.linkSuggest && target.tagName !== "TEXTAREA" && this.opts.ownsHotkey?.(ev)) return;
     if (target.tagName === "TEXTAREA") {
@@ -8702,11 +8717,43 @@ export class MindMapCanvas {
       return;
     }
     if (this.editing) this.commitEdit();
+    // 已经在聚焦里换一个分支（面包屑、上一个 / 下一个）：缩放不变，新分支的主题放在原来那个主题的位置上，像翻 PPT（#43）
+    const prev = this.focusRoot && this.hasView ? this.layout?.placed.get(this.focusRoot.id) : null;
+    const at = prev ? { x: prev.x * this.k + this.tx, y: prev.y * this.k + this.ty } : null;
     this.focusRoot = node;
-    this.hasView = false; // 重新适应画布
-    this.refitOnly = true;
+    if (!at) {
+      this.hasView = false; // 重新适应画布
+      this.refitOnly = true;
+    }
     this.select(node);
     this.render();
+    const p = at ? this.layout?.placed.get(node.id) : null;
+    if (at && p) {
+      this.stopPanAnim();
+      this.tx = at.x - p.x * this.k;
+      this.ty = at.y - p.y * this.k;
+      this.applyTransform();
+    }
+  }
+
+  /** 聚焦分支时的同级（上一个 / 下一个用）：隐藏的、概要主题不算 */
+  private focusSiblings(): { prev: MindNode | null; next: MindNode | null } {
+    const f = this.focusRoot;
+    const parent = f?.parent;
+    if (!f || !parent || !parent.children.includes(f)) return { prev: null, next: null };
+    const kids = parent.children.filter((c) => !c.hidden || c === f);
+    const i = kids.indexOf(f);
+    return { prev: kids[i - 1] ?? null, next: kids[i + 1] ?? null };
+  }
+
+  /** 聚焦到上一个 / 下一个同级分支；没有返回 false */
+  focusStep(dir: -1 | 1): boolean {
+    const { prev, next } = this.focusSiblings();
+    const to = dir < 0 ? prev : next;
+    if (!to) return false;
+    this.closeCrumbMenu();
+    this.focusOn(to);
+    return true;
   }
 
   exitFocus(rerender = true): void {
@@ -8758,6 +8805,27 @@ export class MindMapCanvas {
       b.addEventListener("click", () => (i === 0 ? this.exitFocus() : this.focusOn(n)));
       bar.append(b);
     });
+    // 上一个 / 下一个同级分支（#43）：到头了按钮变灰
+    const { prev, next } = this.focusSiblings();
+    if (prev || next) {
+      const nav = bar.createSpan({ cls: "mm-crumb-nav" });
+      for (const [dir, to, name, label] of [
+        [-1, prev, "prev", t("canvas.focusPrev")],
+        [1, next, "next", t("canvas.focusNext")],
+      ] as const) {
+        const nb = nav.createEl("button", { cls: "mm-crumb-step", attr: { type: "button", "data-dir": String(dir) } });
+        nb.append(icon(name));
+        this.tip(nb, to ? `${label} · ${plainText(to.text) || t("canvas.emptyNode")}` : label, "fixed", "bottom");
+        nb.toggleClass("is-disabled", !to);
+        // 按下不抢焦点：点完接着能用 PageUp / PageDown、方向键
+        nb.addEventListener("mousedown", (ev) => ev.preventDefault());
+        nb.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.focusStep(dir);
+          this.el.focus({ preventScroll: true });
+        });
+      }
+    }
     this.el.append(bar);
     this.crumbs = bar;
   }
@@ -8777,7 +8845,7 @@ export class MindMapCanvas {
     const host = this.el.getBoundingClientRect();
     const r = anchor.getBoundingClientRect();
     const menu = this.buildMenu(
-      kids.map((c) => ({ label: plainText(c.text) || t("canvas.emptyNode"), active: c === current, run: () => this.focusOn(c) })),
+      kids.map((c) => ({ label: plainText(c.text) || t("canvas.emptyNode"), active: c === current, run: () => this.focusOn(c), color: c.color ?? null })),
       null,
       () => this.closeCrumbMenu(),
       { x: r.left - host.left, y: r.bottom - host.top + 4 },

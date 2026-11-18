@@ -1680,7 +1680,14 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 }
 .gg-mm-root button.mm-crumb-sep:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
 .mm-menu.mm-crumb-menu { max-height: 60vh; overflow-y: auto; max-width: 320px; }
-.mm-menu.mm-crumb-menu .mm-menu-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 同级多时菜单是竖排 flex：不许压扁每一行（#43 间距变挤、下面的选不到），放不下就滚动 */
+.mm-menu.mm-crumb-menu .mm-menu-item { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-menu.mm-crumb-menu .mm-outline-dot { display: inline-block; margin-right: 8px; vertical-align: 1px; }
+.mm-crumb-nav { display: inline-flex; margin-left: 6px; padding-left: 6px; border-left: 1px solid var(--background-modifier-border, #e3e3e3); }
+.gg-mm-root button.mm-crumb-step { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 4px; background: none; box-shadow: none; color: var(--text-muted, #888); cursor: pointer; }
+.gg-mm-root button.mm-crumb-step:hover { background: var(--background-modifier-hover, #f0f0f0); color: var(--text-normal, #1f1f1f); }
+.gg-mm-root button.mm-crumb-step.is-disabled { opacity: 0.35; cursor: default; background: none; }
+.mm-crumb-step svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .gg-mm-root[data-toolbar="top"] .mm-crumbs { top: auto; bottom: 12px; }
 
 /* ---------- 标签、标记、任务 ---------- */

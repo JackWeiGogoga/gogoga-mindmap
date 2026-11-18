@@ -4,6 +4,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- When focused on a branch, **‹ ›** buttons after the breadcrumb go to the previous or next sibling branch, like flipping slides; PageUp / PageDown work too (#43).
+
+### Changed
+- Switching branches while already focused (breadcrumb, ‹ ›, PageUp / PageDown) keeps the zoom and puts the new topic where the old one was; entering focus from the whole map still fits the view (#43).
+- The sibling list in the breadcrumb shows a color dot for colored topics, like the outline panel (#43).
+- New icons for **Add child** and **Add sibling** in the node toolbar: boxes are topics and the dashed one is the topic being added, to the right for a child and below for a sibling (#44).
+
+### Fixed
+- With many sibling topics, the breadcrumb's sibling list squeezed its rows and hid the ones at the bottom; rows now keep their height and the list scrolls (#42, #43).
+
 ## [0.83.0] - 2026-11-17
 
 ### Added
