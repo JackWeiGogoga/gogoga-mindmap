@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.85.0] - 2026-11-18
+
 ### 新增
 - 禅模式：画布上只留脑图本身。工具栏、节点浮动栏、格式栏、大纲面板都藏起来，Obsidian 的左右侧栏、标签栏、状态栏也一起收起，退出后按原样恢复（设置里可以改成只藏脑图自己的）。键盘、右键菜单照常；聚焦分支时面包屑鼠标移上去才出来。从命令「切换禅模式」（可绑快捷键）、快速设置面板、画布空白处右键进入；鼠标一动右上角出「退出禅模式」，Esc 也能退出（排在取消选中、退出聚焦之后）。只在当前标签页、不记住，切到别的标签页自动退出（#43）。
 
@@ -1063,7 +1065,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.85.0...HEAD
+[0.85.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.84.0...0.85.0
 [0.84.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.83.0...0.84.0
 [0.83.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.82.0...0.83.0
 [0.82.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.81.0...0.82.0
