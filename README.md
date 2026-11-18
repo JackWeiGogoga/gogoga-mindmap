@@ -29,7 +29,7 @@ On phones, where moving files around is awkward, use the community plugins brows
 
 ## Usage
 
-> [!tip] For a quick start, copy the [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) folder into your vault (the notes are in Chinese).
+> [!tip] For a quick start, run "**gogoga Mind Map: Open the user guide**" from the command palette: the guide goes into a "Mind Map examples" folder in your vault and opens as a mind map. Or copy the [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) folder into your vault (the notes are in Chinese).
 > [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) (Mind Map user guide), opened as a mind map, is a clickable, foldable map of every feature, demonstrated by the plugin itself.
 > [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) (code block example) is an ordinary note with `mindmap` blocks embedded in it. The folder also has a typical mind map, a meeting note with an embedded map, and an `.xmind` file to try the import.
 

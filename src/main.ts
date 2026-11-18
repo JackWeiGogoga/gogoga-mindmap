@@ -74,6 +74,7 @@ import { mediaKind, parseCustomMarkers, setCustomMarkers, setImageMaxWidth } fro
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
+import { GUIDE_FILES } from "./guide";
 import { noteMarkersExtension } from "./note-markers";
 import { noteFormatBarExtension } from "./note-format-bar";
 import type { FormatBarOptions } from "./format-bar";
@@ -1812,6 +1813,12 @@ export default class MindMapPlugin extends Plugin {
 
     this.addRibbonIcon(MINDMAP_ICON, t("command.newMindMap"), () => void this.createMindMap());
 
+    this.addCommand({
+      id: "open-guide",
+      name: t("command.openGuide"),
+      callback: () => void this.openGuide(),
+    });
+
     const exportCommand = (id: string, name: string, run: (view: MindMapView) => Promise<void>) =>
       this.addCommand({
         id,
@@ -1990,6 +1997,32 @@ export default class MindMapPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf(false);
     await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
     new Notice(t("notice.created", { path: file.path }));
+  }
+
+  /**
+   * 「打开使用指南」：库里没有就把指南和它链接到的示例放进根目录的「脑图示例」文件夹，再用脑图打开指南。
+   * 库里已有同名笔记（比如用户复制过 examples 文件夹）就直接打开那篇，绝不覆盖；链接到的示例同理，有就不再建一份
+   */
+  private async openGuide(): Promise<void> {
+    const find = (name: string) => this.app.metadataCache.getFirstLinkpathDest(name.replace(/\.md$/, ""), "");
+    const [guide] = GUIDE_FILES;
+    let file = find(guide.name);
+    if (!file) {
+      const folder = t("guide.folder");
+      const taken = this.app.vault.getAbstractFileByPath(folder);
+      const dir = !taken ? (await this.app.vault.createFolder(folder), folder) : taken instanceof TFolder ? folder : "";
+      for (const f of GUIDE_FILES) {
+        if (find(f.name)) continue;
+        const path = joinPath(dir, f.name);
+        if (this.app.vault.getAbstractFileByPath(path)) continue;
+        await this.app.vault.create(path, f.text);
+      }
+      file = this.app.vault.getFileByPath(joinPath(dir, guide.name));
+      if (!file) return;
+      new Notice(t("notice.guideAdded", { folder: dir || "/" }));
+    }
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.setViewState({ type: VIEW_TYPE_MINDMAP, state: { file: file.path }, active: true });
   }
 
   /** 内置的起始内容：跟随界面语言；只影响新建的文件 */

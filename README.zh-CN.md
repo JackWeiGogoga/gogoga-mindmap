@@ -30,7 +30,7 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 
 ## 用法
 
-> [!tip] 想快速上手，把 [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) 整个文件夹复制进 vault：
+> [!tip] 想快速上手，在命令面板运行「**gogoga Mind Map: 打开使用指南**」，指南会放进库里的「脑图示例」文件夹并用脑图打开。也可以把 [`examples/`](https://github.com/JackWeiGogoga/gogoga-mindmap/tree/main/examples) 整个文件夹复制进 vault：
 > [Mind Map 使用指南](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/Mind%20Map%20%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md) 用脑图打开就是一张可以点开、可以折叠的功能地图，插件的每个能力都在上面，而且用它自己演示了一遍；
 > [脑图代码块嵌入示例](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/examples/%E8%84%91%E5%9B%BE%E4%BB%A3%E7%A0%81%E5%9D%97%E5%B5%8C%E5%85%A5%E7%A4%BA%E4%BE%8B.md) 是一篇插了几块 `mindmap` 的普通笔记。另外还有一张常规脑图、一篇带小脑图的会议纪要，和一个用来试导入的 `.xmind` 文件。
 

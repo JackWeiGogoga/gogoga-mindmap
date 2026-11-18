@@ -15,6 +15,8 @@ const context = await esbuild.context({
   sourcemap: production ? false : "inline",
   treeShaking: true,
   outfile: "dist/main.js",
+  // 「打开使用指南」命令带的示例笔记（src/guide.ts）
+  loader: { ".md": "text" },
 });
 
 if (production) {
