@@ -1171,8 +1171,10 @@ export class MindMapCanvas {
     if (!this.doc || path === null) return;
     const node = findByPath(this.doc.root, path);
     if (!node) return;
-    if (this.els.has(node.id)) this.select(node);
-    else this.pendingSelectPath = path;
+    if (this.els.has(node.id)) {
+      this.select(node);
+      this.quietSelect();
+    } else this.pendingSelectPath = path;
   }
 
   /**
@@ -1195,6 +1197,7 @@ export class MindMapCanvas {
       return;
     }
     this.select(node);
+    this.quietSelect();
     // 同一个标签页在 Markdown 和脑图之间来回切（群里反馈：切两次焦点就丢了）：节点就在眼前时视口一点不动，
     // 看不到才把它移过来，缩放也不改
     if (steady && this.hasView) {
@@ -1346,6 +1349,7 @@ export class MindMapCanvas {
     for (let a = node.parent; a; a = a.parent) if (a.folded) node = a;
     if (!this.layout?.placed.get(node.id)) return;
     this.select(node);
+    this.quietSelect();
     this.ensureVisible(node);
     this.flashNode(node);
   }
@@ -5248,6 +5252,7 @@ export class MindMapCanvas {
       this.opts.showNodebar?.() !== false &&
       this.primary &&
       this.selected.size > 0 &&
+      !this.quietSel &&
       !this.editing &&
       !this.drag &&
       !this.marquee &&
@@ -5363,6 +5368,11 @@ export class MindMapCanvas {
       this.downOnPreview = target.closest<HTMLElement>(".mm-map-preview")?.dataset.key ?? null;
       this.downOnImage = this.imageAt(target, ev.clientX, ev.clientY);
       const nodeEl = target.closest<HTMLElement>(".gg-mm-node");
+      // 点到节点（包括定位过来、已经选中的那个）：浮动工具栏照常出
+      if (nodeEl && this.quietSel) {
+        this.quietSel = false;
+        this.positionNodebar();
+      }
       this.cancelTapCenter();
       // 第一根手指按下：之前记着的按点都是没收到松开的（iPhone 长按弹出菜单后，松手落在菜单上，画布收不到）。
       // 不清掉的话这一下会被当成双指缩放，点哪里都没反应、取消不了选中
@@ -6113,7 +6123,16 @@ export class MindMapCanvas {
     return found;
   }
 
+  /** 从别处定位过来选中的（分屏联动、点链接跳过来、从 Markdown 切过来）：不弹浮动工具栏；在这张图里点一下、键盘挪一下就照常出（zhiqiang 反馈） */
+  private quietSel = false;
+
+  private quietSelect(): void {
+    this.quietSel = true;
+    this.positionNodebar();
+  }
+
   select(node: MindNode | null, mode: "replace" | "add" | "toggle" = "replace"): void {
+    this.quietSel = false;
     if (node && this.focusRoot && node !== this.focusRoot && !isAncestor(this.focusRoot, node)) this.exitFocus(false);
     if (mode === "replace") {
       this.selected.clear();
@@ -8525,6 +8544,8 @@ export class MindMapCanvas {
       );
     }
     more.push({ title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
+    // 带别名：[[笔记#^id|节点的内容]]，粘到别处显示的是内容不是一串 id（zhiqiang 反馈）
+    more.push({ title: t("menu.copyNodeLinkAlias"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node, true) });
     if (this.opts.onRevealInMarkdown) more.push({ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() });
     // 整个节点的文字颜色（浮动工具栏上也有）：第一层菜单放不下了，放在「更多」最后（放最前时，鼠标往二级菜单里移会先扫过它、弹出三级菜单挡住别的项）
     if (editable) {
@@ -9074,7 +9095,7 @@ export class MindMapCanvas {
 
   // ---------- 复制节点链接 ----------
 
-  async copyNodeLink(node: MindNode): Promise<void> {
+  async copyNodeLink(node: MindNode, alias = false): Promise<void> {
     const base = this.opts.host?.fileBasename?.();
     if (!base) return;
     let link: string;
@@ -9090,6 +9111,11 @@ export class MindMapCanvas {
         this.notify();
       }
       link = `[[${base}#^${node.blockId}]]`;
+    }
+    if (alias) {
+      // 别名里不能有 | [ ]（会把链接截断），换行、多个空格并成一个
+      const label = plainText(node.text).replace(/[|[\]]/g, " ").replace(/\s+/g, " ").trim();
+      if (label && label !== base) link = `${link.slice(0, -2)}|${label}]]`;
     }
     try {
       await navigator.clipboard.writeText(link);

@@ -33,6 +33,7 @@ import {
   TFile,
   TFolder,
   normalizePath,
+  type Workspace,
   WorkspaceLeaf,
   WorkspaceTabs,
   ViewState,
@@ -139,6 +140,42 @@ function previewCenterLine(view: MarkdownView): number | null {
     }
   }
   return best ? best.line : Math.max(0, Math.round(view.previewMode.getScroll()));
+}
+
+/**
+ * 阅读模式切到脑图时看哪一行（zhiqiang 反馈）：有鼠标选中的文字就是那一行；没有就是上次点的那一行（还在画面里才算）；
+ * 都没有才用画面中间那一行
+ */
+function previewFocusLine(view: MarkdownView, pick: { el: HTMLElement; line: number } | undefined): number | null {
+  const sel = view.containerEl.win.getSelection();
+  const anchor = sel && !sel.isCollapsed ? sel.anchorNode : null;
+  const anchorEl = anchor ? (anchor.nodeType === Node.ELEMENT_NODE ? (anchor as HTMLElement) : anchor.parentElement) : null;
+  if (anchorEl && anchorEl.closest(".markdown-reading-view") && view.containerEl.contains(anchorEl)) {
+    const line = previewLineAt(view, anchorEl);
+    if (line !== null) return line;
+  }
+  if (pick && pick.el.isConnected && view.containerEl.contains(pick.el)) {
+    const scroller = scrollParentWithin(pick.el, view.containerEl);
+    const r = pick.el.getBoundingClientRect();
+    const b = scroller?.getBoundingClientRect();
+    if (b && r.height > 0 && r.bottom > b.top && r.top < b.bottom) return pick.line;
+  }
+  return previewCenterLine(view);
+}
+
+/** 跳到的那一行闪一下：强调色铺满整行、左边一道竖线。以前用高亮色，那一行本来有 ==高亮== 时看不出来（zhiqiang 反馈） */
+function flashEl(el: HTMLElement): void {
+  const accent = el.win.getComputedStyle(el).getPropertyValue("--interactive-accent").trim() || "#155dff";
+  const bg = `color-mix(in srgb, ${accent} 22%, transparent)`;
+  const bar = `inset 3px 0 0 ${accent}`;
+  el.animate(
+    [
+      { backgroundColor: bg, boxShadow: bar },
+      { backgroundColor: bg, boxShadow: bar, offset: 0.6 },
+      { backgroundColor: "transparent", boxShadow: "inset 3px 0 0 transparent" },
+    ],
+    { duration: 2000, easing: "ease-out" },
+  );
 }
 
 /** 编辑模式：光标所在的行；光标被滚出画面了就用画面中间那一行 */
@@ -326,6 +363,7 @@ export default class MindMapPlugin extends Plugin {
     this.registerSplitSync();
     this.registerFoldFollow();
     this.registerFollowActive();
+    this.registerReuseOpenLinks();
     const syncButtons = () => this.syncMapButtons();
     this.registerEvent(this.app.workspace.on("layout-change", syncButtons));
     this.registerEvent(this.app.workspace.on("file-open", syncButtons));
@@ -991,6 +1029,8 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /** 同一个标签页在 Markdown 和脑图之间来回切：每篇笔记记住 Markdown 那边的模式、滚动位置和光标（只在这次运行里） */
+  /** 阅读模式里上次点的位置（每个 Markdown 视图一份） */
+  private previewPick = new WeakMap<MarkdownView, { el: HTMLElement; line: number; path: string }>();
   private mdSpot = new Map<string, { mode: "source" | "preview"; scroll: number; cursor: EditorPosition | null }>();
 
   /**
@@ -1060,7 +1100,6 @@ export default class MindMapPlugin extends Plugin {
     };
     // 阅读模式没有光标：点到哪一段（列表项）就让脑图选中哪个节点
     const onPreviewClick = (ev: MouseEvent) => {
-      if (!this.settings.syncSplit) return;
       const target = ev.target as HTMLElement | null;
       if (!target?.closest?.(".markdown-reading-view")) return;
       const view = this.app.workspace
@@ -1071,6 +1110,9 @@ export default class MindMapPlugin extends Plugin {
       if (!view || !file) return;
       const line = previewLineAt(view, target);
       if (line === null) return;
+      // 记下点的位置：切到脑图时选中这里（不开分屏联动也记）
+      this.previewPick.set(view, { el: target, line, path: file.path });
+      if (!this.settings.syncSplit) return;
       const maps = this.visibleMapsOf(file.path);
       if (!maps.length) return;
       this.lastFollowKey = `${file.path}\u0001${line}`;
@@ -1097,6 +1139,25 @@ export default class MindMapPlugin extends Plugin {
    * 跟随当前笔记（设置里打开）：编辑器里换了一篇 Markdown 笔记，旁边正显示着的脑图也换成它。
    * 只动一个脑图标签页（最近用过的那个），钉住的不动；那篇已经有脑图在显示就不用换
    */
+  /**
+   * 设置「链接的笔记已经开着时直接跳到那里」也管 Markdown 里点的链接（zhiqiang 反馈）：Markdown 跳脑图、Markdown 跳 Markdown，
+   * 块链接、标题链接都一样。Obsidian 点内部链接走 workspace.openLinkText，不新开（没按 ⌘ 等）时先看链到的笔记是不是已经开着
+   */
+  private registerReuseOpenLinks(): void {
+    const ws = this.app.workspace;
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- 原方法要原样存着、卸载时放回去，调用时用 call 带上 this
+    const orig = ws.openLinkText;
+    const reveal = (linktext: string, sourcePath: string) => this.revealInOpenLeaf(linktext, sourcePath);
+    const on = () => this.settings.linkReuseOpen;
+    ws.openLinkText = function (this: Workspace, linktext, sourcePath, newLeaf, openViewState) {
+      if (!newLeaf && on() && reveal(linktext, sourcePath)) return Promise.resolve();
+      return orig.call(this, linktext, sourcePath, newLeaf, openViewState);
+    };
+    this.register(() => {
+      ws.openLinkText = orig;
+    });
+  }
+
   private registerFollowActive(): void {
     /** 换一次；换了返回 true（等切换完成） */
     const followOnce = async (): Promise<boolean> => {
@@ -1366,8 +1427,7 @@ export default class MindMapPlugin extends Plugin {
       };
       win.setTimeout(recheck, 16);
       if (opts.flash === false || !el.animate) return;
-      const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
-      el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
+      flashEl(el);
     };
     win.requestAnimationFrame(tick);
   }
@@ -1388,8 +1448,7 @@ export default class MindMapPlugin extends Plugin {
         const node = cm.domAtPos(pos).node;
         const el = (node.instanceOf(HTMLElement) ? node : node.parentElement)?.closest<HTMLElement>(".cm-line");
         if (!el?.animate) return;
-        const color = win.getComputedStyle(el).getPropertyValue("--text-highlight-bg").trim() || "rgba(255, 208, 0, 0.4)";
-        el.animate([{ backgroundColor: color }, { backgroundColor: color, offset: 0.5 }, { backgroundColor: "transparent" }], { duration: 1500, easing: "ease-out" });
+        flashEl(el);
       }),
     );
   }
@@ -1544,7 +1603,7 @@ export default class MindMapPlugin extends Plugin {
     if (from instanceof MarkdownView && from.file === file) {
       const mode = from.getMode();
       this.mdSpot.set(file.path, { mode, scroll: from.currentMode.getScroll(), cursor: mode === "source" ? from.editor.getCursor() : this.mdSpot.get(file.path)?.cursor ?? null });
-      const line = mode === "preview" ? previewCenterLine(from) : sourceFocusLine(from);
+      const line = mode === "preview" ? previewFocusLine(from, this.previewPick.get(from)?.path === file.path ? this.previewPick.get(from) : undefined) : sourceFocusLine(from);
       path = line === null ? null : pathAtLine(from.editor.getValue(), line, this.rootRule());
       if (path === "") path = null;
     }
@@ -1810,6 +1869,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("focus-branch", t("command.focusBranch"), async (v) => v.focusSelected());
     exportCommand("exit-focus", t("command.exitFocus"), async (v) => v.exitFocus());
     exportCommand("copy-node-link", t("command.copyNodeLink"), (v) => v.copySelectedNodeLink());
+    exportCommand("copy-node-link-alias", t("command.copyNodeLinkAlias"), (v) => v.copySelectedNodeLink(true));
     exportCommand("search", t("command.search"), async (v) => v.openSearch());
     // 画布里的按键（/、数字键、⌘⇧B…）不是命令，快捷键面板里看不到；这里再注册一份，用户可以自己绑键。不设默认热键
     exportCommand("toggle-fold", t("command.toggleFold"), async (v) => v.toggleFoldSelected());
@@ -2731,6 +2791,8 @@ export default class MindMapPlugin extends Plugin {
     const file = this.app.metadataCache.getFirstLinkpathDest(path, sourcePath);
     if (!file) return false;
     const origin = this.app.workspace.getActiveViewOfType(ItemView)?.leaf;
+    // 链到自己这篇（[[本篇#标题]]）：留在原地，照常滚过去
+    if ((origin?.view as { file?: TFile } | undefined)?.file?.path === file.path) return false;
     const open: WorkspaceLeaf[] = [];
     this.app.workspace.iterateAllLeaves((l) => {
       if (l !== origin && (l.view as { file?: TFile }).file?.path === file.path) open.push(l);

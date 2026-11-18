@@ -4,6 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- **Copy node link with alias** under More in the right-click menu (and as a command) copies `[[note#^id|node text]]`, so the pasted link shows the text (reported by zhiqiang).
+- The setting **Jump to the note if it's already open** now also covers links clicked in Markdown notes: Markdown to mind map and Markdown to Markdown, block and heading links alike, instead of opening another copy in the current tab (reported by zhiqiang).
+- The flash on the line you jump to in Markdown uses the accent color with a bar on the left; it used the highlight color and was invisible on highlighted lines (reported by zhiqiang).
+- Switching from Reading view to the mind map selects the node of the text you selected, or else the line you last clicked (if it's still on screen), and only then the line in the middle of the screen; it used to always take the middle line (reported by zhiqiang).
+- Nodes selected from elsewhere (split sync, following a link, switching from Markdown) no longer pop up the node toolbar; it appears once you click or move with the keyboard in the map, so a map you only read in a split isn't covered by it (reported by zhiqiang).
+
 ## [0.85.0] - 2026-11-18
 
 ### Added

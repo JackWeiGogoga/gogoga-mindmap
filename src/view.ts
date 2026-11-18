@@ -105,9 +105,9 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.canvas?.exitFocus();
   }
 
-  copySelectedNodeLink(): Promise<void> {
+  copySelectedNodeLink(alias = false): Promise<void> {
     const n = this.canvas?.getPrimary();
-    return n ? (this.canvas?.copyNodeLink(n) ?? Promise.resolve()) : Promise.resolve();
+    return n ? (this.canvas?.copyNodeLink(n, alias) ?? Promise.resolve()) : Promise.resolve();
   }
 
   async toggleOutline(): Promise<void> {
