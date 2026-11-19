@@ -2,6 +2,8 @@
 
 [English](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/README.md) | **简体中文**
 
+**官网：**[obsidian.gogoga.top](https://obsidian.gogoga.top/plugins/gogoga-mindmap/)，在浏览器里直接试用示例笔记，也能下载到自己的库里。
+
 XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列表就是节点，脑图视图只是同一个 `.md`
 文件的另一种编辑器，改哪边另一边都跟着变。零运行时依赖，桌面端和移动端都能用。
 

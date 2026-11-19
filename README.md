@@ -2,6 +2,8 @@
 
 **English** | [简体中文](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/README.zh-CN.md)
 
+**Website:** [obsidian.gogoga.top](https://obsidian.gogoga.top/en/plugins/gogoga-mindmap/) — try the example notes live in your browser and download them.
+
 An XMind-style mind map plugin. Markdown is the single source of truth: headings and list items are the nodes, and the mind map view is just another editor for the same `.md` file, so edits on either side show up on the other. No runtime dependencies; works on both desktop and mobile.
 
 The interface follows Obsidian's language setting — English, or Simplified Chinese when Obsidian is set to Chinese.
