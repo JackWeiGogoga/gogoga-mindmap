@@ -4,7 +4,8 @@
 
 import { type ChangeSpec, EditorSelection, EditorState } from "@codemirror/state";
 import { fencedLines } from "./fence";
-import { applyInlineFormat, type InlineFormat } from "./format";
+import { type InlineFormat } from "./format";
+import { applyFormat } from "./format-apply";
 
 /** 一行里能加格式的那一段 [起, 止)：去掉开头的引用、标题、列表、任务框，和行尾的 ^块编号、%%…%% 标记 */
 export function lineContentRange(text: string): [number, number] {
@@ -55,7 +56,7 @@ export function formatSelection(state: EditorState, fmt: InlineFormat): { change
     const s = Math.max(cs, sel.from - line.from);
     const e = Math.min(ce, sel.to - line.from);
     if (s >= e || !line.text.slice(s, e).trim()) continue;
-    const r = applyInlineFormat(line.text, s, e, fmt);
+    const r = applyFormat(line.text, s, e, fmt);
     if (r.text !== line.text) changes.push({ from: line.from, to: line.to, insert: r.text });
     from ??= line.from + delta + r.start;
     to = line.from + delta + r.end;

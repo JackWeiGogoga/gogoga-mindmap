@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.89.0] - 2026-11-19
+
+### Changed
+- The eraser button on the format bar now clears all formatting, like "Clear formatting" in Obsidian's right-click menu (#45, requested by caomei2015): bold, italic, strikethrough, underline, highlight, text color and highlighter color on the selected text all go at once. Before, it only removed colors, so text that mixed bold and italic had to be cleared one format at a time. If you select only part of a formatted run, just that part loses its formatting and the text on either side keeps it. Inline code and links are left alone. This applies to the format bar in node editing, notes, and tables in nodes, and to the command, now called "Clear formatting" (it was "Clear text and highlighter colors").
+
+### Fixed
+- Dragging the mouse to select text in a node that included the `**` around bold text made the text flicker, and the selection could end up short of where you let go (#45). The `**` hid as soon as the whole bold run was selected, which shifted the text left, so the selection moved back, the `**` showed again, and so on. While you hold the mouse button and drag, the markers now stay as they were, and they update once you let go.
+
 ## [0.88.3] - 2026-11-19
 
 ### Fixed
@@ -1119,7 +1127,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...HEAD
+[0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1

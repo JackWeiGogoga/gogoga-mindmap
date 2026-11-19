@@ -5,7 +5,7 @@
  * 删字、打字碰到藏着的标记时保持成对。脑图的节点编辑框和表格的格子编辑框共用
  */
 
-import { EditorSelection, EditorState, Facet, findClusterBreak, Transaction, type Extension, type Range } from "@codemirror/state";
+import { EditorSelection, EditorState, Facet, findClusterBreak, StateEffect, Transaction, type Extension, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { balancedSlice, breakInsideFormats, formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
 
@@ -91,15 +91,39 @@ function build(state: EditorState): { deco: DecorationSet; atomic: DecorationSet
   return { deco: Decoration.set(deco, true), atomic: Decoration.set(atomic, true) };
 }
 
+/** 松开鼠标后按最后的选区重新决定标记的显隐 */
+const dragEnded = StateEffect.define<null>();
+
 const livePreview = ViewPlugin.fromClass(
   class {
     deco: DecorationSet;
     atomic: DecorationSet;
-    constructor(view: EditorView) {
+    /**
+     * 按着鼠标拖选中。这期间选区变了也不改标记的显隐（#45）：拖到刚好把一段 **加粗** 整个包住时标记会藏起来，
+     * 后面的字往左挪，CodeMirror 按鼠标位置重算选区又没包住、标记露出来、字又挪回去……一直来回闪。松手再更新
+     */
+    dragging = false;
+    readonly onDown = (ev: MouseEvent) => {
+      if (ev.button === 0) this.dragging = true;
+    };
+    readonly onUp = () => {
+      if (!this.dragging) return;
+      this.dragging = false;
+      // 松手这一下不在 CodeMirror 的更新流程里：另起一次空的更新，让显隐跟上最后的选区
+      queueMicrotask(() => this.view.dom.isConnected && this.view.dispatch({ effects: dragEnded.of(null) }));
+    };
+    constructor(readonly view: EditorView) {
       ({ deco: this.deco, atomic: this.atomic } = build(view.state));
+      view.contentDOM.addEventListener("mousedown", this.onDown);
+      view.dom.ownerDocument.addEventListener("mouseup", this.onUp, true);
     }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet) ({ deco: this.deco, atomic: this.atomic } = build(update.state));
+      const ended = update.transactions.some((tr) => tr.effects.some((e) => e.is(dragEnded)));
+      if (update.docChanged || ended || (update.selectionSet && !this.dragging)) ({ deco: this.deco, atomic: this.atomic } = build(update.state));
+    }
+    destroy() {
+      this.view.contentDOM.removeEventListener("mousedown", this.onDown);
+      this.view.dom.ownerDocument.removeEventListener("mouseup", this.onUp, true);
     }
   },
   {

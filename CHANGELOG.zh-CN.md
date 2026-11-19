@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.89.0] - 2026-11-19
+
+### 改进
+- 格式栏的橡皮擦按钮改成「清除格式」，和 Obsidian 右键菜单里的「清除格式」一样（#45，caomei2015 提议）：选中文字上的加粗、斜体、删除线、下划线、高亮、文字颜色、荧光笔一次都去掉。以前它只清颜色，一段字里既有加粗又有斜体时要一种一种点掉。只选中一段格式中间的一截时，只有这一截去掉格式，前后没选中的字保留原来的格式。行内代码和链接不动。节点编辑、笔记、节点表格里的格式栏都一样；命令面板里的同名命令（原来叫「清除文字颜色和荧光笔」）也改名「清除格式」，效果相同。
+
+### 修复
+- 节点里加粗之后，用鼠标拖选连 `**` 一起选中，文字会一直闪，松手后选区也可能没到松手的位置（#45）。原因是选区刚好包住整段加粗时 `**` 就藏起来，后面的字往左挪，选区跟着往回缩，`**` 又露出来……来回切。现在按着鼠标拖选期间标记的显隐保持不变，松手后再更新。
+
 ## [0.88.3] - 2026-11-19
 
 ### 修复
@@ -1119,7 +1127,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...HEAD
+[0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1

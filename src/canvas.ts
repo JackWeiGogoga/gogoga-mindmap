@@ -72,7 +72,8 @@ import {
   Structure,
   STRUCTURES,
 } from "./layout";
-import { applyInlineFormat, type InlineFormat } from "./format";
+import { type InlineFormat } from "./format";
+import { applyFormat } from "./format-apply";
 import { formatLines } from "./note-lines";
 import type { LiveNoteEditor, LiveNoteEditorOptions } from "./live-note-editor";
 import { type ColorKind, type ColorMemory, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "./color-palette";
@@ -8677,7 +8678,7 @@ export class MindMapCanvas {
       const task = /^\[( |x|X)\]\s+/.exec(rest)?.[0].length ?? 0;
       const start = editable.length - this.toEdit(rest).length + task;
       if (start >= editable.length) continue;
-      const next = this.fromEdit(applyInlineFormat(editable, start, editable.length, fmt).text);
+      const next = this.fromEdit(applyFormat(editable, start, editable.length, fmt).text);
       if (next !== n.text) {
         n.text = next;
         changed = true;
@@ -8701,7 +8702,7 @@ export class MindMapCanvas {
     const raw = ed.selection;
     const { from, to } = ed.visibleSelection;
     if (raw.from !== raw.to && from === to) return;
-    const r = applyInlineFormat(ed.text, from, to, fmt);
+    const r = applyFormat(ed.text, from, to, fmt);
     if (r.text !== ed.text) ed.setText(r.text, r.start, r.end);
   }
 
@@ -8751,7 +8752,7 @@ export class MindMapCanvas {
           // 标注：取色时编辑框失焦、标注已经提交，在提交后的文字上同一段上色
           if (callout) {
             if (!sel || callout.callout === undefined) return;
-            const next = calloutFromMarker(calloutToMarker(applyInlineFormat(callout.callout, sel.from, sel.to, fmt).text));
+            const next = calloutFromMarker(calloutToMarker(applyFormat(callout.callout, sel.from, sel.to, fmt).text));
             if (next === callout.callout) return;
             callout.callout = next;
             this.render();
@@ -8759,7 +8760,7 @@ export class MindMapCanvas {
             return;
           }
           if (!node || !sel) return;
-          const next = this.fromEdit(applyInlineFormat(this.toEdit(node.text), sel.from, sel.to, fmt).text);
+          const next = this.fromEdit(applyFormat(this.toEdit(node.text), sel.from, sel.to, fmt).text);
           if (next === node.text) return;
           node.text = next;
           this.render();

@@ -21,7 +21,8 @@ import { isoDate, parseLooseDate, readDate, readProgress, splitTags, writeDate, 
 import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula, totalsAllSum } from "../core/ops";
 import { formatFx, type FxEmpty, type FxError, nameOk, prettyOps } from "../core/formula";
 import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
-import { applyInlineFormat, type InlineFormat } from "../core/format";
+import { type InlineFormat } from "../core/format";
+import { applyFormat } from "../core/format-apply";
 import { type CellInput, CodeMirrorInput, type Edge, TextareaInput } from "./cell-input";
 
 /** 列类型菜单的图标 */
@@ -1944,7 +1945,7 @@ export class TableEditor {
     // 选中的只是藏起来的标记、一个看得见的字都没有：不动（不然会当成没选，整段都上格式）
     const { from, to } = el.visibleSelection();
     if (from === to) return;
-    const r = applyInlineFormat(el.value, from, to, fmt);
+    const r = applyFormat(el.value, from, to, fmt);
     if (r.text !== el.value) {
       el.value = r.text;
       el.setSelectionRange(r.start, r.end);
@@ -2083,7 +2084,7 @@ export class TableEditor {
       }
       const cur = this.table.cells[pos.r]?.[pos.c];
       if (cur === undefined) return;
-      const r = applyInlineFormat(cur, from, to, fmt);
+      const r = applyFormat(cur, from, to, fmt);
       if (r.text !== cur) this.apply(setCell(this.table, pos.r, pos.c, r.text), pos);
     };
   }

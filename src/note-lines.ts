@@ -1,4 +1,5 @@
-import { applyInlineFormat, type FormatResult, type InlineFormat } from "./format";
+import { type FormatResult, type InlineFormat } from "./format";
+import { applyFormat } from "./format-apply";
 
 /** 行首不该包进格式的记号：缩进、列表符号（带任务框）、编号、引用、标题 */
 const LINE_PREFIX = /^[ \t]*(?:(?:>[ \t]?)+)?(?:[-*+][ \t]+(?:\[[ xX]\][ \t]+)?|\d+[.)][ \t]+|#{1,6}[ \t]+)?/;
@@ -24,7 +25,7 @@ export function formatLines(text: string, from: number, to: number, fmt: InlineF
       const s = Math.max(a - pos, prefix);
       const e = Math.min(b - pos, line.length);
       if (s < e && line.slice(s, e).trim()) {
-        const r = applyInlineFormat(line, s, e, fmt);
+        const r = applyFormat(line, s, e, fmt);
         next = r.text;
         if (start < 0) start = newPos + r.start;
         end = newPos + r.end;
