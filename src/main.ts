@@ -124,7 +124,10 @@ function previewElAtLine(view: MarkdownView, line: number): { el: HTMLElement; r
 /** 阅读视图画面中间那一行（列表项精确到那一项，其余按段的第一行）；量不出来就用顶上那一行 */
 function previewCenterLine(view: MarkdownView): number | null {
   const secs = previewSections(view);
-  const scroller = secs.length ? scrollParentWithin(secs[0].el, view.containerEl) : null;
+  // 从还挂在页面上的段落往外找滚动容器：阅读视图是懒渲染的，滚下去之后最上面几段会从页面上摘掉，从它们找不到，
+  // 以前因此退回「顶上那一行」，选中的是画面顶边外只露出一点的节点，来回切时差一两个像素就会跳
+  const live = secs.find((s) => s.el.isConnected);
+  const scroller = live ? scrollParentWithin(live.el, view.containerEl) : null;
   if (!scroller) return Math.max(0, Math.round(view.previewMode.getScroll()));
   const b = scroller.getBoundingClientRect();
   const cy = b.top + b.height / 2;
@@ -999,7 +1002,7 @@ export default class MindMapPlugin extends Plugin {
     // 原来的光标就在这个节点里（同一个节点的备注、续行）：光标不动
     const keepCursor = !!spot?.cursor && line !== null && spot.cursor.line < editor.lineCount() && pathAtLine(editor.getValue(), spot.cursor.line, rule) === path;
     if (view.getMode() === "preview") {
-      if (line !== null) this.revealPreviewLine(view, line, { flash: false, onlyIfHidden: !!spot });
+      if (line !== null) this.revealPreviewLine(view, line, { flash: false, onlyIfHidden: !!spot, restoring: spot?.scroll });
       return;
     }
     const cm = (editor as unknown as { cm: EditorView }).cm;
@@ -1362,14 +1365,25 @@ export default class MindMapPlugin extends Plugin {
    * 阅读模式：滚到那一行并闪一下。阅读视图是按段懒渲染的，先用 applyScroll 让那一段画出来，
    * 等它渲染好再找到元素居中（列表项找到那一项，其余是整段）
    */
-  private revealPreviewLine(view: MarkdownView, line: number, opts: { flash?: boolean; onlyIfHidden?: boolean } = {}): void {
+  private revealPreviewLine(view: MarkdownView, line: number, opts: { flash?: boolean; onlyIfHidden?: boolean; restoring?: number } = {}): void {
     const win = view.containerEl.win;
-    // onlyIfHidden：刚恢复了原来的滚动位置，那一行已经在眼前就什么都不做（等那一段渲染出来再判断，最多约 0.3 秒）
+    // onlyIfHidden：刚恢复了原来的滚动位置，那一行已经在眼前就什么都不做（等那一段渲染出来再判断，最多约 0.3 秒）。
+    // restoring：交给 Obsidian 恢复的滚动位置。它要等内容排好才滚（刚打开时还在最顶上），先等它滚到再判断，
+    // 否则在最顶上就判断「看得到」不滚、随后被它滚走；或者先滚过去、又被它拉回原处（机器慢时，测试在虚拟机里抓到的）
     if (opts.onlyIfHidden) {
       const t0 = win.performance.now();
+      let settled = opts.restoring === undefined ? t0 : null;
       const wait = () => {
+        const now = win.performance.now();
+        if (settled === null) {
+          if (Math.abs(view.previewMode.getScroll() - opts.restoring!) > 1 && now - t0 < 1500) {
+            win.setTimeout(wait, 16);
+            return;
+          }
+          settled = now;
+        }
         const hit = previewElAtLine(view, line);
-        if (!hit?.ready && win.performance.now() - t0 < 300) {
+        if (!hit?.ready && now - settled < 300) {
           win.setTimeout(wait, 16);
           return;
         }

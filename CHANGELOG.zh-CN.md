@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.88.2] - 2026-11-19
+
+### 修复
+- 阅读视图往下滚过一段后切到脑图，选中的是画面最顶边（常常只露出一点）的那一项，不是画面中间的；再切回来时阅读视图可能跳一下。现在选画面中间那一项。
+- 从脑图切回阅读视图时，有时不滚到脑图里选中的节点（或者滚过去又被拉回原处），看笔记排版的快慢而定。现在等阅读视图先恢复到原来的位置，再判断要不要滚过去。
+
 ## [0.88.1] - 2026-11-18
 
 ### 修复
@@ -1106,7 +1112,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...HEAD
+[0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2

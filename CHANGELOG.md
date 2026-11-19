@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.88.2] - 2026-11-19
+
+### Fixed
+- Switching a note in Reading view to the mind map, after scrolling down a while, selected the item at the very top edge of the screen (often barely visible) instead of the one in the middle; switching back could then make Reading view jump. It now picks the item in the middle of the screen.
+- Switching back from the mind map to Reading view sometimes didn't scroll to the node you selected in the mind map (or scrolled and then jumped back), depending on how fast the note was laid out. It now waits for Reading view to restore your previous position before checking whether the node is visible.
+
 ## [0.88.1] - 2026-11-18
 
 ### Fixed
@@ -1106,7 +1112,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...HEAD
+[0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0
 [0.87.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.1...0.87.2
