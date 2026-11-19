@@ -159,6 +159,12 @@ test("#46 节点开头有标记时加任务框：加在标记前面（Obsidian �
   // 老写法「⭐ [ ] 事项」照样认：原地勾、去掉，不挪位置
   assert.equal(toggleTask("⭐ [x] 事项"), "⭐ [ ] 事项");
   assert.equal(toggleTask("⭐ [ ] 事项", "add-remove"), "⭐ 事项");
+  // 老写法去掉任务框：后面是 emoji、符号就贴回标记（0.88 从「⭐🌟事项」加出来的，两边空格是当时插的），是文字照旧空一格
+  assert.equal(toggleTask("⭐ [ ] 🌟Example", "add-remove"), "⭐🌟Example");
+  assert.equal(toggleTask("⭐ 1️⃣ [x] 🌟事项", "add-remove"), "⭐ 1️⃣🌟事项");
+  assert.equal(toggleTask("🙈 [ ] Test", "add-remove"), "🙈 Test");
+  // 先加再去掉：新写法原样回来
+  assert.equal(toggleTask(toggleTask("⭐🌟Example", "add-remove"), "add-remove"), "⭐🌟Example");
   // 两种写法拆出来一样：标记、带任务框的正文
   assert.deepEqual(splitMarkers("[ ] ⭐ 1️⃣ 事项"), { markers: ["⭐", "1️⃣"], rest: "[ ] 事项" });
   assert.deepEqual(splitMarkers("⭐ 1️⃣ [ ] 事项"), { markers: ["⭐", "1️⃣"], rest: "[ ] 事项" });

@@ -229,6 +229,20 @@ function previewLineAt(view: MarkdownView, target: HTMLElement): number | null {
   return li && sec.el.contains(li) ? sec.start.line + Number(li.dataset.line) : sec.start.line;
 }
 
+/** 备注表格格式栏要的 gogoga Table 最低版本（0.22.1 起在脑图备注编辑框里一直出） */
+const MIN_TABLE_VERSION = "0.22.1";
+
+/** a 比 b 旧（只比数字段，1.2.3 这种） */
+export function versionBefore(a: string, b: string): boolean {
+  const pa = a.split(".").map((x) => parseInt(x, 10) || 0);
+  const pb = b.split(".").map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d < 0;
+  }
+  return false;
+}
+
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
   /** 间隔复习：牌组、复习数据、状态栏的数字 */
@@ -250,6 +264,18 @@ export default class MindMapPlugin extends Plugin {
 
   private mathReady = false;
   private propertyIcons: PropertyIconDecorator | null = null;
+
+  /** 备注里的表格由 gogoga Table 画：它太旧时格子里选中文字不出格式栏（群友装着 0.19.2，以为高亮没修好）。每次启动只提示一次 */
+  private oldTableWarned = false;
+  private warnOldTablePlugin(): void {
+    if (this.oldTableWarned) return;
+    // 看正在运行的那份（没开就不提示）
+    const table = (this.app as unknown as { plugins?: { plugins?: Record<string, { manifest?: { version?: string } }> } }).plugins?.plugins?.["gogoga-table"];
+    const version = table?.manifest?.version;
+    if (!version || !versionBefore(version, MIN_TABLE_VERSION)) return;
+    this.oldTableWarned = true;
+    new Notice(t("notice.oldTablePlugin", { version, min: MIN_TABLE_VERSION }), 15000);
+  }
 
   async onload(): Promise<void> {
     // 只在 Obsidian 启动时把打开着的脑图笔记换成脑图视图（工作区恢复时可能早于 setViewState 的拦截）。
@@ -2610,6 +2636,7 @@ export default class MindMapPlugin extends Plugin {
       createNoteEditor: (parent, o) => {
         const f = this.app.vault.getAbstractFileByPath(sourcePath());
         // 选中文字浮出格式栏：备注里一律有，不看「选中文字时显示格式栏」这些设置
+        if (/^\s*\|.*\|\s*$/m.test(o.text)) this.warnOldTablePlugin();
         return createLiveNoteEditor(this.app, parent, { ...o, file: f instanceof TFile ? f : null, extensions: [noteFormatBarExtension({ bar: () => this.noteBarOptions() })] });
       },
       notePreviewScope: () => {

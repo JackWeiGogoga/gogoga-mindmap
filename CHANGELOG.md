@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.89.3] - 2026-11-20
+
+### Added
+- When a node's note has a table and gogoga Table is older than 0.22.1, editing the note shows a reminder to update gogoga Table (once per launch). The format bar in note tables needs both plugins updated; with only the mind map updated, highlighting in note tables still seemed broken (reported by a user running gogoga Table 0.19.2).
+
+### Fixed
+- Removing a checkbox written the old way (`⭐ [ ] 🌟Example`, which 0.88 and earlier put after the markers) left a space between the marker and the emoji after it (`⭐ 🌟Example`). Both spaces were inserted back when the checkbox was added; now the marker joins an emoji or symbol directly again (`⭐🌟Example`) and keeps one space before text (#46, reported by Leolo1).
+
 ## [0.89.2] - 2026-11-19
 
 ### Fixed
@@ -1138,7 +1146,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...HEAD
+[0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0

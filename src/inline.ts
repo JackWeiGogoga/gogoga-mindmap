@@ -147,7 +147,13 @@ export function toggleTask(text: string, mode: "check" | "add-remove" = "check")
   const m = TASK_RE.exec(rest);
   if (!m) return `[ ] ${text}`;
   const body = rest.slice(m[0].length);
-  return [...markers, mode === "add-remove" ? body : `${flip(m[1])} ${body}`].join(" ");
+  if (mode === "add-remove") {
+    // 老写法「⭐ [ ] 🌟事项」是 0.88 及以前从「⭐🌟事项」加出来的：任务框两边的空格都是当时插的。
+    // 去掉时后面紧跟 emoji、符号就贴回标记（「⭐🌟事项」），跟着文字照旧空一格（「🙈 [ ] 事项」→「🙈 事项」，#46）
+    const glue = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}]/u.test(body);
+    return markers.join(" ") + (glue ? "" : " ") + body;
+  }
+  return [...markers, `${flip(m[1])} ${body}`].join(" ");
 }
 
 /** 节点是不是一个选择题选项：[x] 是正确选项，[ ] 是错误选项，不是选项返回 null */

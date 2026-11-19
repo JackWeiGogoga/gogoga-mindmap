@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.89.3] - 2026-11-20
+
+### 新增
+- 备注里有表格、装的 gogoga Table 又早于 0.22.1 时，打开备注编辑会提示更新 gogoga Table（每次启动只提示一次）。备注表格里选中文字出格式栏要两边一起更新，只更新脑图看起来就像高亮还是没修好（群友反馈，装的是 gogoga Table 0.19.2）。
+
+### 修复
+- 去掉老写法的任务框（`⭐ [ ] 🌟事项`，0.88 及以前加在标记后面的）时，标记和后面的 emoji 之间多留一个空格（`⭐ 🌟事项`）。这两个空格都是当时加任务框插进去的，现在后面紧跟 emoji、符号时贴回去（`⭐🌟事项`），跟着文字时照旧空一格（#46，Leolo1 反馈）。
+
 ## [0.89.2] - 2026-11-19
 
 ### 修复
@@ -1138,7 +1146,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...HEAD
+[0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
