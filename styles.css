@@ -2459,6 +2459,13 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 
 /* 右边、下边留出位置：骑在表格右下角的填充柄（连同它放大的点击范围）不会被裁掉，也不会把表格撑出横向滚动 */
 .ggt-scroll { overflow-x: auto; overflow-y: visible; padding: 0 12px 12px 0; margin: 0 -12px -12px 0; }
+/* 设置「表格居中」：装表格的那层（.ggt-lp / .ggt-reading，插件加 ggt-center-host）把表格的外框排到中间。
+   外框左边留 14px 放行手柄（margin-left: -14px 抵掉）、右边留 26px 放加号：右边再抵掉 26px，排到中间的就正好是表格本身。
+   safe center：表格比正文宽时退回靠左（左边照旧和正文对齐，右边横向滚动），不会往两边溢出；撑满页面宽度的表格不参与 */
+.ggt-lp.ggt-center-host, .ggt-reading.ggt-center-host, .markdown-source-view.mod-cm6 .cm-content > .ggt-lp.ggt-center-host { display: flex !important; justify-content: safe center; }
+.ggt-center-host > .ggt { min-width: 0; }
+.ggt-center-host > .ggt:not(.is-full) { margin-right: -26px; }
+.ggt-center-host > .ggt.is-full { flex: none; }
 .ggt-table {
   border-collapse: separate;
   border-spacing: 0;
