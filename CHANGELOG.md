@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.89.1] - 2026-11-19
+
+### Fixed
+- In tables inside nodes, clicking a + button to add a row or column while you were still typing in a cell lost what you had just typed. The cell is now saved first.
+
 ## [0.89.0] - 2026-11-19
 
 ### Changed
@@ -1127,7 +1132,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...HEAD
+[0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2

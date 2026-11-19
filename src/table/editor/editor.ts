@@ -3137,7 +3137,11 @@ export class TableEditor {
     });
     el.addEventListener("click", (ev) => {
       ev.preventDefault();
-      if (!this.host.readonly) run();
+      if (this.host.readonly) return;
+      // 正在编辑格子（按下时特意没让编辑框失焦，所以还没保存）：先把这一格存进表格，再按存好的表格加行加列。
+      // 不然 run() 里按旧表格算出加了一行的新表，刚输入的字就丢了（群友反馈）
+      if (this.editing) this.commit();
+      run();
     });
     return el;
   }

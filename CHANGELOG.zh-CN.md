@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.89.1] - 2026-11-19
+
+### 修复
+- 节点里的表格：在格子里输入、还没确认就点加号加一行或一列，刚输入的字会丢。现在先把这一格存好，再加行加列。
+
 ## [0.89.0] - 2026-11-19
 
 ### 改进
@@ -1127,7 +1132,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...HEAD
+[0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
