@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.89.2] - 2026-11-19
+
+### Fixed
+- With gogoga Table installed, selecting text in a table cell while editing a note didn't show the format bar unless that plugin's "Format bar when selecting text in a cell" setting was on (reported by a user: highlighting worked in the note's text but not in its tables). It now always shows there, like for the rest of the note (needs gogoga Table 0.22.1 or later).
+- "Task checkbox" on a node that starts with markers (⭐, 🙈 and the like) put the `[ ]` after the markers (`⭐ [ ] task`), which Obsidian doesn't treat as a task (#46, reported by Leolo1). It now goes in front of all markers (`[ ] ⭐ task`), and the node shows the checkbox first. Adding a marker to a task keeps the checkbox in front too (before, it moved behind the new marker). Notes already written the old way (`⭐ [ ] task`) still work as before: their checkbox shows, checks and unchecks in place.
+
 ## [0.89.1] - 2026-11-19
 
 ### Fixed
@@ -1132,7 +1138,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...HEAD
+[0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3

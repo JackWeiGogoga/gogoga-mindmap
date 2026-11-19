@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.89.2] - 2026-11-19
+
+### 修复
+- 装了 gogoga Table 时，编辑备注里的表格格子选中文字不出格式栏，除非打开了表格插件的「编辑格子时选中文字显示格式栏」（群友反馈：备注正文能高亮，表格里不行）。现在备注里一直出，和正文一样（需要 gogoga Table 0.22.1 或更新）。
+- 节点开头有标记（⭐、🙈 这些）时，右键「任务复选框」把 `[ ]` 加在标记后面（`⭐ [ ] 事项`），Obsidian 不当它是任务（#46，Leolo1 反馈）。现在加在所有标记前面（`[ ] ⭐ 事项`），节点上复选框也显示在最前。给任务节点加标记时任务框同样留在最前（以前会挪到新标记后面）。已经按老写法（`⭐ [ ] 事项`）写的笔记照旧能用：显示复选框，点了原地勾上、取消。
+
 ## [0.89.1] - 2026-11-19
 
 ### 修复
@@ -1132,7 +1138,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...HEAD
+[0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
 [0.89.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...0.89.0
 [0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3

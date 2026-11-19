@@ -86,14 +86,28 @@ export function setCustomMarkers(emojis: string[], exclusive: boolean): void {
 /** 标签开头连续的标记 emoji 与其余文字 */
 export function splitMarkers(text: string): { markers: string[]; rest: string } {
   const markers: string[] = [];
-  let rest = text;
+  // 任务框写在最前面（「[ ] ⭐ 事项」，Obsidian 认得出是任务，#46）：先跳过它找标记，任务框留在 rest 开头。
+  // 老写法「⭐ [ ] 事项」照样认：两种写法拆出来一样
+  const lead = TASK_LEAD.exec(text);
+  let rest = lead ? text.slice(lead[0].length) : text;
   for (;;) {
     const hit = ALL_MARKERS.find((m) => rest.startsWith(m));
     if (!hit) break;
     markers.push(hit);
     rest = rest.slice(hit.length).replace(/^\s+/, "");
   }
+  if (lead) rest = markers.length ? lead[0] + rest : text;
   return { markers, rest };
+}
+
+/** 开头的任务框（和 TASK_RE 一样，放在这里是因为 splitMarkers 先用到） */
+const TASK_LEAD = /^\[( |x|X)\]\s+/;
+
+/** 标记和后面的文字拼回去：后面以任务框开头时任务框放最前面（「[ ] ⭐ 事项」），Obsidian 才认得出是任务（#46） */
+export function joinMarkers(markers: readonly string[], rest: string): string {
+  const task = markers.length ? TASK_LEAD.exec(rest) : null;
+  if (task) return [task[0].trimEnd(), ...markers, rest.slice(task[0].length)].filter(Boolean).join(" ");
+  return [...markers, rest].filter(Boolean).join(" ");
 }
 
 /** 切换一个标记：同组互斥的会替换，已有的会移除 */
@@ -106,7 +120,7 @@ export function toggleMarker(text: string, emoji: string): string {
   else next = [...markers, emoji];
   // 组内顺序固定：优先级、进度、旗帜、符号
   next.sort((a, b) => ALL_MARKERS.indexOf(a) - ALL_MARKERS.indexOf(b));
-  return [...next, rest].filter(Boolean).join(" ");
+  return joinMarkers(next, rest);
 }
 
 /** 节点开头有没有答案标记 */
@@ -118,16 +132,22 @@ const TASK_RE = /^\[( |x|X)\]\s+/;
 
 /**
  * 切换任务复选框。check（点节点上的复选框）：[ ] ⇄ [x]，没有就加 [ ]；
- * add-remove（菜单「任务复选框」）：有就去掉，没有就加 [ ]
+ * add-remove（菜单「任务复选框」）：有就去掉，没有就加 [ ]。
+ * 新加的任务框放在最前面、标记之前（「[ ] ⭐ 事项」）：放在标记后面 Obsidian 就不当它是任务了（#46）。
+ * 已经有的（包括老写法「⭐ [ ] 事项」）在原地切换、去掉，不挪位置
  */
 export function toggleTask(text: string, mode: "check" | "add-remove" = "check"): string {
+  const flip = (box: string) => (box === " " ? "[x]" : "[ ]");
+  const lead = TASK_RE.exec(text);
+  if (lead) {
+    const after = text.slice(lead[0].length);
+    return mode === "add-remove" ? after : `${flip(lead[1])} ${after}`;
+  }
   const { markers, rest } = splitMarkers(text);
   const m = TASK_RE.exec(rest);
-  let body: string;
-  if (!m) body = `[ ] ${rest}`;
-  else if (mode === "add-remove") body = rest.slice(m[0].length);
-  else body = `${m[1] === " " ? "[x]" : "[ ]"} ${rest.slice(m[0].length)}`;
-  return [...markers, body].join(" ");
+  if (!m) return `[ ] ${text}`;
+  const body = rest.slice(m[0].length);
+  return [...markers, mode === "add-remove" ? body : `${flip(m[1])} ${body}`].join(" ");
 }
 
 /** 节点是不是一个选择题选项：[x] 是正确选项，[ ] 是错误选项，不是选项返回 null */
@@ -323,18 +343,7 @@ export function renderInline(el: HTMLElement, text: string, opts: InlineOptions 
 
 function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, nested = false): void {
   let rest = text;
-  if (!nested && el.childElementCount === 0) {
-    const { markers, rest: afterMarkers } = splitMarkers(rest);
-    if (markers.length) {
-      const span = createSpan();
-      span.className = "mm-markers";
-      span.textContent = markers.join(" ");
-      el.appendChild(span);
-      rest = afterMarkers;
-    }
-  }
-  const task = nested ? null : /^\[( |x|X)\]\s+/.exec(rest);
-  if (task) {
+  const taskBox = (task: RegExpExecArray) => {
     const box = createSpan();
     box.className = "mm-task" + (task[1] === " " ? "" : " is-done");
     box.title = t("inline.toggleTask");
@@ -344,6 +353,30 @@ function renderSegment(el: HTMLElement, text: string, opts: InlineOptions, neste
       opts.onTaskToggle?.(ev);
     });
     el.appendChild(box);
+  };
+  // 任务框写在标记前面（「[ ] ⭐ 事项」，#46）：按文字里的顺序显示，复选框在前
+  let leadTask: RegExpExecArray | null = null;
+  if (!nested && el.childElementCount === 0) {
+    const lead = /^\[( |x|X)\]\s+/.exec(rest);
+    if (lead && splitMarkers(rest).markers.length) {
+      leadTask = lead;
+      taskBox(lead);
+      rest = rest.slice(lead[0].length);
+    }
+  }
+  if (!nested && (el.childElementCount === 0 || leadTask)) {
+    const { markers, rest: afterMarkers } = splitMarkers(rest);
+    if (markers.length) {
+      const span = createSpan();
+      span.className = "mm-markers";
+      span.textContent = markers.join(" ");
+      el.appendChild(span);
+      rest = afterMarkers;
+    }
+  }
+  const task = nested || leadTask ? null : /^\[( |x|X)\]\s+/.exec(rest);
+  if (task) {
+    taskBox(task);
     rest = rest.slice(task[0].length);
   }
   let last = 0;

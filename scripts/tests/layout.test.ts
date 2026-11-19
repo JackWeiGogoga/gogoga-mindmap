@@ -147,6 +147,28 @@ test("任务复选框切换：点复选框只在空和勾之间来回，不会�
   assert.equal(toggleTask("[x] 事项", "add-remove"), "事项");
 });
 
+test("#46 节点开头有标记时加任务框：加在标记前面（Obsidian 才认得出是任务），两种写法都认", () => {
+  // 新加：放最前
+  assert.equal(toggleTask("🙈 测试"), "[ ] 🙈 测试");
+  assert.equal(toggleTask("⭐ 🌟这里", "add-remove"), "[ ] ⭐ 🌟这里");
+  assert.equal(toggleTask("1️⃣ ⭐ 事项"), "[ ] 1️⃣ ⭐ 事项");
+  // 新写法：原地勾、去掉
+  assert.equal(toggleTask("[ ] ⭐ 事项"), "[x] ⭐ 事项");
+  assert.equal(toggleTask("[x] ⭐ 事项"), "[ ] ⭐ 事项");
+  assert.equal(toggleTask("[ ] ⭐ 事项", "add-remove"), "⭐ 事项");
+  // 老写法「⭐ [ ] 事项」照样认：原地勾、去掉，不挪位置
+  assert.equal(toggleTask("⭐ [x] 事项"), "⭐ [ ] 事项");
+  assert.equal(toggleTask("⭐ [ ] 事项", "add-remove"), "⭐ 事项");
+  // 两种写法拆出来一样：标记、带任务框的正文
+  assert.deepEqual(splitMarkers("[ ] ⭐ 1️⃣ 事项"), { markers: ["⭐", "1️⃣"], rest: "[ ] 事项" });
+  assert.deepEqual(splitMarkers("⭐ 1️⃣ [ ] 事项"), { markers: ["⭐", "1️⃣"], rest: "[ ] 事项" });
+  assert.deepEqual(splitMarkers("[ ] 事项"), { markers: [], rest: "[ ] 事项" });
+  // 加减标记：任务框留在最前
+  assert.equal(toggleMarker("[ ] ⭐ 事项", "🚩"), "[ ] 🚩 ⭐ 事项");
+  assert.equal(toggleMarker("[ ] 事项", "⭐"), "[ ] ⭐ 事项");
+  assert.equal(toggleMarker("[ ] ⭐ 事项", "⭐"), "[ ] 事项");
+});
+
 test("聚焦分支时布局按相对深度算间距", () => {
   const doc = parseMarkdown(src);
   const a = findByPath(doc.root, "0")!;

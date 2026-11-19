@@ -8674,9 +8674,10 @@ export class MindMapCanvas {
     let changed = false;
     for (const n of this.selected) {
       const editable = this.toEdit(n.text);
+      // 开头的标记、任务框不加格式（两者谁在前都行，#46）：从正文开始的地方算
       const { rest } = splitMarkers(n.text);
-      const task = /^\[( |x|X)\]\s+/.exec(rest)?.[0].length ?? 0;
-      const start = editable.length - this.toEdit(rest).length + task;
+      const body = rest.replace(/^\[( |x|X)\]\s+/, "");
+      const start = editable.length - this.toEdit(body).length;
       if (start >= editable.length) continue;
       const next = this.fromEdit(applyFormat(editable, start, editable.length, fmt).text);
       if (next !== n.text) {

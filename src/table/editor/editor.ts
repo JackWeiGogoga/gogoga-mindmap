@@ -105,7 +105,7 @@ export interface EditorHost {
   /** 格子的编辑框用 CodeMirror：加粗、颜色、荧光笔直接显示效果，标签藏起来（建编辑器时问一次） */
   richEdit?(): boolean;
   /** 编辑格子时选中文字浮出的格式栏用哪些颜色；返回 null（或不给）就不显示格式栏 */
-  formatColors?(): { text: string[]; highlight: string[] } | null;
+  formatColors?(root: HTMLElement): { text: string[]; highlight: string[] } | null;
   /** 格式栏颜色下拉记住的颜色（上次用的、最近使用）；不给就只记在这次的格式栏里 */
   colorMemory?(): ColorMemory;
   /** 日期列写成 [[日记]] 时：按日记插件的日期格式写名字、读名字；不给就用 2026-11-17 */
@@ -1890,7 +1890,7 @@ export class TableEditor {
   /** 编辑中选中了文字、宿主给了颜色：在这一格上方显示格式栏；否则收起 */
   private updateFormatBar(): void {
     const el = this.input;
-    const colors = this.editing && !this.host.readonly && this.sel && el.selectionStart !== el.selectionEnd ? this.host.formatColors?.() : null;
+    const colors = this.editing && !this.host.readonly && this.sel && el.selectionStart !== el.selectionEnd ? this.host.formatColors?.(this.root) : null;
     const cell = colors && this.sel ? this.cellEl(this.sel) : null;
     if (!colors || !cell) return this.hideFormatBar();
     const key = JSON.stringify(colors);
