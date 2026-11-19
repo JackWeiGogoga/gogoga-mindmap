@@ -43,6 +43,8 @@ export interface CellInput {
   setSelectionRange(start: number, end: number): void;
   /** 选中的字（去掉两头藏起来的标记符）：加格式用 */
   visibleSelection(): { from: number; to: number };
+  /** 选中的字在屏幕上的范围（格式栏贴着它放）；拿不到（普通输入框）时 null，改用整个格子 */
+  selectionRect(): { top: number; bottom: number; left: number; right: number } | null;
   /**
    * 光标（没选中字时）已经在这个方向的边上：左 = 最前、右 = 最后、上 = 第一行、下 = 最后一行（按折行后看到的行算）。
    * 编辑时按方向键到了边上就跳到旁边的格子（B站反馈），和 Obsidian 自己的表格一样
@@ -95,6 +97,43 @@ export class TextareaInput implements CellInput {
   detach(): void {
     this.el.remove();
   }
+  selectionRect(): { top: number; bottom: number; left: number; right: number } | null {
+    // textarea 拿不到选区坐标：照着它的样子排一份文字（和 atEdge 同一个办法），量选区开头、结尾在哪
+    const ta = this.el;
+    const m = this.mirror();
+    if (!m) return null;
+    const { div, cs } = m;
+    div.append(ta.value.slice(0, ta.selectionStart));
+    const a = div.createSpan({ text: "\u200b" });
+    div.append(ta.value.slice(ta.selectionStart, ta.selectionEnd));
+    const b = div.createSpan({ text: "\u200b" });
+    div.append(ta.value.slice(ta.selectionEnd) || "\u200b");
+    const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 20;
+    const r = ta.getBoundingClientRect();
+    const k = ta.offsetWidth ? r.width / ta.offsetWidth : 1;
+    const x0 = r.left - ta.scrollLeft * k;
+    const y0 = r.top - ta.scrollTop * k;
+    const out = {
+      top: y0 + a.offsetTop * k,
+      bottom: y0 + (b.offsetTop + lh) * k,
+      left: x0 + Math.min(a.offsetLeft, b.offsetLeft) * k,
+      right: x0 + Math.max(a.offsetLeft, b.offsetLeft) * k,
+    };
+    div.remove();
+    return out;
+  }
+  /** 照着 textarea 的字体、宽度、内边距排文字的隐藏元素（量光标位置用），用完自己 remove */
+  private mirror(): { div: HTMLDivElement; cs: CSSStyleDeclaration } | null {
+    const ta = this.el;
+    const doc = ta.ownerDocument;
+    if (!ta.isConnected) return null;
+    const cs = (doc.defaultView ?? window).getComputedStyle(ta);
+    const div = doc.body.appendChild(doc.createElement("div"));
+    for (const p of ["box-sizing", "width", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-style", "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "line-height", "text-transform", "word-spacing", "tab-size", "text-indent", "word-break", "overflow-wrap"])
+      div.style.setProperty(p, cs.getPropertyValue(p));
+    div.className = "ggt-caret-mirror";
+    return { div, cs };
+  }
   visibleSelection(): { from: number; to: number } {
     return { from: this.el.selectionStart, to: this.el.selectionEnd };
   }
@@ -106,11 +145,9 @@ export class TextareaInput implements CellInput {
     if (dir === "right") return pos === ta.value.length;
     // 上下：textarea 拿不到光标坐标，照着它的样子排一份文字，量光标那一行在不在第一行 / 最后一行
     const doc = ta.ownerDocument;
-    const cs = (doc.defaultView ?? window).getComputedStyle(ta);
-    const m = doc.body.appendChild(doc.createElement("div"));
-    for (const p of ["box-sizing", "width", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-style", "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "line-height", "text-transform", "word-spacing", "tab-size", "text-indent", "word-break", "overflow-wrap"])
-      m.style.setProperty(p, cs.getPropertyValue(p));
-    m.className = "ggt-caret-mirror";
+    const mm = this.mirror();
+    if (!mm) return true;
+    const { div: m, cs } = mm;
     m.append(ta.value.slice(0, pos));
     const mark = m.appendChild(doc.createElement("span"));
     mark.textContent = "\u200b";
@@ -294,6 +331,15 @@ export class CodeMirrorInput implements CellInput {
   setSelectionRange(start: number, end: number): void {
     const len = this.view.state.doc.length;
     this.view.dispatch({ selection: EditorSelection.single(Math.min(start, len), Math.min(end, len)) });
+  }
+  selectionRect(): { top: number; bottom: number; left: number; right: number } | null {
+    const v = this._view;
+    if (!v) return null;
+    const r = v.state.selection.main;
+    const a = v.coordsAtPos(r.from, 1);
+    const b = v.coordsAtPos(r.to, -1);
+    if (!a || !b) return null;
+    return { top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom), left: Math.min(a.left, b.left), right: Math.max(a.right, b.right) };
   }
   visibleSelection(): { from: number; to: number } {
     return visibleSelection(this.view);

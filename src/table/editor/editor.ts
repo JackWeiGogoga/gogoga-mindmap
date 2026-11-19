@@ -1900,13 +1900,37 @@ export class TableEditor {
     }
     const bar = this.formatBar;
     const win = this.root.ownerDocument.defaultView ?? window;
-    const r = cell.getBoundingClientRect();
+    // 贴着选中的字放（拿不到时用整个格子）。格子里字很多、比看得见的区域还高时，按格子放会跑到屏幕外（脑图备注里的表格，群友反馈）：
+    // 先把位置限制在格子真正看得见的那块（窗口和外面各层滚动框的交集），上面放得下放上面，不然放下面，都不行就盖在看得见的那块顶上
+    const cr = cell.getBoundingClientRect();
+    const sr = this.input.selectionRect();
+    const vis = this.clipBox(cell, win);
+    const top0 = Math.max(sr ? sr.top : cr.top, vis.top);
+    const bottom0 = Math.min(sr ? sr.bottom : cr.bottom, vis.bottom);
+    const cx = sr ? (sr.left + sr.right) / 2 : cr.left + cr.width / 2;
     const w = bar.offsetWidth;
     const h = bar.offsetHeight;
-    const left = Math.max(8, Math.min(win.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
-    const top = r.top - h - 6 >= 8 ? r.top - h - 6 : r.bottom + 6;
+    const left = Math.max(8, Math.min(win.innerWidth - w - 8, cx - w / 2));
+    let top: number;
+    if (top0 - h - 6 >= 8) top = top0 - h - 6;
+    else if (bottom0 + 6 + h <= win.innerHeight - 8) top = bottom0 + 6;
+    else top = Math.max(8, Math.min(win.innerHeight - h - 8, vis.top + 6));
     bar.style.left = `${Math.round(left)}px`;
     bar.style.top = `${Math.round(top)}px`;
+  }
+
+  /** 元素看得见的那块：窗口和外面每一层会裁剪内容的框（overflow 不是 visible）的交集 */
+  private clipBox(el: HTMLElement, win: Window): { top: number; bottom: number } {
+    let top = 0;
+    let bottom = win.innerHeight;
+    for (let p = el.parentElement; p && p !== el.ownerDocument.body; p = p.parentElement) {
+      const cs = win.getComputedStyle(p);
+      if (cs.overflowY === "visible" && cs.overflowX === "visible") continue;
+      const r = p.getBoundingClientRect();
+      top = Math.max(top, r.top);
+      bottom = Math.min(bottom, r.bottom);
+    }
+    return bottom > top ? { top, bottom } : { top: 0, bottom: win.innerHeight };
   }
 
   private hideFormatBar(): void {

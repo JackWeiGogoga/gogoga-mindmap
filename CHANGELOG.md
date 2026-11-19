@@ -4,6 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.88.3] - 2026-11-19
+
+### Fixed
+- Selecting text inside a table cell while editing a note didn't show the format bar (reported by a user, who thought long cell text was hiding it; it didn't show for short cells either). Obsidian edits each table cell in a small editor of its own, which the note editor's format bar didn't reach. It now shows for table cells in the note editor too, next to the selected text even when the cell is taller than the note. In regular notes nothing changes: the format bar in table cells still follows the "Format bar in notes" setting.
+- Tables in notes used Obsidian's global table text size, which is larger than note text (15px in a 13px note), and some themes set a different table size for Reading view and the editor, so the text size changed when you double-clicked a note to edit it (reported by the same user). Table text in notes now follows the note's font size (at the same ratio Obsidian uses for tables in notes), and stays the same when viewing and editing whatever the theme sets.
+- In tables inside mind map nodes, the format bar for a cell taller than the window could end up off screen. It now sits next to the selected text, within the visible part of the cell.
+
 ## [0.88.2] - 2026-11-19
 
 ### Fixed
@@ -1112,7 +1119,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...HEAD
+[0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0

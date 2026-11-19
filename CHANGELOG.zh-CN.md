@@ -4,6 +4,13 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.88.3] - 2026-11-19
+
+### 修复
+- 编辑备注时在表格格子里选中文字不出格式栏（群友反馈，以为是格子字多被挡住了，其实字少的格子也不出）。Obsidian 自带表格的每个格子是另建的一个小编辑器，备注编辑框的格式栏管不到。现在备注编辑框里的表格格子也出格式栏，格子比备注框还高时也贴着选中的字。普通笔记不变：表格格子里出不出照旧看「笔记里的格式栏」设置。
+- 备注里的表格用的是 Obsidian 全局的表格字号，比备注正文大一号（13px 的备注里表格是 15px）；有的主题还给阅读视图和编辑器设不同的表格字号，双击备注进编辑时字号就变了（同一位群友反馈）。现在备注里表格的字号跟着备注字号走（和 Obsidian 笔记里正文与表格的比例一样），查看和编辑时一样，不受主题影响。
+- 脑图节点里的表格：格子比窗口还高时，编辑格子选中文字的格式栏可能跑到屏幕外。现在贴着选中的字放，限制在格子看得见的那块里。
+
 ## [0.88.2] - 2026-11-19
 
 ### 修复
@@ -1112,7 +1119,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.3...HEAD
+[0.88.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.2...0.88.3
 [0.88.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.1...0.88.2
 [0.88.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.88.0...0.88.1
 [0.88.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.87.2...0.88.0

@@ -76,7 +76,7 @@ import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
 import { GUIDE_FILES } from "./guide";
 import { noteMarkersExtension } from "./note-markers";
-import { noteFormatBarExtension } from "./note-format-bar";
+import { isTableCellEditor, noteFormatBarExtension } from "./note-format-bar";
 import type { FormatBarOptions } from "./format-bar";
 import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
@@ -548,9 +548,18 @@ export default class MindMapPlugin extends Plugin {
       );
     }
     if (refresh) this.rerenderReadingViews();
-    if (this.settings.formatBarInNotes && !Platform.isMobile) {
-      // 脑图备注的编辑框自己挂了一份（不看设置），这里跳过它
-      this.noteTagExt.push(noteFormatBarExtension({ bar: () => this.noteBarOptions(), skip: (view) => !!view.dom.closest(".mm-note-live") }));
+    if (!Platform.isMobile) {
+      // 脑图备注的编辑框自己挂了一份（不看设置），这里跳过它。但备注里 Obsidian 原生表格的每个格子是它另建的小编辑器，
+      // 编辑框那份管不到：格子里选中文字不出格式栏（群友反馈，以为是字多被挡住）。备注编辑框里的格子由这份负责，不看设置；
+      // 普通笔记照旧只在打开「笔记里的格式栏」时出
+      const inLive = (view: EditorView) => !!view.dom.closest(".mm-note-live");
+      this.noteTagExt.push(
+        noteFormatBarExtension({
+          bar: () => this.noteBarOptions(),
+          skip: (view) => (inLive(view) ? !isTableCellEditor(view) : !this.settings.formatBarInNotes),
+          cell: isTableCellEditor,
+        }),
+      );
     }
     if (this.settings.markersInNotes !== "show") {
       // 只在实时预览、只在脑图笔记（frontmatter 有 mindmap）里

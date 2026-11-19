@@ -832,6 +832,12 @@
 /* 备注里的表格（查看时脑图画的，编辑时装了 gogoga Table 由它画的）：和原生表格一样不超出备注框，长文字换行，
    拖宽、拖窄备注框表格跟着变；列太多、实在放不下时才横向滚动。表格组件默认按内容排宽（width: max-content） */
 .mm-note-table .ggt-table, .mm-note-live .ggt-table { width: auto; max-width: 100%; }
+/* 备注里的表格字号跟着备注字号走（和 Obsidian 原生「正文 16、表格 15」同样的比例）。表格默认用全局的 --table-text-size（固定像素，比 13px 的备注正文大一号），
+   有的主题还给阅读视图和编辑器设不同的值：查看备注和编辑备注时字号就会变（群友反馈）。在备注里每一层都写死，主题怎么设都一样 */
+:is(.mm-popover-body, .mm-note-card-body, .mm-note-live),
+:is(.mm-popover-body, .mm-note-card-body, .mm-note-live) :is(.markdown-rendered, .markdown-source-view, .cm-editor, table, .ggt) {
+  --table-text-size: calc(var(--mm-note-size, 13px) * 0.93);
+}
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) { font-size: var(--mm-note-size, 13px); line-height: 1.55; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :first-child { margin-top: 0; }
 .gg-mm-root :is(.mm-popover-body, .mm-note-card-body) > :last-child { margin-bottom: 0; }

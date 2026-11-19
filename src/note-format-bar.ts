@@ -18,6 +18,13 @@ export interface NoteFormatBarOptions {
   bar: () => Omit<FormatBarOptions, "onFormat">;
   /** 这个编辑器不出（脑图备注编辑框自己挂一份，Markdown 笔记的这份就跳过它，免得出两个） */
   skip?: (view: EditorView) => boolean;
+  /** 是 Obsidian 原生表格格子里的小编辑器：它的状态里没有实时预览标记，照样出 */
+  cell?: (view: EditorView) => boolean;
+}
+
+/** Obsidian 实时预览里原生表格的格子：每格是它另建的一个小编辑器，挂在 .table-cell-wrapper 里 */
+export function isTableCellEditor(view: EditorView): boolean {
+  return !!view.dom.parentElement?.closest(".table-cell-wrapper");
 }
 
 export function noteFormatBarExtension(o: NoteFormatBarOptions): Extension {
@@ -56,7 +63,7 @@ export function noteFormatBarExtension(o: NoteFormatBarOptions): Extension {
         view.requestMeasure({
           read: () => {
             const state = view.state;
-            if (!view.hasFocus || o.skip?.(view) || !state.field(editorLivePreviewField, false) || !canShowFormatBar(state)) return null;
+            if (!view.hasFocus || o.skip?.(view) || !(state.field(editorLivePreviewField, false) || o.cell?.(view)) || !canShowFormatBar(state)) return null;
             const sel = state.selection.main;
             const a = view.coordsAtPos(sel.from, 1);
             const b = view.coordsAtPos(sel.to, -1);
