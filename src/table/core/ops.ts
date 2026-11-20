@@ -906,8 +906,8 @@ export function colTypeOf(t: Table, c: number): ColType | null {
 }
 
 /** 菜单里的「列类型」：状态列只看 opts，别的看 ty */
-export type ColKind = "text" | "status" | "multi" | "date" | "num" | "bar";
-export const COL_KINDS: readonly ColKind[] = ["text", "status", "multi", "date", "num", "bar"];
+export type ColKind = "text" | "status" | "multi" | "date" | "num" | "bar" | "enc";
+export const COL_KINDS: readonly ColKind[] = ["text", "status", "multi", "date", "num", "bar", "enc"];
 
 export function colKindOf(t: Table, c: number): ColKind {
   const ty = colTypeOf(t, c);

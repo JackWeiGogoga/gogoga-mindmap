@@ -33,13 +33,15 @@ export const CURRENCIES = ["¥", "$", "€", "£"] as const;
  * - num：提交时把数写成统一的样子：g 千分位、u 货币符号、p 百分比、d 小数位（不写是照打的）
  * - bar：60%、3/5 这样的格子画成进度条
  * - multi：多选标签（颜色和状态列一样存在 opts 里），格子里用逗号隔开
+ * - enc：加密列，格子里是主密码加密的密文（Meld Encrypt 的行内写法，见 secret.ts），解锁后才看得到明文
  * 状态列（单选）仍然只看 opts，不写 ty
  */
 export type ColType =
   | { t: "date"; f?: "slash" | "link" }
   | { t: "num"; g?: 1; u?: (typeof CURRENCIES)[number]; p?: 1; d?: number }
   | { t: "bar" }
-  | { t: "multi" };
+  | { t: "multi" }
+  | { t: "enc" };
 
 export const TABLE_STYLES = ["default", "zebra", "minimal", "academic"] as const;
 export type TableStyle = (typeof TABLE_STYLES)[number];
@@ -68,7 +70,7 @@ export interface TableMeta {
   fxd?: (number | null)[];
   /** 状态列：每列「值 → 颜色」；设了的列，格子画成彩色标签 */
   opts?: (Record<string, CellColor> | null)[];
-  /** 列类型（日期、数字、进度条、多选），见 ColType */
+  /** 列类型（日期、数字、进度条、多选、加密），见 ColType */
   ty?: (ColType | null)[];
   /** 第一列当标题列（加底色、加粗） */
   headerCol?: boolean;
@@ -203,6 +205,7 @@ function cleanColType(x: unknown): ColType | null {
   if (o.t === "date") return o.f === "slash" || o.f === "link" ? { t: "date", f: o.f } : { t: "date" };
   if (o.t === "bar") return { t: "bar" };
   if (o.t === "multi") return { t: "multi" };
+  if (o.t === "enc") return { t: "enc" };
   if (o.t === "num") {
     const n: ColType = { t: "num" };
     if (o.g === 1) n.g = 1;

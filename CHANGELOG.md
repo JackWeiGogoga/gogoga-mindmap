@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- Node tables support gogoga Table's encrypted columns and cells: they show ••••••, and with gogoga Table installed you can unlock them with its master password to view, copy and edit them (the editor shows the plain text, which is encrypted when you press Enter). Both plugins share the master password and lock together. Without gogoga Table, encrypted cells only show •••••• and can't be unlocked, and Encrypted isn't offered as a column type.
+
 ## [0.89.3] - 2026-11-20
 
 ### Added

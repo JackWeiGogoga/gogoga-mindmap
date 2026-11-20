@@ -24,9 +24,11 @@ import { fromTSV, sourceAttr, toHTML, toTSV } from "../core/clipboard";
 import { type InlineFormat } from "../core/format";
 import { applyFormat } from "../core/format-apply";
 import { type CellInput, CodeMirrorInput, type Edge, TextareaInput } from "./cell-input";
+import { isSealed } from "../core/secret";
+import type { SecretBox } from "../core/secret-box";
 
 /** 列类型菜单的图标 */
-const KIND_ICONS: Record<ColKind, string> = { text: "type", status: "tag", multi: "tags", date: "calendar", num: "hash", bar: "percent" };
+const KIND_ICONS: Record<ColKind, string> = { text: "type", status: "tag", multi: "tags", date: "calendar", num: "hash", bar: "percent", enc: "lock" };
 
 /** 编辑时按方向键：到了格子边上往哪个格子走 */
 const ARROW_EDGE: Record<string, { edge: Edge; dr: number; dc: number } | undefined> = {
@@ -112,10 +114,68 @@ export interface EditorHost {
   dailyNote?(): { name(v: Ymd): string; parse(name: string): Ymd | null } | null;
   /** 日期列手打的 1/5、2026年1月5日、今天 这些，提交时换成这一列的写法；不给当成开着 */
   smartDate?(): boolean;
+  /** 加密列的主密码会话（所有表格共用一个）；不给就只显示 ••••••，不能解锁、不能改加密列 */
+  secrets?(): SecretBox | null;
+  /** 确认框（把加密列解密成明文之前问一下）；不给就不做要确认的事 */
+  confirm?(message: string, ok: string): Promise<boolean>;
   readonly?: boolean;
 }
 
 type Pos = { r: number; c: number };
+
+/** 加密列的数据格：[行, 列, 原文]（合并格只算左上角） */
+function secretCellsOf(t: Table): [number, number, string][] {
+  const out: [number, number, string][] = [];
+  const end = rowCount(t) - (hasTotal(t) ? 1 : 0);
+  t.meta.ty?.forEach((ty, c) => {
+    if (ty?.t !== "enc" || c >= colCount(t)) return;
+    for (let r = headRows(t); r < end; r++) {
+      const m = mergeAt(t, r, c);
+      if (m && (m.r1 !== r || m.c1 !== c)) continue;
+      out.push([r, c, t.cells[r][c]]);
+    }
+  });
+  return out;
+}
+
+/** 整格是加密的内容（任何列里：加密列，或单独加密的格子） */
+function hasSecret(md: string): boolean {
+  return md.includes("🔐") && !!md.trim() && isSealed(md);
+}
+
+/** 表里所有加密的格子的原文（解锁时拿来核对、解开） */
+function sealedCellsOf(t: Table): string[] {
+  const out = new Set<string>();
+  for (const row of t.cells) for (const v of row) if (hasSecret(v)) out.add(v);
+  return [...out];
+}
+
+/** next 的加密列里有 prev 的加密列里没有的明文（粘贴、填充进来的） */
+export function freshPlain(prev: Table, next: Table): boolean {
+  if (!next.meta.ty?.some((x) => x?.t === "enc")) return false;
+  const had = new Set(secretCellsOf(prev).map((x) => x[2]));
+  return secretCellsOf(next).some(([, , v]) => !!v.trim() && !isSealed(v) && !had.has(v));
+}
+
+/** 加密列里的明文全部加密（要先解锁） */
+async function sealTable(t: Table, box: SecretBox): Promise<Table> {
+  const todo = secretCellsOf(t).filter(([, , v]) => v.trim() && !isSealed(v));
+  if (!todo.length) return t;
+  const sealed = await Promise.all(todo.map(([, , v]) => box.seal(v)));
+  let n = t;
+  todo.forEach(([r, c], i) => (n = editCell(n, r, c, sealed[i])));
+  return n;
+}
+
+/** 复制出去的明文过 30 秒从剪贴板清掉（剪贴板里已经换成别的就不动） */
+function clearClipboardLater(win: Window, text: string): void {
+  win.setTimeout(() => {
+    void win.navigator.clipboard
+      .readText()
+      .then((now) => (now === text ? win.navigator.clipboard.writeText("") : undefined))
+      .catch(() => undefined);
+  }, 30000);
+}
 
 /** 内容、对齐、设置都一样（写回风格不算） */
 export function sameTable(a: Table, b: Table): boolean {
@@ -161,6 +221,7 @@ export function isPlainText(md: string): boolean {
 
 /** 最近一次选中格子的那张表：命令（命令面板、快捷键）作用在它上面 */
 let lastActive: TableEditor | null = null;
+
 function markActive(e: TableEditor): void {
   lastActive = e;
 }
@@ -317,6 +378,9 @@ export class TableEditor {
     this.cleanups.push(() => window.clearTimeout(leaveTimer));
     this.root.classList.toggle("is-readonly", !!host.readonly);
     parent.appendChild(this.root);
+    // 主密码锁上、解锁了：重画加密格子（旧版本的会话没有 subscribe）
+    const box = host.secrets?.();
+    if (box?.subscribe) this.cleanups.push(box.subscribe(() => this.refreshSecrets()));
     this.bind();
     this.render();
     this.watchScroll();
@@ -934,6 +998,9 @@ export class TableEditor {
     const opts = this.table.meta.opts?.[c];
     const ty = colTypeOf(this.table, c);
     const isData = r >= headRows(this.table) && !(hasTotal(this.table) && r === rowCount(this.table) - 1);
+    if ((ty?.t === "enc" && isData) || hasSecret(md)) return this.fillSecret(el, md);
+    if (el.title === t("encPlain") || el.title === t("encForeign")) el.removeAttribute("title");
+    el.classList.remove("is-unsealed");
     // 多选：每个标签一个彩色标签
     if (opts && ty?.t === "multi" && isData && md.trim()) {
       el.replaceChildren();
@@ -1016,6 +1083,271 @@ export class TableEditor {
       // 渲染出来的段落带 dir="auto"（阿拉伯文、希伯来文靠右），直接放的文字也一样
       if (this.host.renderMarkdown) el.dir = "auto";
     }
+  }
+
+  // ---------- 加密列 ----------
+
+  /** 这一格要按加密处理：加密列的数据格（表头、合计行不算），或者单独加密过的格子 */
+  private isSecretCell(p: Pos): boolean {
+    const tb = this.table;
+    if (hasSecret(tb.cells[p.r]?.[p.c] ?? "")) return true;
+    return colTypeOf(tb, p.c)?.t === "enc" && p.r >= headRows(tb) && !(hasTotal(tb) && p.r === rowCount(tb) - 1);
+  }
+
+  /** 显示过明文的格子（按密文记，锁上时清掉） */
+  private readonly revealed = new Set<string>();
+  private decrypting = false;
+
+  /**
+   * 加密格子：锁着画 ••••••（旁边一把锁，点了解锁）；解锁后还是 ••••••，旁边的眼睛显示明文、复制按钮复制明文。
+   * 还没加密的明文照常显示，标出来
+   */
+  private fillSecret(el: HTMLElement, md: string): void {
+    const doc = el.ownerDocument;
+    el.replaceChildren();
+    el.classList.remove("is-empty", "is-not-date", "is-unsealed");
+    el.removeAttribute("title");
+    if (!md.trim()) {
+      el.classList.add("is-empty");
+      return;
+    }
+    if (!isSealed(md)) {
+      this.fill(el, md);
+      el.classList.add("is-unsealed");
+      el.title = t("encPlain");
+      return;
+    }
+    const box = this.host.secrets?.() ?? null;
+    const plain = box?.peek(md);
+    if (box?.unlocked && plain === undefined) this.decryptSoon();
+    const wrap = el.appendChild(doc.createElement("span"));
+    wrap.className = "ggt-secret";
+    const shown = typeof plain === "string" && this.revealed.has(md);
+    if (shown) {
+      const text = wrap.appendChild(doc.createElement("span"));
+      text.className = "ggt-secret-text";
+      this.fill(text, plain);
+    } else {
+      const mask = wrap.appendChild(doc.createElement("span"));
+      mask.className = "ggt-secret-mask";
+      mask.textContent = "••••••";
+      if (plain === null) {
+        wrap.classList.add("is-foreign");
+        el.title = t("encForeign");
+      }
+    }
+    const btn = (act: string, icon: string, label: string) => {
+      const b = wrap.appendChild(doc.createElement("button"));
+      b.type = "button";
+      b.tabIndex = -1;
+      b.className = "ggt-secret-btn clickable-icon";
+      b.dataset.act = act;
+      b.setAttribute("aria-label", label);
+      if (this.host.setIcon) this.host.setIcon(b, icon);
+      else b.textContent = act === "unlock" ? "🔒" : act === "copy" ? "⧉" : "👁";
+    };
+    if (!box) return;
+    if (!box.unlocked) btn("unlock", "lock", t("encUnlock"));
+    else if (typeof plain === "string") {
+      btn("toggle", shown ? "eye-off" : "eye", t(shown ? "encHide" : "encShow"));
+      btn("copy", "copy", t("encCopy"));
+    }
+  }
+
+  /** 表里加密的格子的原文（加密列的、单独加密的） */
+  private secretCells(): string[] {
+    return sealedCellsOf(this.table);
+  }
+
+  /** 解锁着、还有没解开的格子：解开后重画加密列 */
+  private decryptSoon(): void {
+    const box = this.host.secrets?.();
+    if (this.decrypting || !box?.unlocked) return;
+    this.decrypting = true;
+    void box.openAll(this.secretCells()).then((fresh) => {
+      this.decrypting = false;
+      if (fresh && !this.destroyed) this.refillSecrets();
+    });
+  }
+
+  /** 加密列和单独加密的格子重新画一遍（正在编辑的那格不动） */
+  private refillSecrets(): void {
+    const done = new Set<HTMLElement>();
+    const tb = this.table;
+    const todo: Pos[] = secretCellsOf(tb).map(([r, c]) => ({ r, c }));
+    tb.cells.forEach((row, r) => row.forEach((v, c) => hasSecret(v) && todo.push({ r, c })));
+    for (const { r, c } of todo) {
+      if (this.editing && this.sel && this.sel.r === r && this.sel.c === c) continue;
+      const cell = this.cellEl({ r, c });
+      const content = cell?.querySelector<HTMLElement>(".ggt-content");
+      if (!cell || !content || done.has(cell)) continue;
+      done.add(cell);
+      const m = mergeAt(this.table, r, c);
+      this.fillCell(content, r, c, m ? mergedText(this.table, m) : this.table.cells[r][c]);
+    }
+    this.refreshCross();
+  }
+
+  /** 主密码锁上、解锁了（refreshSecretCells 调） */
+  refreshSecrets(): void {
+    if (!this.table.meta.ty?.some((x) => x?.t === "enc") && !sealedCellsOf(this.table).length) return;
+    if (!this.host.secrets?.()?.unlocked) this.revealed.clear();
+    this.refillSecrets();
+  }
+
+  private async secretButton(act: string, p: Pos): Promise<void> {
+    const box = this.host.secrets?.();
+    if (!box) return;
+    const raw = this.table.cells[p.r]?.[p.c] ?? "";
+    if (act === "unlock") {
+      if (await box.unlock(this.secretCells())) await box.openAll(this.secretCells());
+      this.refillSecrets();
+      return;
+    }
+    const plain = box.peek(raw);
+    if (typeof plain !== "string") return;
+    box.touch();
+    if (act === "toggle") {
+      if (this.revealed.has(raw)) this.revealed.delete(raw);
+      else this.revealed.add(raw);
+      this.refillSecrets();
+    } else if (act === "copy") this.copySecret(plain);
+  }
+
+  /** 复制明文，30 秒后从剪贴板清掉 */
+  private copySecret(plain: string): void {
+    const win = this.root.ownerDocument.defaultView ?? window;
+    void win.navigator.clipboard.writeText(plain).then(() => {
+      this.host.notice?.(t("encCopied"));
+      clearClipboardLater(win, plain);
+    });
+  }
+
+  /** 锁着（或还没解开）时要编辑加密格子：先解锁、解开，再进编辑（打进来的第一个字留着） */
+  private async secretEditLater(p: Pos, keep: boolean, typedText: string): Promise<void> {
+    const box = this.host.secrets?.();
+    if (!box || !(await box.unlock(this.secretCells()))) return;
+    await box.openAll(this.secretCells());
+    this.refillSecrets();
+    if (this.destroyed || this.editing || !this.sel || this.sel.r !== p.r || this.sel.c !== p.c) return;
+    this.input.focus();
+    if (typedText) {
+      this.input.reset(typedText);
+      const end = typedText.length;
+      this.input.setSelectionRange(end, end);
+      this.startEdit(false);
+    } else if (keep) this.startEdit(true);
+  }
+
+  /**
+   * 加密格子提交：空的照常写（plain）；明文没变不写（same）；变了加密后再写（async，加密好了自己写回）。
+   * 加密的时候表格被别处改了这一格，就不写（提示重新输入）
+   */
+  private secretCommit(p: Pos, text: string): "plain" | "same" | "async" {
+    const raw = this.table.cells[p.r][p.c];
+    if (!text) return "plain";
+    const before = isSealed(raw) ? this.host.secrets?.()?.peek(raw) : raw;
+    if (before === text) return isSealed(raw) ? "same" : "plain";
+    const box = this.host.secrets?.();
+    if (!box) {
+      this.host.notice?.(t("encNoHost"));
+      return "same";
+    }
+    void (async () => {
+      if (!box.unlocked && !(await box.unlock(this.secretCells()))) {
+        this.host.notice?.(t("encNotSaved"));
+        return;
+      }
+      const sealed = await box.seal(text);
+      if (this.destroyed) return;
+      const cur = this.table;
+      // 等的时候这一格被别处改了（撤销、外部改文件）：不覆盖
+      if (cur.cells[p.r]?.[p.c] !== raw) {
+        this.host.notice?.(t("encChanged"));
+        return;
+      }
+      if (this.revealed.has(raw)) this.revealed.add(sealed);
+      const next = normalize(editCell(cur, p.r, p.c, sealed));
+      this.table = next;
+      if (!(this.editing && this.sel?.r === p.r && this.sel?.c === p.c)) this.restoreContent(p);
+      this.host.onChange(next, cur);
+    })();
+    return "async";
+  }
+
+  /** 改动带着加密列里的新明文：解锁、加密好再写回（base 是改之前的表，等的时候表又变了就不写） */
+  private async sealThenApply(base: Table, next: Table, sel?: Pos): Promise<void> {
+    const box = this.host.secrets?.();
+    if (!box) {
+      this.host.notice?.(t("encNoHost"));
+      return;
+    }
+    if (!(await box.unlock([...this.secretCells(), ...secretCellsOf(next).map((x) => x[2])]))) {
+      this.host.notice?.(t("encNotSaved"));
+      return;
+    }
+    const sealed = await sealTable(next, box);
+    if (this.destroyed) return;
+    if (this.table !== base) {
+      this.host.notice?.(t("encChanged"));
+      return;
+    }
+    this.applyNow(sealed, sel);
+  }
+
+  /** 普通列改成加密列：已有的内容全部加密 */
+  private async toSecretCol(c: number, p: Pos): Promise<void> {
+    const box = this.host.secrets?.();
+    if (!box) return;
+    if (this.editing) this.commit();
+    const base = this.table;
+    if (!(await box.unlock(secretCellsOf(setColKind(base, c, "enc")).map((x) => x[2])))) return;
+    const sealed = await sealTable(setColKind(base, c, "enc"), box);
+    if (this.destroyed || this.table !== base) return;
+    this.applyNow(normalize(sealed), p);
+  }
+
+  /** 加密列改成别的类型：问一下，解密成明文写回 */
+  private async fromSecretCol(c: number, kind: ColKind, p: Pos): Promise<void> {
+    const box = this.host.secrets?.();
+    if (this.editing) this.commit();
+    const base = this.table;
+    const cells = secretCellsOf(base).filter(([, cc, v]) => cc === c && v.trim() && isSealed(v));
+    if (cells.length) {
+      if (!box || !this.host.confirm || !(await this.host.confirm(t("encDecryptConfirm"), t("encDecryptOk")))) return;
+      if (!(await box.unlock(cells.map((x) => x[2])))) return;
+      await box.openAll(cells.map((x) => x[2]));
+      if (cells.some(([, , v]) => typeof box.peek(v) !== "string")) {
+        this.host.notice?.(t("encForeignAbort"));
+        return;
+      }
+    }
+    if (this.destroyed || this.table !== base) return;
+    let n = base;
+    for (const [r, cc, v] of cells) n = editCell(n, r, cc, box?.peek(v) ?? v);
+    this.applyNow(normalize(setColKind(n, c, kind)), p);
+  }
+
+  /** 列菜单里加密列的几项：加密还没加密的格子、锁定 */
+  private secretColItems(c: number): MenuItem[] {
+    if (colTypeOf(this.table, c)?.t !== "enc") return [];
+    const box = this.host.secrets?.();
+    const items: MenuItem[] = [];
+    const base = this.table;
+    if (box && secretCellsOf(base).some(([, cc, v]) => cc === c && v.trim() && !isSealed(v)))
+      items.push({
+        title: t("encSealCol"),
+        icon: "lock",
+        disabled: !!this.host.readonly,
+        run: () =>
+          void (async () => {
+            if (!(await box.unlock(this.secretCells()))) return;
+            const sealed = await sealTable(base, box);
+            if (!this.destroyed && this.table === base) this.applyNow(normalize(sealed), this.sel ?? undefined);
+          })(),
+      });
+    if (box?.unlocked) items.push({ title: t("encLock"), icon: "lock-keyhole", run: () => box.lock() });
+    return items;
   }
 
   /** 格子元素；落在合并区域里的取左上角那格 */
@@ -1249,6 +1581,38 @@ export class TableEditor {
       }
       return;
     }
+    // 加密列：要先解锁、解开这一格；编辑框里是明文，提交时再加密
+    let plain: string | null = null;
+    if (this.isSecretCell(this.sel)) {
+      const raw = this.table.cells[this.sel.r][this.sel.c];
+      const box = this.host.secrets?.() ?? null;
+      const typedText = keep ? "" : this.input.value;
+      if (!box) {
+        this.input.reset("");
+        this.host.notice?.(t("encNoHost"));
+        return;
+      }
+      if (isSealed(raw)) {
+        const v = box.peek(raw);
+        if (v === undefined) {
+          this.input.reset("");
+          void this.secretEditLater(this.sel, keep, typedText);
+          return;
+        }
+        if (v === null) {
+          this.input.reset("");
+          this.host.notice?.(t("encForeign"));
+          return;
+        }
+        plain = v;
+      } else if (!box.unlocked) {
+        // 还没加密的明文格子：改完要加密，也得先解锁
+        this.input.reset("");
+        void this.secretEditLater(this.sel, keep, typedText);
+        return;
+      }
+      box.touch();
+    }
     if (this.anchor) {
       this.anchor = null;
       this.markSel();
@@ -1259,7 +1623,7 @@ export class TableEditor {
     this.fillHandle.classList.remove("is-shown");
     this.showMobileBar();
     if (keep) {
-      this.input.reset(shownText(this.table, this.sel.r, this.sel.c));
+      this.input.reset(plain ?? shownText(this.table, this.sel.r, this.sel.c));
       const end = this.input.value.length;
       this.input.setSelectionRange(end, end);
     }
@@ -1304,6 +1668,17 @@ export class TableEditor {
     this.cellEl(p)?.classList.remove("is-editing");
     const text = this.smartDate(p, this.input.value.replace(/\r\n?/g, "\n").replace(/^\s+|\s+$/g, ""));
     this.input.reset("");
+    // 加密列：明文没变就不写；变了先加密（异步），加密好了再写回。文件里不出现明文
+    const secret = this.isSecretCell(p) ? this.secretCommit(p, text) : "plain";
+    if (secret !== "plain") {
+      const pending = this.pending;
+      this.pending = null;
+      if (pending) {
+        this.table = pending;
+        this.render();
+      } else this.restoreContent(p);
+      return;
+    }
     const edited = editCell(this.table, p.r, p.c, text);
     const next = edited === this.table ? edited : normalize(edited);
     const pending = this.pending;
@@ -1365,6 +1740,17 @@ export class TableEditor {
   private apply(nextRaw: Table, sel?: Pos): void {
     if (this.editing) this.commit();
     const next = nextRaw === this.table ? nextRaw : normalize(nextRaw);
+    if (next === this.table) return;
+    // 粘贴、填充这类改动往加密列里放了新的明文：先加密再写，文件里不出现明文
+    if (freshPlain(this.table, next)) {
+      void this.sealThenApply(this.table, next, sel);
+      return;
+    }
+    this.applyNow(next, sel);
+  }
+
+  /** 写回一张已经整理好（normalize 过、加密列都是密文）的表 */
+  private applyNow(next: Table, sel?: Pos): void {
     if (next === this.table) return;
     const prev = this.table;
     this.table = next;
@@ -1475,6 +1861,12 @@ export class TableEditor {
     this.on(this.tableEl, "pointerdown", (ev) => {
       const target = ev.target as HTMLElement;
       if (this.input.contains(target)) return;
+      // 加密格子的按钮：只认点击（只读时也能用），按下不选格子、不抢焦点
+      if (target.closest(".ggt-secret-btn")) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
       const cell = target.closest<HTMLElement>(".ggt-cell");
       if (!cell || this.host.readonly) return;
       // 点链接、标签：照常打开，不选中
@@ -1516,6 +1908,15 @@ export class TableEditor {
       const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a.internal-link");
       const href = link?.dataset.href ?? link?.getAttribute("href");
       if (link && href) this.host.hoverLink?.(ev, href, link);
+    });
+    // 加密格子的按钮：解锁、显示 / 隐藏明文、复制明文（只读时也能用）
+    this.on(this.tableEl, "click", (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLElement>(".ggt-secret-btn");
+      const cell = btn?.closest<HTMLElement>(".ggt-cell");
+      if (!btn || !cell) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      void this.secretButton(btn.dataset.act ?? "", { r: Number(cell.dataset.r), c: Number(cell.dataset.c) });
     });
     // 点勾选框：切换 [ ] / [x]
     this.on(this.tableEl, "click", (ev) => {
@@ -2631,6 +3032,17 @@ export class TableEditor {
   private onCopy(ev: ClipboardEvent, cut: boolean): void {
     if (this.editing || !this.sel || !ev.clipboardData) return;
     ev.preventDefault();
+    // 只选了一个加密格子、已经解开：复制明文（30 秒后清掉）；选了一片还是复制密文
+    if (!this.isMulti() && this.isSecretCell(this.sel)) {
+      const plain = this.host.secrets?.()?.peek(this.table.cells[this.sel.r][this.sel.c]);
+      if (typeof plain === "string" && plain) {
+        ev.clipboardData.setData("text/plain", plain);
+        this.host.notice?.(t("encCopied"));
+        clearClipboardLater(this.root.ownerDocument.defaultView ?? window, plain);
+        if (cut && !this.host.readonly) this.applyKeepRange(clearCells(this.table, this.rangeCells()));
+        return;
+      }
+    }
     const grid = this.rangeGrid();
     const r = this.rangeRect();
     ev.clipboardData.setData("text/plain", toTSV(grid));
@@ -3429,8 +3841,9 @@ export class TableEditor {
       ...this.insertColItems(p),
       { title: t("duplicateCol"), icon: "copy-plus", run: () => this.apply(duplicateCol(tb, p.c), { r: p.r, c: p.c + 1 }) },
       { separator: true },
-      ...this.calcItems(p.c),
+      ...(colKindOf(tb, p.c) === "enc" ? [] : this.calcItems(p.c)),
       { title: t("colType").replace("{v}", t(`kind_${colKindOf(tb, p.c)}`)), icon: KIND_ICONS[colKindOf(tb, p.c)], run: () => this.openTypeMenu(p) },
+      ...this.secretColItems(p.c),
       ...(formulaOf(tb, p.c)
         ? [
             { title: t("fxEdit"), icon: "calculator", run: () => this.openFormula(p.c) },
@@ -3438,8 +3851,8 @@ export class TableEditor {
           ]
         : [{ title: t("fxOn"), icon: "calculator", run: () => this.openFormula(p.c) }]),
       { separator: true },
-      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
-      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
+      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
+      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
       { separator: true },
       { title: t("moveColLeft"), icon: "arrow-left", disabled: p.c === 0, run: () => this.apply(moveCol(tb, p.c, p.c - 1), { r: p.r, c: p.c - 1 }) },
       { title: t("moveColRight"), icon: "arrow-right", disabled: p.c >= colCount(tb) - 1, run: () => this.apply(moveCol(tb, p.c, p.c + 1), { r: p.r, c: p.c + 1 }) },
@@ -3480,8 +3893,67 @@ export class TableEditor {
       { separator: true },
       { title: CHECK_RE.test(tb.cells[p.r][p.c]) ? t("removeCheckbox") : t("addCheckbox"), icon: "square-check", disabled: multi, run: () => this.apply(setCell(tb, p.r, p.c, CHECK_RE.test(tb.cells[p.r][p.c]) ? tb.cells[p.r][p.c].replace(CHECK_RE, "").trimStart() : `[ ] ${tb.cells[p.r][p.c]}`.trimEnd()), p) },
       { title: t("clearCell"), icon: "eraser", disabled: !cells.some((c) => tb.cells[c.r][c.c]), run: () => this.apply(clearCells(tb, cells), this.sel ?? p) },
+      ...this.cellSecretItems(cells),
       ...this.deleteItems(p),
     ];
+  }
+
+  /**
+   * 格子菜单里的「加密」「取消加密」：普通列里单独加密几格（加密列整列都是加密的，不出现）。
+   * 计算列、合计行由公式写，状态、多选列的值会记成选项，这些不能加密
+   */
+  private cellSecretItems(cells: Pos[]): MenuItem[] {
+    const box = this.host.secrets?.();
+    if (!box || this.host.readonly) return [];
+    const tb = this.table;
+    const seen = new Set<string>();
+    const own: Pos[] = [];
+    for (const q of cells) {
+      const c = this.canon(q);
+      const id = `${c.r},${c.c}`;
+      // 状态、多选列的值会记进选项（颜色），密文不能进去
+      if (seen.has(id) || colTypeOf(tb, c.c)?.t === "enc" || tb.meta.opts?.[c.c] || isFxCell(tb, c.r, c.c) || (hasTotal(tb) && c.r === rowCount(tb) - 1)) continue;
+      seen.add(id);
+      own.push(c);
+    }
+    const plain = own.filter((c) => tb.cells[c.r][c.c].trim() && !hasSecret(tb.cells[c.r][c.c]));
+    const sealed = own.filter((c) => hasSecret(tb.cells[c.r][c.c]));
+    const items: MenuItem[] = [];
+    if (plain.length)
+      items.push({
+        title: t("encCell"),
+        icon: "lock",
+        run: () =>
+          void (async () => {
+            if (!(await box.unlock(this.secretCells()))) return;
+            const out = await Promise.all(plain.map((c) => box.seal(tb.cells[c.r][c.c])));
+            if (this.destroyed || this.table !== tb) return;
+            let n = tb;
+            plain.forEach((c, i) => (n = editCell(n, c.r, c.c, out[i])));
+            this.applyNow(normalize(n), this.sel ?? undefined);
+          })(),
+      });
+    if (sealed.length)
+      items.push({
+        title: t("decryptCell"),
+        icon: "lock-open",
+        run: () =>
+          void (async () => {
+            if (!this.host.confirm || !(await this.host.confirm(t("encDecryptCellConfirm"), t("encDecryptOk")))) return;
+            const raws = sealed.map((c) => tb.cells[c.r][c.c]);
+            if (!(await box.unlock(raws))) return;
+            await box.openAll(raws);
+            if (raws.some((v) => typeof box.peek(v) !== "string")) {
+              this.host.notice?.(t("encForeignAbort"));
+              return;
+            }
+            if (this.destroyed || this.table !== tb) return;
+            let n = tb;
+            sealed.forEach((c, i) => (n = editCell(n, c.r, c.c, box.peek(raws[i]) ?? raws[i])));
+            this.applyNow(normalize(n), this.sel ?? undefined);
+          })(),
+      });
+    return items.length ? [{ separator: true }, ...items] : [];
   }
 
   /**
@@ -3555,9 +4027,23 @@ export class TableEditor {
     const c = p.c;
     const kind = colKindOf(tb, c);
     const fx = !!formulaOf(tb, c);
-    const kinds = fx ? (["text", "num"] as ColKind[]) : COL_KINDS;
+    // 加密列要宿主有主密码会话（脑图节点里没有）；已经是加密列的照样列出来，好改回去
+    const kinds = fx ? (["text", "num"] as ColKind[]) : COL_KINDS.filter((k) => k !== "enc" || kind === "enc" || this.host.secrets?.());
     const items: MenuItem[] = [{ title: fx ? t("colTypeFx") : t("colTypeTitle") }];
-    for (const k of kinds) items.push({ title: t(`kind_${k}`), icon: KIND_ICONS[k], checked: kind === k, run: () => (k === "text" || k === "status" || k === "multi" ? this.apply(setColKind(tb, c, k), p) : again(setColKind(tb, c, k))) });
+    for (const k of kinds)
+      items.push({
+        title: t(`kind_${k}`),
+        icon: KIND_ICONS[k],
+        checked: kind === k,
+        run: () => {
+          if (k === kind) return;
+          // 加密、解密是异步的（要解锁），做完不再开二级菜单
+          if (k === "enc") void this.toSecretCol(c, p);
+          else if (kind === "enc") void this.fromSecretCol(c, k, p);
+          else if (k === "text" || k === "status" || k === "multi") this.apply(setColKind(tb, c, k), p);
+          else again(setColKind(tb, c, k));
+        },
+      });
     const ty = colTypeOf(tb, c);
     if (ty?.t === "date") {
       const set = (f: "slash" | "link" | undefined) => again(setColType(tb, c, f ? { t: "date", f } : { t: "date" }));

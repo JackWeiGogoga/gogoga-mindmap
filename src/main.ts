@@ -1,5 +1,7 @@
 import { type CustomSplit, parseCustomSplits } from "./split";
 import { dailyNote } from "./daily-note";
+import { confirmBox } from "./confirm";
+import type { SecretBox } from "./table/core/secret-box";
 import { createLiveNoteEditor } from "./live-note-editor";
 import type { QuickSetting } from "./canvas";
 import {
@@ -2766,6 +2768,9 @@ export default class MindMapPlugin extends Plugin {
       setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
       setIcon: (el, name) => setIcon(el, name),
       dailyNote: () => dailyNote(this.app),
+      // 节点表格的加密格子：用 gogoga Table 的主密码会话（两边共用主密码、一起锁定）；没装、没开就只能看到 ••••••
+      tableSecrets: () => (this.app as unknown as { plugins?: { plugins?: Record<string, { secrets?: SecretBox | null } | undefined> } }).plugins?.plugins?.["gogoga-table"]?.secrets ?? null,
+      confirm: (message, ok) => confirmBox(this.app, message, ok, t("customTheme.cancel")),
       listTags: () => Object.keys((this.app.metadataCache as unknown as { getTags?: () => Record<string, number> }).getTags?.() ?? {}).map((x) => x.replace(/^#/, "")),
       openLink: (href, internal, ev) => {
         if (!internal) {

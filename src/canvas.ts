@@ -117,6 +117,7 @@ import { clampCard, NOTE_CARD_MAX, type NoteCards, type NoteCardState } from "./
 import { TableEditor, type EditorHost } from "./table/editor/editor";
 import { assignReviewIds, deckIdOf, newReviewId, REVIEW_KEY, reviewBranches } from "./review/mindmap-cards";
 import type { Table } from "./table/core/table";
+import type { SecretBox } from "./table/core/secret-box";
 import { type BarItem, isSep, mergeLayout, NODEBAR_DEFAULT, TOOLBAR_DEFAULT, visibleSeps } from "./bar-layout";
 import { isWebUrl, linkDestination } from "./paste-link";
 import { spotInSource } from "./note-spot";
@@ -184,6 +185,10 @@ export interface CanvasHost {
   dailyNote?: () => { name(v: { y: number; m: number; d: number }): string; parse(name: string): { y: number; m: number; d: number } | null };
   /** 用宿主的样式显示提示（Obsidian 的 setTooltip）；没有就退回原生 title */
   setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement) => void;
+  /** 节点表格的加密格子：用 gogoga Table 的主密码会话（装着才有；没有就只显示 ••••••，不能解锁） */
+  tableSecrets?: () => SecretBox | null;
+  /** 确认框（把加密格子解密成明文之前问一下） */
+  confirm?: (message: string, ok: string) => Promise<boolean>;
 }
 
 export type TooltipPlacement = "top" | "right" | "bottom" | "left";
@@ -9747,6 +9752,8 @@ export class MindMapCanvas {
           }
         : undefined,
       dailyNote: host?.dailyNote,
+      secrets: host?.tableSecrets,
+      confirm: host?.confirm,
       readonly: !editable,
       // 表格菜单「复制整张表格」「复制为 Markdown 表格」完成后的提示
       notice: host?.notice,

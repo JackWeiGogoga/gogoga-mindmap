@@ -2956,6 +2956,19 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 .ggt-bar[data-done] .ggt-bar-fill { background: var(--color-green); }
 .ggt-bar-text { flex: none; font-size: 0.92em; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* 日期列里读不出日子的格子：淡淡的波浪线，悬停有说明（只是显示） */
+/* 加密列：•••••• + 按钮（锁 / 眼睛 / 复制），按钮悬停格子时才显出来；手机上一直显示 */
+.ggt-secret { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; vertical-align: middle; }
+.ggt-secret-mask { letter-spacing: 0.12em; color: var(--text-muted); white-space: nowrap; user-select: none; }
+.ggt-secret.is-foreign .ggt-secret-mask { color: var(--text-faint); text-decoration: line-through; }
+.ggt-secret-text { min-width: 0; overflow-wrap: anywhere; }
+.ggt-secret-btn.clickable-icon { flex: none; width: 22px; height: 22px; padding: 3px; margin: 0; border: none; background: transparent; box-shadow: none; color: var(--text-faint); opacity: 0; transition: opacity 0.12s ease; }
+.ggt-secret-btn .svg-icon { width: 14px; height: 14px; }
+.ggt-secret-btn[data-act="unlock"], .ggt-cell:hover .ggt-secret-btn, .ggt-cell.is-selected .ggt-secret-btn, .is-mobile .ggt-secret-btn { opacity: 1; }
+.ggt-secret-btn:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.ggt-cell .is-unsealed { text-decoration: underline dashed color-mix(in srgb, var(--text-error) 60%, transparent); text-underline-offset: 3px; }
+.ggt-secret-modal .ggt-secret-input { display: block; width: 100%; margin-bottom: 10px; }
+.ggt-secret-modal .ggt-secret-error { min-height: 1.4em; color: var(--text-error); font-size: var(--font-ui-small); }
+.ggt-secret-modal .setting-item { border: none; padding-bottom: 0; }
 .ggt-cell .is-not-date { text-decoration: underline wavy color-mix(in srgb, var(--text-warning) 55%, transparent); text-decoration-skip-ink: none; text-underline-offset: 3px; }
 
 /* 日期列的日历：和补全列表一样的浮层 */
