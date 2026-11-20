@@ -108,6 +108,24 @@ export class InlineEditor {
         ],
       }),
     });
+    // 安卓 Chrome（Obsidian 安卓版）上 CodeMirror 收到回车会先压下、等一帧再补发一个合成的 Enter，
+    // 补发的不带 Shift，宿主的按键处理和 Shift-Enter 绑定都看不到 Shift：外接键盘按 Shift+Enter 变成了提交。
+    // 在编辑器外层抢先（捕获阶段）接住 Shift+Enter：宿主要（链接补全）就给宿主，否则换行
+    // Obsidian 安卓版在 body 上加 is-android（手机、平板都是）
+    if (opts.multiline && host.ownerDocument.body.classList.contains("is-android")) {
+      this.view.dom.addEventListener(
+        "keydown",
+        (ev) => {
+          if (ev.key !== "Enter" || !ev.shiftKey || ev.isComposing || ev.keyCode === 229) return;
+          ev.stopPropagation();
+          // 先问宿主（它看 defaultPrevented 判断处理没处理），再拦下浏览器和 CodeMirror 自己的处理
+          const handled = !!opts.onKey?.(ev);
+          ev.preventDefault();
+          if (!handled) insertFormatBreak(this.view);
+        },
+        true,
+      );
+    }
     this.view.focus();
   }
 

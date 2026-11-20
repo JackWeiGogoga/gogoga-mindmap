@@ -48,6 +48,20 @@ export function formatSpans(text: string): FormatSpan[] {
     scan(line, offset, out);
     offset += line.length + 1;
   }
+  // HTML 标签的颜色 / 荧光笔可以跨行（<span style="color:…">甲<br>乙</span>，表格格子里的 <br> 在编辑框里是换行）：
+  // 逐行认不出来，标签就露成源码。把换行当成普通字符再找一遍，只补跨行的这几种；里面的格式逐行已经认过了
+  if (text.includes("\n")) {
+    const flat = text.replace(/\n/g, "\u0000");
+    for (const m of flat.matchAll(TOKEN_RE)) {
+      const g = GROUPS.find((x) => m[x.group] !== undefined);
+      if (!g?.html || !m[0].includes("\u0000")) continue;
+      const from = m.index ?? 0;
+      const to = from + m[0].length;
+      const innerTo = to - g.close;
+      out.push({ kind: g.kind, from, to, innerFrom: innerTo - m[g.group].length, innerTo, ...(g.colorGroup ? { color: m[g.colorGroup] } : {}), html: true });
+    }
+    out.sort((x, y) => x.from - y.from || y.to - x.to);
+  }
   return out;
 }
 

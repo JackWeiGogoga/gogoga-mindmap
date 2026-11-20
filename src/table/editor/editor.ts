@@ -3510,7 +3510,9 @@ export class TableEditor {
         this.sel = row ? { r: p.r, c: colCount(this.table) - 1 } : { r: this.shownRows() - 1, c: p.c };
         this.lineSel = true;
         this.markSel();
-        this.input.focus();
+        // 手机上点手柄只是要菜单：不聚焦输入框（会弹键盘把菜单挡住），已经弹着的键盘也收起来
+        if (ev.pointerType === "touch") (doc.activeElement as HTMLElement | null)?.blur?.();
+        else this.input.focus();
         const rect = handle.getBoundingClientRect();
         this.openMenu(row ? this.rowMenu(p) : this.colMenu(p), rect.left, rect.bottom + 4);
         return;
@@ -4293,12 +4295,31 @@ export class TableEditor {
       });
     }
     if (pop.lastElementChild?.classList.contains("ggt-menu-sep")) pop.lastElementChild.remove();
-    // 放在点击处，超出窗口就往回挪
-    const vw = doc.documentElement.clientWidth;
-    const vh = doc.documentElement.clientHeight;
-    const r = pop.getBoundingClientRect();
-    pop.style.left = `${Math.max(8, Math.min(x, vw - r.width - 8))}px`;
-    pop.style.top = `${Math.max(8, y + r.height > vh - 8 ? Math.max(8, y - r.height) : y)}px`;
+    // 放在点击处，超出可见区域就往回挪。手机上键盘弹着时窗口底部被挡住，按 visualViewport 算可见区域；
+    // 菜单比可见区域还高就限高、里面滚动，顶边不再跑到状态栏后面
+    const place = () => {
+      const win = doc.defaultView ?? window;
+      const vv = win.visualViewport;
+      const vw = doc.documentElement.clientWidth;
+      // iPhone 顶上的状态栏 / 刘海：Obsidian 把安全区写在 --safe-area-inset-top
+      const safe = parseFloat(win.getComputedStyle(doc.body).getPropertyValue("--safe-area-inset-top")) || 0;
+      const top0 = (vv ? vv.offsetTop : 0) + Math.max(8, safe);
+      const bottom0 = (vv ? vv.offsetTop + vv.height : doc.documentElement.clientHeight) - 8;
+      pop.style.maxHeight = `${Math.max(120, bottom0 - top0)}px`;
+      const r = pop.getBoundingClientRect();
+      pop.style.left = `${Math.max(8, Math.min(x, vw - r.width - 8))}px`;
+      const below = y + r.height <= bottom0;
+      const above = y - r.height >= top0;
+      const top = below ? y : above ? y - r.height : bottom0 - r.height;
+      pop.style.top = `${Math.max(top0, top)}px`;
+    };
+    place();
+    // 菜单开着时键盘弹出 / 收起：跟着重新放
+    const vv = (doc.defaultView ?? window).visualViewport;
+    if (vv) {
+      const onVV = () => (this.popover === pop ? place() : vv.removeEventListener("resize", onVV));
+      vv.addEventListener("resize", onVV);
+    }
     pop.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") {
         ev.stopPropagation();

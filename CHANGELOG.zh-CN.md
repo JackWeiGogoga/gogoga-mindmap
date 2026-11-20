@@ -4,7 +4,13 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.90.1] - 2026-11-20
+
 ### 修复
+- 手机、平板上删不掉关联线（小红书反馈）：删除要按 Delete 键，长按细线又没反应。现在点一下线会选中它，线上方出现小工具栏（编辑文字、删除）；长按线弹出它的菜单；手指也更容易点中线。
+- 安卓平板接蓝牙键盘时，编辑节点按 Shift+Enter 会直接结束编辑，不换行（群友反馈）。现在和电脑上一样换行。
+- 颜色、荧光笔标签中间有换行（`<span style="color:…">甲<br>乙</span>`）时，编辑会露出 HTML 标签；节点表格里也一样（随 gogoga Table 0.23.1）。
+- 节点表格：手机上点行、列手柄不再弹出键盘挡住菜单，菜单长时也不会跑到状态栏后面（随 gogoga Table 0.23.1）。
 - 用有些主题时，点节点表格的格子进编辑，字号和查看时不一样（群友反馈）：主题给编辑器定的字号套到了格子的编辑框上。现在编辑时的字号、字体、行高和查看时一样。
 
 ## [0.90.0] - 2026-11-20
@@ -1154,7 +1160,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...HEAD
+[0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2

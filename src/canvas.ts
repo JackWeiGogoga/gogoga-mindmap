@@ -716,6 +716,11 @@ export class MindMapCanvas {
   private edgeMenu: HTMLElement | null = null;
   private editToggle: HTMLButtonElement | null = null;
   private nodebar: HTMLElement | null = null;
+  /** 手机 / 平板上选中关联线时线上方的小工具栏（编辑文字、删除）：没有 Delete 键、长按线也难按准，靠它删线 */
+  private relbar: HTMLElement | null = null;
+  /** 触屏长按关联线弹菜单的计时；fired 记下刚自己弹过菜单，系统随后再发的 contextmenu 就不重复弹 */
+  private relPress: { timer: number; x: number; y: number } | null = null;
+  private relPressFired = 0;
 
   private doc: MindDoc | null = null;
   private layout: LayoutResult | null = null;
@@ -2468,6 +2473,7 @@ export class MindMapCanvas {
       r.handles.forEach((h) => h.remove());
       this.relEls.delete(key);
     }
+    this.positionRelbar();
   }
 
   private createRel(): { g: SVGGElement; line: SVGPathElement; hit: SVGPathElement; arrow: SVGPathElement; label: HTMLElement; guides: SVGPathElement; handles: [HTMLElement, HTMLElement] } {
@@ -2504,6 +2510,27 @@ export class MindMapCanvas {
     hit.addEventListener("pointerdown", (ev) => {
       ev.stopPropagation();
       this.el.focus({ preventScroll: true });
+      // 触屏：按住不动 450ms 弹关联线菜单。不靠系统的 contextmenu（iPhone 上按在线上常常不来）
+      if (ev.pointerType === "touch" && this.opts.editable) {
+        this.cancelRelPress();
+        const timer = window.setTimeout(() => {
+          this.relPress = null;
+          const r = info(hit);
+          if (!r) return;
+          this.relPressFired = performance.now();
+          this.activateRel(r.rel);
+          this.showContextMenu(this.relMenuEntries(r.src, r.rel), ev);
+        }, 450);
+        this.relPress = { timer, x: ev.clientX, y: ev.clientY };
+      }
+    });
+    hit.addEventListener("pointermove", (ev) => {
+      if (this.relPress && Math.hypot(ev.clientX - this.relPress.x, ev.clientY - this.relPress.y) > 8) this.cancelRelPress();
+    });
+    for (const type of ["pointerup", "pointercancel"] as const) hit.addEventListener(type, () => this.cancelRelPress());
+    // 长按弹了菜单后松手：取消触屏补发的鼠标事件和 click（mousedown 会被菜单当成点外面而关掉，click 可能误点菜单项）
+    hit.addEventListener("touchend", (ev) => {
+      if (performance.now() - this.relPressFired < 1500) ev.preventDefault();
     });
     hit.addEventListener("click", (ev) => {
       ev.stopPropagation();
@@ -2518,6 +2545,8 @@ export class MindMapCanvas {
     hit.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
+      // 长按计时已经弹过菜单了（或马上要弹）：系统这次的 contextmenu 不再弹第二个
+      if (this.relPress || performance.now() - this.relPressFired < 1500) return;
       const r = info(hit);
       if (!r || !this.opts.editable) return;
       this.activateRel(r.rel);
@@ -2670,6 +2699,64 @@ export class MindMapCanvas {
     return found;
   }
 
+  private cancelRelPress(): void {
+    if (!this.relPress) return;
+    window.clearTimeout(this.relPress.timer);
+    this.relPress = null;
+  }
+
+  /** 选中的关联线上方放一个小工具栏（编辑文字、删除；跟节点的浮动工具栏一样的样式），手机上点它删线。其余操作在右键 / 长按菜单里 */
+  private positionRelbar(): void {
+    const rel = this.activeRel;
+    const src = rel && this.doc ? this.relSource(rel) : null;
+    const entry = rel ? [...this.relEls.values()].find((r) => this.relOf.get(r.label)?.rel === rel) : undefined;
+    // 只在手机 / 平板上出：电脑上有 Delete 键和右键菜单，线上方多一条工具栏反而挡着双击改文字
+    const touch = this.el.ownerDocument.body.classList.contains("is-mobile");
+    const show = touch && !!rel && !!src && !!entry && this.opts.editable && this.opts.showNodebar?.() !== false && !this.editingRel && !this.selected.size;
+    if (!show) {
+      this.relbar?.remove();
+      this.relbar = null;
+      return;
+    }
+    if (!this.relbar) {
+      const bar = createDiv({ cls: "mm-nodebar mm-relbar" });
+      bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      bar.addEventListener("contextmenu", (ev) => { ev.preventDefault(); ev.stopPropagation(); });
+      const tool = (id: string, iconName: string, title: string, run: (src: MindNode, rel: Relation) => void) => {
+        const b = createEl("button");
+        b.type = "button";
+        b.className = "mm-tool";
+        b.dataset.tool = id;
+        this.tip(b, title);
+        b.append(icon(iconName));
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const r = this.activeRel;
+          const s = r && this.relSource(r);
+          if (r && s) run(s, r);
+        });
+        bar.append(b);
+      };
+      tool("rel-label", "pencil", t("menu.editRelLabel"), (_s, r) => this.editRelLabel(r));
+      tool("rel-delete", "trash", t("menu.deleteRel"), (s, r) => this.deleteRel(s, r));
+      this.relbar = bar;
+      this.el.append(bar);
+    }
+    const bar = this.relbar;
+    bar.classList.remove("is-hidden");
+    // 放在线中间那个圆点 / 文字的上方；上面放不下就放下面
+    const host = this.el.getBoundingClientRect();
+    const a = entry.label.getBoundingClientRect();
+    const cx = a.left + a.width / 2 - host.left;
+    const bw = bar.offsetWidth;
+    const bh = bar.offsetHeight;
+    let top = a.top - host.top - bh - 12;
+    if (top < 4) top = a.bottom - host.top + 12;
+    bar.style.left = `${Math.max(4, Math.min(cx - bw / 2, this.el.clientWidth - bw - 4))}px`;
+    bar.style.top = `${top}px`;
+    bar.classList.toggle("is-hidden", cx < 0 || cx > this.el.clientWidth || top > this.el.clientHeight);
+  }
+
   private relMenuEntries(src: MindNode, rel: Relation): MenuEntry[] {
     const dst = this.relTarget(rel);
     return [
@@ -2701,6 +2788,7 @@ export class MindMapCanvas {
     const before = rel.label;
     this.activateRel(rel);
     this.editingRel = rel;
+    this.positionRelbar();
     label.classList.remove("is-empty");
     label.classList.add("is-editing");
     delete label.dataset.raw;
@@ -5274,6 +5362,7 @@ export class MindMapCanvas {
 
   private positionNodebar(): void {
     this.updateImageHandle();
+    this.positionRelbar();
     // 只读（包括选中节点后才锁定）时不显示，留着的要收掉
     const show =
       this.opts.editable &&

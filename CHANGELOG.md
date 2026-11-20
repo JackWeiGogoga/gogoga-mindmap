@@ -4,7 +4,13 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.90.1] - 2026-11-20
+
 ### Fixed
+- On phones and tablets, relationship lines couldn't be deleted (reported on Xiaohongshu): Delete needs a keyboard and long-pressing the thin line did nothing. Tapping a line now selects it with a small toolbar above it (Edit label, Delete); long-pressing a line opens its menu; and the line is easier to hit with a finger.
+- On Android with a hardware keyboard, Shift+Enter while editing a node finished the edit instead of starting a new line (reported in the user group). It now inserts a line break, as on desktop.
+- A colored span or highlight that spans lines (`<span style="color:…">a<br>b</span>`) showed its HTML tags while editing; in node tables too (from gogoga Table 0.23.1).
+- Node tables: on phones, tapping a row or column handle no longer brings up the keyboard over the menu, and long menus stay below the status bar (from gogoga Table 0.23.1).
 - With some themes, clicking into a node table cell to edit it changed the text size (reported in the user group): the theme's editor font size applied to the cell editor. Editing now uses the same size, font and line height as viewing.
 
 ## [0.90.0] - 2026-11-20
@@ -1154,7 +1160,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...HEAD
+[0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2

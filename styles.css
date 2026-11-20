@@ -3518,3 +3518,8 @@ body.gg-mm-zen-app .status-bar,
 body.gg-mm-zen-app.mod-macos.is-hidden-frameless:not(.is-fullscreen) .gg-mm-root.is-zen .mm-crumbs { left: 84px; }
 /* Windows / Linux 隐藏标题栏时，右上角是最小化、最大化、关闭按钮：在右上角那组标签页里的脑图，「退出禅模式」往左让开（宽度用 Obsidian 自己的 --frame-right-space，macOS 是 0） */
 body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-top-right-space .gg-mm-root.is-zen .mm-zen-exit { right: calc(12px + var(--frame-right-space, 0px)); }
+
+/* 关联线：手机上手指按不准 12px 的线，点击区加宽；选中后线上方出小工具栏（.mm-relbar 用节点浮动工具栏的样式） */
+.is-mobile .mm-rel-hit { stroke-width: 28; }
+.is-mobile .mm-relbar .mm-tool { width: 34px; height: 34px; }
+.is-mobile .mm-relbar .mm-tool .mm-icon { font-size: 18px; }
