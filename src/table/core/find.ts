@@ -135,6 +135,15 @@ export function findTables(lines: readonly string[]): TableBlock[] {
     }
     // 块标识后面没有空行时，我们的注释不能紧贴着放（放了块标识就失效），这时不认后面的注释
     const blockIdNoBlank = tail.length === 1 && BLOCK_ID_RE.test(tail[0]);
+    // 格式化插件（Linter「表格前后空行」这类）会在表格和我们的注释之间插空行，注释就不认了，合并、颜色全丢（B站反馈）。
+    // 中间隔着空行也认：空行原样留在 tail 里，写回时照样隔着，不和格式化插件来回改
+    if (!blockIdNoBlank && !(k < lines.length && parseMetaLine(at(k) ?? ""))) {
+      let j = k;
+      while (j < lines.length && lines[j].trim() === "") j++;
+      if (j > k && j < lines.length && parseMetaLine(at(j) ?? "")) {
+        for (; k < j; k++) tail.push("");
+      }
+    }
     const metaText = k < lines.length ? at(k) : null;
     const meta = !blockIdNoBlank && metaText !== null ? parseMetaLine(metaText) : null;
     const metaLine = meta ? k : null;

@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.91.2] - 2026-11-20
+
+### Fixed
+- Node tables and tables in notes: when a formatter put a blank line between a table and the comment below it, merged cells and colors were lost. The comment is now read across blank lines (synced from gogoga Table).
+
 ## [0.91.1] - 2026-11-20
 
 ### Changed
@@ -1181,7 +1186,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...HEAD
+[0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2
 [0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1
 [0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
 [0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
