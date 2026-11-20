@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.91.4] - 2026-11-21
+
+### Fixed
+- Node tables on iPhone and iPad: menus couldn't be tapped, the column-width handle sat at the table's left edge, and long-pressing an empty cell while editing didn't open the table menu (synced from gogoga Table).
+
 ## [0.91.3] - 2026-11-20
 
 ### Fixed
@@ -1191,7 +1196,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...HEAD
+[0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3
 [0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2
 [0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1

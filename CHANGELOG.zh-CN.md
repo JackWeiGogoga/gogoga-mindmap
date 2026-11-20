@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.91.4] - 2026-11-21
+
+### 修复
+- 节点表格在 iPhone、iPad 上：菜单点不动、调列宽的把手跑到表格最左边、编辑空格子时长按出不来表格菜单（随 gogoga Table 同步）。
+
 ## [0.91.3] - 2026-11-20
 
 ### 修复
@@ -1191,7 +1196,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...HEAD
+[0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3
 [0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2
 [0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1

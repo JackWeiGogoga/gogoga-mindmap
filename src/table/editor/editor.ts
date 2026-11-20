@@ -252,6 +252,15 @@ export const TABLE_COMMANDS = [
 ] as const;
 export type TableCommand = (typeof TABLE_COMMANDS)[number];
 
+/**
+ * 浮出来的菜单挂在哪：电脑上挂 body；手机、平板上挂进 Obsidian 的 .app-container。
+ * iPhone 上挂在 body 下的菜单看得见、点不到，手指点下去落到了后面的格子、正文上（iPhone 镜像实测，小红书反馈「删除行列只有最后一行一列才有用」）
+ */
+export function popupParent(doc: Document): HTMLElement {
+  if (doc.body.classList.contains("is-mobile")) return doc.querySelector<HTMLElement>(".app-container") ?? doc.body;
+  return doc.body;
+}
+
 export class TableEditor {
   readonly root: HTMLElement;
   private table: Table;
@@ -1860,7 +1869,15 @@ export class TableEditor {
     const doc = this.root.ownerDocument;
     this.on(this.tableEl, "pointerdown", (ev) => {
       const target = ev.target as HTMLElement;
-      if (this.input.contains(target)) return;
+      // 手机、平板上编辑着一个空格子时长按：编辑框盖住了整格，按下都落在编辑框上，长按以前只出系统的「粘贴、选择、全选」，
+      // 出不来表格菜单（小红书反馈 iPad 上长按空行老是出系统菜单）。空格子没有字可选，长按改成表格菜单；有字的照旧交给系统（放光标、选字）
+      if (this.input.contains(target)) {
+        if (ev.pointerType === "touch" && this.editing && this.sel && !this.host.readonly && !this.input.value.trim()) {
+          this.touched = true;
+          this.touchStart(ev, this.sel);
+        }
+        return;
+      }
       // 加密格子的按钮：只认点击（只读时也能用），按下不选格子、不抢焦点
       if (target.closest(".ggt-secret-btn")) {
         ev.preventDefault();
@@ -1986,6 +2003,13 @@ export class TableEditor {
       });
     });
     this.on(this.resizeBar, "pointerdown", (ev) => this.startResize(ev, this.resizeBar));
+    // 手机、平板上拖把手：触摸事件别传到 Obsidian，不然左右拖会被当成拉出侧栏的手势（小红书反馈 iPad 上拖列宽带出左侧栏）
+    for (const type of ["touchstart", "touchmove"] as const) {
+      this.on(this.resizeBar, type, (ev) => {
+        ev.stopPropagation();
+        if (type === "touchmove" && ev.cancelable) ev.preventDefault();
+      }, { passive: false });
+    }
     this.on(this.fillHandle, "pointerdown", (ev) => this.fillDrag(ev));
     // 宿主改了默认样式（设置变了）
     this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => {
@@ -2050,6 +2074,12 @@ export class TableEditor {
     this.bindInput();
     this.cleanups.push(() => this.input.destroy());
     this.on(doc, "scroll", () => this.formatBar && this.updateFormatBar(), { capture: true, passive: true });
+    // 同上：手指落在菜单范围里时，别让后面的格子、正文拿到这次触摸（会弹键盘、放光标）
+    this.on(doc, "touchstart", (ev) => {
+      const t = ev.touches[0];
+      const fl = t ? this.floatingAt(t.clientX, t.clientY) : null;
+      if (fl && !fl.contains(ev.target as Node) && ev.cancelable) ev.preventDefault();
+    }, { capture: true, passive: false });
     this.on(doc, "pointerdown", (ev) => {
       const target = ev.target as Node;
       // 点格式栏的按钮：还在编辑这一格
@@ -2058,6 +2088,13 @@ export class TableEditor {
       if (this.mobileBar?.contains(target)) return;
       // 点补全列表（状态、[[ 链接、# 标签）：它挂在 body 上，不能当成点到表格外面，不然先按原样退出编辑、列表也关了
       if (this.suggest?.el.contains(target) || this.cal?.el.contains(target)) return;
+      // iPhone 上菜单看得见却点不到（点击判定落到后面的格子、正文上）：按坐标认，落在菜单里就点菜单里那个按钮
+      const fl = this.floatingAt(ev.clientX, ev.clientY);
+      if (fl && !fl.contains(target) && this.tapPopoverAt(ev.clientX, ev.clientY)) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
       if (this.popover && !this.popover.contains(target)) this.closePopover();
       // 点到表格外面：取消选中
       if (this.sel && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
@@ -2066,6 +2103,48 @@ export class TableEditor {
         this.markSel();
       }
     }, { capture: true });
+  }
+
+  /** 挂在页面上的浮层（菜单、格式栏、手机工具条、补全列表、日历）里，坐标落在哪一个上 */
+  private floatingAt(x: number, y: number): HTMLElement | null {
+    for (const el of [this.popover, this.formatBar, this.mobileBar, this.suggest?.el, this.cal?.el]) {
+      if (!el || !el.isConnected) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return el;
+    }
+    return null;
+  }
+
+  /** 坐标在开着的菜单里：按位置找到菜单里的按钮（色块、对齐按钮、菜单项）点它，返回 true；不在菜单里返回 false */
+  private tapPopoverAt(x: number, y: number): boolean {
+    if (!Number.isFinite(x)) return false;
+    const pop = this.floatingAt(x, y);
+    if (!pop) return false;
+    // 坐标下面最小的那个元素（按钮、色块、补全项、日历的日子），给它补一套按下、抬起、点击：有的在按下时就执行，有的在点击时
+    let hit: HTMLElement = pop;
+    let area = Infinity;
+    for (const el of Array.from(pop.querySelectorAll<HTMLElement>("*"))) {
+      const br = el.getBoundingClientRect();
+      if (!br.width || !br.height || x < br.left || x > br.right || y < br.top || y > br.bottom) continue;
+      if (br.width * br.height <= area) {
+        area = br.width * br.height;
+        hit = el;
+      }
+    }
+    const target = hit.closest<HTMLElement>("button, input, select, textarea, [role=menuitem], [role=option], [role=button]") ?? hit;
+    if (target.tagName === "BUTTON" && (target as HTMLButtonElement).disabled) return true;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) {
+      target.focus();
+      return true;
+    }
+    const win = target.ownerDocument.defaultView ?? window;
+    const init = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0 };
+    target.dispatchEvent(new win.PointerEvent("pointerdown", { ...init, pointerType: "touch", isPrimary: true }));
+    target.dispatchEvent(new win.MouseEvent("mousedown", init));
+    target.dispatchEvent(new win.PointerEvent("pointerup", { ...init, pointerType: "touch", isPrimary: true }));
+    target.dispatchEvent(new win.MouseEvent("mouseup", init));
+    target.dispatchEvent(new win.MouseEvent("click", init));
+    return true;
   }
 
   private onKey(ev: KeyboardEvent): void {
@@ -2982,8 +3061,8 @@ export class TableEditor {
       const b = tr?.getBoundingClientRect();
       return b ? { a: b.top, b: b.bottom } : { a: 0, b: 0 };
     }
-    const b = this.tableEl.querySelectorAll("col")[i]?.getBoundingClientRect();
-    return b ? { a: b.left, b: b.right } : { a: 0, b: 0 };
+    const b = this.colBox(i);
+    return { a: b.left, b: b.right };
   }
 
   private showFillPreview(src: Rect, plan: { dir: FillDir; count: number } | null, rows: { a: number; b: number }[], cols: { a: number; b: number }[]): void {
@@ -3102,7 +3181,7 @@ export class TableEditor {
     let html = `<table data-ggt="1"${source ? sourceAttr(source) : ""} style="border-collapse:collapse">`;
     html += "<colgroup>";
     const k = this.scale();
-    for (let c = rect.c1; c <= rect.c2; c++) html += `<col style="width:${Math.round((cols[c]?.getBoundingClientRect().width ?? 80 * k) / k)}px">`;
+    for (let c = rect.c1; c <= rect.c2; c++) html += `<col style="width:${Math.round((cols[c] ? this.colBox(c).width || 80 * k : 80 * k) / k)}px">`;
     html += "</colgroup>";
     for (let r = rect.r1; r <= rect.r2; r++) {
       html += "<tr>";
@@ -3255,6 +3334,8 @@ export class TableEditor {
       if (moved) return;
       pressed = true;
       this.longPressAt = performance.now();
+      // 编辑着（空格子里长按）：先收起编辑，键盘下去，菜单不被挡
+      if (this.editing) this.commit();
       this.setSel(p, false);
       this.openMenu(this.cellMenu(p), x0, y0);
     }, 500);
@@ -3301,9 +3382,9 @@ export class TableEditor {
       const c1 = under ? Number(under.dataset.c) : -1;
       const c2 = under ? c1 + under.colSpan - 1 : -1;
       const cols = Array.from(this.tableEl.querySelectorAll("col"));
-      cols.forEach((col, c) => {
+      cols.forEach((_col, c) => {
         if (c >= c1 && c < c2) return;
-        const right = col.getBoundingClientRect().right;
+        const right = this.colBox(c).right;
         if (hit < 0 && Math.abs(x - right) <= 4) {
           hit = c;
           at = right;
@@ -3339,7 +3420,7 @@ export class TableEditor {
     const t = this.tableEl.getBoundingClientRect();
     const base = this.root.getBoundingClientRect();
     const k = this.scale();
-    const at = col.getBoundingClientRect().right;
+    const at = this.colBox(c).right;
     bar.dataset.c = String(c);
     bar.setAttribute("style", `left:${(at - base.left) / k - 4}px;top:${(t.top - base.top) / k}px;height:${t.height / k}px`);
     // 把手的圆点放在选中那一格的高度上，手指好找
@@ -3358,7 +3439,7 @@ export class TableEditor {
     const col = this.tableEl.querySelectorAll("col")[c];
     if (!col || Number.isNaN(c)) return;
     const k = this.scale();
-    this.resize = { c, startX: ev.clientX, startW: col.getBoundingClientRect().width / k, col, fitW: this.root.classList.contains("is-fit") ? parseFloat(this.tableEl.style.width) || 0 : 0, scale: this.fitScale };
+    this.resize = { c, startX: ev.clientX, startW: this.colBox(c).width / k, col, fitW: this.root.classList.contains("is-fit") ? parseFloat(this.tableEl.style.width) || 0 : 0, scale: this.fitScale };
     const startLeft = parseFloat(handle.style.left) || 0;
     // 触屏把手的圆点高度（重写 style 时别丢了）
     const grip = handle.style.getPropertyValue("--ggt-grip-y");
@@ -3765,10 +3846,35 @@ export class TableEditor {
     ];
   }
 
+  /**
+   * 第 c 列在屏幕上的左右边：Chromium 量 <col> 就行；iPhone、iPad（WebKit）上 <col> 量出来一律是 0，
+   * 这时用这一列的格子（不跨列的那种；都被合并盖住时取格子的边线）算。调列宽的把手就是按它放的，
+   * 以前在手机上全跑到表格最左边，一拖就成了 Obsidian 拉出侧栏的手势（小红书反馈）
+   */
+  private colBox(c: number): { left: number; right: number; width: number } {
+    const col = this.tableEl.querySelectorAll("col")[c];
+    const b = col?.getBoundingClientRect();
+    if (b && b.width > 0) return { left: b.left, right: b.right, width: b.width };
+    let left = NaN;
+    let right = NaN;
+    for (const el of Array.from(this.tableEl.querySelectorAll<HTMLTableCellElement>(".ggt-cell"))) {
+      const c0 = Number(el.dataset.c);
+      const c1 = c0 + (el.colSpan || 1) - 1;
+      if (c0 !== c && c1 !== c) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width) continue;
+      if (c0 === c && Number.isNaN(left)) left = r.left;
+      if (c1 === c && Number.isNaN(right)) right = r.right;
+      if (!Number.isNaN(left) && !Number.isNaN(right)) break;
+    }
+    if (Number.isNaN(left) || Number.isNaN(right)) return { left: 0, right: 0, width: 0 };
+    return { left, right, width: right - left };
+  }
+
   /** 每列现在实际的宽度 */
   private colWidths(): number[] {
     const k = this.scale();
-    return Array.from(this.tableEl.querySelectorAll("col")).map((c) => c.getBoundingClientRect().width / k);
+    return Array.from(this.tableEl.querySelectorAll("col")).map((_c, i) => this.colBox(i).width / k);
   }
 
   /**
@@ -3793,7 +3899,7 @@ export class TableEditor {
     const natural = t.offsetWidth;
     if (avail <= 0 || !natural || natural <= avail + 1) return;
     const k = this.scale();
-    const ws = cols.map((c) => c.getBoundingClientRect().width / k);
+    const ws = cols.map((_c, i) => this.colBox(i).width / k);
     const sum = ws.reduce((a, b) => a + b, 0);
     if (!sum) return;
     const f = avail / sum;
@@ -3807,7 +3913,12 @@ export class TableEditor {
   /** 正文给表格的宽度（量外层，表格自己比它宽时就要横向滚动） */
   private availWidth(): number {
     const host = this.root.parentElement;
-    return host ? host.clientWidth - 2 : 0;
+    return host ? host.clientWidth - 2 - this.mobileRoom() : 0;
+  }
+
+  /** 手机、平板上加号收在正文里（外框不往右伸出，见 styles.css），表格能用的宽度少这一截 */
+  private mobileRoom(): number {
+    return this.root.ownerDocument.body.classList.contains("is-mobile") ? 26 : 0;
   }
 
   /** 撑满页面：按现在各列的比例放大 / 缩小到正文的可用宽度 */
@@ -3816,7 +3927,7 @@ export class TableEditor {
     const sum = ws.reduce((a, b) => a + b, 0) || 1;
     const host = this.root.parentElement;
     // 表格外层左右各有一点留白（放手柄、加号）
-    const avail = (host?.clientWidth ?? sum) - 4;
+    const avail = (host?.clientWidth ?? sum) - 4 - this.mobileRoom();
     return ws.map((w) => (w / sum) * avail);
   }
 
@@ -4188,7 +4299,7 @@ export class TableEditor {
     this.closePopover();
     this.menuAt = { x, y };
     const doc = this.root.ownerDocument;
-    const pop = doc.body.appendChild(doc.createElement("div"));
+    const pop = popupParent(doc).appendChild(doc.createElement("div"));
     pop.className = "ggt-menu";
     pop.setAttribute("role", "menu");
     let swatches: HTMLElement | null = null;
