@@ -4,6 +4,19 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.91.0] - 2026-11-20
+
+### 改进
+- 右上角的脑图 / Markdown 切换改成一个开关：两个视图里长得一样、位置一样（这排按钮的最右边），当前所在的那一半高亮（群友反馈：原来两边是两个不同的图标，来回切总点错）。
+- 节点里表格的尺寸设置调节范围加大：最大宽度到 4000，最大高度到 3000（原来是 1600 和 1200）。
+
+### 新增
+- Markdown 编辑器的右键菜单和命令里加了「在脑图中定位」：选中光标所在行对应的节点。旁边开着这篇的脑图就在那边选中，没开就把这个标签页切成脑图。
+- 在 Markdown 里，光标在列表项或标题下面的表格里时，右键菜单和命令可以把它设为节点表格（给那一行加上 `%%table%%`），或放回备注。
+
+### 修复
+- 给表格「拷贝块链接」后，Obsidian 在表格下面单独一行写的块标识（`^id`）会显示在脑图节点表格的下面。现在它跟着表格不显示，文件里的文字不变。
+
 ## [0.90.1] - 2026-11-20
 
 ### 修复
@@ -1160,7 +1173,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...HEAD
+[0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
 [0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3

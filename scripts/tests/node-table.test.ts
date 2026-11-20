@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseMarkdown, serializeMarkdown } from "../../src/markdown";
-import { addTable, blankBeforeNodeTables, noteRest, noteTable, withoutTable, withTable } from "../../src/node-table";
+import { addTable, blankBeforeNodeTables, noteRest, noteTable, toggleTableMarkerAt, withoutTable, withTable } from "../../src/node-table";
 import { setCell, setBg } from "../../src/table/core/ops";
 
 const parse = (t: string) => parseMarkdown(t, { fallbackTitle: "" });
@@ -74,4 +74,41 @@ test("保存时给 0.46.0 写的节点表格补空行：只动带 %%table%% 的�
   assert.equal(blankBeforeNodeTables("- 同步 %%table%%\n\n\t| a |"), "- 同步 %%table%%\n\n\t| a |");
   assert.equal(blankBeforeNodeTables("- 备注里的表\n\t| a |"), "- 备注里的表\n\t| a |");
   assert.equal(blankBeforeNodeTables("```\n- x %%table%%\n\t| a |\n```"), "```\n- x %%table%%\n\t| a |\n```");
+});
+
+test("表格的块标识（拷贝块链接时写在表格下面单独一行）不当备注显示，原文不动", () => {
+  const T = "| a | b |\n| --- | --- |\n| 1 | 2 |";
+  // 隔一个空行（拷贝块链接写的就是这种）
+  assert.equal(noteRest(`${T}\n\n^nb-mwnorlte`), "");
+  assert.equal(noteRest(`${T}\n\n^nb-mwnorlte\n\n后面一句`), "后面一句");
+  // 紧贴表格
+  assert.equal(noteRest(`${T}\n^tbl-1\n\n后面一句`), "后面一句");
+  // 不挨着表格的 ^id 还是备注里的字
+  assert.equal(noteRest(`${T}\n\n中间一句\n\n^p-1`), "中间一句\n\n^p-1");
+  // 改表格写回：块标识留在原处
+  const note = `${T}\n\n^nb-mwnorlte`;
+  const nt = noteTable(note)!;
+  assert.ok(withTable(note, nt.table, false).endsWith("\n\n^nb-mwnorlte"));
+});
+
+test("Markdown 里把光标所在的表格设为 / 取消节点表格：只改节点那一行", () => {
+  const T = "  | a | b |\n  | --- | --- |\n  | 1 | 2 |";
+  const src = `# 根\n- 甲\n\n${T}\n- 乙\n`;
+  const r = toggleTableMarkerAt(src, 4);
+  assert.deepEqual(r, { line: 1, text: "- 甲 %%table%%", on: true });
+  // 已经是节点表格：去掉
+  const src2 = `# 根\n- 甲 %%red fold table%% ^blk-1\n\n${T}\n`;
+  assert.deepEqual(toggleTableMarkerAt(src2, 3), { line: 1, text: "- 甲 %%red fold%% ^blk-1", on: false });
+  // 已有别的标记、行尾有块标识：加在标记里，块标识留在最后
+  assert.deepEqual(toggleTableMarkerAt(`# 根\n- 甲 %%red%% ^blk-1\n\n${T}\n`, 5), { line: 1, text: "- 甲 %%red table%% ^blk-1", on: true });
+  // 标题下面的表格
+  const h = "# 根\n\n## 服务\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n";
+  assert.deepEqual(toggleTableMarkerAt(h, 5), { line: 2, text: "## 服务 %%table%%", on: true });
+  // 不在表格行上、在中心主题下的表格：不处理
+  assert.equal(toggleTableMarkerAt(src, 1), null);
+  assert.equal(toggleTableMarkerAt("# 根\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n", 3), null);
+  // 改完再读：节点带上了表格
+  const after = src.split("\n");
+  after[1] = r!.text;
+  assert.equal(toggleTableMarkerAt(after.join("\n"), 4)?.on, false);
 });

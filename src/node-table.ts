@@ -7,7 +7,8 @@
 
 import { blockTable, findTables, writeBlock } from "./table/core/find";
 import { emptyTable, serializeBlock, type Table } from "./table/core/table";
-import { normalizeNote, unescapeNote } from "./markdown";
+import { MARKER_RE, normalizeNote, parseMarkdown, pathAtLine, unescapeNote, type RootRule } from "./markdown";
+import { findByPath, type MindNode } from "./model";
 
 export interface NoteTable {
   table: Table;
@@ -61,8 +62,16 @@ export function withoutTable(note: string, inList: boolean): string {
 export function noteRest(note: string): string {
   const nt = noteTable(note);
   if (!nt) return unescapeNote(note);
-  return tidy([...nt.lines.slice(0, nt.start), ...nt.lines.slice(nt.stop)]);
+  // 表格的块标识（「拷贝块链接」时 Obsidian 写在表格下面，隔一个空行单独一行 ^id）是这张表的，跟着表格不显示；
+  // 紧贴表格的那种已经算在表格块里（tail）。只影响显示，原文不动
+  let stop = nt.stop;
+  let k = stop;
+  while (k < nt.lines.length && nt.lines[k].trim() === "") k++;
+  if (k > stop && k < nt.lines.length && BLOCK_ID_LINE.test(nt.lines[k].slice(nt.indent.length))) stop = k + 1;
+  return tidy([...nt.lines.slice(0, nt.start), ...nt.lines.slice(stop)]);
 }
+
+const BLOCK_ID_LINE = /^\^[A-Za-z0-9-]+[ \t]*$/;
 
 /** 在备注最前面加一张空表（表头 + 两行，三列）；备注里原来的文字空一行接在后面 */
 export function addTable(note: string, inList: boolean, rows = 3, cols = 3): string {
@@ -133,4 +142,37 @@ export function blankBeforeNodeTables(text: string): string {
     if (next !== undefined && /^\s+\|/.test(next)) out.push(next.match(/^[ \t]*/)![0]);
   }
   return out.join("\n");
+}
+
+/**
+ * 在 Markdown 里把光标所在的表格设为（或取消）节点表格：给这张表所属的节点那一行加上 / 去掉 %%table%%
+ * （群友反馈：在 Markdown 里写的表格没法变成脑图里的节点表格，只能手写 %%table%%）。
+ * line 是光标所在行（0 起）；这一行不在某个节点（列表项、标题）备注里的表格上，或那是中心主题，返回 null。
+ * 只改节点那一行：已有标记就在里面加减 table，没有就在行尾（块标识 ^id 前面）加 %%table%%
+ */
+export function toggleTableMarkerAt(src: string, line: number, rule: RootRule = {}): { line: number; text: string; on: boolean } | null {
+  const srcLines = src.replace(/\r\n?/g, "\n").split("\n");
+  if (!/^\s*\|/.test(srcLines[line] ?? "")) return null;
+  const path = pathAtLine(src, line, rule);
+  if (!path) return null;
+  const lines = new Map<MindNode, number>();
+  const doc = parseMarkdown(src, { lines, ...rule });
+  const node = findByPath(doc.root, path);
+  const at = node ? lines.get(node) : undefined;
+  if (!node || node === doc.root || at === undefined || at >= line || !noteTable(node.note)) return null;
+  const on = !node.table;
+  const orig = srcLines[at];
+  const hard = / {2}$/.test(orig) ? "  " : "";
+  let body = hard ? orig.slice(0, -2) : orig;
+  const id = /[ \t]+\^[A-Za-z0-9-]+[ \t]*$/.exec(body);
+  const idPart = id ? body.slice(id.index) : "";
+  if (id) body = body.slice(0, id.index);
+  const m = MARKER_RE.exec(body);
+  if (m) {
+    const tokens = m[1].split(/\s+/).filter((x) => x && x.toLowerCase() !== "table");
+    if (on) tokens.push("table");
+    const head = body.slice(0, m.index);
+    body = tokens.length ? `${head} %%${tokens.join(" ")}%%` : head.trimEnd();
+  } else if (on) body = `${body.trimEnd()} %%table%%`;
+  return { line: at, text: body + idPart + hard, on };
 }

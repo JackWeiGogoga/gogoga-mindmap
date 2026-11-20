@@ -48,14 +48,14 @@ const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "
 import { mergeLayout, nodebarDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 import { type ColorMemory, pushRecent } from "./color-palette";
 import { locateBlock, replaceBlock } from "./codeblock";
-import { blankBeforeNodeTables } from "./node-table";
+import { blankBeforeNodeTables, toggleTableMarkerAt } from "./node-table";
 import { preserveFormat } from "./merge";
 import { parseColorList } from "./format";
 import { htmlCharset, titleFromHtml } from "./paste-link";
 import { PdfExcerpt } from "./pdf-excerpt";
 import { Key, setLocale, t } from "./i18n";
 import { setLanguage as setTableLanguage } from "./table/editor/i18n";
-import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
+import { asModeToggle, MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
@@ -1077,6 +1077,7 @@ export default class MindMapPlugin extends Plugin {
       const el = view.addAction(MINDMAP_ICON, t("menu.openAsMindMap"), () => {
         if (view.file) void this.openAsMindMap(view.file, view.leaf);
       });
+      asModeToggle(el, "markdown", t("menu.openAsMindMap"));
       this.mapButtons.set(view, el);
     }
     for (const [view, el] of this.mapButtons) {
@@ -1651,6 +1652,29 @@ export default class MindMapPlugin extends Plugin {
     if (path !== null && leaf.view instanceof MindMapView) leaf.view.revealPath(path, true);
   }
 
+  /** 把 toggleTableMarkerAt 算好的那一行写回编辑器（一次改动，⌘Z 能撤销） */
+  private applyTableMarker(editor: Editor, hit: { line: number; text: string; on: boolean }): void {
+    const old = editor.getLine(hit.line);
+    editor.replaceRange(hit.text, { line: hit.line, ch: 0 }, { line: hit.line, ch: old.length });
+    new Notice(t(hit.on ? "notice.tableInNodeMd" : "notice.tableToNoteMd"));
+  }
+
+  /** Markdown 里光标所在的行 → 脑图里对应的节点：旁边开着这篇的脑图就在那边选中、居中；没开就把这个标签页切成脑图（切过去时本来就按光标选中） */
+  async revealInMindMap(view: MarkdownView): Promise<void> {
+    const file = view.file;
+    if (!file) return;
+    const side = this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP).find((l) => l !== view.leaf && l.view instanceof MindMapView && l.view.file === file);
+    if (!side) {
+      await this.openAsMindMap(file, view.leaf, false);
+      return;
+    }
+    const line = view.getMode() === "preview" ? previewFocusLine(view, this.previewPick.get(view)?.path === file.path ? this.previewPick.get(view) : undefined) : view.editor.getCursor().line;
+    const path = line === null ? null : pathAtLine(view.editor.getValue(), line, this.rootRule());
+    if (path === null) return;
+    await this.app.workspace.revealLeaf(side);
+    (side.view as MindMapView).revealPath(path, true);
+  }
+
   // ---------- 间隔复习 ----------
 
   /** 复习服务要在注册脑图视图之前建好：Obsidian 注册视图时就会恢复开着的脑图，它们一打开就要用 */
@@ -1855,6 +1879,41 @@ export default class MindMapPlugin extends Plugin {
         return true;
       },
     });
+
+    // 反过来定位（群友反馈：脑图能定位到 Markdown，Markdown 没法定位到脑图）：光标所在的行 → 脑图里对应的节点。
+    // 旁边开着这篇的脑图就在那边选中，没开就把这个标签页切成脑图
+    this.addCommand({
+      id: "reveal-in-mindmap",
+      name: t("command.revealInMindMap"),
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view?.file || !this.isMindMapFile(view.file.path)) return false;
+        if (!checking) void this.revealInMindMap(view);
+        return true;
+      },
+    });
+    // Markdown 里把光标所在的表格设为 / 取消节点表格（给它所属的节点加减 %%table%%）
+    this.addCommand({
+      id: "toggle-node-table-in-markdown",
+      name: t("command.toggleNodeTableMd"),
+      editorCheckCallback: (checking, editor, info) => {
+        const view = info instanceof MarkdownView ? info : null;
+        if (!view?.file || !this.isMindMapFile(view.file.path)) return false;
+        const hit = toggleTableMarkerAt(editor.getValue(), editor.getCursor().line, this.rootRule());
+        if (!hit) return false;
+        if (!checking) this.applyTableMarker(editor, hit);
+        return true;
+      },
+    });
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, info) => {
+        const view = info instanceof MarkdownView ? info : null;
+        if (!view?.file || !this.isMindMapFile(view.file.path)) return;
+        menu.addItem((item) => item.setTitle(t("menu.revealInMindMap")).setIcon(MINDMAP_ICON).setSection("view").onClick(() => void this.revealInMindMap(view)));
+        const hit = toggleTableMarkerAt(editor.getValue(), editor.getCursor().line, this.rootRule());
+        if (hit) menu.addItem((item) => item.setTitle(t(hit.on ? "menu.tableInNodeMd" : "menu.tableToNoteMd")).setIcon("table").setSection("view").onClick(() => this.applyTableMarker(editor, hit)));
+      }),
+    );
 
     this.addCommand({
       id: "new-mindmap",

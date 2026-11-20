@@ -4,6 +4,19 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.91.0] - 2026-11-20
+
+### Changed
+- The mind map / Markdown switch at the top right is now one toggle that looks the same and sits in the same place (the far right of the view's buttons) in both views, with the current view highlighted (reported in the user group: the two different icons were easy to mix up).
+- Node table size settings go higher: maximum width up to 4000, maximum height up to 3000 (were 1600 and 1200).
+
+### Added
+- "Show in mind map" in the Markdown editor's right-click menu and as a command: selects the node for the line at the cursor, in the mind map open beside it, or by switching this tab to the mind map.
+- In Markdown, with the cursor in a table under a list item or heading, the right-click menu and a command can make it a node table (adds `%%table%%` to that item's line) or turn it back into a note table.
+
+### Fixed
+- After "Copy block link" on a table, the block ID that Obsidian writes below it (`^id` on its own line) showed under the node table in the mind map. It now stays with the table and isn't shown; the text in the file is unchanged.
+
 ## [0.90.1] - 2026-11-20
 
 ### Fixed
@@ -1160,7 +1173,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...HEAD
+[0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
 [0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3

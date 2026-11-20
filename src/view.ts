@@ -8,7 +8,7 @@ import { type MapReviewDriver, MindMapCanvas, NodeCommand } from "./canvas";
 import { formatInterval, type Grade } from "./review/core/schedule";
 import { Session } from "./review/core/session";
 import { deckIdOf, extractCards } from "./review/mindmap-cards";
-import { MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
+import { asModeToggle, MARKDOWN_ICON, MINDMAP_ICON } from "./icon";
 import { parseColorList, type InlineFormat } from "./format";
 import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
@@ -330,9 +330,11 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   async onOpen(): Promise<void> {
     this.unsubReview = this.plugin.review.onChange(() => void this.refreshReview());
     this.contentEl.addClass("mm-view-content");
-    this.addAction(MARKDOWN_ICON, t("menu.openAsMarkdown"), () => {
+    // 「脑图 | Markdown」开关：先加的在最右边；Markdown 视图里也挪到同一个位置
+    const toggle = this.addAction(MARKDOWN_ICON, t("menu.openAsMarkdown"), () => {
       if (this.file) void this.plugin.openAsMarkdown(this.file, this.leaf);
     });
+    asModeToggle(toggle, "map", t("menu.openAsMarkdown"));
     // 分屏对照：左边 Markdown、右边脑图。旁边已经开着这篇的 Markdown 时藏起来（见 updateSplitSync）
     this.sideAction = this.addAction("columns-2", t("command.openPreview"), () => {
       if (this.file) void this.plugin.openSideBySide(this.file, this.leaf);
