@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- With some themes, clicking into a node table cell to edit it changed the text size (reported in the user group): the theme's editor font size applied to the cell editor. Editing now uses the same size, font and line height as viewing.
+
 ## [0.90.0] - 2026-11-20
 
 ### Added

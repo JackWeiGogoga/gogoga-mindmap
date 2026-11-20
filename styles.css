@@ -3099,6 +3099,8 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 .ggt .ggt-input.ggt-input-cm .cm-scroller { overflow: hidden !important; font-family: inherit !important; line-height: inherit !important; padding: 0 !important; }
 .ggt .ggt-input.ggt-input-cm .cm-content { padding: 0 !important; min-height: 0 !important; caret-color: var(--ggt-sel); font: inherit !important; color: inherit !important; max-width: none !important; white-space: pre-wrap; }
 .ggt .ggt-input.ggt-input-cm .cm-line { padding: 0 !important; text-indent: 0 !important; }
+/* 字号、字体、行高一律跟格子：有的主题给编辑器（.cm-editor、.cm-scroller、.cm-line）定了字号，不压回去编辑时字就比查看时大或小（群友反馈，脑图节点表格里最明显） */
+.ggt .ggt-cell .ggt-input.ggt-input-cm, .ggt .ggt-input.ggt-input-cm :is(.cm-scroller, .cm-content, .cm-line) { font-size: inherit !important; font-family: inherit !important; line-height: inherit !important; }
 .ggt .ggt-input.ggt-input-cm.cm-focused { outline: none !important; }
 .ggt .ggt-input.ggt-input-cm .cm-gutters { display: none !important; }
 .ggt .ggt-input.ggt-input-cm .cm-cursor { border-left-color: var(--ggt-sel); }
