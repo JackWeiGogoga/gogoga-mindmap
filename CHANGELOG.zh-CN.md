@@ -4,8 +4,10 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-11-20
+
 ### 新增
-- 节点表格支持 gogoga Table 的加密列和加密格子：格子显示 ••••••，同时装着 gogoga Table 时可以用它的主密码解锁、点眼睛查看、复制、编辑（编辑框里是明文，按 Enter 后加密写回），两边共用主密码、一起锁定。没装 gogoga Table 时只显示 ••••••，不能解锁，列类型菜单里也没有「加密」。
+- 节点表格支持 gogoga Table 的加密列和加密格子：格子显示 ••••••，同时装着 gogoga Table（0.23.0 及以上）时可以用它的主密码解锁、点眼睛查看、复制、编辑（编辑框里是明文，按 Enter 后加密写回），两边共用主密码、一起锁定。没装 gogoga Table 时只显示 ••••••，不能解锁，列类型菜单里也没有「加密」。
 
 ## [0.89.3] - 2026-11-20
 
@@ -1149,7 +1151,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...HEAD
+[0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1

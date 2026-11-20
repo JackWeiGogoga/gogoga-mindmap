@@ -4,8 +4,10 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-11-20
+
 ### Added
-- Node tables support gogoga Table's encrypted columns and cells: they show ••••••, and with gogoga Table installed you can unlock them with its master password to view, copy and edit them (the editor shows the plain text, which is encrypted when you press Enter). Both plugins share the master password and lock together. Without gogoga Table, encrypted cells only show •••••• and can't be unlocked, and Encrypted isn't offered as a column type.
+- Node tables support gogoga Table's encrypted columns and cells: they show ••••••, and with gogoga Table 0.23.0 or later installed you can unlock them with its master password to view, copy and edit them (the editor shows the plain text, which is encrypted when you press Enter). Both plugins share the master password and lock together. Without gogoga Table, encrypted cells only show •••••• and can't be unlocked, and Encrypted isn't offered as a column type.
 
 ## [0.89.3] - 2026-11-20
 
@@ -1149,7 +1151,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...HEAD
+[0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0
 [0.89.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.2...0.89.3
 [0.89.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.1...0.89.2
 [0.89.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.0...0.89.1
