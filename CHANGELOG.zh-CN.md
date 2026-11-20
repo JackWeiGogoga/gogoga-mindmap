@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.91.1] - 2026-11-20
+
+### 改进
+- 脑图 / Markdown 切换改回一个按钮，两个视图里位置一样：紧挨在 Obsidian 自己的阅读视图、更多选项按钮左边，原生按钮的位置不动（0.91.0 的两段式开关跑到了更多选项右边）。图标是要切过去的那一边。脑图视图里也加了阅读视图按钮，点了切到 Markdown 的阅读模式，这样两个视图的按钮一一对齐（群友反馈）。
+
+### 修复
+- 自定义主题里的「最大宽度」（最大 1200）连节点表格也一起限制了，表格大了就被卡住（群友反馈）。现在它只管文字在哪里换行，节点里的表格按「节点里表格的最大宽度」设置来。
+
 ## [0.91.0] - 2026-11-20
 
 ### 改进
@@ -1173,7 +1181,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...HEAD
+[0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1
 [0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
 [0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0

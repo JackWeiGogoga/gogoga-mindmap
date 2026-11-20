@@ -46,6 +46,7 @@ const en = {
   "command.copyPng": "Copy as image",
   "menu.openAsMarkdown": "Open as Markdown",
   "menu.openAsMindMap": "Open as mind map",
+  "menu.openAsReading": "Open in reading view",
 
   // main.ts
   "hover.display": "Mind map",
@@ -959,6 +960,7 @@ const zh: Record<Key, string> = {
   "command.copyPng": "复制为图片",
   "menu.openAsMarkdown": "以 Markdown 打开",
   "menu.openAsMindMap": "以思维导图打开",
+  "menu.openAsReading": "切换到阅读视图",
 
   "hover.display": "思维导图",
   "notice.setIconFirst": "先在设置里填一个图标值",

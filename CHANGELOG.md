@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.91.1] - 2026-11-20
+
+### Changed
+- The mind map / Markdown switch is a single button again, now in the same place in both views: just left of Obsidian's own reading-view and more-options buttons, which stay where they are (the 0.91.0 two-part toggle sat to the right of more-options). It shows the view it switches to. The mind map view also gets a reading-view button that opens the note in Markdown reading view, so the buttons line up in both views (reported in the user group).
+
+### Fixed
+- A custom theme's maximum node width (at most 1200) also limited node tables, so large tables were squeezed (reported in the user group). It now only sets where text wraps; node tables follow the "Maximum table width in nodes" setting.
+
 ## [0.91.0] - 2026-11-20
 
 ### Changed
@@ -1173,7 +1181,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...HEAD
+[0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1
 [0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
 [0.90.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.0...0.90.1
 [0.90.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.89.3...0.90.0

@@ -1,4 +1,4 @@
-import { addIcon, setIcon } from "obsidian";
+import { addIcon } from "obsidian";
 
 /**
  * 插件自带的脑图图标：Phosphor 的 tree-structure（MIT），
@@ -32,25 +32,4 @@ const MARKDOWN_CONTENT =
 export function registerMindMapIcon(): void {
   addIcon(MINDMAP_ICON, `<g transform="${SCALE}" fill="currentColor" stroke="none">${CONTENT}</g>`);
   addIcon(MARKDOWN_ICON, `<g transform="scale(4.1666667)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${MARKDOWN_CONTENT}</g>`);
-}
-
-/**
- * 标题栏右上角「脑图 | Markdown」切换开关（群友反馈：两个视图里是两个不同的图标，来回切总点错）。
- * 两个视图里长得一样、位置一样（这排按钮的最右边），当前所在的那一半高亮，点哪儿都切到另一边。
- * el 是 view.addAction 返回的按钮
- */
-export function asModeToggle(el: HTMLElement, current: "map" | "markdown", tip: string): void {
-  el.empty();
-  el.addClass("mm-mode-toggle");
-  el.setAttribute("aria-label", tip);
-  el.setAttribute("aria-pressed", String(current === "map"));
-  for (const [mode, icon] of [["map", MINDMAP_ICON], ["markdown", MARKDOWN_ICON]] as const) {
-    const half = el.createSpan({ cls: "mm-mode-toggle-half" });
-    half.toggleClass("is-active", mode === current);
-    setIcon(half, icon);
-  }
-  // 挪到这排按钮的最右边：Markdown 视图里插件的按钮默认排在 Obsidian 自己的阅读 / 编辑切换左边，
-  // 脑图视图里它本来就在最右，这样两边位置一样
-  const bar = el.parentElement;
-  if (bar && bar.lastElementChild !== el) bar.appendChild(el);
 }

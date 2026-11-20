@@ -2430,30 +2430,6 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 .mm-tool .mm-tool-count:empty { display: none; }
 .gg-mm-node.has-review-due::after { content: ""; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-green); box-shadow: 0 0 0 2px var(--mm-bg, var(--background-primary)); pointer-events: none; }
 
-/* 标题栏的「脑图 | Markdown」开关：两个图标并排，当前视图那一半高亮（脑图视图和 Markdown 视图里一样） */
-.view-action.mm-mode-toggle {
-  display: inline-flex;
-  gap: 1px;
-  padding: 2px;
-  width: auto;
-  border-radius: var(--radius-s, 6px);
-  background: var(--background-modifier-hover);
-}
-.view-action.mm-mode-toggle .mm-mode-toggle-half {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 6px;
-  border-radius: calc(var(--radius-s, 6px) - 2px);
-  color: var(--text-faint);
-}
-.view-action.mm-mode-toggle .mm-mode-toggle-half.is-active {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  box-shadow: 0 0 0 1px var(--background-modifier-border);
-}
-.view-action.mm-mode-toggle:hover .mm-mode-toggle-half:not(.is-active) { color: var(--text-muted); }
-
 /* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */
 /*
  * gogoga Table

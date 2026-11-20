@@ -55,7 +55,7 @@ import { htmlCharset, titleFromHtml } from "./paste-link";
 import { PdfExcerpt } from "./pdf-excerpt";
 import { Key, setLocale, t } from "./i18n";
 import { setLanguage as setTableLanguage } from "./table/editor/i18n";
-import { asModeToggle, MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
+import { MARKDOWN_ICON, MINDMAP_ICON, MINDMAP_LIST_ICON, registerMindMapIcon } from "./icon";
 import { PropertyIconDecorator } from "./property-icon";
 import { MenuLike, registerNotebookNavigatorMenus } from "./nn-menus";
 import { NotePickerModal } from "./note-picker";
@@ -1014,7 +1014,8 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /** 从脑图切到 Markdown：选中了节点就跳到它那一行（先落盘，行号按文件里的实际文本算） */
-  async openAsMarkdown(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
+  /** mode 给了就用它（脑图视图里的 📖 打开阅读模式），否则回到上次在这篇 Markdown 里的模式 */
+  async openAsMarkdown(file: TFile, leaf: WorkspaceLeaf, mode?: "source" | "preview"): Promise<void> {
     const from = leaf.view;
     let path: string | null = null;
     if (from instanceof MindMapView && from.file === file) {
@@ -1027,7 +1028,7 @@ export default class MindMapPlugin extends Plugin {
     this.markdownOverride.add(file.path);
     try {
       // 滚动位置跟着打开一起交给 Obsidian（它会等内容排好再滚），和它自己恢复标签页位置走同一条路
-      await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: spot?.mode ?? "source" }, active: true }, spot ? { scroll: spot.scroll } : undefined);
+      await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: mode ?? spot?.mode ?? "source" }, active: true }, spot ? { scroll: spot.scroll } : undefined);
     } finally {
       this.markdownOverride.delete(file.path);
     }
@@ -1077,7 +1078,7 @@ export default class MindMapPlugin extends Plugin {
       const el = view.addAction(MINDMAP_ICON, t("menu.openAsMindMap"), () => {
         if (view.file) void this.openAsMindMap(view.file, view.leaf);
       });
-      asModeToggle(el, "markdown", t("menu.openAsMindMap"));
+      el.addClass("mm-view-switch");
       this.mapButtons.set(view, el);
     }
     for (const [view, el] of this.mapButtons) {

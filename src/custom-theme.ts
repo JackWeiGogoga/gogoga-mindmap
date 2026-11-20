@@ -165,7 +165,8 @@ function tierRules(sel: string, t: TierStyle, depth: number, theme: CustomTheme,
       `${node} { font-size: calc(${t.fontSize}px * var(--mm-font-scale, 1)); font-weight: ${t.bold ? 600 : 400}; font-style: ${t.italic ? "italic" : "normal"}; }`,
       `${node}:not(.is-underline) { border-radius: ${t.radius}px; border: ${border}; }`,
     );
-    if (t.maxWidth) out.push(`${node}:not(.has-width) { max-width: ${t.maxWidth}px; }`);
+    // 最大宽度管的是文字在哪儿换行；节点里的表格有自己的「节点里表格的最大宽度」设置，不受它限制（群友反馈：表格大时被卡在这里）
+    if (t.maxWidth) out.push(`${node}:not(.has-width):not(.has-table) { max-width: ${t.maxWidth}px; }`);
   } else if (t.borderStyle !== "none" && !t.underline) {
     out.push(`${node}:not(.is-underline) { border-color: ${col(t.borderColor, "stroke")}; }`);
   }
