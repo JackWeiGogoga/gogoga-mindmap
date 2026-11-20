@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.91.3] - 2026-11-20
+
+### 修复
+- 节点表格开着「编辑格子时直接显示格式」时，编辑居中、右对齐的格子，字会往左偏一截（随 gogoga Table 同步）。
+
 ## [0.91.2] - 2026-11-20
 
 ### 修复
@@ -1186,7 +1191,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...HEAD
+[0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3
 [0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2
 [0.91.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.0...0.91.1
 [0.91.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.90.1...0.91.0
