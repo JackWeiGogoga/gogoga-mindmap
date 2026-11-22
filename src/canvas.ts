@@ -46,6 +46,8 @@ import {
   stripTypedNumbers,
   TYPED_NUMBER_RE,
   allChildren,
+  type RelShape,
+  REL_SHAPES,
 } from "./model";
 import {
   allSpines,
@@ -386,6 +388,8 @@ export interface CanvasOptions {
   taskProgress?: () => TaskProgressMode;
   /** 完成度放在哪：文字后面（默认），或者文字下面单独一行 */
   taskProgressPos?: () => "end" | "below";
+  /** 没单独设线形的关联线用哪种（#53），默认曲线 */
+  relShape?: () => RelShape;
   /**
    * 每条展开备注单独的状态（单独收起、拖出来的大小）变了，或者节点改名、挪动让文字路径变了：把整份交回去存。
    * 打开文件时由宿主用 setNoteCards 交进来；不接就只在这次打开有效
@@ -2438,7 +2442,8 @@ export class MindMapCanvas {
         }
         this.relOf.set(r.hit, { src, rel });
         this.relOf.set(r.label, { src, rel });
-        const geo = relGeometry(a, b, rel.c, relCubic(rel));
+        const shape = this.relShapeOf(rel);
+        const geo = relGeometry(a, b, rel.c, relCubic(rel), shape);
         if (r.line.getAttribute("d") !== geo.d) {
           r.line.setAttribute("d", geo.d);
           r.hit.setAttribute("d", geo.d);
@@ -2455,7 +2460,7 @@ export class MindMapCanvas {
         r.label.style.left = `${round2(geo.top.x)}px`;
         r.label.style.top = `${round2(geo.top.y)}px`;
         // 选中的线：两头各一个控制点手柄，用细线连到线头（#28）
-        const handles = active && !!this.opts.editable;
+        const handles = active && !!this.opts.editable && shape === "curve";
         r.g.classList.toggle("has-handles", handles);
         r.guides.setAttribute("d", handles ? `M${round2(geo.s.x)},${round2(geo.s.y)} L${round2(geo.h1.x)},${round2(geo.h1.y)} M${round2(geo.e.x)},${round2(geo.e.y)} L${round2(geo.h2.x)},${round2(geo.h2.y)}` : "");
         [geo.h1, geo.h2].forEach((h, j) => {
@@ -2591,6 +2596,11 @@ export class MindMapCanvas {
 
   /** 拖线上的文字 / 手柄改弯曲：弧顶跟着鼠标走。没怎么动就当单击（选中） */
   private dragRelCurve(src: MindNode, rel: Relation, label: HTMLElement, down: PointerEvent): void {
+    // 直线、直角折线没有弯曲可拖：按一下就是选中
+    if (this.relShapeOf(rel) !== "curve") {
+      this.activateRel(rel);
+      return;
+    }
     const start = { x: down.clientX, y: down.clientY };
     const geo = this.relGeoOf(src, rel);
     if (!geo) return;
@@ -2634,7 +2644,20 @@ export class MindMapCanvas {
     const dst = this.relTarget(rel);
     const a = this.layout?.placed.get(src.id);
     const b = dst && this.layout?.placed.get(dst.id);
-    return a && b ? relGeometry(a, b, rel.c, relCubic(rel)) : null;
+    return a && b ? relGeometry(a, b, rel.c, relCubic(rel), this.relShapeOf(rel)) : null;
+  }
+
+  /** 这条关联线画成什么形状：单独设过的用它，否则按设置里的默认线形 */
+  private relShapeOf(rel: Relation): RelShape {
+    return rel.shape ?? this.opts.relShape?.() ?? "curve";
+  }
+
+  /** 改一条关联线的线形；和默认线形一样就不写进文件（跟着设置走） */
+  setRelShape(rel: Relation, shape: RelShape): void {
+    if (!this.opts.editable || this.relShapeOf(rel) === shape) return;
+    rel.shape = shape === (this.opts.relShape?.() ?? "curve") ? undefined : shape;
+    this.render();
+    this.notify();
   }
 
   /**
@@ -2765,7 +2788,12 @@ export class MindMapCanvas {
       { separator: true },
       { title: t("menu.editRelLabel"), icon: "pencil", run: () => this.editRelLabel(rel) },
       { title: t("menu.reverseRel"), icon: "arrow-left-right", run: () => this.reverseRel(src, rel) },
-      { title: t("menu.resetRelCurve"), icon: "spline", disabled: !rel.c && !rel.c1 && !rel.c2, run: () => this.resetRelCurve(rel) },
+      {
+        title: t("menu.relShape"),
+        icon: "waypoints",
+        submenu: REL_SHAPES.map((sh) => ({ title: t(`edge.${sh}`), icon: sh === "curve" ? "spline" : sh === "straight" ? "move-up-right" : "corner-down-right", checked: this.relShapeOf(rel) === sh, run: () => this.setRelShape(rel, sh) })),
+      },
+      { title: t("menu.resetRelCurve"), icon: "spline", disabled: this.relShapeOf(rel) !== "curve" || (!rel.c && !rel.c1 && !rel.c2), run: () => this.resetRelCurve(rel) },
       { separator: true },
       { title: t("menu.deleteRel"), icon: "trash", run: () => this.deleteRel(src, rel) },
     ];

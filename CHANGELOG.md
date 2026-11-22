@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.92.0] - 2026-11-22
+
+### Added
+- Relationship lines can be straight or right-angled (#53): right-click a relationship (long-press on phones) → Line shape → Curved, Straight or Right-angled. The new Relationship line shape setting sets the default for lines you haven't changed, so if you mostly draw straight lines you only change it once.
+- Custom themes get a Canvas background (#51): pick a background color for the canvas; dark mode gets a darker version automatically, and exported images use it too.
+- New Node font setting (#48): follow the interface font (default), follow the text font, or name a font installed on the device.
+- Node tables can merge cells on phones and tablets: long-press a cell, drag the dot at its bottom-right corner to select a block, then tap "Merge cells"; the toolbar above the keyboard also gets a Table menu button (synced from gogoga Table).
+
+### Fixed
+- On phones, the table toolbar above the keyboard didn't show while editing a node table (synced from gogoga Table).
+- On phones, long-pressing a node-table cell with the keyboard up opened the menu behind the keyboard (synced from gogoga Table).
+
 ## [0.91.4] - 2026-11-21
 
 ### Fixed
@@ -1196,7 +1208,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...HEAD
+[0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3
 [0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2

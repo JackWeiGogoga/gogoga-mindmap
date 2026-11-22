@@ -12,7 +12,7 @@
  * 对非规范格式的文件只规范化空行和缩进，不丢内容。
  */
 
-import { attachSummaryTopics, type BranchLayout, isBranchLayout, orderedBullet, walkAll, fileChildren, fixTopics, isSummaryTopic, withTopics, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
+import { attachSummaryTopics, type BranchLayout, isBranchLayout, orderedBullet, walkAll, fileChildren, fixTopics, isSummaryTopic, withTopics, Boundary, createNode, findByPath, FloatPos, HiddenSpan, isAncestor, pathOf, Relation, type RelShape, stripHidden, Summary, DocStyle, MindDoc, MindNode, NODE_MAX_WIDTH, NODE_MIN_WIDTH, NodeKind, normalizeBoxes } from "./model";
 
 export const COLOR_NAMES = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "gray"] as const;
 export type ColorName = (typeof COLOR_NAMES)[number];
@@ -147,6 +147,9 @@ export function splitMarker(text: string): { text: string; marker: Marker } {
       const rel = marker.rels[marker.rels.length - 1];
       const which = lower.slice(0, eq) as "c" | "c1" | "c2";
       rel[which] = { x, y };
+    } else if (/^line=(curve|straight|elbow)$/.test(lower) && marker.rels?.length) {
+      // 线形跟着前面最近的那条 rel（#53）
+      marker.rels[marker.rels.length - 1].shape = lower.slice(5) as RelShape;
     } else if (/^id=/.test(lower) && REL_ID_RE.test(t.slice(3))) {
       marker.anchor = t.slice(3);
     } else if (tok[1] === "box") {
@@ -254,6 +257,7 @@ export function formatMarker(
     parts.push(`rel=${r.to}${label ? ` "${label}"` : ""}`);
     if (r.c1 && r.c2) parts.push(`c1=${Math.round(r.c1.x)},${Math.round(r.c1.y)}`, `c2=${Math.round(r.c2.x)},${Math.round(r.c2.y)}`);
     else if (r.c) parts.push(`c=${Math.round(r.c.x)},${Math.round(r.c.y)}`);
+    if (r.shape) parts.push(`line=${r.shape}`);
   }
   return parts.length ? ` %%${parts.join(" ")}%%` : "";
 }

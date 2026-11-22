@@ -13,7 +13,7 @@
  */
 
 import { t } from "./i18n";
-import { boxGroups, type BranchLayout, isSummaryTopic, MindNode, summaryGroups, visibleChildren } from "./model";
+import { boxGroups, type BranchLayout, isSummaryTopic, MindNode, type RelShape, summaryGroups, visibleChildren } from "./model";
 
 export type Structure =
   | "logic-right"
@@ -1447,9 +1447,12 @@ export function relGeometry(
   b: { x: number; y: number; w: number; h: number },
   c?: Pt,
   cubic?: { c1: Pt; c2: Pt },
+  shape: RelShape = "curve",
 ): RelGeometry {
   const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
   const cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  if (shape === "straight") return straightRel(a, b, ca, cb);
+  if (shape === "elbow") return elbowRel(a, b, ca, cb);
   if (cubic) return cubicRel(a, b, ca, cb, cubic.c1, cubic.c2);
   const off = c ?? defaultRelOffset(ca, cb);
   const top = { x: (ca.x + cb.x) / 2 + off.x, y: (ca.y + cb.y) / 2 + off.y };
@@ -1476,6 +1479,57 @@ export function relGeometry(
   const h1 = { x: s.x + ((q.x - s.x) * 2) / 3, y: s.y + ((q.y - s.y) * 2) / 3 };
   const h2 = { x: e.x + ((q.x - e.x) * 2) / 3, y: e.y + ((q.y - e.y) * 2) / 3 };
   return { d, arrow, top, c: off, s, e, h1, h2 };
+}
+
+/** 直线（#53）：两头从节点中心朝对方出发，文字在中点；没有弯曲，手柄不用 */
+function straightRel(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, ca: Pt, cb: Pt): RelGeometry {
+  const s = rectExit(a, cb);
+  const e = rectExit(b, ca);
+  const l = Math.hypot(e.x - s.x, e.y - s.y) || 1;
+  const { arrow, end } = arrowAt(e, (e.x - s.x) / l, (e.y - s.y) / l);
+  const top = { x: (s.x + e.x) / 2, y: (s.y + e.y) / 2 };
+  const d = `M${r2(s.x)},${r2(s.y)} L${r2(end.x)},${r2(end.y)}`;
+  return { d, arrow, top, c: { x: top.x - (ca.x + cb.x) / 2, y: top.y - (ca.y + cb.y) / 2 }, s, e, h1: s, h2: e };
+}
+
+/**
+ * 直角折线（#53）：左右离得远就从侧边出发「横—竖—横」，上下离得远（或左右叠在一起）就从上下边出发「竖—横—竖」，
+ * 文字在中间那一段的中点
+ */
+function elbowRel(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, ca: Pt, cb: Pt): RelGeometry {
+  const dx = cb.x - ca.x;
+  const dy = cb.y - ca.y;
+  const sx = Math.sign(dx) || 1;
+  const sy = Math.sign(dy) || 1;
+  // 横着走得通：两个框左右不重叠
+  const apartX = sx > 0 ? b.x - (a.x + a.w) > 2 * REL_GAP : a.x - (b.x + b.w) > 2 * REL_GAP;
+  const apartY = sy > 0 ? b.y - (a.y + a.h) > 2 * REL_GAP : a.y - (b.y + b.h) > 2 * REL_GAP;
+  const horiz = apartX && (Math.abs(dx) >= Math.abs(dy) || !apartY);
+  let s: Pt;
+  let e: Pt;
+  let d: string;
+  let top: Pt;
+  let ux = 0;
+  let uy = 0;
+  if (horiz) {
+    s = { x: sx > 0 ? a.x + a.w + REL_GAP : a.x - REL_GAP, y: ca.y };
+    e = { x: sx > 0 ? b.x - REL_GAP : b.x + b.w + REL_GAP, y: cb.y };
+    ux = sx;
+    const mx = (s.x + e.x) / 2;
+    const { end } = arrowAt(e, ux, 0);
+    d = `M${r2(s.x)},${r2(s.y)} H${r2(mx)} V${r2(e.y)} H${r2(end.x)}`;
+    top = { x: mx, y: (s.y + e.y) / 2 };
+  } else {
+    s = { x: ca.x, y: sy > 0 ? a.y + a.h + REL_GAP : a.y - REL_GAP };
+    e = { x: cb.x, y: sy > 0 ? b.y - REL_GAP : b.y + b.h + REL_GAP };
+    uy = sy;
+    const my = (s.y + e.y) / 2;
+    const { end } = arrowAt(e, 0, uy);
+    d = `M${r2(s.x)},${r2(s.y)} V${r2(my)} H${r2(e.x)} V${r2(end.y)}`;
+    top = { x: (s.x + e.x) / 2, y: my };
+  }
+  const { arrow } = arrowAt(e, ux, uy);
+  return { d, arrow, top, c: { x: top.x - (ca.x + cb.x) / 2, y: top.y - (ca.y + cb.y) / 2 }, s, e, h1: s, h2: e };
 }
 
 /** 箭头：尖在 e，方向是 u（单位向量）；线停在箭头底边上 */

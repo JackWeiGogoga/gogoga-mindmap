@@ -125,7 +125,12 @@ export interface Relation {
    */
   c1?: { x: number; y: number };
   c2?: { x: number; y: number };
+  /** 线形（#53）：曲线、直线、直角折线；没写就按设置里的默认线形。%%rel=x line=straight%% */
+  shape?: RelShape;
 }
+
+export type RelShape = "curve" | "straight" | "elbow";
+export const REL_SHAPES: RelShape[] = ["curve", "straight", "elbow"];
 
 export interface FloatPos {
   x: number;

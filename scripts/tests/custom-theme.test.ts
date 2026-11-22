@@ -50,3 +50,12 @@ test("旧版固定宽度迁移成最大宽度 + 同层对齐；没设过的保�
   // 已是新格式的不动
   assert.deepEqual(normalizeCustomTheme(theme), theme);
 });
+
+test("画布背景（#51）：设了就写 --mm-bg，深色模式自动推一个深底；没设不出规则", () => {
+  const css = customThemeCss([{ ...theme, canvasBg: "#f7f5ef" }]);
+  assert.match(css, /\.gg-mm-root\[data-custom="custom-abc"\] \{ --mm-bg: #f7f5ef; \}/);
+  const dark = /\.theme-dark \.gg-mm-root\[data-custom="custom-abc"\] \{ --mm-bg: (hsl\([^)]*\)); \}/.exec(css);
+  assert.ok(dark && dark[1] === darkVariant("#f7f5ef", "fill"), css.slice(0, 300));
+  assert.ok(!/--mm-bg/.test(customThemeCss([theme])));
+  assert.ok(!/--mm-bg/.test(customThemeCss([{ ...theme, canvasBg: null }])));
+});

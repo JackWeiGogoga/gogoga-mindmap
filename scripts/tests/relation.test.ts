@@ -102,3 +102,45 @@ test("一个控制点的线也给出画同一条线的两个手柄位置（拖�
   const mid = { x: (q.s.x + 3 * q.h1.x + 3 * q.h2.x + q.e.x) / 8, y: (q.s.y + 3 * q.h1.y + 3 * q.h2.y + q.e.y) / 8 };
   assert.ok(Math.abs(mid.x - q.top.x) < 0.01 && Math.abs(mid.y - q.top.y) < 0.01, JSON.stringify([mid, q.top]));
 });
+
+test("线形（#53）：line= 跟在 rel 后面，读出来、写回一字不差；没有 rel 的 line= 不认", () => {
+  const src = "# T\n\n- 甲 %%rel=r1 \"依赖\" line=straight rel=r2 c1=40,-60 c2=-40,-60 line=elbow%%\n- 乙 %%id=r1%%\n- 丙 %%id=r2%%\n";
+  const doc = parse(src);
+  const a = doc.root.children[0];
+  assert.equal(a.rels?.[0].shape, "straight");
+  assert.equal(a.rels?.[1].shape, "elbow");
+  assert.equal(serializeMarkdown(doc), src);
+  const bad = parse("# T\n\n- 甲 %%line=straight%%\n");
+  assert.equal(bad.root.children[0].text, "甲 %%line=straight%%");
+  const odd = parse("# T\n\n- 甲 %%rel=r1 line=wavy%%\n- 乙 %%id=r1%%\n");
+  assert.equal(odd.root.children[0].rels?.[0].shape, undefined);
+});
+
+test("直线：两头在节点外、朝着对方，文字在中点，箭头沿线", async () => {
+  const { relGeometry } = await import("../../src/layout");
+  const a = { x: 0, y: 0, w: 100, h: 40 };
+  const b = { x: 300, y: 0, w: 100, h: 40 };
+  const g = relGeometry(a, b, undefined, undefined, "straight");
+  assert.ok(g.s.x > 100 && g.s.x < 110 && g.s.y === 20, JSON.stringify(g.s));
+  assert.ok(g.e.x < 300 && g.e.x > 290 && g.e.y === 20, JSON.stringify(g.e));
+  assert.match(g.d, /^M[\d.]+,20 L[\d.]+,20$/);
+  assert.equal(g.top.y, 20);
+  assert.equal(Math.round(g.top.x), Math.round((g.s.x + g.e.x) / 2));
+  // 有弯曲（c、c1/c2）也照样画直线
+  assert.equal(relGeometry(a, b, { x: 0, y: -80 }, { c1: { x: 50, y: -60 }, c2: { x: -50, y: -60 } }, "straight").d, g.d);
+});
+
+test("直角折线：左右分开时横—竖—横，上下分开时竖—横—竖，文字在中间那段", async () => {
+  const { relGeometry } = await import("../../src/layout");
+  const a = { x: 0, y: 0, w: 100, h: 40 };
+  const g = relGeometry(a, { x: 300, y: 200, w: 100, h: 40 }, undefined, undefined, "elbow");
+  assert.match(g.d, /^M[\d.]+,20 H[\d.]+ V220 H[\d.]+$/);
+  assert.equal(g.top.y, 120);
+  // 上下分开、左右叠着：竖着走
+  const v = relGeometry(a, { x: 20, y: 300, w: 100, h: 40 }, undefined, undefined, "elbow");
+  assert.match(v.d, /^M50,[\d.]+ V[\d.]+ H70 V[\d.]+$/);
+  assert.equal(v.top.x, 60);
+  // 往左上：从左边出发
+  const back = relGeometry({ x: 400, y: 200, w: 100, h: 40 }, a, undefined, undefined, "elbow");
+  assert.ok(back.s.x < 400 && back.e.x > 100, back.d);
+});

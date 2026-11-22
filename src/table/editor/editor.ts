@@ -296,6 +296,9 @@ export class TableEditor {
   private scrolledAt = 0;
   /** 最近一次是用手指点的：触屏没有悬停，手柄跟着选中的格子显示 */
   private touched = false;
+  /** 触屏上的「多选格子」：点格子不进编辑，而是从起点选到这一格（相当于电脑上按住 Shift 点），长按选区出菜单 */
+  /** 刚按坐标替菜单点过按钮：这次触摸剩下的事件（iPhone 上 touchstart 在 pointerdown 之后才来，那时菜单已经关了）别再落到后面的正文、格子上 */
+  private swallowUntil = 0;
   /** 每个位置 → 显示它的格子元素（被合并盖住的位置指向左上角那格）。render 时建，大表格里不用每次 querySelector 全表 */
   private grid: HTMLElement[][] = [];
   /** 上一次加了选中样式、十字高亮的格子：下次只清这些，不扫全表 */
@@ -2010,7 +2013,14 @@ export class TableEditor {
         if (type === "touchmove" && ev.cancelable) ev.preventDefault();
       }, { passive: false });
     }
-    this.on(this.fillHandle, "pointerdown", (ev) => this.fillDrag(ev));
+    // 手指拖填充柄是扩大选区（手机上没法拖选、按 Shift），鼠标拖才是填充
+    this.on(this.fillHandle, "pointerdown", (ev) => (ev.pointerType === "mouse" ? this.fillDrag(ev) : this.rangeDrag(ev)));
+    for (const type of ["touchstart", "touchmove"] as const) {
+      this.on(this.fillHandle, type, (ev) => {
+        ev.stopPropagation();
+        if (type === "touchmove" && ev.cancelable) ev.preventDefault();
+      }, { passive: false });
+    }
     // 宿主改了默认样式（设置变了）
     this.on(this.root, "ggt-restyle" as keyof HTMLElementEventMap, () => {
       this.refreshInput();
@@ -2078,10 +2088,16 @@ export class TableEditor {
     this.on(doc, "touchstart", (ev) => {
       const t = ev.touches[0];
       const fl = t ? this.floatingAt(t.clientX, t.clientY) : null;
-      if (fl && !fl.contains(ev.target as Node) && ev.cancelable) ev.preventDefault();
+      const swallow = performance.now() < this.swallowUntil;
+      if (((fl && !fl.contains(ev.target as Node)) || swallow) && ev.cancelable) ev.preventDefault();
     }, { capture: true, passive: false });
     this.on(doc, "pointerdown", (ev) => {
       const target = ev.target as Node;
+      if (performance.now() < this.swallowUntil) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        return;
+      }
       // 点格式栏的按钮：还在编辑这一格
       if (this.formatBar?.contains(target)) return;
       // 点手机工具条的按钮：同上
@@ -2091,13 +2107,16 @@ export class TableEditor {
       // iPhone 上菜单看得见却点不到（点击判定落到后面的格子、正文上）：按坐标认，落在菜单里就点菜单里那个按钮
       const fl = this.floatingAt(ev.clientX, ev.clientY);
       if (fl && !fl.contains(target) && this.tapPopoverAt(ev.clientX, ev.clientY)) {
+        this.swallowUntil = performance.now() + 500;
         ev.preventDefault();
         ev.stopPropagation();
         return;
       }
       if (this.popover && !this.popover.contains(target)) this.closePopover();
-      // 点到表格外面：取消选中
-      if (this.sel && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
+      // 点到表格外面：取消选中。目标是 <html>、<body> 的不算：iPhone 上正文编辑器拿着焦点（键盘弹着）时，每次触摸前会先来一个落在 <html> 上的按下，
+      // 不是真点到了外面（多选格子时它把选区清掉、多选也退了）
+      const bare = target === doc.documentElement || target === doc.body;
+      if (this.sel && !bare && !this.root.contains(target) && !(this.popover && this.popover.contains(target))) {
         if (this.editing) this.commit();
         this.sel = null;
         this.markSel();
@@ -2609,6 +2628,8 @@ export class TableEditor {
       bar.append(s);
     };
     btn("check", "✓", t("mbDone"), () => this.commit());
+    // 编辑着有字的格子时长按交给系统（挪光标、选字、粘贴），表格菜单从这里出：收起编辑和键盘，对这一格弹菜单
+    btn("more-horizontal", "⋯", t("mbMenu"), () => this.menuFromBar());
     btn("undo-2", "↶", t("mbUndo"), () => this.input.undo());
     btn("redo-2", "↷", t("mbRedo"), () => this.input.redo());
     sep();
@@ -2624,10 +2645,16 @@ export class TableEditor {
     btn("arrow-left", "←", t("mbPrevCell"), () => this.editNext(-1));
     btn("arrow-right", "→", t("mbNextCell"), () => this.editNext(1));
     doc.body.append(bar);
+    // Obsidian 自己的编辑工具条（撤销、[[、标签、附件……）只管正文：编辑格子时它会叠在我们这条上面，先藏起来
+    doc.body.classList.add("ggt-cell-editing");
     // 贴在键盘上方：键盘弹出时可见区域变矮（visualViewport），工具条的底边跟着它
     const vv = win.visualViewport;
     const place = () => {
-      const bottom = vv ? Math.max(0, win.innerHeight - (vv.offsetTop + vv.height)) : 0;
+      let bottom = vv ? Math.max(0, win.innerHeight - (vv.offsetTop + vv.height)) : 0;
+      // 没弹软键盘（外接键盘、iPhone 镜像）：Obsidian 底部的浮动导航栏还在，工具条放到它上面，别被压住
+      const nav = doc.querySelector<HTMLElement>(".mobile-navbar");
+      const nb = nav && nav.offsetParent ? nav.getBoundingClientRect() : null;
+      if (nb && nb.height && nb.top < win.innerHeight - bottom) bottom = Math.max(bottom, win.innerHeight - nb.top + 4);
       bar.style.setProperty("--ggt-kb", `${Math.round(bottom)}px`);
     };
     place();
@@ -2640,7 +2667,27 @@ export class TableEditor {
     this.mobileBar = bar;
   }
 
+  private menuFromBar(): void {
+    const p = this.sel;
+    if (!p) return;
+    this.commit();
+    this.touched = true;
+    // 编辑时收起的圆点（拖着多选）重新放出来
+    this.markSel();
+    this.dropKeyboard();
+    const box = this.cellEl(p)?.getBoundingClientRect();
+    if (!box) return;
+    this.openMenu(this.cellMenu(p), box.left, box.bottom + 8, () => this.touchAvoid());
+  }
+
+  /** 触屏上开表格菜单前收起软键盘：焦点在格子的输入框或正文编辑器里，键盘会一直弹着、挡住菜单 */
+  private dropKeyboard(): void {
+    const ae = this.root.ownerDocument.activeElement as HTMLElement | null;
+    if (ae && (ae.isContentEditable || ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) ae.blur();
+  }
+
   private hideMobileBar(): void {
+    if (this.mobileBar) this.root.ownerDocument.body.classList.remove("ggt-cell-editing");
     this.mobileBarCleanup?.();
     this.mobileBarCleanup = null;
     this.mobileBar?.remove();
@@ -3054,6 +3101,61 @@ export class TableEditor {
     handle.addEventListener("pointercancel", cancel);
   }
 
+  /** 手指按住选区右下角的圆点拖：从选区左上角扩到手指下的格子，松手出菜单（合并在最上面） */
+  private rangeDrag(ev: PointerEvent): void {
+    const src = this.rangeRect();
+    if (!src || this.host.readonly) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.closePopover();
+    const handle = this.fillHandle;
+    try {
+      handle.setPointerCapture(ev.pointerId);
+    } catch {
+      // 合成事件
+    }
+    this.touched = true;
+    const start = { r: src.r1, c: src.c1 };
+    const rows = Array.from({ length: rowCount(this.table) }, (_, r) => this.lineBox(r, true));
+    const cols = Array.from({ length: colCount(this.table) }, (_, c) => this.lineBox(c, false));
+    const indexAt = (v: number, lines: { a: number; b: number }[]) => {
+      for (let i = 0; i < lines.length; i++) if (v < lines[i].b) return i;
+      return lines.length - 1;
+    };
+    let last = "";
+    const move = (e: PointerEvent) => {
+      const to = { r: Math.max(start.r, indexAt(e.clientY, rows)), c: Math.max(start.c, indexAt(e.clientX, cols)) };
+      const key = `${to.r},${to.c}`;
+      if (key === last) return;
+      last = key;
+      this.sel = start;
+      this.anchor = null;
+      this.setSel(to, false, true);
+    };
+    const up = (e?: PointerEvent) => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      if (!e || e.type !== "pointerup" || !this.sel) return;
+      const b = handle.getBoundingClientRect();
+      this.openMenu(this.cellMenu(this.sel), b.left, b.bottom + 10, () => this.touchAvoid());
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  }
+
+  /** 选区连同右下角圆点在屏幕上的上下边：触屏菜单避开这一段 */
+  private touchAvoid(): { top: number; bottom: number } | undefined {
+    const r = this.rangeRect();
+    if (!r) return undefined;
+    const a = this.cellEl({ r: r.r1, c: r.c1 })?.getBoundingClientRect();
+    const f = this.fillHandle.classList.contains("is-shown") ? this.fillHandle.getBoundingClientRect() : null;
+    if (!a) return undefined;
+    const bottom = Math.max(this.lineBox(r.r2, true).b, f ? f.bottom + 12 : 0);
+    return { top: a.top, bottom };
+  }
+
   /** 第 i 行（或列）在屏幕上的起止 */
   private lineBox(i: number, row: boolean): { a: number; b: number } {
     if (row) {
@@ -3337,7 +3439,9 @@ export class TableEditor {
       // 编辑着（空格子里长按）：先收起编辑，键盘下去，菜单不被挡
       if (this.editing) this.commit();
       this.setSel(p, false);
-      this.openMenu(this.cellMenu(p), x0, y0);
+      // 菜单别盖住这一格和右下角拖着多选的圆点
+      this.dropKeyboard();
+      this.openMenu(this.cellMenu(p), x0, y0, () => this.touchAvoid());
     }, 500);
     const move = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8) {
@@ -3987,14 +4091,19 @@ export class TableEditor {
     const mergeItems: MenuItem[] = [];
     if (multi && rect) mergeItems.push({ title: t("mergeCells"), icon: "combine", disabled: crossesHead(tb, rect), run: () => this.apply(mergeCells(tb, rect), { r: rect.r1, c: rect.c1 }) });
     if (merged) mergeItems.push({ title: t("unmergeCells"), icon: "split", run: () => this.apply(unmergeAt(tb, p.r, p.c), { r: merged.r1, c: merged.c1 }) });
+    // 触屏上没法拖选、按 Shift：拖右下角的圆点选出一片（iPad 上没法合并格子，小红书 Momo 反馈）。只选着一格时提示一句
+    if (this.touched && !multi && !this.host.readonly) mergeItems.push({ title: t("dragToSelect") });
     const cells = multi ? this.rangeCells() : [p];
     const cols = multi && rect ? Array.from({ length: rect.c2 - rect.c1 + 1 }, (_, i) => rect.c1 + i) : [p.c];
+    // 手指选出一片：合并放最上面，拖完松手就能点到
+    const mergeFirst = this.touched && multi;
     return [
+      ...(mergeFirst ? [...mergeItems, { separator: true }] : []),
       ...this.insertRowItems(p, merged?.r2),
       ...this.insertColItems(p, merged?.c2),
       { separator: true },
-      ...mergeItems,
-      ...(mergeItems.length ? [{ separator: true }] : []),
+      ...(mergeFirst ? [] : mergeItems),
+      ...(!mergeFirst && mergeItems.length ? [{ separator: true }] : []),
       ...this.alignItems(cols),
       { separator: true },
       ...this.statusColorItems(p),
@@ -4295,7 +4404,8 @@ export class TableEditor {
   }
 
   /** 自己画的弹出菜单：样式统一，色块能排成一行，手机上也好点 */
-  private openMenu(items: MenuItem[], x: number, y: number): void {
+  /** avoid：菜单别盖住的一块（屏幕坐标），放不下就贴着它的上边或下边、限高滚动 */
+  private openMenu(items: MenuItem[], x: number, y: number, avoidAt?: () => { top: number; bottom: number } | undefined): void {
     this.closePopover();
     this.menuAt = { x, y };
     const doc = this.root.ownerDocument;
@@ -4415,16 +4525,30 @@ export class TableEditor {
       // iPhone 顶上的状态栏 / 刘海：Obsidian 把安全区写在 --safe-area-inset-top
       const safe = parseFloat(win.getComputedStyle(doc.body).getPropertyValue("--safe-area-inset-top")) || 0;
       const top0 = (vv ? vv.offsetTop : 0) + Math.max(8, safe);
-      const bottom0 = (vv ? vv.offsetTop + vv.height : doc.documentElement.clientHeight) - 8;
+      // iOS 上软键盘盖在网页上面、可见区域不变：再按 Obsidian 写的 --keyboard-height 让出键盘
+      const kb = parseFloat(win.getComputedStyle(doc.documentElement).getPropertyValue("--keyboard-height")) || 0;
+      const bottom0 = Math.min((vv ? vv.offsetTop + vv.height : doc.documentElement.clientHeight) - 8, win.innerHeight - kb - 8);
       pop.style.maxHeight = `${Math.max(120, bottom0 - top0)}px`;
+      const avoid = avoidAt?.();
       const r = pop.getBoundingClientRect();
       pop.style.left = `${Math.max(8, Math.min(x, vw - r.width - 8))}px`;
+      if (avoid) {
+        const roomB = bottom0 - (avoid.bottom + 8);
+        const roomA = avoid.top - 8 - top0;
+        const down = r.height <= roomB || (r.height > roomA && roomB >= roomA);
+        const h = Math.min(r.height, Math.max(120, down ? roomB : roomA));
+        pop.style.maxHeight = `${h}px`;
+        pop.style.top = `${Math.max(top0, down ? avoid.bottom + 8 : avoid.top - 8 - h)}px`;
+        return;
+      }
       const below = y + r.height <= bottom0;
       const above = y - r.height >= top0;
       const top = below ? y : above ? y - r.height : bottom0 - r.height;
       pop.style.top = `${Math.max(top0, top)}px`;
     };
     place();
+    // 刚收起键盘（长按、点「表格菜单」时）：键盘落下去以后按新的空间再放一次
+    if (avoidAt) for (const ms of [350, 700]) window.setTimeout(() => this.popover === pop && place(), ms);
     // 菜单开着时键盘弹出 / 收起：跟着重新放
     const vv = (doc.defaultView ?? window).visualViewport;
     if (vv) {

@@ -154,6 +154,7 @@ export class MindMapEmbed extends Component {
         noteCardFilter: () => settings.noteCardShow,
         taskProgress: () => settings.taskProgress,
         taskProgressPos: () => settings.taskProgressPos,
+        relShape: () => settings.relShape,
         notePopoverSize: this.plugin.notePopoverSize,
         // 用户自己缩放了（不是适应画布那一下）：记住这次的缩放，下次打开这张嵌入的图还用它（链接里写了 |80% 的以链接为准）
         onViewChange: (state) => {

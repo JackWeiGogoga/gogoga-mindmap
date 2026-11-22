@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.92.0] - 2026-11-22
+
+### 新增
+- 关联线可以画成直线、直角折线了（#53）：右键关联线（手机上长按）→「线形」里选曲线、直线或直角折线；设置里的「关联线线形」决定没单独设过的线默认画成什么样，常用直线的话改这一项就行。
+- 自定义主题加了「画布背景」（#51）：可以给画布挑一个底色，深色模式下自动推算一个深色，导出图片也用这个底色。
+- 设置里加了「节点字体」（#48）：跟随界面字体（默认）、跟随正文字体，或者填一个这台设备上装了的字体名。
+- 节点表格在手机、平板上也能合并单元格：长按格子后按住右下角的圆点拖，选出一片，松手点「合并单元格」；编辑格子时键盘上方的工具条加了「表格菜单」按钮（随 gogoga Table 同步）。
+
+### 修复
+- 手机上编辑节点表格时，键盘上方的表格工具条看不到（随 gogoga Table 同步）。
+- 手机上键盘弹着时长按节点表格的格子，菜单被键盘挡住（随 gogoga Table 同步）。
+
 ## [0.91.4] - 2026-11-21
 
 ### 修复
@@ -1196,7 +1208,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...HEAD
+[0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3
 [0.91.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.1...0.91.2

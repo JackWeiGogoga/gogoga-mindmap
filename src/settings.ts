@@ -12,6 +12,7 @@ import { newCustomThemeId, type CustomTheme } from "./custom-theme";
 import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-modal";
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
+import type { RelShape } from "./model";
 import { colorLabel, redrawAllCanvases, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
 import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
 import { colorTitle } from "./format-bar";
@@ -48,6 +49,11 @@ export interface MindMapSettings {
   taskProgress: TaskProgressMode;
   /** 完成度放在文字后面还是下面单独一行 */
   taskProgressPos: "end" | "below";
+  /** 没单独设线形的关联线画成什么样（#53） */
+  relShape: RelShape;
+  /** 节点文字用的字体（#48）：跟随界面字体 / 跟随正文字体 / 自己填的字体名 */
+  mapFont: "interface" | "text" | "custom";
+  mapFontName: string;
   /** 编辑备注时旁边实时显示渲染效果（分栏预览，默认关） */
   notePreview: boolean;
   /** 编辑备注时所见即所得：嵌入 Obsidian 的实时预览编辑器（默认开）；关掉是普通输入框 */
@@ -287,6 +293,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   noteCardShow: "all",
   taskProgress: "off",
   taskProgressPos: "end",
+  relShape: "curve",
+  mapFont: "interface",
+  mapFontName: "",
   notePreview: false,
   noteLiveEdit: true,
   formatBar: false,
@@ -386,7 +395,11 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "noteCardShow":
       case "taskProgress":
       case "taskProgressPos":
+      case "relShape":
         return redrawAllCanvases();
+      case "mapFont":
+      case "mapFontName":
+        return p.applyDisplayScale();
       case "toolbarPosition":
         return p.applyToolbarPosition();
       case "embedToolbar":
@@ -461,6 +474,8 @@ export class MindMapSettingTab extends PluginSettingTab {
           dropdown("defaultTheme", t("settings.theme.name"), t("settings.theme.desc"), Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])), ["style", "风格", "配色"]),
           this.scaleSetting("spacingScale", t("settings.spacing.name"), t("settings.spacing.desc"), 50, 200),
           this.scaleSetting("fontScale", t("settings.fontScale.name"), t("settings.fontScale.desc"), 70, 150),
+          dropdown("mapFont", t("settings.mapFont.name"), t("settings.mapFont.desc"), { interface: t("settings.mapFont.interface"), text: t("settings.mapFont.text"), custom: t("settings.mapFont.custom") }, ["font", "字体", "typeface"]),
+          text("mapFontName", t("settings.mapFontName.name"), t("settings.mapFontName.desc"), "LXGW WenKai", ["font", "字体"]),
           this.sizeSetting("imageThumbWidth", t("settings.imageThumbWidth.name"), t("settings.imageThumbWidth.desc"), 120, 800, t("settings.resetImageThumb")),
           this.sizeSetting("imageMaxWidth", t("settings.imageMaxWidth.name"), t("settings.imageMaxWidth.desc"), 400, 2000, t("settings.resetImageMax")),
           dropdown(
@@ -477,6 +492,7 @@ export class MindMapSettingTab extends PluginSettingTab {
             { end: t("settings.taskProgressPos.end"), below: t("settings.taskProgressPos.below") },
             ["task", "progress", "任务", "进度", "位置", "下方"],
           ),
+          dropdown("relShape", t("settings.relShape.name"), t("settings.relShape.desc"), { curve: t("edge.curve"), straight: t("edge.straight"), elbow: t("edge.elbow") }, ["relationship", "关联线", "直线", "line"]),
         ],
         () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
       ),

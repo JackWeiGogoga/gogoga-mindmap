@@ -43,6 +43,8 @@ export interface CustomTheme {
   dashed: boolean;
   branchColors: boolean;
   spacing: Spacing;
+  /** 画布背景色（#51）；没有就跟着基础主题 / Obsidian 的背景 */
+  canvasBg?: string | null;
   /** 0 中心主题 · 1 主主题 · 2 子主题 · 3 第 3 层及以下 */
   tiers: TierStyle[];
 }
@@ -184,6 +186,11 @@ export function customThemeCss(themes: CustomTheme[]): string {
   const parts: string[] = [];
   for (const th of themes) {
     const sel = `.gg-mm-root[data-custom="${th.id}"]`;
+    // 画布背景：写进 --mm-bg，折叠按钮、文字描边、导出图片的底色都跟着变；深色模式自动推一个深底
+    if (th.canvasBg) {
+      parts.push(`${sel} { --mm-bg: ${th.canvasBg}; }`);
+      parts.push(`.theme-dark ${sel} { --mm-bg: ${darkVariant(th.canvasBg, "fill")}; }`);
+    }
     th.tiers.forEach((t, depth) => {
       parts.push(tierRules(sel, t, depth, th, false));
       parts.push(tierRules(`.theme-dark ${sel}`, t, depth, th, true));

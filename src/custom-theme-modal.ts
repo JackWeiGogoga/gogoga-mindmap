@@ -213,6 +213,26 @@ export class CustomThemeModal extends Modal {
         this.changed();
       }),
     );
+    // 画布背景（#51）：跟随主题，或自己挑一个颜色（深色模式自动推算）
+    new Setting(el)
+      .setName(t("customTheme.canvasBg"))
+      .setDesc(t("customTheme.canvasBgDesc"))
+      .addDropdown((x) =>
+        x
+          .addOptions({ theme: t("customTheme.canvasBg.theme"), custom: t("customTheme.canvasBg.custom") })
+          .setValue(d.canvasBg ? "custom" : "theme")
+          .onChange((v) => {
+            d.canvasBg = v === "custom" ? (d.canvasBg ?? "#f7f5ef") : null;
+            this.changed(true);
+          }),
+      );
+    if (d.canvasBg)
+      new Setting(el).setName(t("customTheme.canvasBgColor")).addColorPicker((x) =>
+        x.setValue(d.canvasBg ?? "#f7f5ef").onChange((v) => {
+          d.canvasBg = v;
+          this.changed();
+        }),
+      );
     new Setting(el).setName(t("customTheme.spacing")).addDropdown((x) =>
       x
         .addOptions({ compact: t("customTheme.spacing.compact"), normal: t("customTheme.spacing.normal"), loose: t("customTheme.spacing.loose") })

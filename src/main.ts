@@ -524,6 +524,11 @@ export default class MindMapPlugin extends Plugin {
     const k = this.settings.fontScale / 100;
     if (k === 1) doc.body.style.removeProperty("--mm-font-scale");
     else doc.body.style.setProperty("--mm-font-scale", String(k));
+    // 节点字体（#48）：样式表的 --mm-font 先看 --mm-font-user，没有就跟界面字体
+    const fontName = this.settings.mapFontName.trim().replace(/["\\;{}]/g, "");
+    const font = this.settings.mapFont === "text" ? "var(--font-text)" : this.settings.mapFont === "custom" && fontName ? `"${fontName}", var(--font-interface)` : "";
+    if (font) doc.body.style.setProperty("--mm-font-user", font);
+    else doc.body.style.removeProperty("--mm-font-user");
     // 没设宽度的图片默认显示多宽（样式表按它算高度上限和中心主题里的宽度）
     const thumb = this.settings.imageThumbWidth;
     if (thumb === DEFAULT_SETTINGS.imageThumbWidth) doc.body.style.removeProperty("--mm-img-thumb-w");
@@ -2359,6 +2364,7 @@ export default class MindMapPlugin extends Plugin {
       noteCardFilter: () => this.settings.noteCardShow,
       taskProgress: () => this.settings.taskProgress,
       taskProgressPos: () => this.settings.taskProgressPos,
+      relShape: () => this.settings.relShape,
       notePopoverSize: this.notePopoverSize,
     };
   }
