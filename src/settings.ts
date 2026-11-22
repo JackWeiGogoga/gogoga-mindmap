@@ -112,6 +112,8 @@ export interface MindMapSettings {
   outlineOpen: boolean;
   /** 大纲面板里的标题换行显示全文（默认一行，放不下就省略） */
   outlineWrap: boolean;
+  /** 大纲面板的折叠同步到脑图（以前的做法）；默认大纲自己折叠 */
+  outlineFoldSync: boolean;
   /**
    * 写进 frontmatter `icon` 属性的值，让文件列表显示图标。
    * Notebook Navigator、Iconize 等都读这个属性；留空则不写。
@@ -245,6 +247,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   rememberViewport: true,
   outlineOpen: false,
   outlineWrap: false,
+  outlineFoldSync: false,
   toolbarPosition: "bottom",
   showNodebar: true,
   zenHideObsidian: true,
@@ -589,6 +592,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           toggle("foldFollow", t("settings.foldFollow.name"), t("settings.foldFollow.desc"), ["fold", "折叠"]),
           toggle("followActiveNote", t("settings.followActive.name"), t("settings.followActive.desc"), ["sidebar", "侧边栏"]),
           toggle("outlineWrap", t("settings.outlineWrap.name"), t("settings.outlineWrap.desc"), ["outline", "大纲"]),
+          toggle("outlineFoldSync", t("settings.outlineFoldSync.name"), t("settings.outlineFoldSync.desc"), ["outline", "大纲", "fold", "折叠"]),
         ]),
         group(t("settings.group.noteDisplay"), [
           toggle("hideTagsInNotes", t("settings.hideTagsInNotes.name"), t("settings.hideTagsInNotes.desc"), ["html", "span", "mark", "标签", "下划线", "underline", "颜色"]),

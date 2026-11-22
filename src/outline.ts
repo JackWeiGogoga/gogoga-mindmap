@@ -4,11 +4,20 @@
  * 所有改动都通过画布的方法进行，Markdown 与画布随之更新。
  */
 
+import { Menu } from "obsidian";
 import type { MindMapCanvas } from "./canvas";
 import { t } from "./i18n";
 import { InlineEditor } from "./inline-editor";
 import { plainText } from "./inline";
-import { isSummaryTopic, MindNode, numberLabel, visibleChildren, withTopics } from "./model";
+import { isSummaryTopic, MindNode, numberLabel, walkMap, withTopics } from "./model";
+
+/** 大纲折叠（#49）：默认大纲自己记折叠，不动脑图；打开 sync 就和以前一样直接折叠脑图 */
+export interface OutlineFoldOptions {
+  sync: () => boolean;
+  setSync: (on: boolean) => void;
+  /** 大纲自己的折叠状态（节点 id），放在视图上，关掉再开大纲面板还在 */
+  folded: Set<string>;
+}
 
 export class OutlinePanel {
   readonly el: HTMLElement;
@@ -17,7 +26,12 @@ export class OutlinePanel {
   private editing: { node: MindNode; editor: InlineEditor; isNew: boolean } | null = null;
   private disposers: (() => void)[] = [];
 
-  constructor(container: HTMLElement, private canvas: MindMapCanvas, onClose: () => void) {
+  constructor(
+    container: HTMLElement,
+    private canvas: MindMapCanvas,
+    onClose: () => void,
+    private fold: OutlineFoldOptions = { sync: () => true, setSync: () => {}, folded: new Set() },
+  ) {
     this.el = container;
     this.el.classList.add("mm-outline");
     this.el.tabIndex = 0;
@@ -31,7 +45,18 @@ export class OutlinePanel {
     canvas.tipFor(close, t("outline.close"), "left");
     close.textContent = "×";
     close.addEventListener("click", onClose);
-    header.append(title, close);
+    const levels = createEl("button");
+    levels.type = "button";
+    levels.className = "mm-tool mm-outline-levels";
+    canvas.tipFor(levels, t("outline.levels"), "left");
+    levels.textContent = "≣";
+    levels.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      this.openLevelMenu(ev);
+    });
+    const tools = createDiv({ cls: "mm-outline-tools" });
+    tools.append(levels, close);
+    header.append(title, tools);
     this.list = createDiv();
     this.list.className = "mm-outline-list";
     this.el.append(header, this.list);
@@ -69,11 +94,11 @@ export class OutlinePanel {
       if (isSummaryTopic(node)) row.classList.add("is-summary-topic");
 
       const chevron = createSpan();
-      chevron.className = "mm-outline-chevron" + (node.children.length ? "" : " is-leaf") + (node.folded ? " is-folded" : "");
+      chevron.className = "mm-outline-chevron" + (node.children.length ? "" : " is-leaf") + (this.isFolded(node) ? " is-folded" : "");
       chevron.textContent = node.children.length ? "▾" : "";
       chevron.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        this.canvas.toggleFold(node);
+        this.toggle(node);
       });
       row.append(chevron);
 
@@ -102,6 +127,8 @@ export class OutlinePanel {
       }
 
       row.addEventListener("click", () => {
+        // 大纲自己折叠时，这一项在脑图上可能还收在折叠分支里：展开它的上级再选中
+        this.canvas.unfoldAncestors(node);
         this.canvas.select(node);
         this.canvas.centerOn(node);
         this.el.focus({ preventScroll: true });
@@ -112,16 +139,71 @@ export class OutlinePanel {
       });
       this.list.append(row);
       this.rows.set(node.id, row);
-      for (const c of withTopics(visibleChildren(node))) visit(c);
+      for (const c of withTopics(this.shownChildren(node))) visit(c);
     };
     visit(doc.root);
     this.list.scrollTop = scroll;
   }
 
+  private isFolded(node: MindNode): boolean {
+    return this.fold.sync() ? !!node.folded : this.fold.folded.has(node.id);
+  }
+
+  private shownChildren(node: MindNode): MindNode[] {
+    return this.isFolded(node) ? [] : node.children;
+  }
+
+  private toggle(node: MindNode): void {
+    if (this.fold.sync()) {
+      this.canvas.toggleFold(node);
+      return;
+    }
+    if (!this.fold.folded.delete(node.id)) this.fold.folded.add(node.id);
+    this.refresh();
+  }
+
+  /** 大纲只显示到第 level 层（null = 全部展开）；同步模式下就是脑图的「显示到第 N 层」 */
+  setLevel(level: number | null): void {
+    const doc = this.canvas.getDoc();
+    if (!doc) return;
+    if (this.fold.sync()) {
+      this.canvas.setFoldLevel(level);
+      return;
+    }
+    this.fold.folded.clear();
+    if (level !== null) walkMap(doc.root, (n) => {
+      if (n.children.length && n.depth >= level) this.fold.folded.add(n.id);
+    });
+    this.refresh();
+  }
+
+  private openLevelMenu(ev: MouseEvent): void {
+    const menu = new Menu();
+    menu.addItem((i) => i.setTitle(t("canvas.expandAll")).onClick(() => this.setLevel(null)));
+    menu.addItem((i) => i.setTitle(t("canvas.mainTopicsOnly")).onClick(() => this.setLevel(1)));
+    menu.addItem((i) => i.setTitle(t("canvas.showToLevel", { n: 2 })).onClick(() => this.setLevel(2)));
+    menu.addItem((i) => i.setTitle(t("canvas.showToLevel", { n: 3 })).onClick(() => this.setLevel(3)));
+    menu.addSeparator();
+    menu.addItem((i) =>
+      i
+        .setTitle(t("outline.foldSync"))
+        .setChecked(this.fold.sync())
+        .onClick(() => {
+          this.fold.setSync(!this.fold.sync());
+          this.refresh();
+        }),
+    );
+    menu.showAtMouseEvent(ev);
+  }
+
   syncSelection(primary: MindNode | null): void {
     for (const row of this.rows.values()) row.classList.remove("is-selected");
     if (!primary) return;
-    const row = this.rows.get(primary.id);
+    // 选中的节点在大纲里收着：高亮最近的那个露出来的上级
+    let shown: MindNode | null = primary;
+    while (shown && !this.rows.has(shown.id)) shown = shown.parent;
+    if (!shown) return;
+    const row = this.rows.get(shown.id);
     if (!row) return;
     row.classList.add("is-selected");
     row.scrollIntoView({ block: "nearest" });
@@ -133,7 +215,7 @@ export class OutlinePanel {
     const out: MindNode[] = [];
     const visit = (n: MindNode) => {
       out.push(n);
-      for (const c of withTopics(visibleChildren(n))) visit(c);
+      for (const c of withTopics(this.shownChildren(n))) visit(c);
     };
     visit(doc.root);
     return out;
@@ -201,7 +283,7 @@ export class OutlinePanel {
         return;
       case " ":
         ev.preventDefault();
-        if (node?.children.length) this.canvas.toggleFold(node);
+        if (node?.children.length) this.toggle(node);
         return;
       case "F2":
         ev.preventDefault();

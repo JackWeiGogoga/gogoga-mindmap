@@ -4,6 +4,12 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-11-22
+
+### Added
+- Search lists every matching node (#50): the search bar shows the results below the box, with the match highlighted (and the matching bit of the note when the match is only in a note); click one to jump to it. On phones the list folds away after a tap so it doesn't cover the map, and the list button brings it back.
+- The outline panel folds on its own (#49): folding in the outline no longer folds the map, so you can collapse the outline to one or two levels to find your way around while the map stays as it is. The new Show levels button in the outline header expands all or shows up to level 1, 2 or 3. To get the old behaviour back, turn on "Folding also folds the map" in that menu (or "Outline folding also folds the map" in settings).
+
 ## [0.92.0] - 2026-11-22
 
 ### Added
@@ -1208,7 +1214,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...HEAD
+[0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0
 [0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3

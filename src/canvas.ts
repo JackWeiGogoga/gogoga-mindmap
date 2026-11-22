@@ -863,7 +863,7 @@ export class MindMapCanvas {
   private pendingSelectPath: string | null = null;
   /** 触屏：按住节点不动一段时间才进入拖拽，期间手指移动视为平移 */
   private touchPress: { node: MindNode; timer: number; ev: PointerEvent } | null = null;
-  private search: { bar: HTMLElement; input: HTMLInputElement; count: HTMLElement; matches: Set<MindNode>; list: MindNode[]; index: number } | null = null;
+  private search: { bar: HTMLElement; input: HTMLInputElement; count: HTMLElement; results: HTMLElement; matches: Set<MindNode>; list: MindNode[]; index: number; listOpen: boolean } | null = null;
   private foldMenu: HTMLElement | null = null;
   private linkMenu: HTMLElement | null = null;
   private linking = false;
@@ -7977,16 +7977,41 @@ export class MindMapCanvas {
       });
       return b;
     };
-    bar.append(
+    // 命中节点列表（#50）：点一条跳过去；手机上点完收起列表和键盘，点列表按钮再展开
+    const results = createDiv();
+    results.className = "mm-search-results";
+    results.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
+    results.addEventListener("click", (ev) => {
+      const row = (ev.target as HTMLElement).closest<HTMLElement>(".mm-search-item");
+      const s = this.search;
+      if (!row || !s) return;
+      ev.stopPropagation();
+      s.index = Number(row.dataset.index);
+      this.applyMatchClasses();
+      if (this.touchUi()) {
+        this.setSearchList(false);
+        input.blur();
+        this.revealMatch(false);
+      } else this.revealMatch();
+    });
+    const row = createDiv();
+    row.className = "mm-search-row";
+    bar.append(row, results);
+    row.append(
       input,
       count,
+      tool("outline", t("canvas.searchList"), () => this.setSearchList(!this.search?.listOpen)),
       tool("up", t("canvas.prevMatch", { key: sc("Shift", "Enter") }), () => this.stepMatch(-1)),
       tool("down", t("canvas.nextMatch", { key: sc("Enter") }), () => this.stepMatch(1)),
       tool("close", t("canvas.closeSearch", { key: "Esc" }), () => this.closeSearch()),
     );
     this.el.append(bar);
-    this.search = { bar, input, count, matches: new Set(), list: [], index: -1 };
-    input.addEventListener("input", () => this.runSearch(input.value));
+    this.search = { bar, input, count, results, matches: new Set(), list: [], index: -1, listOpen: true };
+    input.addEventListener("input", () => {
+      this.setSearchList(true);
+      this.runSearch(input.value);
+    });
+    input.addEventListener("focus", () => this.setSearchList(true));
     input.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
       if (ev.isComposing || ev.keyCode === 229) return;
@@ -8025,8 +8050,68 @@ export class MindMapCanvas {
     s.list = list;
     s.matches = new Set(list);
     s.index = list.length ? Math.min(Math.max(s.index, 0), list.length - 1) : -1;
+    this.renderSearchList(q);
     this.applyMatchClasses();
     if (reveal && s.index >= 0) this.revealMatch();
+  }
+
+  private touchUi(): boolean {
+    return this.el.ownerDocument.body.classList.contains("is-mobile");
+  }
+
+  private setSearchList(open: boolean): void {
+    const s = this.search;
+    if (!s) return;
+    s.listOpen = open;
+    s.bar.classList.toggle("is-list-open", open && s.list.length > 0);
+    s.bar.querySelector('[data-tool="outline"]')?.classList.toggle("is-active", open);
+    if (open) this.scrollCurrentRow();
+  }
+
+  /** 命中列表：节点文字高亮关键词；文字里没有、命中在备注或标注里的，第二行放那一段 */
+  private renderSearchList(q: string): void {
+    const s = this.search;
+    if (!s) return;
+    s.results.empty();
+    const MAX = 300;
+    const mark = (host: HTMLElement, text: string) => {
+      const i = text.toLowerCase().indexOf(q);
+      if (i < 0) {
+        host.append(text);
+        return;
+      }
+      host.append(text.slice(0, i));
+      host.createEl("mark", { text: text.slice(i, i + q.length) });
+      host.append(text.slice(i + q.length));
+    };
+    const snippet = (text: string) => {
+      const flat = text.replace(/\s+/g, " ");
+      const i = flat.toLowerCase().indexOf(q);
+      const from = Math.max(0, i - 12);
+      return (from > 0 ? "…" : "") + flat.slice(from, i + q.length + 60);
+    };
+    s.list.slice(0, MAX).forEach((n, i) => {
+      const row = s.results.createDiv({ cls: "mm-search-item" });
+      row.dataset.index = String(i);
+      const title = plainText(n.text).replace(/\s+/g, " ").trim();
+      mark(row.createDiv({ cls: "mm-search-title" }), title || t("canvas.searchEmptyNode"));
+      if (!title.toLowerCase().includes(q)) {
+        const note = unescapeNote(n.note);
+        const src = note.toLowerCase().includes(q) ? note : n.callout ?? "";
+        if (src) mark(row.createDiv({ cls: "mm-search-sub" }), snippet(src));
+      }
+    });
+    if (s.list.length > MAX) s.results.createDiv({ cls: "mm-search-more", text: t("canvas.searchMore", { n: String(s.list.length - MAX) }) });
+    s.bar.classList.toggle("is-list-open", s.listOpen && s.list.length > 0);
+  }
+
+  private scrollCurrentRow(): void {
+    const s = this.search;
+    const row = s?.results.querySelector<HTMLElement>(".mm-search-item.is-current");
+    if (!s || !row) return;
+    const box = s.results;
+    if (row.offsetTop < box.scrollTop) box.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = row.offsetTop + row.offsetHeight - box.clientHeight;
   }
 
   private stepMatch(dir: number): void {
@@ -8048,13 +8133,12 @@ export class MindMapCanvas {
       el.classList.toggle("is-current-match", node !== null && node === current);
     }
     s.count.textContent = `${s.index + 1}/${s.list.length}`;
+    for (const row of Array.from(s.results.children)) row.classList.toggle("is-current", (row as HTMLElement).dataset.index === String(s.index));
+    this.scrollCurrentRow();
   }
 
-  /** 展开命中节点的祖先、选中并把它挪到画布中央 */
-  private revealMatch(): void {
-    const s = this.search;
-    if (!s || s.index < 0) return;
-    const node = s.list[s.index];
+  /** 节点收在折叠分支里就展开它的上级（会写回文件里的折叠标记），返回有没有展开 */
+  unfoldAncestors(node: MindNode): boolean {
     let unfolded = false;
     for (let p = node.parent; p; p = p.parent) {
       if (p.folded) {
@@ -8064,12 +8148,20 @@ export class MindMapCanvas {
     }
     if (unfolded) {
       this.render();
-      this.applyMatchClasses();
       if (this.opts.editable) this.notify();
     }
+    return unfolded;
+  }
+
+  /** 展开命中节点的祖先、选中并把它挪到画布中央 */
+  private revealMatch(refocus = true): void {
+    const s = this.search;
+    if (!s || s.index < 0) return;
+    const node = s.list[s.index];
+    if (this.unfoldAncestors(node)) this.applyMatchClasses();
     this.select(node);
     this.centerOn(node);
-    s.input.focus();
+    if (refocus) s.input.focus();
   }
 
   /** 节点出了画布（或贴得太近）就平移最小距离把它带回来，留 56px 余量；已经在视野里就不动 */

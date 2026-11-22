@@ -4,6 +4,12 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-11-22
+
+### 新增
+- 搜索时列出所有命中的节点（#50）：搜索框下面列出结果，关键词高亮；只在备注里搜到的，下面一行显示备注里那一段。点一条就跳过去。手机上点完列表会自动收起，不挡脑图，点列表按钮可以再展开。
+- 大纲面板的折叠不再带着脑图一起折（#49）：可以把大纲收到一两层快速定位，脑图保持原样。大纲标题栏新增「显示层级」按钮，可以展开全部，或只显示到第 1、2、3 层。想要原来的效果，在这个菜单里勾上「折叠时脑图跟着折叠」，或者在设置里打开「大纲折叠时脑图跟着折叠」。
+
 ## [0.92.0] - 2026-11-22
 
 ### 新增
@@ -1208,7 +1214,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...HEAD
+[0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0
 [0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
 [0.91.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.2...0.91.3

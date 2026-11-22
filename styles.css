@@ -1202,8 +1202,7 @@
   top: 12px;
   z-index: 3;
   display: flex;
-  align-items: center;
-  gap: 2px;
+  flex-direction: column;
   padding: 4px 4px 4px 8px;
   border-radius: 8px;
   /* 浮层用 Obsidian 菜单的底色：主题开了半透明 / 壁纸（phycat 等）时不会透出底下的内容 */
@@ -1234,6 +1233,22 @@
   text-align: center;
 }
 .gg-mm-search .mm-tool { width: 24px; height: 24px; }
+/* 命中列表（#50）：在搜索栏里换行占满一整行 */
+.mm-search-row { display: flex; align-items: center; gap: 2px; }
+.gg-mm-search { max-width: calc(100% - 24px); box-sizing: border-box; }
+.gg-mm-search .mm-search-results { display: none; contain: inline-size; max-height: min(320px, 45vh); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; margin: 4px 0 0 -4px; padding-top: 4px; border-top: 1px solid var(--background-modifier-border, #e3e3e3); }
+.gg-mm-search.is-list-open .mm-search-results { display: block; }
+.mm-search-item { padding: 5px 8px; border-radius: 6px; cursor: pointer; font: 13px/1.35 var(--mm-font); color: var(--text-normal, #1f1f1f); }
+.mm-search-item:hover { background: var(--background-modifier-hover, rgba(0, 0, 0, 0.05)); }
+.mm-search-item.is-current { background: color-mix(in srgb, #f5b400 18%, transparent); }
+.mm-search-title, .mm-search-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mm-search-sub { margin-top: 1px; color: var(--text-muted, #666); font-size: 12px; }
+.mm-search-item mark { background: none; color: var(--text-accent, #7c5cff); font-weight: 600; }
+.mm-search-more { padding: 6px 8px; color: var(--text-faint, #999); font-size: 12px; }
+.gg-mm-search .mm-tool.is-active { color: var(--text-accent, #7c5cff); }
+/* 搜索栏在下方时，列表放到输入框上面 */
+.gg-mm-root[data-toolbar="top"] .gg-mm-search .mm-search-results { order: -1; margin: 0 0 4px -4px; padding: 0 0 4px; border-top: none; border-bottom: 1px solid var(--background-modifier-border, #e3e3e3); }
+.is-mobile .mm-search-item { padding: 9px 8px; font-size: 14px; }
 .gg-mm-node.is-match { box-shadow: 0 0 0 2px color-mix(in srgb, #f5b400 70%, transparent); }
 .gg-mm-node.is-current-match,
 .gg-mm-node.is-current-match.is-selected { box-shadow: 0 0 0 2px var(--mm-bg), 0 0 0 4px #f5b400; }
@@ -1505,6 +1520,9 @@
 }
 .mm-outline button.mm-outline-close { width: 22px; height: 22px; font-size: 16px; line-height: 1; border: none; background: transparent; box-shadow: none; color: var(--text-muted, #666); border-radius: 5px; cursor: pointer; }
 .mm-outline button.mm-outline-close:hover { background: var(--background-modifier-hover, #e8e8ea); }
+.mm-outline-tools { display: flex; align-items: center; gap: 2px; }
+.mm-outline button.mm-outline-levels { width: 22px; height: 22px; font-size: 15px; line-height: 1; border: none; background: transparent; box-shadow: none; color: var(--text-muted, #666); border-radius: 5px; cursor: pointer; }
+.mm-outline button.mm-outline-levels:hover { background: var(--background-modifier-hover, #e8e8ea); }
 .mm-outline-list { flex: 1 1 auto; overflow: auto; padding: 0 6px 12px; }
 .mm-outline-row {
   display: flex;

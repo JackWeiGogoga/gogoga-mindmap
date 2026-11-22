@@ -46,6 +46,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   hoverPopover: HoverPopover | null = null;
   private canvas: MindMapCanvas | null = null;
   private outline: OutlinePanel | null = null;
+  /** 大纲自己的折叠状态（#49），关掉再开面板还在 */
+  private outlineFolded = new Set<string>();
   private outlineHost: HTMLElement | null = null;
   private history = new History();
   private doc: MindDoc | null = null;
@@ -119,7 +121,14 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   private openOutline(): void {
     if (this.outline || !this.canvas || !this.outlineHost) return;
-    this.outline = new OutlinePanel(this.outlineHost, this.canvas, () => void this.toggleOutline());
+    this.outline = new OutlinePanel(this.outlineHost, this.canvas, () => void this.toggleOutline(), {
+      sync: () => this.plugin.settings.outlineFoldSync,
+      setSync: (on) => {
+        this.plugin.settings.outlineFoldSync = on;
+        void this.plugin.saveSettings();
+      },
+      folded: this.outlineFolded,
+    });
     this.contentEl.addClass("has-outline");
   }
 

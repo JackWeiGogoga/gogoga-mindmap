@@ -311,6 +311,9 @@ const en = {
   "canvas.mainTopicsOnly": "Show main topics only",
   "canvas.showToLevel": "Show up to level {n}",
   "canvas.searchPlaceholder": "Search nodes",
+  "canvas.searchList": "Show / hide result list",
+  "canvas.searchEmptyNode": "(empty node)",
+  "canvas.searchMore": "{n} more — refine the search to see them",
   "canvas.prevMatch": "Previous match {key}",
   "canvas.nextMatch": "Next match {key}",
   "canvas.closeSearch": "Close search {key}",
@@ -626,6 +629,8 @@ const en = {
   // outline.ts
   "outline.title": "Outline",
   "outline.close": "Close outline panel",
+  "outline.levels": "Show levels",
+  "outline.foldSync": "Folding also folds the map",
 
   // 选择器
   "picker.navigate": "Navigate",
@@ -927,6 +932,8 @@ const en = {
   "bar.expandDesc": "Code blocks only",
   "settings.outlineWrap.name": "Show full titles in the outline",
   "settings.outlineWrap.desc": "Long titles in the mind map's outline panel wrap onto more lines instead of being cut off.",
+  "settings.outlineFoldSync.name": "Outline folding also folds the map",
+  "settings.outlineFoldSync.desc": "Off: folding in the outline panel only folds the outline, so you can collapse it to one or two levels to jump around while the map stays as it is. On: folding in the outline folds the map too (the old behaviour).",
   "settings.headingsOnly.name": "Only headings as nodes",
   "settings.headingsOnly.desc": "Mind maps of notes show only headings as nodes; lists and paragraphs under a heading become its note, kept exactly as written. Code-block mind maps are not affected.",
   "settings.codeBlockHeight.name": "Maximum height of embedded code blocks",
@@ -1231,6 +1238,9 @@ const zh: Record<Key, string> = {
   "canvas.mainTopicsOnly": "只显示主主题",
   "canvas.showToLevel": "显示到第 {n} 层",
   "canvas.searchPlaceholder": "搜索节点",
+  "canvas.searchList": "显示 / 收起结果列表",
+  "canvas.searchEmptyNode": "（空节点）",
+  "canvas.searchMore": "还有 {n} 条，输入更多字缩小范围",
   "canvas.prevMatch": "上一个匹配 {key}",
   "canvas.nextMatch": "下一个匹配 {key}",
   "canvas.closeSearch": "关闭搜索 {key}",
@@ -1543,6 +1553,8 @@ const zh: Record<Key, string> = {
 
   "outline.title": "大纲",
   "outline.close": "关闭大纲面板",
+  "outline.levels": "显示层级",
+  "outline.foldSync": "折叠时脑图跟着折叠",
 
   "picker.navigate": "选择",
   "picker.use": "使用",
@@ -1839,6 +1851,8 @@ const zh: Record<Key, string> = {
   "bar.expandDesc": "只有代码块嵌入的图有",
   "settings.outlineWrap.name": "大纲显示完整标题",
   "settings.outlineWrap.desc": "脑图大纲面板里太长的标题换行显示全文，不再省略成一行。",
+  "settings.outlineFoldSync.name": "大纲折叠时脑图跟着折叠",
+  "settings.outlineFoldSync.desc": "关闭时，大纲面板里的折叠只折大纲，可以把大纲收到一两层快速定位，脑图保持原样。打开就和以前一样，大纲里折叠会同时折叠脑图。",
   "settings.headingsOnly.name": "只把标题当节点",
   "settings.headingsOnly.desc": "笔记的脑图只把标题当节点，标题下面的列表和段落算作它的备注，原样保留。代码块里的脑图不受影响。",
   "settings.codeBlockHeight.name": "代码块嵌入的最大高度",
