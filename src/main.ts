@@ -62,9 +62,9 @@ import { NotePickerModal } from "./note-picker";
 import { BlockEditorModal } from "./block-editor";
 import { isStructure } from "./layout";
 import { History } from "./history";
-import { CanvasHost, type CanvasOptions, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, redrawAllCanvases, refreshAllBars, refreshAllNodebars, setSpacingScale } from "./canvas";
+import { CanvasHost, type CanvasOptions, flattenMenu, MenuEntry, MindMapCanvas, NodeCommand, nodeDecor, redrawAllCanvases, refreshAllBars, refreshAllNodebars, setSpacingScale } from "./canvas";
 import { fillTemplate, foldPlan, frontmatterValue, lineOfPath, parseMarkdown, parseNodeColors, pathAtLine, promoteRoot, RootRule, serializeMarkdown, setFrontmatterValue, withFrontmatter } from "./markdown";
-import { DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
+import { DEFAULT_LEVEL_COLORS, DEFAULT_SETTINGS, embedToolbarLayout, indentString, MindMapSettings, MindMapSettingTab, SavedViewport } from "./settings";
 import { edgeFromFrontmatter, isThemeId } from "./theme";
 import { customThemeCss, getCustomTheme, normalizeCustomTheme, PREVIEW_ID, setCustomThemes } from "./custom-theme";
 import { MindMapView, useFallbackViewType, VIEW_TYPE_MINDMAP, VIEW_TYPE_MINDMAP_FALLBACK } from "./view";
@@ -279,6 +279,79 @@ export default class MindMapPlugin extends Plugin {
     new Notice(t("notice.oldTablePlugin", { version, min: MIN_TABLE_VERSION }), 15000);
   }
 
+  /** 按层级着色：每一层的颜色（算一次存起来，设置或主题变了清掉） */
+  private levelCache: string[] | null = null;
+
+  resetNodeDecor(): void {
+    this.levelCache = null;
+  }
+
+  /** 第 depth 层（中心主题 0）的颜色；关着时 null。跟随标题颜色：超过 H6 用 H6；自定义：六色循环 */
+  levelColor(depth: number): string | null {
+    const mode = this.settings.levelColors;
+    if (mode !== "headings" && mode !== "custom") return null;
+    if (!this.levelCache) {
+      const palette = parseColorList(this.settings.levelPalette);
+      const own = palette.length ? palette : parseColorList(DEFAULT_LEVEL_COLORS);
+      this.levelCache = mode === "custom" ? own : this.headingColors(own);
+    }
+    const list = this.levelCache;
+    if (!list.length) return null;
+    return mode === "custom" ? list[depth % list.length] : list[Math.min(depth, list.length - 1)];
+  }
+
+  /**
+   * 主题里 H1～H6 的标题颜色：在页面上放一段看不见的 Markdown 渲染区量出来（变量可能是 inherit、可能嵌套别的变量，量出来的才准）。
+   * 和正文同色的那级（主题没给标题设颜色，Obsidian 自带主题就是这样）用自定义颜色里对应的那个
+   */
+  private headingColors(fallback: string[]): string[] {
+    const doc = activeDocument;
+    const box = doc.body.createDiv({ cls: "markdown-rendered markdown-preview-view" });
+    box.setCssStyles({ position: "absolute", visibility: "hidden", pointerEvents: "none", left: "-9999px", top: "0" });
+    try {
+      const body = getComputedStyle(box.createEl("p", { text: "x" })).color;
+      const out: string[] = [];
+      for (let i = 1; i <= 6; i++) {
+        const c = getComputedStyle(box.createEl(`h${i}` as "h1", { text: "x" })).color;
+        out.push(c && c !== body ? c : fallback[(i - 1) % fallback.length]);
+      }
+      return out;
+    } finally {
+      box.remove();
+    }
+  }
+
+  /**
+   * 节点文字里 PDF++ 链接（[[x.pdf#…&color=yellow]] 或 [](x.pdf#…color=…)）的标注颜色，换成外框颜色；
+   * 颜色名按 PDF++ 设置里的配色找（不分大小写，中文名也行），也认 PDF++ 的 r,g,b 写法。第一个认得出的为准
+   */
+  pdfBorderColor(text: string): string | null {
+    if (!this.settings.pdfBorder || !/color=/i.test(text)) return null;
+    const colors = ((this.app as unknown as { plugins?: { plugins?: Record<string, { settings?: { colors?: Record<string, string> } }> } }).plugins?.plugins?.["pdf-plus"]?.settings?.colors) ?? {};
+    const re = /(?:\[\[|\]\()([^\])|]*?\.pdf#[^\])|]*)/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const hash = m[1].slice(m[1].indexOf("#") + 1);
+      for (const part of hash.split("&")) {
+        if (!/^color=/i.test(part)) continue;
+        let name = part.slice(6);
+        try {
+          name = decodeURIComponent(name);
+        } catch {
+          // 不是合法的转义就按原样
+        }
+        name = name.trim();
+        const key = Object.keys(colors).find((k) => k.toLowerCase() === name.toLowerCase());
+        const rgb = /^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(name) ? `rgb(${name})` : null;
+        const base = key ? colors[key] : rgb;
+        if (!base) continue;
+        const fade = Math.max(0, Math.min(100, this.settings.pdfBorderFade));
+        return fade ? `color-mix(in srgb, ${base} ${100 - fade}%, transparent)` : base;
+      }
+    }
+    return null;
+  }
+
   async onload(): Promise<void> {
     // 只在 Obsidian 启动时把打开着的脑图笔记换成脑图视图（工作区恢复时可能早于 setViewState 的拦截）。
     // 插件被重新加载、更新、启用时工作区早就好了，用户这时以 Markdown 开着的是他自己选的，不去动。
@@ -292,6 +365,20 @@ export default class MindMapPlugin extends Plugin {
     this.createReviewService();
     this.register(() => this.pdfExcerpt.stop());
     this.applyCustomThemes();
+    // 按层级着色、PDF++ 外框（设置里）：画布渲染节点时来问颜色；换主题、改 CSS 片段时标题颜色可能变了，重新取
+    nodeDecor.levelColor = (depth) => this.levelColor(depth);
+    nodeDecor.pdfBorder = (text) => this.pdfBorderColor(text);
+    this.register(() => {
+      nodeDecor.levelColor = undefined;
+      nodeDecor.pdfBorder = undefined;
+    });
+    this.registerEvent(
+      this.app.workspace.on("css-change", () => {
+        if (this.settings.levelColors !== "headings") return;
+        this.resetNodeDecor();
+        redrawAllCanvases();
+      }),
+    );
     this.applyCustomMarkers(false);
     this.applyEmbedToolbar();
     this.applyDisplayScale(false);
@@ -443,6 +530,11 @@ export default class MindMapPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       if (atStartup) this.convertOpenLeaves();
       this.propertyIcons?.schedule();
+      // styles.css 没加载（手动安装漏了这个文件、同步盘没同步过来）时脑图整个是乱的：提示一下
+      const timer = window.setTimeout(() => {
+        if (!getComputedStyle(document.body).getPropertyValue("--gg-mm-styles-loaded").trim()) new Notice(t("notice.stylesMissing", { dir: this.manifest.dir ?? "" }), 0);
+      }, 3000);
+      this.register(() => window.clearTimeout(timer));
     });
   }
 
@@ -2007,6 +2099,7 @@ export default class MindMapPlugin extends Plugin {
       ["insert-parent", "insert-parent", "command.insertParent"],
       ["edit-node", "edit", "command.editNode"],
       ["edit-callout", "callout", "command.editCallout"],
+      ["edit-note", "note", "command.editNote"],
       ["add-relationship", "add-rel", "command.addRel"],
       ["delete-node", "delete", "command.deleteNode"],
       ["delete-node-only", "delete-only", "command.deleteNodeOnly"],

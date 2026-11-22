@@ -251,6 +251,7 @@ const zh = {
   green: "绿",
   blue: "蓝",
   purple: "紫",
+  stylesMissing: "gogoga Table 的样式文件 styles.css 没有加载，表格会显示错乱（表格下面多出一排按钮、每行很高）。请看一下插件文件夹 {dir} 里有没有 styles.css，或者在「设置 → 第三方插件」里卸载后重新安装。",
 };
 
 type Key = keyof typeof zh;
@@ -506,6 +507,7 @@ const en: Record<Key, string> = {
   green: "Green",
   blue: "Blue",
   purple: "Purple",
+  stylesMissing: "gogoga Table's stylesheet (styles.css) didn't load, so tables will look broken (a row of buttons under each table, very tall rows). Check that the plugin folder {dir} contains styles.css, or uninstall and reinstall the plugin in Settings → Community plugins.",
 };
 
 let lang: "zh" | "en" = "en";

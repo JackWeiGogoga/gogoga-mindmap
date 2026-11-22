@@ -4,6 +4,21 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.94.0] - 2026-11-23
+
+### Added
+- "Border in the PDF++ highlight color" setting (off by default, suggested in the user group): topics with a PDF++ link get a border in that link's highlight color (color=…), taken from PDF++'s own color settings (names in any language work), with adjustable transparency. With several links the first recognized color wins; topics you colored yourself are left alone.
+- "Color by level" setting (off by default, suggested in the user group): each level's topics get a faint tint of that level's color and the lines leading to them use it, with the text unchanged. Choose "Follow Obsidian heading colors" (central topic = H1, main topics = H2…, changing with your theme) or cycle through six custom colors. Topics you colored yourself keep their color; with this on, lines follow the levels. In the "Opening and display" settings page.
+- Shortcut for adding or editing a note: ⌘⇧M (Ctrl+Shift+M on Windows), also available as the command "Add or edit note" so you can rebind it in Obsidian's hotkey settings (reported on Bilibili). The context menu and the note button in the node toolbar show it.
+- While editing a node, pressing Up on the first line or Down on the last line moves straight to the previous or next node and keeps editing, with the cursor at the end; it goes where the arrow keys go when you're not editing. It also works when the whole text is selected (reported on Bilibili).
+- "Fold every topic at this level" in the context menu under Fold and view: folds every topic at this topic's depth across the map and unfolds the levels above. Handy when the map is deeper than the toolbar's three levels (reported on Bilibili).
+- If the plugin's styles.css didn't load (left out of a manual install, or not synced yet), a notice now says where to check or to reinstall.
+
+### Fixed
+- When the vault's default editing mode was Source mode, editing a note (WYSIWYG) also opened in Source mode, showing tables and headings as raw Markdown (reported in the user group). The note editor now always uses Live Preview, without changing the vault setting.
+- Colored text turned back to the default color when made bold or italic in themes that give bold or italic their own color, so it looked as if colored text couldn't be bolded. It now keeps the text color (reported on Bilibili).
+- When only part of a strikethrough was colored, the line over that part stayed in the default color. The line now follows the text color, also while editing (reported on Bilibili).
+
 ## [0.93.1] - 2026-11-22
 
 ### Fixed
@@ -1219,7 +1234,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...HEAD
+[0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0
 [0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1
 [0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0
 [0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0

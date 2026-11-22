@@ -3,6 +3,9 @@
    节点是 HTML，连线是 SVG；所有颜色都走 CSS 变量，跟随 Obsidian 主题与深色模式。
    ========================================================================== */
 
+/* 样式表加载了的标记：插件启动时检查它，没有就提示 styles.css 没加载 */
+body { --gg-mm-styles-loaded: 1; }
+
 .mm-view-content {
   padding: 0 !important;
   overflow: hidden !important;
@@ -398,6 +401,13 @@
   transition: box-shadow 0.12s ease;
 }
 
+/* 按层级着色（设置里）：背景上叠一层很淡的层级色，原来的背景、文字不变；下划线式的主题没有背景，不叠 */
+.gg-mm-node.has-level-color:not(.is-underline) {
+  background-image: linear-gradient(color-mix(in srgb, var(--mm-level) 12%, transparent), color-mix(in srgb, var(--mm-level) 12%, transparent));
+}
+/* PDF++ 标注颜色的外框（设置里）：用 outline，不占位置、不改排版，选中框照常 */
+.gg-mm-node.has-pdf-border { outline: 2px solid var(--mm-pdf-border); outline-offset: 0; }
+
 .gg-mm-node[data-depth="1"] {
   background: var(--mm-main-bg);
   color: var(--mm-main-fg);
@@ -493,6 +503,11 @@
   color: inherit;
   border-radius: 2px;
 }
+/* 变过色的文字里再加粗、斜体、删除线：跟着这个颜色。主题常给粗体、斜体单独设颜色（--bold-color、--italic-color），
+   会把变过色的字盖回默认色，看起来像「变色后不能加粗」（B站反馈） */
+:is(.mm-label, .mm-has-editor) :is(.mm-color, [style*="color"]) :is(strong, b, em, i, del, s, u, mark) { color: inherit; }
+/* 删除线里只有一段变了色（~~<span style="color">…</span>…~~）：横线是外层画的、用默认色；变色那段自己再画一条，横线跟着字的颜色 */
+:is(.mm-label :is(del, s), .mm-has-editor .mm-ed-del) :is(.mm-color, [style*="color"]) { text-decoration: line-through; }
 /* Obsidian 1.15 的彩色高亮 ==🔴文字==：用主题里的高亮色，老版本 Obsidian 没有这些变量时按主题色调淡 */
 :is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
 :is(.mm-label mark, .mm-has-editor .mm-ed-mark, .mm-format-bar .mm-format-btn.is-bg, .mm-hl-chip)[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
@@ -2455,6 +2470,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
  * 颜色全部取 Obsidian 主题变量，换主题、深浅色都跟着变。
  */
 
+/* 样式表加载了的标记：插件启动时检查它，没有就提示 styles.css 没加载 */
+body { --ggt-styles-loaded: 1; }
+
 .ggt {
   --ggt-line: var(--table-border-color, var(--background-modifier-border));
   --ggt-head-bg: rgba(var(--mono-rgb-100), 0.035);
@@ -3355,6 +3373,9 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .ggt-hbar::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 6px; background-clip: padding-box; background-color: var(--scrollbar-thumb-bg, rgba(0, 0, 0, 0.2)); }
 .ggt-hbar::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-active-thumb-bg, rgba(0, 0, 0, 0.35)); }
 @media print { .ggt-hbar { display: none !important; } }
+
+/* 设置「隐藏表格上方的空行」：表格前面那个空行（Markdown 要求的）不显示，光标在这一行（.cm-active）时照常显示（B站天堂鸟0 的建议） */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line:not(.cm-active):has(> br:only-child):has(+ .ggt-lp.ggt-hide-blank-above) { display: none; }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

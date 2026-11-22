@@ -51,6 +51,14 @@ export interface MindMapSettings {
   taskProgressPos: "end" | "below";
   /** 没单独设线形的关联线画成什么样（#53） */
   relShape: RelShape;
+  /** 按层级着色：关 / 跟随 Obsidian 的 H1～H6 标题颜色 / 自定义六色（中心主题对应第一个） */
+  levelColors: "off" | "headings" | "custom";
+  /** 自定义的层级颜色（逗号隔开）；跟随标题颜色时，主题没给某级标题设颜色就用这里的 */
+  levelPalette: string;
+  /** 按 PDF++ 标注颜色给节点画外框 */
+  pdfBorder: boolean;
+  /** PDF++ 外框的透明度（0 = 原色，越大越淡） */
+  pdfBorderFade: number;
   /** 节点文字用的字体（#48）：跟随界面字体 / 跟随正文字体 / 自己填的字体名 */
   mapFont: "interface" | "text" | "custom";
   mapFontName: string;
@@ -235,6 +243,7 @@ export const TOOLBAR_POSITIONS: { id: ToolbarPosition; readonly label: string }[
 /** 默认的节点颜色：内置九种，跟着主题和暗色模式变 */
 export const DEFAULT_NODE_COLORS = COLOR_NAMES.join(", ");
 export const DEFAULT_TEXT_COLORS = "#e03e3e, #2f80ed, #27ae60";
+export const DEFAULT_LEVEL_COLORS = "#e03e3e, #d9730d, #dfab01, #0f7b6c, #0b6e99, #6940a5";
 export const DEFAULT_HIGHLIGHT_COLORS = "#ffd43b99, #69db7c99, #ff8fab99";
 
 export const DEFAULT_SETTINGS: MindMapSettings = {
@@ -297,6 +306,10 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   taskProgress: "off",
   taskProgressPos: "end",
   relShape: "curve",
+  levelColors: "off",
+  levelPalette: DEFAULT_LEVEL_COLORS,
+  pdfBorder: false,
+  pdfBorderFade: 30,
   mapFont: "interface",
   mapFontName: "",
   notePreview: false,
@@ -399,6 +412,9 @@ export class MindMapSettingTab extends PluginSettingTab {
       case "taskProgress":
       case "taskProgressPos":
       case "relShape":
+      case "levelColors":
+      case "pdfBorder":
+        p.resetNodeDecor();
         return redrawAllCanvases();
       case "mapFont":
       case "mapFontName":
@@ -496,6 +512,19 @@ export class MindMapSettingTab extends PluginSettingTab {
             ["task", "progress", "任务", "进度", "位置", "下方"],
           ),
           dropdown("relShape", t("settings.relShape.name"), t("settings.relShape.desc"), { curve: t("edge.curve"), straight: t("edge.straight"), elbow: t("edge.elbow") }, ["relationship", "关联线", "直线", "line"]),
+          dropdown(
+            "levelColors",
+            t("settings.levelColors.name"),
+            t("settings.levelColors.desc"),
+            { off: t("settings.levelColors.off"), headings: t("settings.levelColors.headings"), custom: t("settings.levelColors.custom") },
+            ["level", "depth", "heading", "层级", "标题颜色", "配色", "着色"],
+          ),
+          this.colorListSetting("levelPalette", "text", t("settings.levelPalette.name"), t("settings.levelPalette.desc"), ["level", "层级", "配色"]),
+          toggle("pdfBorder", t("settings.pdfBorder.name"), t("settings.pdfBorder.desc"), ["pdf", "pdf++", "标注", "外框", "颜色"]),
+          this.sliderWithReset("pdfBorderFade", t("settings.pdfBorderFade.name"), t("settings.pdfBorderFade.desc"), 0, 90, 5, 30, t("settings.reset"), () => {
+            this.plugin.resetNodeDecor();
+            redrawAllCanvases();
+          }),
         ],
         () => STRUCTURES.find((x) => x.id === settings.defaultStructure)?.label ?? "",
       ),
@@ -724,9 +753,9 @@ export class MindMapSettingTab extends PluginSettingTab {
    * 颜色清单（节点颜色、常用文字颜色、常用荧光笔颜色）：一排色块，点色块打开色板换颜色，× 删除，拖动调顺序，+ 新增；
    * 「直接写色值」切换成原来的文本框（颜色名、🔴、rgba() 这些也能直接写）。存的还是逗号隔开的字符串，和以前一样
    */
-  private colorListSetting(key: "nodeColors" | "textColors" | "highlightColors", kind: ColorKind, name: string, desc: string, aliases: string[]): SettingDefinition {
+  private colorListSetting(key: "nodeColors" | "textColors" | "highlightColors" | "levelPalette", kind: ColorKind, name: string, desc: string, aliases: string[]): SettingDefinition {
     const plugin = this.plugin;
-    const fallback = key === "nodeColors" ? DEFAULT_NODE_COLORS : key === "textColors" ? DEFAULT_TEXT_COLORS : DEFAULT_HIGHLIGHT_COLORS;
+    const fallback = key === "nodeColors" ? DEFAULT_NODE_COLORS : key === "textColors" ? DEFAULT_TEXT_COLORS : key === "levelPalette" ? DEFAULT_LEVEL_COLORS : DEFAULT_HIGHLIGHT_COLORS;
     const read = () =>
       plugin.settings[key]
         .split(/[,，\s]+(?![^(]*\))/)
@@ -736,6 +765,10 @@ export class MindMapSettingTab extends PluginSettingTab {
       plugin.settings[key] = list.join(", ");
       await plugin.saveSettings();
       refreshAllBars();
+      if (key === "levelPalette") {
+        plugin.resetNodeDecor();
+        redrawAllCanvases();
+      }
     };
     const label = (c: string) => (kind === "node" ? colorLabel(c) : colorTitle(c));
     let raw = false;
@@ -754,7 +787,13 @@ export class MindMapSettingTab extends PluginSettingTab {
             input.placeholder = fallback;
             input.addEventListener("change", () => {
               plugin.settings[key] = input.value;
-              void plugin.saveSettings().then(() => refreshAllBars());
+              void plugin.saveSettings().then(() => {
+                refreshAllBars();
+                if (key === "levelPalette") {
+                  plugin.resetNodeDecor();
+                  redrawAllCanvases();
+                }
+              });
             });
           } else {
             const list = read();
@@ -970,7 +1009,7 @@ export class MindMapSettingTab extends PluginSettingTab {
   }
 
   private sliderWithReset(
-    key: "spacingScale" | "fontScale" | "noteFontSize" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth",
+    key: "spacingScale" | "fontScale" | "noteFontSize" | "noteMaxHeight" | "noteMaxWidth" | "tableMaxWidth" | "tableMaxHeight" | "imageMaxWidth" | "imageThumbWidth" | "pdfBorderFade",
     name: string,
     desc: string,
     min: number,

@@ -448,7 +448,8 @@ export type NodeCommand =
   | "collapse-branch"
   | "expand-level"
   | "collapse-level"
-  | "callout";
+  | "callout"
+  | "note";
 
 /** label 用 getter：模块加载时界面语言还没定，用到时再查字典 */
 const TOOLBAR_POSITION_LABELS: { id: ToolbarPosition; readonly label: string }[] = [
@@ -487,6 +488,13 @@ export function setSpacingScale(scale: number): void {
 }
 
 /** 全局显示设置变了：所有打开着的画布重新量尺寸、重新排版 */
+/**
+ * 跟着设置走的节点装饰（宿主在启动时挂上，画布里不碰 Obsidian）：
+ * levelColor：按层级着色，第 depth 层（中心主题 0）的颜色，关着时 null；
+ * pdfBorder：节点文字里 PDF++ 链接的标注颜色（color=…）对应的外框颜色，没有或关着时 null
+ */
+export const nodeDecor: { levelColor?: (depth: number) => string | null; pdfBorder?: (text: string) => string | null } = {};
+
 export function redrawAllCanvases(): void {
   for (const c of liveCanvases) c.redrawAll();
 }
@@ -1893,6 +1901,18 @@ export class MindMapCanvas {
         }
         el.classList.add("has-color");
       }
+      // 按层级着色（设置里）：节点背景混一点这一层的颜色，自己设过颜色的节点不动
+      const level = node.color ? null : (nodeDecor.levelColor?.(node.depth) ?? null);
+      if (level) {
+        el.style.setProperty("--mm-level", level);
+        el.classList.add("has-level-color");
+      }
+      // PDF++ 标注颜色的外框（设置里）：自己设过颜色的节点不动
+      const pdf = node.color ? null : (nodeDecor.pdfBorder?.(node.text) ?? null);
+      if (pdf) {
+        el.style.setProperty("--mm-pdf-border", pdf);
+        el.classList.add("has-pdf-border");
+      }
       if (node.width) {
         el.classList.add("has-width");
         el.style.width = `${node.width}px`;
@@ -2358,7 +2378,9 @@ export class MindMapCanvas {
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;
       const branch = this.els.get(child.node.id)?.dataset.branch;
-      const stroke = branch !== undefined ? `var(--mm-branch-${branch})` : "";
+      // 按层级着色开着时连线听层级（连到这一层的线用这一层的颜色），盖过「分支各一色」
+      const levelStroke = nodeDecor.levelColor?.(child.node.depth) ?? null;
+      const stroke = levelStroke ?? (branch !== undefined ? `var(--mm-branch-${branch})` : "");
       if (path.style.stroke !== stroke) path.style.stroke = stroke;
       if (path.style.display) path.setCssStyles({ display: "" });
     }
@@ -4996,7 +5018,7 @@ export class MindMapCanvas {
     tool("child", "child", t("canvas.addChildTip", { key: "Tab" }), () => this.addChildToSelected());
     tool("sibling", "sibling", t("canvas.addSiblingTip", { key: sc("Enter") }), () => this.addSiblingToSelected(false));
     tool("marker", "marker", t("canvas.markersTip"), () => this.toggleMarkerPicker());
-    tool("note", "note", t("canvas.noteTip"), () => {
+    tool("note", "note", t("canvas.noteTip", { key: sc("Mod", "Shift", "M") }), () => {
       if (this.primary) this.toggleNotePopover(this.primary, true);
     });
     tool("box", "box", t("canvas.boxTip", { key: sc("Mod", "Shift", "B") }), (ev) => this.boxButton(ev));
@@ -6059,6 +6081,15 @@ export class MindMapCanvas {
       } else if (ev.key === "Escape") {
         ev.preventDefault();
         this.commitEdit(true);
+      } else if ((ev.key === "ArrowUp" || ev.key === "ArrowDown") && !mod && !ev.shiftKey && !ev.altKey && this.nodeEditor?.view.dom.contains(ev.target as Node) && this.nodeEditor.atEdge(ev.key === "ArrowUp" ? "up" : "down")) {
+        // 光标已经在第一行 / 最后一行：跳到上一个 / 下一个节点接着编辑，光标放在末尾（B站反馈：用脑图连续改字更快）。
+        // 往哪走和没在编辑时按方向键一样；那边没有节点就留在原地，光标挪到开头 / 末尾
+        ev.preventDefault();
+        const from = this.editing;
+        this.commitEdit();
+        this.navigate(from, ev.key);
+        const next = this.primary ?? from;
+        this.startEdit(next, false, next !== from ? "end" : ev.key === "ArrowUp" ? "start" : "end");
       } else if (ev.key === "Tab") {
         ev.preventDefault();
         this.commitEdit();
@@ -6111,6 +6142,14 @@ export class MindMapCanvas {
     }
     if (mod && ev.key.toLowerCase() === "v") {
       // 交给 paste 事件：它能拿到剪贴板里的图片文件
+      return;
+    }
+    // ⌘⇧M：添加 / 编辑选中节点的备注（B站反馈：找不到添加备注的快捷键）。⌘⇧N 是 Obsidian 自己的「在新标签页新建笔记」，先被它拿走了
+    if (mod && ev.shiftKey && !ev.altKey && ev.code === "KeyM") {
+      if (this.opts.editable && this.primary) {
+        ev.preventDefault();
+        this.toggleNotePopover(this.primary, true);
+      }
       return;
     }
     if (mod && ev.shiftKey && ev.key.toLowerCase() === "b") {
@@ -7384,6 +7423,8 @@ export class MindMapCanvas {
         return this.startEdit(sel);
       case "callout":
         return this.editCallout(sel);
+      case "note":
+        return this.toggleNotePopover(sel, true);
       case "delete":
         return this.deleteSelected();
       case "delete-only":
@@ -7452,7 +7493,7 @@ export class MindMapCanvas {
     this.notify();
   }
 
-  startEdit(node: MindNode, isNew = false): void {
+  startEdit(node: MindNode, isNew = false, caret?: "start" | "end"): void {
     if (!this.opts.editable) return;
     if (this.editing === node) return;
     if (this.editing) this.commitEdit();
@@ -7471,7 +7512,7 @@ export class MindMapCanvas {
     this.nodeEditor = new InlineEditor(label, {
       text: this.toEdit(node.text),
       // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
-      selectAll: named || !this.opts.caretAtEnd?.(),
+      selectAll: !caret && (named || !this.opts.caretAtEnd?.()),
       multiline: true,
       // 回车提交、Esc、Tab、链接补全的上下键、⌘B 这些走画布的按键处理；画布没处理的（打字、方向键、⌘Z）归编辑框
       onKey: (ev) => {
@@ -7506,6 +7547,7 @@ export class MindMapCanvas {
         if (this.editing === node) this.commitEdit();
       },
     });
+    if (caret && this.nodeEditor) this.nodeEditor.select(caret === "start" ? 0 : this.nodeEditor.text.length);
     this.reflow();
     // 双击进入编辑时文字已经全选：选区是建编辑框时就给好的，不会触发 onSelect，格式栏要自己叫一次（等排好版、拿到焦点）。
     // 新建的节点（默认名字全选着，马上就要打字替换）不弹，免得连续加节点时格式栏一直闪
@@ -7794,6 +7836,16 @@ export class MindMapCanvas {
     const next = Math.max(base === top ? 1 : 0, now + step);
     if (next === now) return;
     this.setFoldLevel(next, base);
+  }
+
+  /** 折叠同一层：整张图（聚焦时是聚焦的分支）只显示到这个节点这一层，同一层的节点都收起来，再把它移到眼前 */
+  foldSameLevel(node: MindNode): void {
+    if (!this.doc) return;
+    const top = this.focusRoot ?? this.doc.root;
+    if (node === top || !isAncestor(top, node)) return;
+    this.setFoldLevel(node.depth - top.depth, top);
+    this.select(node);
+    this.ensureVisible(node);
   }
 
   /** 把某个分支（含外框）缩放到正好占满画布 */
@@ -8698,6 +8750,8 @@ export class MindMapCanvas {
           { title: `${t("menu.collapseLevel")}  -`, icon: "chevron-up", disabled: leaf, run: () => this.stepFoldLevel(node, -1) },
           // 和数字键一样从这个节点往下算：1 = 只露出下一级
           { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", disabled: leaf, run: () => this.setFoldLevel(1, node) },
+          // 整张图里和它同一层的节点都折起来（上面几层展开）：层级多时比工具栏的「显示到第 3 层」管用（B站反馈）
+          { title: t("menu.foldSameLevel"), icon: "chevrons-down-up", disabled: node === (this.focusRoot ?? this.doc?.root), run: () => this.foldSameLevel(node) },
           sep,
           this.focusRoot === node
             ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
@@ -8717,7 +8771,7 @@ export class MindMapCanvas {
         entries.push({ title: `${t("menu.linkNote")}  ${sc("Mod")}K`, icon: "link", run: () => void this.linkSelectedToNote() });
       }
       entries.push(
-        { title: node.note ? t("menu.editNote") : t("menu.addNote"), icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
+        { title: `${node.note ? t("menu.editNote") : t("menu.addNote")}  ${sc("Mod", "Shift", "M")}`, icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
       );
       if (this.noteShown(node)) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(

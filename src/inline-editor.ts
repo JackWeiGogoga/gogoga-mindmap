@@ -235,6 +235,22 @@ export class InlineEditor {
     return { left, right, top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom), width: right - left };
   }
 
+  /**
+   * 光标（没有选中文字）在第一个显示行（up）/ 最后一个显示行（down）上：再按上 / 下方向键就该出编辑框了。
+   * 按显示出来的行算（长文字折了行也一样），不按换行符。整段全选着也算
+   */
+  atEdge(dir: "up" | "down"): boolean {
+    const sel = this.view.state.selection.main;
+    const len = this.view.state.doc.length;
+    // 整段全选着（双击、F2 进来默认全选）也算：这时按上下本来也只是把全选收起来
+    if (sel.from === 0 && sel.to === len) return true;
+    if (!sel.empty) return false;
+    const head = this.view.coordsAtPos(sel.head, dir === "up" ? 1 : -1);
+    const edge = this.view.coordsAtPos(dir === "up" ? 0 : len, dir === "up" ? 1 : -1);
+    if (!head || !edge) return true;
+    return Math.abs(head.top - edge.top) < 2;
+  }
+
   focus(): void {
     this.view.focus();
   }

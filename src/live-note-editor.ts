@@ -134,6 +134,10 @@ export function createLiveNoteEditor(app: App, parent: HTMLElement, o: LiveNoteE
     }
     const box = parent.createDiv({ cls: "mm-note-live markdown-source-view mod-cm6 is-live-preview" });
     const ed = new Live(app, box, owner);
+    // 库的默认编辑模式是源码模式时，这个编辑器也会跟着是源码模式：表格、标题、加粗全显示成 Markdown 原文（群友反馈）。
+    // 这个编辑框按设置就是「所见即所得」，切回实时预览；只切这一个编辑器，不改库的设置
+    const modes = ed as unknown as { sourceMode?: boolean; toggleSource?: () => void };
+    if (modes.sourceMode && typeof modes.toggleSource === "function") modes.toggleSource();
     owner.editor = ed.editor;
     owner.editMode = ed;
     ed.set(o.text, true);
