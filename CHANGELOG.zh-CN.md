@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.93.1] - 2026-11-22
+
+### 修复
+- 节点里的表格：有的主题或 CSS 片段把表格格子统一设成居中，左对齐不生效（和 gogoga Table 同一处修复）。
+
 ## [0.93.0] - 2026-11-22
 
 ### 新增
@@ -1214,7 +1219,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...HEAD
+[0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1
 [0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0
 [0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4

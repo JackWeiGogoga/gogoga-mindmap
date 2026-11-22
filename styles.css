@@ -2537,6 +2537,12 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 .ggt .ggt-cell[data-valign="middle"] { vertical-align: middle; }
 .ggt .ggt-cell[data-valign="bottom"] { vertical-align: bottom; }
 .ggt .ggt-cell[data-align="right"] { text-align: right; }
+/* 对齐再写到格子里面这一层（显示的内容、编辑框）：不少主题、CSS 片段给 table td / th 设了 text-align: center（有的还带 !important），
+   只设在格子上，左对齐的列会被盖成居中，点左对齐、居中都「没反应」（B站 Kenhalid）。主题的规则一般只到 td，碰不到里面 */
+.ggt .ggt-cell { --ggt-align: left; }
+.ggt .ggt-cell[data-align="center"] { --ggt-align: center; }
+.ggt .ggt-cell[data-align="right"] { --ggt-align: right; }
+.ggt .ggt-cell > .ggt-content, .ggt .ggt-cell > .ggt-content > p, .ggt .ggt-cell .ggt-input, .ggt .ggt-cell .ggt-input.ggt-input-cm :is(.cm-content, .cm-line) { text-align: var(--ggt-align) !important; }
 
 .ggt-content {
   padding: var(--ggt-pad-y) var(--ggt-pad-x);

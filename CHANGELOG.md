@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.93.1] - 2026-11-22
+
+### Fixed
+- Tables in nodes: left alignment no longer gets overridden by themes or CSS snippets that center all table cells (same fix as gogoga Table).
+
 ## [0.93.0] - 2026-11-22
 
 ### Added
@@ -1214,7 +1219,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...HEAD
+[0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1
 [0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0
 [0.92.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.4...0.92.0
 [0.91.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.91.3...0.91.4
