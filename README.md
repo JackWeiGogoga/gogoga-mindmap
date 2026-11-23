@@ -77,7 +77,7 @@ The block can also be named `gogoga-mindmap`; it works the same. If you also use
 ```
 ````
 
-A block can carry its own frontmatter that applies only to that block, for example a different structure and theme:
+A block can carry its own frontmatter that applies only to that block, for example a different structure and theme. Add `mindmap-height: 300` to fix the block's height in pixels; without it the height follows the content:
 
 ````markdown
 ```mindmap

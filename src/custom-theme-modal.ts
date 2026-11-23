@@ -362,7 +362,7 @@ export class CustomThemeModal extends Modal {
             this.changed(true);
           }),
       );
-    if (tier.maxWidth) slider(new Setting(el).setName(t("customTheme.widthPx")), 60, 1200, 10, () => tier.maxWidth ?? 300, (v) => (tier.maxWidth = v));
+    if (tier.maxWidth) slider(new Setting(el).setName(t("customTheme.widthPx")), 60, 4000, 10, () => tier.maxWidth ?? 300, (v) => (tier.maxWidth = v));
     new Setting(el)
       .setName(t("customTheme.align"))
       .setDesc(t("customTheme.alignDesc"))

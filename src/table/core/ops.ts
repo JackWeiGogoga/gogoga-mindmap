@@ -735,6 +735,28 @@ export function toggleCheck(t: Table, r: number, c: number): Table {
   return setCell(t, r, c, (m[1] === " " ? "[x]" : "[ ]") + v.slice(3));
 }
 
+/** 列表里的待办：- [ ] / * [x] / 1. [ ]（Obsidian 方括号里一个字符都算待办） */
+const TASK_RE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([^\]])\]/;
+
+/**
+ * 格子里第 n 个列表待办（按换行、<br> 分行数，和渲染出来的勾选框一一对应）切换勾选；没有这一个返回原表。
+ * 以前点列表里的勾选框只改了屏幕上的，原文没动，再画一次就变回去（群友在路上反馈）
+ */
+export function toggleTask(t: Table, r: number, c: number, n: number): Table {
+  const v = t.cells[r]?.[c];
+  if (v === undefined) return t;
+  const parts = v.split(/(<br\s*\/?>|\n)/i);
+  let k = 0;
+  for (let i = 0; i < parts.length; i += 2) {
+    const m = TASK_RE.exec(parts[i]);
+    if (!m) continue;
+    if (k++ !== n) continue;
+    parts[i] = m[1] + (m[2] === " " ? "x" : " ") + parts[i].slice(m[1].length + 1);
+    return setCell(t, r, c, parts.join(""));
+  }
+  return t;
+}
+
 // ---------- 合计行 ----------
 
 export function hasTotal(t: Table): boolean {

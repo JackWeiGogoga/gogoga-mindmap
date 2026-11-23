@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { carryAcrossBreaks, toEditableText } from "../../src/inline";
-import { balancedSlice, breakInsideFormats } from "../../src/live-preview";
+import { balancedSlice, breakInsideFormats, formatBreak } from "../../src/live-preview";
 
 const RED = '<span style="color: #e03e3e">';
 
@@ -44,6 +44,19 @@ test("在颜色里换行：先收尾、换行、再接上", () => {
   const p = t.indexOf("后");
   assert.equal(breakInsideFormats(t, p), `</span>\n${RED}`);
   assert.equal(breakInsideFormats("普通文字", 2), "\n");
+});
+
+test("光标贴着格式开头或结尾换行：换行挪到标签外面，不拆出空的 <span></span>（zhiqiang 反馈）", () => {
+  const t = `在联系。${RED}对当时</span>后面`;
+  const open = t.indexOf("对");
+  assert.deepEqual(formatBreak(t, open), { pos: t.indexOf("<span"), insert: "\n" });
+  const close = t.indexOf("</span>");
+  assert.deepEqual(formatBreak(t, close), { pos: close + "</span>".length, insert: "\n" });
+  // 嵌套：两层一起贴着开头
+  const n = `${RED}**粗**</span>`;
+  assert.deepEqual(formatBreak(n, n.indexOf("粗")), { pos: 0, insert: "\n" });
+  // 中间照旧收尾、接上
+  assert.deepEqual(formatBreak(t, t.indexOf("当")), { pos: t.indexOf("当"), insert: `</span>\n${RED}` });
 });
 
 import { linkRange, linkWholeText, unlinkText, wikilinkOf } from "../../src/inline";

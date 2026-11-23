@@ -446,9 +446,9 @@ test("节点宽度 %%w=N%%：与其他标记共存、往返不变、超范围收
   assert.equal(a.width, 200);
   assert.equal(a.color, "red");
   assert.ok(a.box);
-  assert.equal(findByPath(doc.root, "0/0")!.width, 1200);
+  assert.equal(findByPath(doc.root, "0/0")!.width, 4000);
   const out = serializeMarkdown(doc);
-  assert.equal(out, md.replace("w=90000", "w=1200"));
+  assert.equal(out, md.replace("w=90000", "w=4000"));
   assert.equal(serializeMarkdown(parseMarkdown(out)), out);
 });
 

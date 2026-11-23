@@ -239,8 +239,30 @@ export function balancedSlice(text: string, from: number, to: number): string {
  * 节点里按 <br> 分行显示、Markdown 里都认得出来。返回要插入的文字
  */
 export function breakInsideFormats(text: string, pos: number): string {
-  const spans = formatSpans(text).filter((s) => s.innerFrom <= pos && pos <= s.innerTo && s.innerFrom < s.innerTo);
+  return formatBreak(text, pos).insert;
+}
+
+/**
+ * 换行该插在哪、插什么。光标正好贴着格式的开头（看不见的 <span …> 后面）或结尾（</span> 前面）时，
+ * 把换行挪到标签外面：不然会拆出一个空的 <span …></span>，编辑框里露出 </span>（zhiqiang 反馈）
+ */
+export function formatBreak(text: string, pos: number): { pos: number; insert: string } {
+  const all = formatSpans(text);
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const s of all) {
+      if (s.innerFrom === s.innerTo) continue;
+      if (pos === s.innerFrom && s.from < pos) {
+        pos = s.from;
+        moved = true;
+      } else if (pos === s.innerTo && s.to > pos) {
+        pos = s.to;
+        moved = true;
+      }
+    }
+  }
+  const spans = all.filter((s) => s.innerFrom < pos && pos < s.innerTo);
   const outer = [...spans].sort((a, b) => a.from - b.from);
   const inner = [...spans].sort((a, b) => b.from - a.from);
-  return inner.map((s) => text.slice(s.innerTo, s.to)).join("") + "\n" + outer.map((s) => text.slice(s.from, s.innerFrom)).join("");
+  return { pos, insert: inner.map((s) => text.slice(s.innerTo, s.to)).join("") + "\n" + outer.map((s) => text.slice(s.from, s.innerFrom)).join("") };
 }

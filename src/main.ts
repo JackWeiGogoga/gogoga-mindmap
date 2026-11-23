@@ -2278,6 +2278,38 @@ export default class MindMapPlugin extends Plugin {
       const theme = frontmatterValue(doc.frontmatter, "mindmap-theme");
       let current = source.replace(/\n$/, "");
       let lastHeight = 0;
+      let lastBounds: { w: number; h: number } | null = null;
+      // 块里写 mindmap-height: 300 就固定这个高度（不受设置里的上限管）
+      const fixedHeight = (() => {
+        const v = Number(frontmatterValue(doc.frontmatter, "mindmap-height")?.replace(/px$/i, ""));
+        return Number.isFinite(v) && v >= 80 ? Math.round(v) : 0;
+      })();
+      /**
+       * 框的高度：宽图会按宽度缩小来适应，高度也按同样的比例算，不然上下空出一大片（村上种树反馈）。
+       * 工具栏在上下边时多留出它的高度，最靠边的节点才不会被挡住
+       */
+      const sizeBlock = () => {
+        let h = fixedHeight;
+        if (!h) {
+          const b = lastBounds;
+          if (!b || !wrap.clientWidth) return;
+          const bar = canvas.toolbarInsets();
+          const k = Math.min(1, Math.max(0.2, (wrap.clientWidth - 96) / Math.max(1, b.w)));
+          h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(b.h * k + 96 + bar.top + bar.bottom)));
+        }
+        if (h === lastHeight) return;
+        lastHeight = h;
+        wrap.style.height = `${h}px`;
+      };
+      if (fixedHeight) sizeBlock();
+      let lastWidth = 0;
+      const ro = new ResizeObserver(() => {
+        if (wrap.clientWidth === lastWidth) return;
+        lastWidth = wrap.clientWidth;
+        wrap.win.requestAnimationFrame(sizeBlock);
+      });
+      ro.observe(wrap);
+      child.register(() => ro.disconnect());
       let writing = Promise.resolve();
 
       // 代码块里没被这次编辑碰到的行保持原样，和脑图笔记一样
@@ -2352,16 +2384,9 @@ export default class MindMapPlugin extends Plugin {
           writeBack(keepFormat(serializeMarkdown(d)));
         },
         onLayout: (bounds) => {
-          // 工具栏在上下边时多留出它的高度，最靠边的节点才不会被挡住
-          const bar = canvas.toolbarInsets();
-          const h = Math.min(this.settings.codeBlockMaxHeight, Math.max(200, Math.round(bounds.h + 96 + bar.top + bar.bottom)));
-          if (h !== lastHeight) {
-            lastHeight = h;
-            // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧
-            wrap.win.requestAnimationFrame(() => {
-              wrap.style.height = `${h}px`;
-            });
-          }
+          lastBounds = bounds;
+          // 布局回调可能处在 ResizeObserver 链路里，直接改高度会触发 "loop completed" 警告；推到下一帧
+          wrap.win.requestAnimationFrame(sizeBlock);
         },
         onViewChange: (v) => {
           state.view = v;

@@ -80,7 +80,7 @@ XMind 风格的思维导图插件。Markdown 是唯一数据源：标题和列�
 ```
 ````
 
-块里还可以再写一层 frontmatter，只对这一块生效，比如换个结构和主题：
+块里还可以再写一层 frontmatter，只对这一块生效，比如换个结构和主题；写 `mindmap-height: 300` 可以固定这一块的高度（像素），不写就按内容自适应：
 
 ````markdown
 ```mindmap

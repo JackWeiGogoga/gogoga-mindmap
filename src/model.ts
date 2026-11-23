@@ -110,7 +110,7 @@ export interface MindNode {
 }
 
 export const NODE_MIN_WIDTH = 60;
-export const NODE_MAX_WIDTH = 1200;
+export const NODE_MAX_WIDTH = 4000;
 
 /** 一条关联线：从所在节点指向 anchor 为 to 的节点 */
 export interface Relation {

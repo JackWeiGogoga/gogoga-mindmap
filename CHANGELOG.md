@@ -4,6 +4,20 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-11-24
+
+### Added
+- A code block can set `mindmap-height: 300` to fix that block's height in pixels, regardless of the "Maximum height of embedded code blocks" setting (suggested in the user group).
+
+### Changed
+- In custom themes, each level's "Maximum width" now goes up to 4000 (was 1200); dragging a node's width and double-clicking the width handle to fit one line also allow up to 4000 (reported by zhiqiang).
+- Encrypted columns in node tables: the password prompt is now titled "Enter master password", and if gogoga Table's keychain entry doesn't hold the master password, the prompt says it wasn't used (changed together with gogoga Table).
+
+### Fixed
+- Ticking a list task (`- [ ]`) in a multi-line cell of a node table wasn't saved and went back to unchecked on the next edit (fixed together with gogoga Table).
+- A wide map in a code block is scaled down to fit the width, but the box height was worked out from the full size, leaving large empty bands above and below (reported in the user group). The height now follows the scaled-down map and is recalculated when the window gets wider or narrower.
+- Pressing Shift+Enter at the start or end of colored text while editing a node showed a stray `</span>` in the editor (reported by zhiqiang). The line break now goes outside the color, without leaving an empty color tag behind.
+
 ## [0.94.0] - 2026-11-23
 
 ### Added
@@ -1234,7 +1248,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...HEAD
+[0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0
 [0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1
 [0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0

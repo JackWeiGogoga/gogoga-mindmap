@@ -7,7 +7,7 @@
 
 import { EditorSelection, EditorState, Facet, findClusterBreak, StateEffect, Transaction, type Extension, type Range } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { balancedSlice, breakInsideFormats, formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
+import { balancedSlice, formatBreak, formatSpans, guardHiddenMarks, revealed, type FormatSpan, type TextEdit } from "./live-preview";
 
 /** 这个编辑框里格式标记始终藏着 */
 const hideAll = Facet.define<boolean, boolean>({ combine: (v) => v.some(Boolean) });
@@ -159,8 +159,10 @@ function copySel(ev: ClipboardEvent, view: EditorView, cut: boolean): boolean {
 export function insertFormatBreak(view: EditorView): boolean {
   const { from, to } = view.state.selection.main;
   const text = view.state.doc.toString();
-  const ins = breakInsideFormats(text.slice(0, from) + text.slice(to), from);
-  view.dispatch({ changes: { from, to, insert: ins }, selection: { anchor: from + ins.length }, userEvent: "input" });
+  const b = formatBreak(text.slice(0, from) + text.slice(to), from);
+  // 换行挪到了标签外面：选区先删掉，再在挪过去的位置插（位置都按删掉选区之后的文字算）
+  const changes = from === to ? [{ from: b.pos, insert: b.insert }] : [{ from, to }, { from: b.pos <= from ? b.pos : b.pos + (to - from), insert: b.insert }];
+  view.dispatch({ changes, selection: { anchor: b.pos + b.insert.length }, userEvent: "input" });
   return true;
 }
 

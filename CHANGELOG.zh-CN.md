@@ -4,6 +4,20 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-11-24
+
+### 新增
+- 代码块里可以写 `mindmap-height: 300` 固定这一块的高度（像素），不受设置里「代码块嵌入的最大高度」限制（群友建议）。
+
+### 改进
+- 自定义主题里每一层的「最大宽度」最大可调到 4000（原来 1200）；拖节点宽度、双击宽度手柄拉成一行也放宽到 4000（zhiqiang 反馈）。
+- 节点里表格的加密列：输入主密码的弹框标题改成「输入主密码」；gogoga Table 的钥匙串里存的不是主密码时，弹框里会说明没有用上（和 gogoga Table 一起改的）。
+
+### 修复
+- 节点里表格的格子中换行写的列表待办（`- [ ]`）点了勾选框不保存，再编辑就变回未完成（和 gogoga Table 一起修的）。
+- 宽脑图放进代码块时会按宽度缩小显示，框的高度却按原来的大小算，上下空出一大片（群友反馈）。现在高度按缩小后的图算，窗口变宽变窄也会跟着重算。
+- 编辑节点时光标在彩色文字的开头或结尾按 Shift+Enter 换行，编辑框里会露出 `</span>`（zhiqiang 反馈）。现在换行放在颜色外面，不再拆出空的颜色标签。
+
 ## [0.94.0] - 2026-11-23
 
 ### 新增
@@ -1234,7 +1248,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...HEAD
+[0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0
 [0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1
 [0.93.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.92.0...0.93.0

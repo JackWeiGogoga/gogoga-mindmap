@@ -17,7 +17,13 @@ export interface SecretBoxIO {
    * 问主密码。setup：第一次设（输两遍，可以写提示），返回密码和提示；change：换新的主密码（和 setup 一样）；unlock：解锁，verify 核对（错了弹窗里提示、不关），
    * 返回核对通过的密码。取消返回 null
    */
-  ask(mode: "setup" | "unlock" | "change", hint: string, verify: (password: string) => Promise<boolean>): Promise<{ password: string; hint: string } | null>;
+  ask(
+    mode: "setup" | "unlock" | "change",
+    hint: string,
+    verify: (password: string) => Promise<boolean>,
+    /** unlock 时：钥匙串里有密码，但不是主密码（弹窗里要说出来，不然用户以为钥匙串里的就是主密码） */
+    keychainWrong?: boolean,
+  ): Promise<{ password: string; hint: string } | null>;
   /** 设置里存的校验密文（没有返回 null） */
   loadCheck(): string | null;
   saveCheck(check: string): void;
@@ -100,7 +106,7 @@ export class SecretBox {
       hint = r.hint;
     } else {
       const shownHint = check ? (parseSecret(check)?.hint ?? "") : (samples.map(parseSecret).find((p) => p?.hint)?.hint ?? "");
-      const r = await this.io.ask("unlock", shownHint, async (pw) => (await verify(pw)) !== null);
+      const r = await this.io.ask("unlock", shownHint, async (pw) => (await verify(pw)) !== null, !!kept);
       if (!r) return false;
       password = r.password;
       hint = shownHint;

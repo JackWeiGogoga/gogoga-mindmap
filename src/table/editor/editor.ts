@@ -15,7 +15,7 @@
 
 import { type ColorMemory, colorFormat, createColorSplit, createPalette, paintColor, refreshColorSplit, THEME_HIGHLIGHT } from "../core/color-palette";
 import { type Align, type Calc, CALCS, CELL_COLORS, type CellColor, type ColType, CURRENCIES, FONT_SIZES, isDelimiterRow, parseTable, type Rect, serializeTable, type Table, TABLE_DENSITIES, TABLE_STYLES, type TableDensity, type TableStyle, type VAlign } from "../core/table";
-import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
+import { headRows, setFolded, canSetHead, crossesHead, MAX_HEAD_ROWS, alignAll, autoWidthAll, bgOf, hasTotal, normalize, setCalc, setOptionColor, fgOf, setFg, fontSizeOf, setFontSize, setTableFontSize, setWide, setWidths, canSortRows, CHECK_RE, duplicateCol, duplicateRow, insertCols, insertRows, sortRows, toggleCheck, toggleTask, editCell, mergedText, shownText, clearAllBg, clearCells, fillRange, setTableLook, type FillDir, isCovered, colCount, deleteCol, deleteRow, insertCol, insertRow, mergeAt, mergeCells, merges, moveCol, moveRow, pasteGrid, rowCount, setAlign, setBg, setCell, setWidth, subTable, unmergeAt, widthOf, setVAlign, vAlignAll, vAlignOf } from "../core/ops";
 import { COL_KINDS, type ColKind, colKindOf, colTypeOf, setColKind, setColType } from "../core/ops";
 import { isoDate, parseLooseDate, readDate, readProgress, splitTags, writeDate, type Ymd } from "../core/coltype";
 import { checkFormula, columnNames, formulaError, formulaOf, fxCellNote, fxPlacesOf, isFxCell, setFormula, totalsAllSum } from "../core/ops";
@@ -1938,15 +1938,17 @@ export class TableEditor {
       ev.stopPropagation();
       void this.secretButton(btn.dataset.act ?? "", { r: Number(cell.dataset.r), c: Number(cell.dataset.c) });
     });
-    // 点勾选框：切换 [ ] / [x]
+    // 点勾选框：切换 [ ] / [x]；列表里的待办（- [ ]，渲染出来的勾选框）按第几个改原文
     this.on(this.tableEl, "click", (ev) => {
-      const box = (ev.target as HTMLElement).closest<HTMLInputElement>("input.ggt-check");
+      const box = (ev.target as HTMLElement).closest<HTMLInputElement>("input.ggt-check, .ggt-content input.task-list-item-checkbox");
       const cell = box?.closest<HTMLElement>(".ggt-cell");
-      if (!box || !cell) return;
+      if (!box || !cell || this.editing) return;
       ev.preventDefault();
       if (this.host.readonly) return;
       const p = { r: Number(cell.dataset.r), c: Number(cell.dataset.c) };
-      this.apply(toggleCheck(this.table, p.r, p.c), p);
+      if (box.classList.contains("ggt-check")) return this.apply(toggleCheck(this.table, p.r, p.c), p);
+      const n = [...cell.querySelectorAll<HTMLInputElement>(".ggt-content input.task-list-item-checkbox:not(.ggt-check)")].indexOf(box);
+      if (n >= 0) this.apply(toggleTask(this.table, p.r, p.c, n), p);
     });
     this.on(this.tableEl, "dblclick", (ev) => {
       const target = ev.target as HTMLElement;
