@@ -13,6 +13,9 @@ export interface NoteCardState {
   collapsed?: boolean;
   w?: number;
   h?: number;
+  /** 点图标查看备注的弹窗：这条备注单独拖出来的宽高（像素）。没有就用全局记的尺寸，再没有按内容（群友 zhiqiang：各条备注长短不一，共用一个尺寸互相影响） */
+  pw?: number;
+  ph?: number;
 }
 /** 一个文件里各条备注的状态：键是节点在树里的文字路径（见 canvas 的 noteKey） */
 export type NoteCards = Record<string, NoteCardState>;
@@ -88,6 +91,10 @@ function cleanCards(v: unknown): NoteCards | undefined {
     const h = num(r.h, NOTE_CARD_MAX.h);
     if (w) card.w = w;
     if (h) card.h = h;
+    const pw = num(r.pw, 4000);
+    const ph = num(r.ph, 4000);
+    if (pw) card.pw = pw;
+    if (ph) card.ph = ph;
     if (Object.keys(card).length) out[k] = card;
   }
   return Object.keys(out).length ? out : undefined;

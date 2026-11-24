@@ -358,6 +358,10 @@ export class TableEditor {
     this.resizeBar = this.root.appendChild(doc.createElement("div"));
     this.resizeBar.className = "ggt-resize";
     this.resizeBar.setAttribute("aria-label", t("resize"));
+    // 手机、平板：从这些把手上横着拖是在调列宽、拖填充、挪行列，不是拉出 Obsidian 的侧栏。
+    // Obsidian 的侧栏手势在 touchstart 时沿着目标往上找 data-ignore-swipe，有就不启动（它自己的滑块、拖动把手也这么标）
+    this.resizeBar.dataset.ignoreSwipe = "true";
+    this.fillHandle.dataset.ignoreSwipe = "true";
     this.rowHandle = this.handle("ggt-row-handle", t("rowMenu"), "grip-vertical");
     this.cornerBtn = this.root.appendChild(doc.createElement("button"));
     this.cornerBtn.setAttribute("type", "button");
@@ -1558,7 +1562,8 @@ export class TableEditor {
     if (sb) this.rangeBox.setAttribute("style", `left:${sb.x}px;top:${sb.y}px;width:${sb.w}px;height:${sb.h}px`);
     this.rangeBox.classList.toggle("is-under-frozen", !!sb && this.root.classList.contains("is-freeze") && (this.rangeRect()?.c1 ?? 0) > 0);
     this.markCross();
-    if (cell) this.placeFill();
+    // 没选中（点到表格外面、Esc）也要走一遍：把填充柄收起来，不然右下角的小方块留在原处
+    this.placeFill();
     this.placeHandles();
     this.placeTouchResize();
   }
@@ -3731,6 +3736,7 @@ export class TableEditor {
     const el = this.root.appendChild(doc.createElement("button"));
     el.type = "button";
     el.className = `ggt-handle ${cls}`;
+    el.dataset.ignoreSwipe = "true";
     el.setAttribute("aria-label", label);
     el.tabIndex = -1;
     if (this.host.setIcon) this.host.setIcon(el, icon);

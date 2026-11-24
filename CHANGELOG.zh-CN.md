@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.97.0] - 2026-11-24
+
+### 新增
+- 设置「备注」页新增「查看备注窗口的默认大小」：填宽和高，查看备注时按这个大小打开；留空就按内容自动。
+- 双击查看备注窗口的右下角，恢复默认大小（群友反馈）。
+
+### 改进
+- 拖查看备注窗口的右下角改大小，现在只记这一条备注的尺寸，不再改掉所有备注（群友反馈）；别的备注还是默认大小。
+
+### 修复
+- 节点里的表格：用 Minimal 主题并关掉「表格样式优先于主题」时，竖着合并格子后后面一列不再错开；点表格外面后右下角的填充小方块不再留着；手机上拖表格把手不会再带出侧栏（和 gogoga Table 一起修的）。
+
 ## [0.96.0] - 2026-11-24
 
 ### 新增
@@ -1262,7 +1274,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...HEAD
+[0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0
 [0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0

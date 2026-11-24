@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.97.0] - 2026-11-24
+
+### Added
+- "Default size of the note window" setting on the Notes page: set the width and height that viewed notes open at, or leave empty for automatic sizing.
+- Double-click the bottom-right corner of a viewed note to reset it to the default size (feedback from the user group).
+
+### Changed
+- Resizing a viewed note by dragging its corner now remembers the size for that note only, instead of changing it for every note (feedback from the user group). Other notes keep the default size.
+
+### Fixed
+- Node tables: with the Minimal theme and "Table style over theme" off, the next column no longer misaligns after merging cells down a column; the small fill handle no longer stays behind after clicking outside the table, and dragging table handles on mobile no longer opens the sidebar (fixed together with gogoga Table).
+
 ## [0.96.0] - 2026-11-24
 
 ### Added
@@ -1262,7 +1274,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...HEAD
+[0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0
 [0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0

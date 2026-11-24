@@ -2537,7 +2537,9 @@ body { --ggt-styles-loaded: 1; }
 .ggt.is-fit .ggt-cell { min-width: 0; }
 .ggt .ggt-cell {
   position: relative;
-  padding: 0;
+  /* 内边距在里面的 .ggt-content 上，格子本身必须是 0。Minimal 等主题给 td:first-child 另设左内边距、选择器比这里强：
+     合并后被盖住的格子不画，第二列成了那几行的第一个元素，单独多/少一截，列就对不齐了（群友反馈） */
+  padding: 0 !important;
   min-width: 80px;
   border: 0;
   border-right: 1px solid var(--ggt-line);
@@ -3612,3 +3614,5 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .mm-inline-title:focus { border-color: var(--interactive-accent); background: var(--background-primary); outline: none; box-shadow: none; }
 .mm-inline-title.is-hidden { display: none; }
 .gg-mm-root.is-printing ~ .mm-inline-title { display: none; }
+/* 设置：查看备注窗口的默认宽、高两个数字框 */
+.mm-setting-size { width: 96px; }

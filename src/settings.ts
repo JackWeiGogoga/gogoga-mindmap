@@ -112,7 +112,7 @@ export interface MindMapSettings {
   /** 节点里表格的最大宽度、高度（像素，随节点字号缩放）：超出的在节点里滚动 */
   tableMaxWidth: number;
   tableMaxHeight: number;
-  /** 查看备注弹窗拖出来的尺寸，没拖过就按内容自适应 */
+  /** 查看备注弹窗的默认尺寸（设置里填，老版本拖出来的也在这）；单条备注拖过的记在文件状态里（state.ts 的 pw/ph），没有就按内容自适应 */
   notePopoverSize?: { w: number; h: number };
   /** 嵌入的脑图上次的缩放（#36）：键是「所在笔记|脑图文件#子路径」，最多记 300 个 */
   embedZoom?: Record<string, number>;
@@ -622,6 +622,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         this.sliderWithReset("noteFontSize", t("settings.noteFontSize.name"), t("settings.noteFontSize.desc"), 11, 22, 1, DEFAULT_SETTINGS.noteFontSize, t("settings.resetNoteFontSize"), () => this.plugin.applyDisplayScale()),
         this.sizeSetting("noteMaxHeight", t("settings.noteMaxHeight.name"), t("settings.noteMaxHeight.desc"), 120, 800, t("settings.resetNoteHeight")),
         this.sizeSetting("noteMaxWidth", t("settings.noteMaxWidth.name"), t("settings.noteMaxWidth.desc"), 160, 960, t("settings.resetNoteWidth")),
+        this.notePopoverSetting(),
         this.sizeSetting("tableMaxWidth", t("settings.tableMaxWidth.name"), t("settings.tableMaxWidth.desc"), 320, 4000, t("settings.resetTableWidth")),
         this.sizeSetting("tableMaxHeight", t("settings.tableMaxHeight.name"), t("settings.tableMaxHeight.desc"), 160, 3000, t("settings.resetTableHeight")),
         toggle("noteLiveEdit", t("settings.noteLiveEdit.name"), t("settings.noteLiveEdit.desc"), ["所见即所得", "WYSIWYG", "实时预览", "live preview", "编辑器"]),
@@ -1021,6 +1022,56 @@ export class MindMapSettingTab extends PluginSettingTab {
       desc: t("bar.embedPageDesc"),
       displayValue: () => (plugin.settings.embedToolbar === "custom" ? `${modes.custom} · ${count()}` : modes[plugin.settings.embedToolbar]),
       items: plugin.settings.embedToolbar === "custom" ? [mode, reset, ...rows] : [mode],
+    };
+  }
+
+  /** 查看备注窗口的默认大小：宽、高两个数字框，都留空 = 按内容自动。各条备注拖过的尺寸记在文件状态里，不受这里影响 */
+  private notePopoverSetting(): SettingDefinition {
+    return {
+      name: t("settings.notePopover.name"),
+      desc: t("settings.notePopover.desc"),
+      render: (setting) => {
+        const inputs: { setValue(v: string): unknown }[] = [];
+        const cur = this.plugin.settings.notePopoverSize;
+        let w = cur ? String(cur.w) : "";
+        let h = cur ? String(cur.h) : "";
+        const save = async () => {
+          const nw = Number(w);
+          const nh = Number(h);
+          if (!w.trim() && !h.trim()) this.plugin.settings.notePopoverSize = undefined;
+          else if (nw >= 160 && nh >= 48) this.plugin.settings.notePopoverSize = { w: Math.round(Math.min(4000, nw)), h: Math.round(Math.min(4000, nh)) };
+          else return;
+          await this.plugin.saveSettings();
+        };
+        for (const [label, get, set] of [
+          [t("settings.notePopover.w"), () => w, (v: string) => (w = v)],
+          [t("settings.notePopover.h"), () => h, (v: string) => (h = v)],
+        ] as const) {
+          setting.addText((tx) => {
+            inputs.push(tx);
+            tx.inputEl.type = "number";
+            tx.inputEl.addClass("mm-setting-size");
+            tx.inputEl.setAttribute("aria-label", label);
+            tx.setPlaceholder(`${label} · ${t("settings.notePopover.auto")}`)
+              .setValue(get())
+              .onChange((v) => {
+                set(v);
+                void save();
+              });
+          });
+        }
+        setting.addExtraButton((b) =>
+          b
+            .setIcon("rotate-ccw")
+            .setTooltip(t("settings.notePopover.reset"))
+            .onClick(async () => {
+              w = h = "";
+              for (const i of inputs) i.setValue("");
+              this.plugin.settings.notePopoverSize = undefined;
+              await this.plugin.saveSettings();
+            }),
+        );
+      },
     };
   }
 

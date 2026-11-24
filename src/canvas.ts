@@ -399,7 +399,7 @@ export interface CanvasOptions {
   onNoteCardsChange?: (cards: NoteCards) => void;
   /** 按键是不是用户在快捷键设置里绑给本插件命令的；是就不在画布里处理，交给 Obsidian 去执行命令 */
   ownsHotkey?: (ev: KeyboardEvent) => boolean;
-  /** 查看备注弹窗的尺寸：用户拖过右下角就记下来，下次打开沿用 */
+  /** 查看备注弹窗的默认尺寸（设置里填的）；单条备注拖过的尺寸记在备注状态里（pw/ph），优先用它 */
   notePopoverSize?: { get: () => PopoverSize | undefined; set: (size: PopoverSize) => void };
   /** 提供则节点右键菜单有「在 Markdown 中定位」：切到 Markdown 并跳到选中节点那一行 */
   onRevealInMarkdown?: () => void;
@@ -10830,7 +10830,7 @@ export class MindMapCanvas {
         });
       }
       this.el.append(pop);
-      this.applyPopoverSize(pop);
+      this.applyPopoverSize(pop, node, nodeEl);
       this.placePopover(pop, nodeEl);
       // 图片晚到会把弹窗撑大，再摆一次免得出了画布
       body.addEventListener("load", () => this.placePopover(pop, nodeEl), true);
@@ -11074,26 +11074,47 @@ export class MindMapCanvas {
   }
 
   /**
-   * 查看备注的弹窗右下角可以拖动改大小（CSS resize）。用过的尺寸记下来，下次打开直接用；
+   * 查看备注的弹窗右下角可以拖动改大小（CSS resize）。拖出来的尺寸记在这条备注上（和展开卡片的大小一样按文件存），
+   * 下次打开这条备注直接用；没单独拖过的用全局记的尺寸（以前的版本拖过就有），再没有就按内容。
+   * 双击右下角：去掉这条备注自己的尺寸，回到全局尺寸或按内容（群友 zhiqiang）。
    * 默认的最大宽高是为了不撑满画布，拖动时放开到画布大小
    */
-  private applyPopoverSize(pop: HTMLElement): void {
+  private applyPopoverSize(pop: HTMLElement, node: MindNode, nodeEl: HTMLElement): void {
     const store = this.opts.notePopoverSize;
     const host = this.el.getBoundingClientRect();
     // 画布还没量出尺寸（刚打开、被折叠）时不按它收窄，免得记住的尺寸被压成最小
     const room = (v: number, fallback: number) => (v > 50 ? v - 16 : fallback);
     const lift = () => pop.setCssStyles({ maxWidth: `${room(host.width, 4000)}px`, maxHeight: `${room(host.height, 4000)}px` });
-    const saved = store?.get();
     // 太小的值是坏数据（比如拖到一半弹窗被关掉量成 0），当没记过
-    if (saved && saved.w >= 160 && saved.h >= 48) {
-      lift();
-      pop.setCssStyles({ width: `${Math.min(saved.w, room(host.width, saved.w))}px`, height: `${Math.min(saved.h, room(host.height, saved.h))}px` });
-    }
-    if (!store) return;
-    pop.addEventListener("pointerdown", (ev) => {
+    const ok = (s: PopoverSize | undefined): s is PopoverSize => !!s && s.w >= 160 && s.h >= 48;
+    const own = (): PopoverSize | undefined => {
+      const c = this.cardState.get(node.id);
+      return c?.pw && c.ph ? { w: c.pw, h: c.ph } : undefined;
+    };
+    const size = () => {
+      const mine = own();
+      const saved = ok(mine) ? mine : store?.get();
+      if (ok(saved)) {
+        lift();
+        pop.setCssStyles({ width: `${Math.min(saved.w, room(host.width, saved.w))}px`, height: `${Math.min(saved.h, room(host.height, saved.h))}px` });
+      } else pop.setCssStyles({ width: "", height: "", maxWidth: "", maxHeight: "" });
+    };
+    size();
+    const corner = (ev: MouseEvent) => {
       const r = pop.getBoundingClientRect();
       // 只认右下角的拖动柄那一小块
-      if (ev.clientX < r.right - 18 || ev.clientY < r.bottom - 18) return;
+      return ev.clientX >= r.right - 18 && ev.clientY >= r.bottom - 18;
+    };
+    pop.addEventListener("dblclick", (ev) => {
+      if (!corner(ev)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (own()) this.updateCard(node, { pw: undefined, ph: undefined });
+      size();
+      this.placePopover(pop, nodeEl);
+    });
+    pop.addEventListener("pointerdown", (ev) => {
+      if (!corner(ev)) return;
       // 先把当前尺寸钉成显式宽高再放开上限，否则内容宽的弹窗（大图）一按就自己撑大
       const w0 = pop.offsetWidth;
       const h0 = pop.offsetHeight;
@@ -11104,7 +11125,7 @@ export class MindMapCanvas {
         doc.removeEventListener("pointerup", up, true);
         // 松手前弹窗可能已经被关掉了（量出来是 0），那次不算
         if (!pop.isConnected || pop.offsetWidth < 160 || pop.offsetHeight < 48) return;
-        if (pop.offsetWidth !== w0 || pop.offsetHeight !== h0) store.set({ w: pop.offsetWidth, h: pop.offsetHeight });
+        if (pop.offsetWidth !== w0 || pop.offsetHeight !== h0) this.updateCard(node, { pw: pop.offsetWidth, ph: pop.offsetHeight });
       };
       doc.addEventListener("pointerup", up, true);
     });
