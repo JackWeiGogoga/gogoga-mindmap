@@ -4,6 +4,20 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.96.0] - 2026-11-24
+
+### Added
+- "Show the map title on the canvas" setting (off by default, reported on Bilibili): the file name shows at the top left of the canvas; click it to rename the file, Enter to save, Esc to cancel, instead of having to edit the central topic.
+- "Floating toolbar and format bar position" setting (reported on Bilibili): the toolbar for a selected topic and the format bar for selected text can appear above the topic (default), below it, or fixed at the top of the canvas so they don't cover nearby topics.
+- "Folder for new mind maps" setting (reported on Bilibili): Obsidian's new file location (default), the current file's folder, or a folder of your choice. Creating one from a folder's context menu still puts it in that folder.
+- Node tables: on phones and tablets, press and hold a cell then drag to select a range (changed together with gogoga Table).
+
+### Changed
+- The "Drag to set the width" tooltip now appears only after the pointer rests on the handle, so it no longer covers nearby topics while you pass over or drag it (reported on Bilibili).
+
+### Fixed
+- Node tables: on Obsidian installed with an older installer (common on Windows), the column-resize hit area and crosshair highlight were misplaced (fixed together with gogoga Table).
+
 ## [0.95.0] - 2026-11-24
 
 ### Added
@@ -1248,7 +1262,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...HEAD
+[0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0
 [0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1

@@ -2911,7 +2911,7 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .ggt-fill.is-shown { display: block; }
 .ggt-fill::before { content: ""; position: absolute; inset: -6px; }
 .is-mobile .ggt-fill { width: 14px; height: 14px; border-radius: 50%; }
-.is-mobile .ggt-fill::before { inset: -14px; }
+.is-mobile .ggt-fill::before { inset: -18px; }
 .ggt-fill-preview { position: absolute; z-index: 3; display: none; border: 1.5px dashed var(--ggt-sel); border-radius: 2px; pointer-events: none; box-sizing: border-box; }
 .ggt-fill-preview.is-shown { display: block; }
 .ggt.is-filling, .ggt.is-filling * { cursor: crosshair !important; user-select: none; }
@@ -3377,6 +3377,14 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 
 /* 设置「隐藏表格上方的空行」：表格前面那个空行（Markdown 要求的）不显示，光标在这一行（.cm-active）时照常显示（B站天堂鸟0 的建议） */
 .markdown-source-view.mod-cm6 .cm-content > .cm-line:not(.cm-active):has(> br:only-child):has(+ .ggt-lp.ggt-hide-blank-above) { display: none; }
+
+/* 手机、平板：长按格子是「按住再拖 = 框选」，系统的长按选字会把一整行字选上、冒出选字手柄（iPhone 实测）。
+   格子的显示内容不让系统选字、不弹长按气泡；编辑格子用的是单独的输入框，不受影响；只读的表格照旧能长按选字复制 */
+.is-mobile .ggt:not(.is-readonly) .ggt-cell .ggt-content {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */
@@ -3581,3 +3589,26 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .is-mobile .mm-rel-hit { stroke-width: 28; }
 .is-mobile .mm-relbar .mm-tool { width: 34px; height: 34px; }
 .is-mobile .mm-relbar .mm-tool .mm-icon { font-size: 18px; }
+
+/* 画布左上角的导图标题（设置「在画布左上角显示导图标题」）：平时像标题文字，悬停、改名时才露出输入框的边 */
+.mm-inline-title {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 2;
+  width: calc(var(--mm-title-ch, 8) * 0.62em + 16px);
+  max-width: 40%;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: var(--font-ui-large, 18px);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  box-shadow: none;
+}
+.mm-inline-title:hover { border-color: var(--background-modifier-border); }
+.mm-inline-title:focus { border-color: var(--interactive-accent); background: var(--background-primary); outline: none; box-shadow: none; }
+.mm-inline-title.is-hidden { display: none; }
+.gg-mm-root.is-printing ~ .mm-inline-title { display: none; }

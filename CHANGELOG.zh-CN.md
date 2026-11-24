@@ -4,6 +4,20 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.96.0] - 2026-11-24
+
+### 新增
+- 设置「在画布左上角显示导图标题」（默认关，B 站反馈）：画布左上角显示文件名，点一下就能改名，回车保存、Esc 取消，不用非得去改中心主题。
+- 设置「浮动工具栏和格式栏的位置」（B 站反馈）：选中主题时的浮动工具栏、选中文字时的格式栏可以放在主题上方（默认）、下方，或固定在画布顶部，不挡住旁边的主题。
+- 设置「新建的思维导图放在」（B 站反馈）：跟随 Obsidian 的新文件位置（默认）、当前文件所在的文件夹，或指定的文件夹。在文件夹上右键新建的照旧放在那个文件夹里。
+- 节点里的表格：手机、平板上长按格子后拖动可以框选多个格子（和 gogoga Table 一起改的）。
+
+### 改进
+- 拖动改宽度的提示改成鼠标停一会儿才出现，路过和直接拖的时候不再挡住旁边的主题（B 站反馈）。
+
+### 修复
+- 节点里的表格：用较早的安装器装的 Obsidian（常见于 Windows）上，拖列宽的触发点和十字高亮错位（和 gogoga Table 一起修的）。
+
 ## [0.95.0] - 2026-11-24
 
 ### 新增
@@ -1248,7 +1262,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...HEAD
+[0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
 [0.94.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.1...0.94.0
 [0.93.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.93.0...0.93.1

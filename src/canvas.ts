@@ -186,7 +186,7 @@ export interface CanvasHost {
   /** 节点表格的日期列写成 [[日记]] 时：按日记插件的日期格式写名字、读名字 */
   dailyNote?: () => { name(v: { y: number; m: number; d: number }): string; parse(name: string): { y: number; m: number; d: number } | null };
   /** 用宿主的样式显示提示（Obsidian 的 setTooltip）；没有就退回原生 title */
-  setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement) => void;
+  setTooltip?: (el: HTMLElement, text: string, placement: TooltipPlacement, delay?: number) => void;
   /** 节点表格的加密格子：用 gogoga Table 的主密码会话（装着才有；没有就只显示 ••••••，不能解锁） */
   tableSecrets?: () => SecretBox | null;
   /** 确认框（把加密格子解密成明文之前问一下） */
@@ -334,6 +334,8 @@ export interface CanvasOptions {
   copyPlain?: () => boolean;
   /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
   showNodebar?: () => boolean;
+  /** 浮动工具栏、格式栏放在哪：节点（选中的字）上方 / 下方 / 固定在画布顶部（B 站落尘-书生） */
+  barPlacement?: () => "above" | "below" | "top";
   /** 浮动工具栏、主工具栏的按钮：显示哪些、什么顺序（见 bar-layout.ts）；每次建工具栏时读 */
   nodebarLayout?: () => BarItem[];
   toolbarLayout?: () => BarItem[];
@@ -713,7 +715,7 @@ export class MindMapCanvas {
   private toolbar!: HTMLElement;
   private toolbarPos: ToolbarPosition = "bottom";
   /** 记住每个按钮的提示文案；节点上的图标会随渲染反复重建，用 WeakMap 免得越积越多 */
-  private tips = new WeakMap<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement }>();
+  private tips = new WeakMap<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement; delay?: number }>();
   /** 工具栏按钮单独留一份引用，换位置时要重新按新方向应用 */
   private toolbarTips: HTMLElement[] = [];
   private positionMenu: HTMLElement | null = null;
@@ -4441,8 +4443,8 @@ export class MindMapCanvas {
   }
 
   /** 给按钮加提示。zone 为 toolbar 的会跟随工具栏位置改变弹出方向 */
-  private tip(el: HTMLElement, text: string, zone: "toolbar" | "fixed" = "fixed", placement?: TooltipPlacement): void {
-    this.tips.set(el, { text, zone, placement });
+  private tip(el: HTMLElement, text: string, zone: "toolbar" | "fixed" = "fixed", placement?: TooltipPlacement, delay?: number): void {
+    this.tips.set(el, { text, zone, placement, delay });
     if (zone === "toolbar" && !this.toolbarTips.includes(el)) this.toolbarTips.push(el);
     this.applyTip(el);
   }
@@ -4453,7 +4455,7 @@ export class MindMapCanvas {
     const placement = t.zone === "toolbar" ? this.toolbarTipPlacement() : (t.placement ?? "top");
     if (this.opts.host?.setTooltip) {
       el.removeAttribute("title");
-      this.opts.host.setTooltip(el, t.text, placement);
+      this.opts.host.setTooltip(el, t.text, placement, t.delay);
     } else {
       el.title = t.text;
     }
@@ -5457,9 +5459,8 @@ export class MindMapCanvas {
     // 横向时间轴里朝上长的主主题：折叠按钮在节点上面，工具栏放到按钮上方，不然盖住按钮点不到
     const toggle = this.layout?.placed.get(this.primary!.id)?.side === "up" ? this.els.get(this.primary!.id)?.querySelector(".mm-toggle") : null;
     if (toggle) above = Math.min(above, toggle.getBoundingClientRect().top - this.el.getBoundingClientRect().top);
-    let top = above - bh - 10;
-    if (top < 4) {
-      // 上面放不下改放下面：节点下方挂着展开的备注时放到备注下面，同样不盖住它
+    // 下面：节点下方挂着展开的备注时放到备注下面，同样不盖住它
+    const belowTop = () => {
       let below = r.y + r.height;
       const card = this.noteEls.get(this.primary!.id);
       if (card && card.isConnected) {
@@ -5467,12 +5468,37 @@ export class MindMapCanvas {
         const host = this.el.getBoundingClientRect();
         if (c.top - host.top >= below - 1) below = Math.max(below, c.bottom - host.top);
       }
-      top = below + 10;
+      return below + 10;
+    };
+    const place = this.opts.barPlacement?.() ?? "above";
+    if (place === "top") {
+      // 固定在画布顶部正中，不跟着节点走；主工具栏也在顶部时放在它下面
+      this.nodebar.style.left = `${Math.max(4, (this.el.clientWidth - bw) / 2)}px`;
+      this.nodebar.style.top = `${this.topBarInset()}px`;
+      this.nodebar.classList.remove("is-hidden");
+      return;
+    }
+    let top: number;
+    if (place === "below") {
+      // 下面放不下改放上面
+      top = belowTop();
+      if (top + bh > this.el.clientHeight - 4 && above - bh - 10 >= 4) top = above - bh - 10;
+    } else {
+      // 上面放不下改放下面
+      top = above - bh - 10;
+      if (top < 4) top = belowTop();
     }
     this.nodebar.style.left = `${left}px`;
     this.nodebar.style.top = `${top}px`;
     const hidden = r.y + r.height < 0 || r.y > this.el.clientHeight || r.x + r.width < 0 || r.x > this.el.clientWidth;
     this.nodebar.classList.toggle("is-hidden", hidden);
+  }
+
+  /** 固定在画布顶部的浮动栏离顶边多远：主工具栏也在顶部时让开它 */
+  private topBarInset(): number {
+    if (this.toolbarPos !== "top" || !this.toolbar?.isConnected || this.toolbar.offsetParent === null) return 8;
+    const t = this.toolbar.getBoundingClientRect();
+    return Math.max(8, t.bottom - this.el.getBoundingClientRect().top + 6);
   }
 
   /** 设置里的节点颜色；没设过（或嵌入的图没传）就是内置的九种 */
@@ -8992,9 +9018,18 @@ export class MindMapCanvas {
     const w = bar.offsetWidth;
     const h = bar.offsetHeight;
     const left = Math.max(4, Math.min(host.width - w - 4, rect.left + rect.width / 2 - host.left - w / 2));
-    // 上面放不下就放到选区下面
     const above = Math.min(rect.top, nodeRect.top) - host.top - h - 6;
-    const top = above >= 4 ? above : Math.max(rect.bottom, nodeRect.bottom) - host.top + 6;
+    const below = Math.max(rect.bottom, nodeRect.bottom) - host.top + 6;
+    const place = this.opts.barPlacement?.() ?? "above";
+    let top: number;
+    if (place === "top") {
+      bar.style.left = `${Math.round(Math.max(4, (host.width - w) / 2))}px`;
+      bar.style.top = `${Math.round(this.topBarInset())}px`;
+      return;
+    }
+    // 上面放不下就放到选区下面；设成「下方」时反过来
+    if (place === "below") top = below + h <= host.height - 4 || above < 4 ? below : above;
+    else top = above >= 4 ? above : below;
     bar.style.left = `${Math.round(left)}px`;
     bar.style.top = `${Math.round(top)}px`;
   }
@@ -9497,7 +9532,8 @@ export class MindMapCanvas {
     const dir: 1 | -1 = el.dataset.side === "left" ? -1 : 1;
     const handle = createDiv();
     handle.className = "mm-width-handle" + (dir < 0 ? " is-left" : "") + (hover ? " is-hover" : "");
-    this.tip(handle, t("canvas.resizeWidth"), "fixed", dir < 0 ? "left" : "right");
+    // 鼠标停一会儿才出提示：路过、直接拖的时候不弹出来挡住旁边的节点（B 站落尘-书生）
+    this.tip(handle, t("canvas.resizeWidth"), "fixed", dir < 0 ? "left" : "right", 1200);
     el.append(handle);
     handle.addEventListener("pointerdown", (ev) => {
       if (ev.button !== 0) return;

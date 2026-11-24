@@ -359,6 +359,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.swapAction.hide();
     this.outlineHost = this.contentEl.createDiv({ cls: "mm-outline-host" });
     const host = this.contentEl.createDiv({ cls: "mm-canvas-host" });
+    this.buildInlineTitle(host);
     this.canvas = new MindMapCanvas(host, {
       structure: this.plugin.settings.defaultStructure,
       theme: this.plugin.settings.defaultTheme,
@@ -426,6 +427,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       autoNumber: () => this.plugin.settings.numberByTyping,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
+      barPlacement: () => this.plugin.settings.barPlacement,
       nodebarLayout: () => mergeLayout(this.plugin.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       toolbarLayout: () => mergeLayout(this.plugin.settings.toolbarLayout, TOOLBAR_DEFAULT),
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),
@@ -757,6 +759,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   setViewData(data: string, clear: boolean): void {
+    this.updateInlineTitle();
     // 外面来的内容（打开文件、Markdown 那边改的、同步来的）：先把脑图里还没清理的删除处理掉，再按新内容记下用到的图片
     this.flushImageSweep();
     this.applyViewData(data, clear);
@@ -989,9 +992,74 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     this.app.fileManager.renameFile(file, path).catch((e: unknown) => revert(String(e)));
   }
 
+  // ---------- 画布左上角的导图标题（设置「在画布左上角显示导图标题」，B 站落尘-书生） ----------
+
+  private titleInput: HTMLInputElement | null = null;
+
+  private buildInlineTitle(host: HTMLElement): void {
+    const input = host.createEl("input", { cls: "mm-inline-title", type: "text" });
+    input.spellcheck = false;
+    input.setAttribute("aria-label", t("settings.inlineTitle.name"));
+    this.titleInput = input;
+    const fit = () => input.style.setProperty("--mm-title-ch", String(Math.max(4, [...input.value].reduce((n, ch) => n + (ch.charCodeAt(0) > 0x2e80 ? 2 : 1), 0) + 1)));
+    input.addEventListener("input", fit);
+    // 画布的快捷键、拖动不管这里
+    for (const type of ["keydown", "pointerdown", "wheel", "dblclick", "copy", "paste", "cut"]) input.addEventListener(type, (ev) => ev.stopPropagation());
+    input.addEventListener("keydown", (ev) => {
+      if (ev.isComposing) return;
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        input.blur();
+      } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        input.value = this.file?.basename ?? "";
+        fit();
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", () => void this.commitInlineTitle());
+    this.updateInlineTitle();
+  }
+
+  /** 显示 / 隐藏，改名后（在哪改的都算）更新文字；正在改的时候不动 */
+  updateInlineTitle(): void {
+    const input = this.titleInput;
+    if (!input) return;
+    const show = this.plugin.settings.inlineTitle && !!this.file;
+    input.toggleClass("is-hidden", !show);
+    if (!show || input.ownerDocument.activeElement === input) return;
+    input.value = this.file?.basename ?? "";
+    input.dispatchEvent(new Event("input"));
+  }
+
+  private async commitInlineTitle(): Promise<void> {
+    const input = this.titleInput;
+    const file = this.file;
+    if (!input || !file) return;
+    const name = input.value.trim();
+    const reset = () => this.updateInlineTitle();
+    if (!name || name === file.basename) return reset();
+    if (/[\\/:*?"<>|]/.test(name)) {
+      new Notice(t("notice.renameBadName"));
+      return reset();
+    }
+    const path = normalizePath(`${file.parent && !file.parent.isRoot() ? file.parent.path + "/" : ""}${name}.${file.extension}`);
+    if (this.app.vault.getAbstractFileByPath(path)) {
+      new Notice(t("notice.renameExists", { name }));
+      return reset();
+    }
+    try {
+      await this.app.fileManager.renameFile(file, path);
+    } catch (e) {
+      new Notice((e as Error).message);
+    }
+    reset();
+  }
+
   /** 笔记改名了（在哪改的都算）：中心主题是文件名时跟着变 */
   async onRename(file: TFile): Promise<void> {
     await super.onRename(file);
+    this.updateInlineTitle();
     if (this.doc && !this.doc.rootFromHeading && this.doc.root.text !== file.basename) {
       this.doc.root.text = file.basename;
       this.canvas?.render();

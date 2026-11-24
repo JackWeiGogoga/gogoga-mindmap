@@ -1035,6 +1035,13 @@ export default class MindMapPlugin extends Plugin {
   }
 
   /** 把设置里的工具栏位置应用到所有打开的脑图视图（except 可跳过刚发起改动的那个） */
+  /** 设置「在画布左上角显示导图标题」改了：所有开着的导图跟着显示 / 隐藏 */
+  applyInlineTitle(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      if (leaf.view instanceof MindMapView) leaf.view.updateInlineTitle();
+    }
+  }
+
   applyToolbarPosition(except?: MindMapView): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       const view = leaf.view;
@@ -2193,10 +2200,10 @@ export default class MindMapPlugin extends Plugin {
     } else menu.addItem((item) => item.setTitle(t("menu.fileReviewAdd")).setIcon("layers").onClick(() => void this.setReviewFor(file, true)));
   }
 
-  /** 不传文件夹就按 Obsidian 的新建笔记位置设置来 */
+  /** 不传文件夹就按设置「新建的思维导图放在」来（默认跟随 Obsidian 的新建笔记位置） */
   private async createMindMap(target?: TFolder): Promise<void> {
     const active = this.app.workspace.getActiveFile();
-    const folder: TFolder = target ?? this.app.fileManager.getNewFileParent(active?.path ?? "");
+    const folder: TFolder = target ?? (await this.newMapFolder(active));
     const base = t("newFile.baseName");
     let name = `${base}.md`;
     for (let i = 1; this.app.vault.getAbstractFileByPath(joinPath(folder.path, name)); i++) name = `${base} ${i}.md`;
@@ -2470,6 +2477,7 @@ export default class MindMapPlugin extends Plugin {
       autoNumber: () => this.settings.numberByTyping,
       copyPlain: () => this.settings.copyPlain,
       showNodebar: () => this.settings.showNodebar,
+      barPlacement: () => this.settings.barPlacement,
       nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       nodeColors: () => parseNodeColors(this.settings.nodeColors),
       textColors: () => parseColorList(this.settings.textColors),
@@ -2949,7 +2957,7 @@ export default class MindMapPlugin extends Plugin {
       notice: (m) => new Notice(m),
       linkTitle: (url) => (this.settings.pasteLinkTitle ? this.fetchPageTitle(url) : null),
       // 工具栏按钮只有图标：提示别让人等（Obsidian 默认要停一会儿才出）
-      setTooltip: (el, text, placement) => setTooltip(el, text, { placement, delay: 150 }),
+      setTooltip: (el, text, placement, delay) => setTooltip(el, text, { placement, delay: delay ?? 150 }),
       setIcon: (el, name) => setIcon(el, name),
       dailyNote: () => dailyNote(this.app),
       // 节点表格的加密格子：用 gogoga Table 的主密码会话（两边共用主密码、一起锁定）；没装、没开就只能看到 ••••••
@@ -3017,6 +3025,24 @@ export default class MindMapPlugin extends Plugin {
           }).open();
         }),
     };
+  }
+
+  /** 新建思维导图放在哪个文件夹（设置「新建的思维导图放在」）；指定的文件夹建不了就退回 Obsidian 的新文件位置 */
+  private async newMapFolder(active: TFile | null): Promise<TFolder> {
+    const fallback = this.app.fileManager.getNewFileParent(active?.path ?? "");
+    const mode = this.settings.newMapFolder;
+    if (mode === "current") return active?.parent ?? fallback;
+    if (mode !== "custom") return fallback;
+    const path = normalizePath(this.settings.newMapFolderPath.trim() || "/");
+    if (path === "/") return this.app.vault.getRoot();
+    const hit = this.app.vault.getAbstractFileByPath(path);
+    if (hit instanceof TFolder) return hit;
+    if (hit) return fallback;
+    try {
+      return await this.app.vault.createFolder(path);
+    } catch {
+      return fallback;
+    }
   }
 
   /** 从脑图新建的笔记放在哪个文件夹（设置「从脑图新建的笔记放在」）；要建的文件夹建不了就退回 Obsidian 的新文件位置 */

@@ -130,8 +130,12 @@ export interface MindMapSettings {
   listIcon: string;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
+  /** 画布左上角显示导图标题（文件名），点一下就能改名（默认关，B 站落尘-书生） */
+  inlineTitle: boolean;
   /** 选中节点时显示浮动工具栏 */
   showNodebar: boolean;
+  /** 浮动工具栏、格式栏放在哪：节点（选中的字）上方 / 下方 / 固定在画布顶部 */
+  barPlacement: "above" | "below" | "top";
   /** 禅模式时一起收起 Obsidian 的侧栏、标签栏、状态栏 */
   zenHideObsidian: boolean;
   /** 浮动工具栏、主工具栏的按钮顺序和显示（bar-layout.ts）；空数组 = 默认 */
@@ -165,6 +169,10 @@ export interface MindMapSettings {
   linkReuseOpen: boolean;
   /** 从脑图新建的链接笔记放在哪：跟随 Obsidian 的新文件位置 / 脑图所在文件夹 / 脑图旁边和它同名的文件夹 / 指定文件夹 */
   newNoteFolder: "default" | "map" | "mapSub" | "custom";
+  /** 新建思维导图放在哪：跟随 Obsidian 的新文件位置 / 当前文件所在的文件夹 / 指定文件夹（B 站爆炸的沙雕） */
+  newMapFolder: "default" | "current" | "custom";
+  /** newMapFolder 是 custom 时的文件夹路径 */
+  newMapFolderPath: string;
   /** newNoteFolder 是 custom 时的文件夹路径 */
   newNoteFolderPath: string;
   /** 节点拖到空白处变成自由主题（默认关：拖到空白处是取消） */
@@ -258,7 +266,9 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineWrap: false,
   outlineFoldSync: false,
   toolbarPosition: "bottom",
+  inlineTitle: false,
   showNodebar: true,
+  barPlacement: "above",
   zenHideObsidian: true,
   nodebarLayout: [],
   toolbarLayout: [],
@@ -277,6 +287,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   linkReuseOpen: false,
   newNoteFolder: "default",
   newNoteFolderPath: "",
+  newMapFolder: "default",
+  newMapFolderPath: "",
   dragToFloat: false,
   openView: "fit",
   syncSplit: false,
@@ -421,6 +433,10 @@ export class MindMapSettingTab extends PluginSettingTab {
         return p.applyDisplayScale();
       case "toolbarPosition":
         return p.applyToolbarPosition();
+      case "inlineTitle":
+        return p.applyInlineTitle();
+      case "barPlacement":
+        return redrawAllCanvases();
       case "embedToolbar":
         p.applyEmbedToolbar();
         refreshAllBars();
@@ -579,7 +595,9 @@ export class MindMapSettingTab extends PluginSettingTab {
         t("settings.page.toolbar"),
         [
           dropdown("toolbarPosition", t("settings.toolbar.name"), t("settings.toolbar.desc"), Object.fromEntries(TOOLBAR_POSITIONS.map((x) => [x.id, x.label]))),
+          toggle("inlineTitle", t("settings.inlineTitle.name"), t("settings.inlineTitle.desc"), ["title", "标题", "改名", "rename", "文件名"]),
           toggle("showNodebar", t("settings.showNodebar.name"), t("settings.showNodebar.desc")),
+          dropdown("barPlacement", t("settings.barPlacement.name"), t("settings.barPlacement.desc"), { above: t("settings.barPlacement.above"), below: t("settings.barPlacement.below"), top: t("settings.barPlacement.top") }, ["toolbar", "format", "工具栏", "格式栏", "位置", "挡住"]),
           toggle("zenHideObsidian", t("settings.zenHideObsidian.name"), t("settings.zenHideObsidian.desc")),
           this.barLayoutPage("nodebarLayout"),
           this.barLayoutPage("toolbarLayout"),
@@ -646,6 +664,8 @@ export class MindMapSettingTab extends PluginSettingTab {
       ]),
       page(t("settings.group.newMap"), t("settings.page.newMap"), [
         this.templateSetting(),
+        dropdown("newMapFolder", t("settings.newMapFolder.name"), t("settings.newMapFolder.desc"), { default: t("settings.newMapFolder.default"), current: t("settings.newMapFolder.current"), custom: t("settings.newMapFolder.custom") }, ["folder", "文件夹", "新建", "位置", "存放"]),
+        text("newMapFolderPath", t("settings.newMapFolderPath.name"), t("settings.newMapFolderPath.desc"), t("settings.newNoteFolderPath.placeholder"), ["folder", "文件夹", "路径"]),
         dropdown("indent", t("settings.indent.name"), t("settings.indent.desc"), {
           tab: t("settings.indent.tab"),
           "2": t("settings.indent.spaces", { n: 2 }),
