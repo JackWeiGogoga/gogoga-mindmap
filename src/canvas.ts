@@ -888,7 +888,7 @@ export class MindMapCanvas {
   /** 鼠标正指着的节点（悬停调宽度用） */
   private hoverNode: MindNode | null = null;
   /** 拖宽度手柄：group 是一起改宽度的节点（框选了好几个、拖的是其中一个时是选中的全部，否则只有它） */
-  private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1; group: { node: MindNode; el: HTMLElement; w: number }[] } | null = null;
+  private widthResize: { node: MindNode; el: HTMLElement; startWorldX: number; startW: number; dir: 1 | -1; group: { node: MindNode; el: HTMLElement; w: number }[]; moved?: boolean } | null = null;
   private imgResize: {
     node: MindNode;
     /** 图片或 iframe，两者都靠右下角那个手柄改大小 */
@@ -5079,27 +5079,33 @@ export class MindMapCanvas {
    * 量出它压住画布的高度，写进 --mm-bottom-inset，底部工具栏和搜索框据此抬高。
    */
   private updateBottomInset(): void {
-    const doc = this.el.ownerDocument;
-    // 看有没有画出来，不看 offsetParent：手机上 Obsidian 底部那条悬浮导航栏是 position: fixed，offsetParent 永远是 null，
-    // 以前因此当它不存在，脑图的工具栏被它挡住（#37）
-    // 电脑上要避开的是右下角的状态栏：它只压在最右下那个窗格上，分屏时别的窗格不用抬高（zhiqiang 反馈分屏时工具栏下面空一截）
-    const desktop = !doc.body.classList.contains("is-mobile");
-    const bars = [...doc.querySelectorAll<HTMLElement>(desktop ? ".status-bar" : ".mobile-navbar, .mobile-toolbar")].filter((b) => {
-      const r = b.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
-    });
     const r = this.el.getBoundingClientRect();
-    let inset = 0;
-    for (const b of bars) {
-      const br = b.getBoundingClientRect();
-      if (br.top < r.bottom && br.bottom > r.top && br.left < r.right && br.right > r.left) inset = Math.max(inset, r.bottom - br.top);
-    }
+    const desktop = !this.el.ownerDocument.body.classList.contains("is-mobile");
+    const inset = this.bottomCover(r.left, r.right);
     // 电脑上没被压着就和别的位置一样离底边 12px（样式表里没量过时的默认值是 44px，给状态栏留的）
     const v = inset > 0 ? `${Math.round(inset + 8)}px` : desktop ? "12px" : "";
     if (this.el.style.getPropertyValue("--mm-bottom-inset") !== v) {
       if (v) this.el.style.setProperty("--mm-bottom-inset", v);
       else this.el.style.removeProperty("--mm-bottom-inset");
     }
+  }
+
+  /**
+   * 画布底部被盖住的高度，只算和屏幕上 [left, right) 这段横向范围重叠的：电脑上是右下角的状态栏，手机上是底部悬浮导航栏。
+   * 看有没有画出来，不看 offsetParent：手机上那条导航栏是 position: fixed，offsetParent 永远是 null，
+   * 以前因此当它不存在，脑图的工具栏被它挡住（#37）。电脑上的状态栏只压在最右下那个窗格上，分屏时别的窗格不受影响
+   */
+  private bottomCover(left: number, right: number): number {
+    const doc = this.el.ownerDocument;
+    const desktop = !doc.body.classList.contains("is-mobile");
+    const r = this.el.getBoundingClientRect();
+    let cover = 0;
+    for (const b of doc.querySelectorAll<HTMLElement>(desktop ? ".status-bar" : ".mobile-navbar, .mobile-toolbar")) {
+      const br = b.getBoundingClientRect();
+      if (!(br.width > 0 && br.height > 0) || getComputedStyle(b).visibility === "hidden") continue;
+      if (br.top < r.bottom && br.bottom > r.top && br.left < Math.min(right, r.right) && br.right > Math.max(left, r.left)) cover = Math.max(cover, r.bottom - br.top);
+    }
+    return cover;
   }
 
   // ---------- 原地复习 ----------
@@ -8824,9 +8830,15 @@ export class MindMapCanvas {
         entries.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
       }
       {
-        // 右键的是选中的节点之一：选中的里面设过宽度的一起恢复
-        const many = this.selected.size > 1 && this.selected.has(node) ? [...this.selected].filter((n) => n.width) : node.width ? [node] : [];
-        if (many.length) entries.push({ title: t("menu.resetWidth"), icon: "move-horizontal", run: () => this.resetWidths(many) });
+        // 右键的是选中的节点之一：对选中的一起。有折行的可以拉成一行，设过宽度的可以恢复；两样都有时收进「节点宽度」二级菜单，第一层只占一项
+        const group = this.selected.size > 1 && this.selected.has(node) ? [...this.selected] : [node];
+        const many = group.filter((n) => n.width);
+        const wrapped = this.oneLineWidths(group).size > 0;
+        const fit = { title: t("menu.oneLine"), icon: "move-horizontal", run: () => this.fitOneLine(group) };
+        const reset = { title: t("menu.resetWidth"), icon: "rotate-ccw", run: () => this.resetWidths(many) };
+        if (wrapped && many.length) entries.push({ title: t("menu.widthGroup"), icon: "move-horizontal", submenu: [fit, reset] });
+        else if (wrapped) entries.push(fit);
+        else if (many.length) entries.push({ ...reset, icon: "move-horizontal" });
       }
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
@@ -9557,6 +9569,8 @@ export class MindMapCanvas {
       if (!r) return;
       const dx = this.toWorld(clientX, clientY).x - r.startWorldX;
       const w = Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, r.startW + r.dir * dx));
+      if (!r.moved && Math.abs(dx) < 1) return;
+      r.moved = true;
       for (const g of r.group) {
         g.el.classList.add("has-width");
         g.el.style.width = `${Math.round(w)}px`;
@@ -9578,6 +9592,9 @@ export class MindMapCanvas {
       ev.stopPropagation();
       this.stopAutoScroll();
       this.widthResize = null;
+      // 只是点了一下（双击的前两下）没拖：什么都不改。不然框选了几个时，点一下就把它们都设成这个节点的宽度，
+      // 还会重画掉手柄，第二下落在新手柄上、双击不触发
+      if (!r.moved) return;
       const w = Math.round(r.el.offsetWidth);
       if (r.group.every((g) => g.w === w && (g.node.width ?? g.w) === w)) return;
       for (const g of r.group) g.node.width = w;
@@ -9619,6 +9636,12 @@ export class MindMapCanvas {
    */
   toggleWidth(node: MindNode): void {
     if (!this.opts.editable) return;
+    // 框选了好几个、双击的是其中一个：有折行的就一起拉成一行，都不折行了就一起恢复自动宽度（B 站反馈：一个个拉太慢）
+    if (this.selected.size > 1 && this.selected.has(node)) {
+      const group = [...this.selected];
+      if (!this.fitOneLine(group)) this.resetWidths(group);
+      return;
+    }
     if (node.width) {
       this.resetWidth(node);
       return;
@@ -9758,6 +9781,39 @@ export class MindMapCanvas {
     node.width = undefined;
     this.render();
     this.notify();
+  }
+
+  /**
+   * 量每个节点不折行时要多宽：只返回现在折了行的（图片、视频节点不算）。设过宽度的也按内容量；
+   * 量的是缩放后的屏幕宽度，换回画布上的宽度；往上取整，免得差零点几像素又折一行
+   */
+  private oneLineWidths(nodes: MindNode[]): Map<MindNode, number> {
+    const out = new Map<MindNode, number>();
+    for (const n of nodes) {
+      const el = this.els.get(n.id);
+      if (!el || el.querySelector("img.mm-img, iframe.mm-frame, video.mm-media")) continue;
+      const now = el.offsetWidth;
+      const had = el.classList.contains("has-width");
+      const w0 = el.style.width;
+      el.setCssStyles({ width: "" });
+      el.classList.add("has-width");
+      const one = Math.ceil(el.getBoundingClientRect().width / this.k);
+      el.setCssStyles({ width: w0 });
+      if (!had) el.classList.remove("has-width");
+      if (one > now + 1) out.set(n, Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, one)));
+    }
+    return out;
+  }
+
+  /** 把几个节点里折了行的都拉成一行（一步撤销）；没有折行的返回 false */
+  private fitOneLine(nodes: MindNode[]): boolean {
+    if (!this.opts.editable) return false;
+    const widths = this.oneLineWidths(nodes);
+    if (!widths.size) return false;
+    for (const [n, w] of widths) n.width = w;
+    this.render();
+    this.notify();
+    return true;
   }
 
   /** 几个节点一起恢复自动宽度（一步撤销） */
@@ -11115,7 +11171,8 @@ export class MindMapCanvas {
     });
     pop.addEventListener("pointerdown", (ev) => {
       if (!corner(ev)) return;
-      // 先把当前尺寸钉成显式宽高再放开上限，否则内容宽的弹窗（大图）一按就自己撑大
+      // 先把当前尺寸钉成显式宽高再放开上限，否则内容宽的弹窗（大图）一按就自己撑大；为状态栏临时压矮的也放开
+      pop.classList.remove("is-capped");
       const w0 = pop.offsetWidth;
       const h0 = pop.offsetHeight;
       pop.setCssStyles({ width: `${w0}px`, height: `${h0}px` });
@@ -11135,8 +11192,20 @@ export class MindMapCanvas {
     const r = nodeEl.getBoundingClientRect();
     const host = this.el.getBoundingClientRect();
     const left = Math.max(8, Math.min(r.left - host.left, host.width - pop.offsetWidth - 8));
+    // 右下角的状态栏浮在画布上：弹窗落在它那一段时底边要让开，不然右下角拖动改大小、双击恢复的那块被它盖住点不到
+    const bottom = host.height - 8 - this.bottomCover(host.left + left, host.left + left + pop.offsetWidth);
+    pop.style.removeProperty("--mm-pop-cap");
+    pop.classList.remove("is-capped");
     let top = r.bottom - host.top + 8;
-    if (top + pop.offsetHeight > host.height - 8) top = Math.max(8, r.top - host.top - pop.offsetHeight - 8);
+    if (top + pop.offsetHeight > bottom) top = Math.max(8, r.top - host.top - pop.offsetHeight - 8);
+    // 上下都放不下：尽量往上挪；还是比可用的高度高，这次显示先压矮（不改记下的尺寸），右下角始终露在外面
+    if (top + pop.offsetHeight > bottom) {
+      top = Math.max(8, bottom - pop.offsetHeight);
+      if (top + pop.offsetHeight > bottom && bottom - top > 48) {
+        pop.style.setProperty("--mm-pop-cap", `${Math.floor(bottom - top)}px`);
+        pop.classList.add("is-capped");
+      }
+    }
     pop.style.left = `${left}px`;
     pop.style.top = `${top}px`;
   }

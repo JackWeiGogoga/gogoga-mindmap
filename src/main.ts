@@ -50,6 +50,10 @@ import { type ColorMemory, pushRecent } from "./color-palette";
 import { locateBlock, replaceBlock } from "./codeblock";
 import { blankBeforeNodeTables, toggleTableMarkerAt } from "./node-table";
 import { preserveFormat } from "./merge";
+import type { Diag } from "./diag";
+import { createDiag, watchMarkdown } from "./diag-host";
+import { initWhatsNew } from "./whatsnew";
+import { WHATS_NEW } from "./whatsnew-data";
 import { parseColorList } from "./format";
 import { htmlCharset, titleFromHtml } from "./paste-link";
 import { PdfExcerpt } from "./pdf-excerpt";
@@ -247,6 +251,8 @@ export function versionBefore(a: string, b: string): boolean {
 
 export default class MindMapPlugin extends Plugin {
   settings: MindMapSettings = { ...DEFAULT_SETTINGS };
+  /** 诊断记录（只在电脑端，见 diag.ts）；手机上为 null */
+  diag: Diag | null = null;
   /** 间隔复习：牌组、复习数据、状态栏的数字 */
   review!: ReviewService;
   private reviewStatus: HTMLElement | null = null;
@@ -361,7 +367,27 @@ export default class MindMapPlugin extends Plugin {
     setLocale(getLanguage());
     setTableLanguage(getLanguage());
     registerMindMapIcon();
+    // 诊断尽早建好：加载、更新插件那一刻也要记进去
+    this.diag = createDiag(this.app, this, "mindmap");
+    // 之前没存过设置 = 新装：更新提示只记版本不弹
+    const fresh = (await this.loadData()) == null;
     await this.loadSettings();
+    initWhatsNew(this, {
+      name: "gogoga Mind Map",
+      icon: MINDMAP_ICON,
+      notes: WHATS_NEW,
+      changelogUrl: {
+        zh: "https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/CHANGELOG.zh-CN.md",
+        en: "https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/CHANGELOG.md",
+      },
+      enabled: () => this.settings.whatsNew,
+      lastSeen: () => this.settings.lastSeenVersion,
+      setLastSeen: async (v) => {
+        this.settings.lastSeenVersion = v;
+        await this.saveSettings();
+      },
+      fresh,
+    });
     this.createReviewService();
     this.register(() => this.pdfExcerpt.stop());
     this.applyCustomThemes();
@@ -481,6 +507,11 @@ export default class MindMapPlugin extends Plugin {
     const refreshProps = () => this.propertyIcons?.schedule();
     this.registerEvent(this.app.workspace.on("file-open", refreshProps));
     this.registerEditorSync();
+    // Markdown 视图那边的存盘、外部改动：装着表格插件时由它看（免得两边都读文件）
+    if (this.diag) {
+      const diag = this.diag;
+      watchMarkdown(this.app, this, diag, () => !(this.app as unknown as { plugins: { plugins: Record<string, { diag?: unknown } | undefined> } }).plugins.plugins["gogoga-table"]?.diag);
+    }
     this.registerSplitSync();
     this.registerFoldFollow();
     this.registerFollowActive();

@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-11-25
+
+### Added
+- Diagnostics (desktop only, Settings → "Diagnostics"): if a note suddenly becomes empty, loses a large part or looks garbled, copies from before and after plus recent read/write events are saved on this computer; if it doesn't look like your own edit, a notice offers to restore it as a new note. Day to day only events are kept in memory, never note content; everything stays in Obsidian's app data folder outside the vault, never uploaded and untouched by git or cloud sync. "Detailed diagnostics" and "Export diagnostics" help send a problem to the developer (reports of notes being garbled or emptied).
+- What's new after updating: after the plugin updates, a notice in the bottom right says which version it is now; click "What's new" to see what changed. If you skipped a few versions it shows once, listing all of them. Turn it off in settings, or run "Show what's new" from the command palette any time.
+- "Fit on one line" in the context menu: every selected node that wraps is widened to fit on one line, instead of double-clicking each width handle (reported on Bilibili). Select all (⌘A / Ctrl+A) and right-click to do the whole map. When some selected nodes have a set width, it sits with "Reset to automatic width" under a "Node width" submenu. One undo step reverts it.
+- With several nodes selected, double-clicking one node's width handle fits all wrapped ones on one line; if they're all on one line already, it resets them all to automatic width.
+
+### Fixed
+- A viewed note near the bottom right of the canvas had its corner hidden under Obsidian's status bar, so it couldn't be resized or double-clicked to reset; it now stays clear of the status bar, and is shown a little shorter when there's no room.
+- With several nodes selected, a single click on a width handle without dragging set every selected node to that node's width.
+
 ## [0.97.0] - 2026-11-24
 
 ### Added
@@ -1274,7 +1286,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...HEAD
+[0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0
 [0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0
 [0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0

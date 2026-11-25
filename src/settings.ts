@@ -1,3 +1,4 @@
+import { diagSettingDefinitions } from "./diag-host";
 import { AbstractInputSuggest, App, Platform, PluginSettingTab, Setting, setIcon, TFile, type SettingDefinition, type SettingDefinitionItem } from "obsidian";
 import type { TaskProgressMode } from "./task-progress";
 import { DEFAULT_REVIEW_PREFS, type ReviewPrefs } from "./review/core/schedule";
@@ -200,6 +201,10 @@ export interface MindMapSettings {
   customMarkersExclusive: boolean;
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
+  /** 更新后右下角提示「已更新到 x.y.z」，带「查看更新内容」按钮（whatsnew.ts） */
+  whatsNew: boolean;
+  /** 上次提示过 / 看过的版本 */
+  lastSeenVersion?: string;
   /** 新建脑图用的模板笔记路径；留空用内置的「主题 1/2/3」 */
   newFileTemplate: string;
   /** 编辑器里切换笔记时，旁边的脑图跟着显示那篇（默认关） */
@@ -302,6 +307,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   customMarkers: "",
   customMarkersExclusive: false,
   rememberView: true,
+  whatsNew: true,
   newFileTemplate: "",
   embedToolbar: "full",
   embedWheel: "click",
@@ -504,6 +510,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           dropdown("openView", t("settings.openView.name"), t("settings.openView.desc"), { fit: t("settings.openView.fit"), center: t("settings.openView.center") }),
           toggle("rememberViewport", t("settings.rememberViewport.name"), t("settings.rememberViewport.desc")),
           toggle("rememberView", t("settings.rememberView.name"), t("settings.rememberView.desc")),
+          toggle("whatsNew", t("settings.whatsNew.name"), t("settings.whatsNew.desc"), ["update", "changelog", "更新", "新功能"]),
           dropdown("touchToggles", t("settings.touchToggles.name"), t("settings.touchToggles.desc"), { always: t("settings.touchToggles.always"), selected: t("settings.touchToggles.selected") }, ["fold", "折叠", "按钮", "touch", "手机", "平板"]),
           dropdown("defaultStructure", t("settings.structure.name"), t("settings.structure.desc"), Object.fromEntries(STRUCTURES.map((x) => [x.id, x.label])), ["layout", "布局"]),
           dropdown("defaultTheme", t("settings.theme.name"), t("settings.theme.desc"), Object.fromEntries(themeIds().map((id) => [id, themeLabel(id)])), ["style", "风格", "配色"]),
@@ -678,6 +685,8 @@ export class MindMapSettingTab extends PluginSettingTab {
       ]),
       this.reviewPage(),
       this.customThemesPage(),
+      // 诊断（只在电脑端）：异常时的副本、详细记录、导出
+      ...(this.plugin.diag ? [page(t("settings.group.diag"), t("settings.page.diag"), diagSettingDefinitions(this.app, this.plugin.diag))] : []),
       {
         name: t("settings.support.name"),
         desc: t("settings.support.desc"),

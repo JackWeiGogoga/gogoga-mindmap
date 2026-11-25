@@ -2,6 +2,7 @@ import { HoverPopover, Menu, normalizePath, Notice, Platform, Scope, TextFileVie
 import { mergeLayout, nodebarDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 import { buildSvg, svgToPdf, svgToPng } from "./export";
 import { mergeExternal, preserveFormat } from "./merge";
+import type { DiagOrigin } from "./diag";
 import { under } from "./review/service";
 import { blankBeforeNodeTables } from "./node-table";
 import { type MapReviewDriver, MindMapCanvas, NodeCommand } from "./canvas";
@@ -743,6 +744,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   private local = "";
   /** 上次读入或写盘时磁盘上的文本，外部改动和本地没落盘的编辑合并时的基准 */
   private disk: string | null = null;
+  /** 诊断：这次进来的内容是谁的（跟随 Markdown 编辑器 / 磁盘上被外部改了） */
+  private incomingOrigin: DiagOrigin = "external";
 
   /**
    * 写盘。库外的笔记（Obsidian 能直接打开库外的 md，路径是 file:/…）：写盘时 Obsidian 发的 modify 事件早于内容就绪，
@@ -750,10 +753,14 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
    */
   async save(clear?: boolean): Promise<void> {
     const file = this.file;
+    const prev = this.disk;
     const saving = super.save(clear);
     // TextFileView 在真正写盘前就同步记下了要写的文本（没变、正在写的不记）
     const saved = (this as unknown as { lastSavedData: string | null }).lastSavedData;
-    if (saved !== null) this.disk = saved;
+    if (saved !== null) {
+      this.disk = saved;
+      if (file && saved !== prev) this.plugin.diag?.change(file.path, prev, saved, "mindmap");
+    }
     await saving;
     if (file && file.path.startsWith("file:") && this.app.vault.getAbstractFileByPath(file.path)) this.app.vault.trigger("modify", file);
   }
@@ -793,8 +800,14 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   private applyViewData(data: string, clear: boolean): void {
     if (clear) this.history.reset();
+    const path = this.file?.path;
+    if (path && this.plugin.diag?.on) {
+      if (clear) this.plugin.diag.log("load", { file: path, len: data.length, lines: data.split("\n").length });
+      else this.plugin.diag.change(path, this.disk, data, this.incomingOrigin, { unsaved: this.data !== this.disk });
+    }
     if (!clear && this.canvas) {
       const merged = this.mergeWithLocal(data);
+      if (path) this.plugin.diag?.log("merge", { file: path, result: merged === data ? "accept" : "merged", len: merged.length });
       this.disk = data;
       if (merged !== data) {
         if (merged !== this.data) {
@@ -856,6 +869,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (base === null) return ours;
     const merged = mergeExternal(base, ours, disk);
     if (merged !== null) return merged;
+    if (this.file) this.plugin.diag?.conflict(this.file.path, base, ours, disk);
     new Notice(t("notice.externalConflict", { file: this.file?.basename ?? "" }));
     return ours;
   }
@@ -868,7 +882,12 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   syncFromEditor(text: string, path: string): void {
     if (!this.canvas || !this.file || this.file.path !== path || text === this.data || this.canvas.isBusy()) return;
     this.data = text;
-    this.setViewData(text, false);
+    this.incomingOrigin = "follow";
+    try {
+      this.setViewData(text, false);
+    } finally {
+      this.incomingOrigin = "external";
+    }
   }
 
   clear(): void {

@@ -834,6 +834,8 @@ body { --gg-mm-styles-loaded: 1; }
   cursor: auto;
 }
 /* 查看备注：默认更大一些，右下角可以拖动改大小（拖过的尺寸会记住） */
+/* 放不下时这次显示先压矮，右下角露在状态栏上面（placePopover），不改记下的尺寸 */
+.mm-popover.is-view.is-capped { max-height: var(--mm-pop-cap) !important; }
 .mm-popover.is-view {
   max-width: min(520px, calc(100% - 16px));
   max-height: min(480px, calc(100% - 16px));
@@ -3387,6 +3389,28 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+/* 更新内容（whatsnew.ts，两个插件共用）和诊断提示里的按钮 */
+.gg-whatsnew-modal { width: min(640px, 92vw); }
+.gg-whatsnew { max-height: 60vh; overflow-y: auto; }
+.gg-whatsnew-version + .gg-whatsnew-version { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--background-modifier-border); }
+.gg-whatsnew-version > h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; font-size: var(--h3-size, 1.2em); }
+.gg-whatsnew-date { color: var(--text-muted); font-size: var(--font-ui-small); font-weight: var(--font-normal, 400); }
+.gg-whatsnew-body h3 { margin: 10px 0 4px; font-size: var(--font-ui-medium); color: var(--text-muted); }
+.gg-whatsnew-body ul { margin: 0; padding-inline-start: 1.4em; }
+.gg-whatsnew-body li { margin: 3px 0; line-height: 1.55; }
+.gg-whatsnew-foot { margin-top: 14px; text-align: right; font-size: var(--font-ui-small); }
+.gg-diag-notice-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* 右上角的更新提示（whatsnew.ts）：图标 + 插件名 + 版本号小标签，一行亮点，两个按钮；外框还是 Obsidian 的提示 */
+.notice.gg-update-notice { min-width: 260px; max-width: 360px; }
+.gg-update-notice-head { display: flex; align-items: center; gap: 8px; }
+.gg-update-notice-icon { display: inline-flex; color: var(--interactive-accent); }
+.gg-update-notice-icon svg { width: 18px; height: 18px; }
+.gg-update-notice-name { font-weight: var(--font-semibold, 600); }
+.gg-update-notice-version { padding: 1px 7px; border-radius: 999px; background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; line-height: 1.5; }
+.gg-update-notice-text { margin-top: 6px; color: inherit; opacity: 0.78; font-size: var(--font-ui-small); line-height: 1.5; }
+.gg-update-notice-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.gg-update-notice-actions button { font-size: var(--font-ui-small); }
 /* ==== gogoga-table 同步结束 ==== */
 
 /* 「在笔记里隐藏格式标签」：Markdown 笔记实时预览里藏起标签后的效果 */

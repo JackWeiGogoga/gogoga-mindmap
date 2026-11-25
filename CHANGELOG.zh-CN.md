@@ -4,6 +4,18 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [0.98.0] - 2026-11-25
+
+### 新增
+- 诊断记录（只在电脑端，设置 →「诊断」）：笔记突然变空、被大量删减或疑似被拼坏时，自动在本机保存变化前后的副本和最近的读写事件，看起来不是你自己改的会弹提示，可以一键恢复为新笔记。平时只在内存里记事件，不含笔记内容；全部存在库外的 Obsidian 应用数据目录，不上传、不被 git 或网盘同步。另有「详细诊断」和「导出诊断包」，方便把问题发给开发者排查（群友反馈笔记被写坏、清空）。
+- 更新后提示更新内容：插件更新后右下角提示一下更新到了哪个版本，点「查看更新内容」看这次改了什么；隔了几版才打开也只提示一次，列出这期间的全部版本。不想看可以在设置里关掉，命令面板的「查看更新内容」随时能看。
+- 右键菜单「拉成一行」：选中的节点里折了行的一起拉成一行，不用一个个双击宽度手柄（B 站反馈）。全选（⌘A / Ctrl+A）后右键就是整张图。选中的节点里有设过宽度的时候，它和「恢复自动宽度」放在「节点宽度」二级菜单里。一步就能撤销。
+- 选中多个节点时双击其中一个的宽度手柄：有折行的一起拉成一行，都已经是一行时一起恢复自动宽度。
+
+### 修复
+- 查看备注的窗口靠近画布右下角时，右下角会被 Obsidian 的状态栏盖住，拖不动、双击恢复不了；现在会避开状态栏，放不下时这次显示先压矮一点。
+- 选中多个节点时，在宽度手柄上只点一下不拖，会把选中的节点都改成这个节点的宽度。
+
 ## [0.97.0] - 2026-11-24
 
 ### 新增
@@ -1274,7 +1286,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...HEAD
+[0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0
 [0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0
 [0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0
 [0.95.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.94.0...0.95.0
