@@ -769,6 +769,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
    * 旁边开着它的 Markdown 读到的还是旧内容、一直不刷新（#30）。写完再通知一次；库内的笔记不受影响
    */
   async save(clear?: boolean): Promise<void> {
+    this.catchUpWithEditor();
     const file = this.file;
     const prev = this.disk;
     const saving = super.save(clear);
@@ -904,19 +905,65 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
    * 落盘照旧由脑图这边存，编辑器那边内容一样不会再写
    */
   private pushToEditors(): void {
-    const path = this.file?.path;
-    if (!path) return;
-    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      const view = leaf.view as { file?: TFile | null; editor?: unknown; getMode?: () => string };
-      // 阅读视图不推：它只在重新读入文件时重画，推了编辑器内容反而让落盘后的重新读入以为没变、不再重画
-      if (view.file?.path !== path || view.getMode?.() !== "source") continue;
-      const cm = (view.editor as { cm?: EditorView } | undefined)?.cm;
-      if (!cm) continue;
+    for (const { cm } of this.sourceEditors()) {
       const change = editorChange(cm.state.doc.toString(), this.data);
       if (!change) continue;
       cm.dispatch({ changes: change, annotations: Transaction.addToHistory.of(false) });
       this.pushedDocs.add(cm.state.doc);
+      this.agreed.set(cm, cm.state.doc.toString());
     }
+  }
+
+  /**
+   * 每个旁边的编辑器和脑图最后一次文本一致时的样子（推过去之后、从它同步过来之后）。
+   * 存盘前两边又不一样了，拿它当基准三方合并，才分得清哪些是编辑器里新打 / 撤销的、哪些是脑图新改的
+   */
+  private agreed = new WeakMap<object, string>();
+
+  /**
+   * 存盘前：旁边编辑器里有脑图还没同步过来的输入（用户刚打字 / 撤销，150ms 的同步还没到），先合进来再存。
+   * 不然脑图延迟 2 秒的存盘会把旧文本写回去，Obsidian 再把它合回编辑器（在 Markdown 里撤销掉的字又冒出来）。
+   * 没有基准（这个编辑器和脑图从没对上过，比如脑图改了还没存时才打开的 Markdown）就不动，照常存脑图的
+   */
+  private catchUpWithEditor(): void {
+    if (!this.canvas || this.canvas.isBusy()) return;
+    this.canvas.syncPending();
+    const crlf = this.data.includes("\r\n");
+    const mine = this.data.replace(/\r\n/g, "\n");
+    for (const { cm } of this.sourceEditors()) {
+      const text = cm.state.doc.toString();
+      if (text === mine) {
+        this.agreed.set(cm, text);
+        continue;
+      }
+      const base = this.agreed.get(cm);
+      if (base === undefined) continue;
+      const merged = mergeExternal(base, mine, text);
+      // 两边改到同一处：分不开，照常存脑图的（和外部改动冲突时一样以脑图为准）
+      if (merged === null || merged === mine) continue;
+      this.data = this.local = crlf ? merged.replace(/\n/g, "\r\n") : merged;
+      this.reparse();
+      // 合出来的结果编辑器那边也要有（脑图这边的改动）
+      this.pushToEditors();
+      return;
+    }
+  }
+
+  /**
+   * 旁边开着同一篇、源码模式（编辑 / 实时预览）的 Markdown 编辑器。阅读视图不算：它只在重新读入文件时重画，
+   * 推了编辑器内容反而让落盘后的重新读入以为没变、不再重画
+   */
+  private sourceEditors(): { view: { requestSave?: () => void }; cm: EditorView }[] {
+    const path = this.file?.path;
+    if (!path) return [];
+    const out: { view: { requestSave?: () => void }; cm: EditorView }[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view as { file?: TFile | null; editor?: unknown; getMode?: () => string; requestSave?: () => void };
+      if (view.file?.path !== path || view.getMode?.() !== "source") continue;
+      const cm = (view.editor as { cm?: EditorView } | undefined)?.cm;
+      if (cm) out.push({ view, cm });
+    }
+    return out;
   }
 
   /**
@@ -936,6 +983,9 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     } finally {
       this.incomingOrigin = "external";
     }
+    // 脑图接下了编辑器的文本（没和脑图自己没存的改动合出别的样子）：两边一致了
+    const cm = (editor as { cm?: EditorView } | undefined)?.cm;
+    if (cm && cm.state.doc.toString() === this.data.replace(/\r\n/g, "\n")) this.agreed.set(cm, cm.state.doc.toString());
   }
 
   clear(): void {
