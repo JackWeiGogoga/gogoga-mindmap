@@ -4,6 +4,7 @@
  */
 
 import { progressLabel, taskProgress, type TaskProgressMode } from "./task-progress";
+import { centerAt, minimapScale, minimapShown, toMini, viewRect, type MinimapMode } from "./minimap-core";
 import { clickNode, frameView, presentKey, presentLook, presentProgress, presentRoute, presentSwipe, reanchor, startState, step as presentStep, type PresentAction, type PresentState } from "./present-core";
 import { noteCardParts, type NoteCardFilter } from "./note-filter";
 import {
@@ -361,6 +362,8 @@ export interface CanvasOptions {
   centerOnSelect?: () => boolean;
   /** 演示模式：叶子也各占一步 */
   presentLeaves?: () => boolean;
+  /** 左下角的缩略图：自动（大图才显示）/ 总是 / 从不 */
+  minimap?: () => MinimapMode;
   /** 编辑时光标挨着格式也不露出 ** == 这些标记（默认关） */
   hideSyntax?: () => boolean;
   /** 鼠标移到任意节点的右边缘就能拖动改宽、双击，不用先选中（默认关：只有选中的节点有手柄） */
@@ -506,6 +509,11 @@ export function setSpacingScale(scale: number): void {
  * pdfBorder：节点文字里 PDF++ 链接的标注颜色（color=…）对应的外框颜色，没有或关着时 null
  */
 export const nodeDecor: { levelColor?: (depth: number) => string | null; pdfBorder?: (text: string) => string | null } = {};
+
+/** 缩略图的设置变了：开着的脑图都重画缩略图 */
+export function refreshAllMinimaps(): void {
+  for (const c of liveCanvases) c.scheduleMinimap();
+}
 
 export function redrawAllCanvases(): void {
   for (const c of liveCanvases) c.redrawAll();
@@ -1028,6 +1036,7 @@ export class MindMapCanvas {
         this.wasVisible = visible;
         this.updateBottomInset();
         this.positionNodebar();
+        this.scheduleMinimap();
       });
       this.ro.observe(this.el);
       this.noteRo = new ResizeObserver(() => this.scheduleReflow());
@@ -1612,6 +1621,7 @@ export class MindMapCanvas {
 
   destroy(): void {
     if (this.present) this.endPresent();
+    if (this.minimapFrame) this.el.win.cancelAnimationFrame(this.minimapFrame);
     if (this.mapReview) this.endMapReview();
     if (this.zen) this.setZen(false);
     liveCanvases.delete(this);
@@ -2274,6 +2284,8 @@ export class MindMapCanvas {
    * 读全部 3000 个节点的 offsetWidth 会触发整页强制布局（约 30ms）。
    */
   private reflow(remeasure?: MindNode): void {
+    // 排完版（这一帧之后）重画缩略图
+    this.scheduleMinimap();
     const doc = this.doc!;
     const theme = resolveTheme(this.opts.theme);
     const base = this.focusRoot ?? doc.root;
@@ -4416,6 +4428,7 @@ export class MindMapCanvas {
 
   private applyTransform(): void {
     this.viewport.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.k})`;
+    this.placeMinimapFrame();
     this.holdLayer();
     this.updateZoomLabel();
     this.positionNodebar();
@@ -5348,6 +5361,7 @@ export class MindMapCanvas {
     const route = this.presentRouteNow();
     this.present = { route, state: startState(route, from), path: [], bar, prevLocked, prevZen, prevView, prevSel, down: null, cleanup, anim: 0 };
     this.el.classList.add("is-presenting");
+    this.scheduleMinimap();
     this.select(null);
     this.el.focus({ preventScroll: true });
     this.applyPresent(true);
@@ -5361,6 +5375,7 @@ export class MindMapCanvas {
     p.cleanup();
     p.bar.remove();
     this.el.classList.remove("is-presenting", "is-present-all");
+    this.scheduleMinimap();
     for (const el of this.el.querySelectorAll(".is-present-on, .is-present-ring")) el.classList.remove("is-present-on", "is-present-ring");
     if (!p.prevZen) this.setZen(false);
     if (!p.prevLocked) this.setLocked(false);
@@ -5535,6 +5550,128 @@ export class MindMapCanvas {
       p.anim = u < 1 ? win.requestAnimationFrame(tick) : 0;
     };
     p.anim = win.requestAnimationFrame(tick);
+  }
+
+  // ---------- 缩略图（见 minimap-core.ts） ----------
+
+  private minimap: { el: HTMLElement; map: HTMLCanvasElement; frame: HTMLElement; s: number; o: { x: number; y: number }; bounds: Bounds } | null = null;
+  private minimapFrame = 0;
+
+  /** 下一帧重画缩略图（排版、窗格大小、设置变了）；一帧里只画一次 */
+  scheduleMinimap(): void {
+    if (this.minimapFrame) return;
+    this.minimapFrame = this.el.win.requestAnimationFrame(() => {
+      this.minimapFrame = 0;
+      this.drawMinimap();
+    });
+  }
+
+  private drawMinimap(): void {
+    const layout = this.layout;
+    const show =
+      !!layout &&
+      minimapShown(this.opts.minimap?.() ?? "auto", {
+        nodes: layout.placed.size,
+        viewW: this.el.clientWidth,
+        viewH: this.el.clientHeight,
+        embedded: !!this.opts.embedded,
+        presenting: !!this.present,
+      });
+    if (!show || !layout) {
+      this.minimap?.el.remove();
+      this.minimap = null;
+      return;
+    }
+    let mm = this.minimap;
+    if (!mm) {
+      const el = this.el.createDiv({ cls: "mm-minimap", attr: { "aria-label": t("canvas.minimap") } });
+      const map = el.createEl("canvas");
+      const frame = el.createDiv({ cls: "mm-minimap-frame" });
+      // 在缩略图上按下、拖动：那一点到画布正中；别让画布当成平移 / 框选
+      let dragging = false;
+      const go = (ev: PointerEvent) => {
+        const m = this.minimap;
+        if (!m) return;
+        const r = el.getBoundingClientRect();
+        const to = centerAt(m.bounds, m.s, ev.clientX - r.left, ev.clientY - r.top, { w: this.el.clientWidth, h: this.el.clientHeight, k: this.k }, m.o);
+        this.stopPanAnim();
+        this.userView = true;
+        this.tx = to.tx;
+        this.ty = to.ty;
+        this.applyTransform();
+      };
+      el.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        dragging = true;
+        el.setPointerCapture(ev.pointerId);
+        go(ev);
+      });
+      el.addEventListener("pointermove", (ev) => {
+        if (dragging) go(ev);
+      });
+      const stop = () => {
+        dragging = false;
+      };
+      el.addEventListener("pointerup", stop);
+      el.addEventListener("pointercancel", stop);
+      el.addEventListener("dblclick", (ev) => ev.stopPropagation());
+      el.addEventListener("contextmenu", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      });
+      el.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
+      mm = this.minimap = { el, map, frame, s: 1, o: { x: 0, y: 0 }, bounds: layout.bounds };
+    }
+    const b = layout.bounds;
+    const { s, w, h, ox, oy } = minimapScale(b);
+    mm.s = s;
+    mm.o = { x: ox, y: oy };
+    mm.bounds = b;
+    mm.el.setCssStyles({ width: `${w}px`, height: `${h}px` });
+    const dpr = this.el.win.devicePixelRatio || 1;
+    const cv = mm.map;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cv.setCssStyles({ width: `${w}px`, height: `${h}px` });
+    }
+    const ctx = cv.getContext("2d");
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const css = getComputedStyle(this.el);
+      const muted = css.getPropertyValue("--text-muted").trim() || "#888";
+      const colors = new Map<string, string>();
+      const colorOf = (branch: string | undefined) => {
+        if (branch === undefined) return muted;
+        let c = colors.get(branch);
+        if (c === undefined) {
+          c = css.getPropertyValue(`--mm-branch-${branch}`).trim() || muted;
+          colors.set(branch, c);
+        }
+        return c;
+      };
+      for (const p of layout.placed.values()) {
+        const a = toMini(b, s, p.x, p.y, mm.o);
+        const el = this.els.get(p.node.id);
+        const root = !p.node.parent;
+        ctx.globalAlpha = root ? 1 : 0.8;
+        ctx.fillStyle = root ? muted : colorOf(el?.dataset.branch);
+        // 太小的节点至少画 1.5 像素，看得出有东西
+        ctx.fillRect(a.x, a.y, Math.max(1.5, p.w * s), Math.max(1.5, p.h * s));
+      }
+      ctx.globalAlpha = 1;
+    }
+    this.placeMinimapFrame();
+  }
+
+  /** 视口框：平移、缩放时只挪它，不重画缩略图 */
+  private placeMinimapFrame(): void {
+    const mm = this.minimap;
+    if (!mm) return;
+    const r = viewRect(mm.bounds, mm.s, { w: this.el.clientWidth, h: this.el.clientHeight, tx: this.tx, ty: this.ty, k: this.k }, mm.o);
+    mm.frame.setCssStyles({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
   }
 
   /** 揭开过的都盖回去 */
@@ -6077,8 +6214,8 @@ export class MindMapCanvas {
       el,
       "wheel",
       (ev) => {
-        // 备注弹窗、链接补全这类菜单自己能滚，滚轮留给它们，不拿去平移缩放画布
-        if ((ev.target as HTMLElement).closest(".mm-popover, .mm-menu")) {
+        // 备注弹窗、链接补全这类菜单自己能滚，滚轮留给它们，不拿去平移缩放画布；缩略图上滚轮也不动画布
+        if ((ev.target as HTMLElement).closest(".mm-popover, .mm-menu, .mm-minimap")) {
           if (this.opts.embedded) ev.stopPropagation();
           return;
         }

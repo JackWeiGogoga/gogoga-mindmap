@@ -14,7 +14,7 @@ import { ConfirmModal, CustomThemeModal, themeFromBase } from "./custom-theme-mo
 import { THEME_LIST, themeShortLabel, type ThemeName } from "./theme";
 import type MindMapPlugin from "./main";
 import type { RelShape } from "./model";
-import { colorLabel, redrawAllCanvases, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
+import { colorLabel, redrawAllCanvases, refreshAllBars, refreshAllMinimaps, syncNotesExpandedAll, toolIcon } from "./canvas";
 import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
 import { colorTitle } from "./format-bar";
 import { cleanLayout, MENU_ITEMS, type MenuPlace, placeOf } from "./menu-layout";
@@ -151,6 +151,8 @@ export interface MindMapSettings {
   colorMemory: { last: Partial<Record<"text" | "bg" | "node", string>>; recent: Partial<Record<"text" | "bg" | "node", string[]>> };
   /** 滚轮行为：pan 平移（Cmd/Ctrl+滚轮缩放），zoom 直接缩放（Shift+滚轮平移） */
   wheelAction: "pan" | "zoom";
+  /** 左下角的缩略图 */
+  minimap: "auto" | "always" | "never";
   /** 左键拖空白处：pan 平移（Shift+拖框选），select 框选（右键或中键拖平移，XMind 的习惯） */
   leftDrag: "pan" | "select";
   /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
@@ -287,6 +289,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   nodeColors: DEFAULT_NODE_COLORS,
   colorMemory: { last: {}, recent: {} },
   wheelAction: "pan",
+  minimap: "auto",
   leftDrag: "pan",
   editCaret: "select",
   splitKeepOriginal: true,
@@ -453,6 +456,8 @@ export class MindMapSettingTab extends PluginSettingTab {
         return p.applyInlineTitle();
       case "barPlacement":
         return redrawAllCanvases();
+      case "minimap":
+        return refreshAllMinimaps();
       case "embedToolbar":
         p.applyEmbedToolbar();
         refreshAllBars();
@@ -521,6 +526,7 @@ export class MindMapSettingTab extends PluginSettingTab {
           dropdown("openView", t("settings.openView.name"), t("settings.openView.desc"), { fit: t("settings.openView.fit"), center: t("settings.openView.center") }),
           toggle("rememberViewport", t("settings.rememberViewport.name"), t("settings.rememberViewport.desc")),
           toggle("rememberView", t("settings.rememberView.name"), t("settings.rememberView.desc")),
+          dropdown("minimap", t("settings.minimap.name"), t("settings.minimap.desc"), { auto: t("settings.minimap.auto"), always: t("settings.minimap.always"), never: t("settings.minimap.never") }, ["minimap", "overview", "缩略图", "导航", "全局"]),
           toggle("whatsNew", t("settings.whatsNew.name"), t("settings.whatsNew.desc"), ["update", "changelog", "更新", "新功能"]),
           dropdown("touchToggles", t("settings.touchToggles.name"), t("settings.touchToggles.desc"), { always: t("settings.touchToggles.always"), selected: t("settings.touchToggles.selected") }, ["fold", "折叠", "按钮", "touch", "手机", "平板"]),
           dropdown("defaultStructure", t("settings.structure.name"), t("settings.structure.desc"), Object.fromEntries(STRUCTURES.map((x) => [x.id, x.label])), ["layout", "布局"]),

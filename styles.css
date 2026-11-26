@@ -3690,3 +3690,14 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .gg-mm-root .mm-present-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--interactive-accent); transition: width 0.3s ease; }
 .is-mobile .gg-mm-root .mm-present-crumbs .mm-present-crumb:not(.is-current),
 .is-mobile .gg-mm-root .mm-present-crumbs .mm-present-crumb-sep { display: none; }
+
+/* ---------- 缩略图 ---------- */
+.gg-mm-root .mm-minimap { position: absolute; left: 12px; bottom: 12px; z-index: 2; overflow: hidden; border-radius: 8px; cursor: pointer; touch-action: none;
+  background: linear-gradient(var(--menu-background, var(--background-primary, #fff)), var(--menu-background, var(--background-primary, #fff))), var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #e3e3e3); box-shadow: var(--shadow-s); }
+.gg-mm-root:not(.is-embedded) .mm-minimap { bottom: var(--mm-bottom-inset, 44px); }
+.gg-mm-root .mm-minimap canvas { display: block; }
+.gg-mm-root .mm-minimap-frame { position: absolute; box-sizing: border-box; border: 1.5px solid var(--interactive-accent); border-radius: 3px; background: color-mix(in srgb, var(--interactive-accent) 8%, transparent); pointer-events: none; }
+/* 禅模式、演示时不显示；工具栏放在左边时让开它 */
+.gg-mm-root.is-zen .mm-minimap { display: none; }
+.gg-mm-root:has(> .mm-toolbar[data-pos="left"]) .mm-minimap { left: 64px; }

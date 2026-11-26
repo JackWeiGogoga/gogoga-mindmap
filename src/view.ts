@@ -443,6 +443,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       quickSettings: () => this.plugin.quickSettings(),
       centerOnSelect: () => this.plugin.settings.centerOnSelect,
       presentLeaves: () => this.plugin.settings.presentLeaves,
+      minimap: () => this.plugin.settings.minimap,
       hideSyntax: () => this.plugin.settings.hideSyntax,
       widthHandleOnHover: () => this.plugin.settings.widthHandleOnHover,
       newNodeName: () => this.plugin.settings.newNodeName,
