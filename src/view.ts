@@ -14,6 +14,9 @@ import { parseColorList, type InlineFormat } from "./format";
 import { t } from "./i18n";
 import { OutlinePanel } from "./outline";
 import { History } from "./history";
+import { editorChange } from "./editor-push-core";
+import { Transaction } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import { isStructure, Structure } from "./layout";
 import { blankAfterQuotedNotes, frontmatterValue, parseMarkdown, parseNodeColors, matchLine, pathAtLine, serializeMarkdown, setFrontmatterValue, strippedMarkerRenames } from "./markdown";
 import { pathOf, walk, type MindDoc, adoptIds } from "./model";
@@ -889,12 +892,43 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   }
 
   /**
+   * 推给旁边 Markdown 编辑器后它的文档对象（CodeMirror 的 Text 不可变，改一下就是新对象）。
+   * 编辑器的 editor-change 150ms 后会把它原样转回来，这期间脑图可能又改了：编辑器的文档还是这个对象，说明是自己的回声，不收。
+   * 不按文本比：在 Markdown 里撤销常常正好回到脑图推过去的某个版本，按文本比会把用户的撤销当回声挡掉
+   */
+  private pushedDocs = new WeakSet<object>();
+
+  /**
+   * 脑图改了文本：旁边开着同一篇的 Markdown 编辑器马上跟上，不等落盘后 Obsidian 重新读入（约 2 秒）。
+   * 只改动到的那一段，编辑器的光标、滚动、折叠都不动；不进编辑器自己的撤销记录（撤销在脑图里做）。
+   * 落盘照旧由脑图这边存，编辑器那边内容一样不会再写
+   */
+  private pushToEditors(): void {
+    const path = this.file?.path;
+    if (!path) return;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view as { file?: TFile | null; editor?: unknown; getMode?: () => string };
+      // 阅读视图不推：它只在重新读入文件时重画，推了编辑器内容反而让落盘后的重新读入以为没变、不再重画
+      if (view.file?.path !== path || view.getMode?.() !== "source") continue;
+      const cm = (view.editor as { cm?: EditorView } | undefined)?.cm;
+      if (!cm) continue;
+      const change = editorChange(cm.state.doc.toString(), this.data);
+      if (!change) continue;
+      cm.dispatch({ changes: change, annotations: Transaction.addToHistory.of(false) });
+      this.pushedDocs.add(cm.state.doc);
+    }
+  }
+
+  /**
    * 旁边的 Markdown 编辑器正在改同一个文件：不等它落盘（约 2 秒），直接跟上。
    * 脑图这边有没提交的编辑时跳过，等落盘后走 setViewData 的正常合并。
    * path 是那段文字所属的文件：脑图这时已经换了别的文件就不收，免得把一篇笔记的内容存进另一篇（#30）
    */
-  syncFromEditor(text: string, path: string): void {
+  syncFromEditor(text: string, path: string, editor?: unknown): void {
     if (!this.canvas || !this.file || this.file.path !== path || text === this.data || this.canvas.isBusy()) return;
+    // 自己刚推过去的那份转回来了：脑图这期间又改过的话 text 已经旧了，不收
+    const doc = (editor as { cm?: EditorView } | undefined)?.cm?.state.doc;
+    if (doc && this.pushedDocs.has(doc)) return;
     this.data = text;
     this.incomingOrigin = "follow";
     try {
@@ -997,6 +1031,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (next === this.data) return;
     this.history.push(this.data, next);
     this.data = this.local = next;
+    this.pushToEditors();
     this.imagesChanged();
     // 「Markdown 跟着脑图折叠」：折叠状态变了就马上存，不等 Obsidian 两秒的延迟保存，Markdown 那边才跟得上
     const folds = this.plugin.settings.foldFollow ? foldedSignature(doc) : null;
@@ -1131,6 +1166,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (!r) return;
     if ("conflict" in r) return void new Notice(t("notice.undoConflict"));
     this.data = this.local = r.text;
+    this.pushToEditors();
     this.reparse();
     this.followRootRename();
     this.imagesChanged();
@@ -1143,6 +1179,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (!r) return;
     if ("conflict" in r) return void new Notice(t("notice.redoConflict"));
     this.data = this.local = r.text;
+    this.pushToEditors();
     this.reparse();
     this.followRootRename();
     this.imagesChanged();

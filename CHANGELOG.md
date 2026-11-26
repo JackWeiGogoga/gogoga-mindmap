@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- In split view, changes made in the map (edits, adding and removing nodes, dragging, undo) now show up in the Markdown editor next to it right away instead of after the roughly 2-second autosave. Only the changed lines are replaced, so the editor's cursor and scroll position stay put, and the editor's own undo only covers what was typed there. A reading view next to the map still refreshes after saving.
+
 ### Fixed
 - After editing a note in the Markdown view next to the map (or in another program), pressing ⌘Z in the map also reverted those outside edits, and they were lost once saved. Undo and redo now only revert the map's own step and keep the outside edits; if the outside edit touched the same lines, the step is not undone and a notice explains why. Maps in code blocks work the same way.
 

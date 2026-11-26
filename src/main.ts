@@ -1652,7 +1652,7 @@ export default class MindMapPlugin extends Plugin {
             // 编辑器已经不是这篇就不推；脑图按现在显示的文件重新找，不用当初记下的（#30：库内笔记被库外笔记的内容覆盖）
             if (info.file?.path !== path) return;
             const text = editor.getValue();
-            for (const v of mapsOf()) v.syncFromEditor(text, path);
+            for (const v of mapsOf()) v.syncFromEditor(text, path, editor);
           }, 150),
         );
       }),
