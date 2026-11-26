@@ -89,6 +89,19 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
         return false;
       });
     }
+    // ⌘L（任务复选框）、⌘]（概要）在 Obsidian 编辑器里有默认热键（切换待办、缩进），会先被截走：
+    // 焦点在画布上时归我们，在备注编辑框、搜索框这些输入框里照常交给 Obsidian
+    for (const [k, cmd] of [["l", "task"], ["]", "summary"]] as const) {
+      this.scope.register(["Mod"], k, (ev) => {
+        const own = this.plugin.ownHotkeyCommand(ev);
+        const commands = (this.app as unknown as { commands?: { executeCommandById?: (id: string) => boolean } }).commands;
+        if (own && commands?.executeCommandById) {
+          commands.executeCommandById(own);
+          return false;
+        }
+        return this.canvas?.handleScopeKey(ev, cmd) ?? true;
+      });
+    }
   }
 
   linkSelectedToNote(): Promise<void> {
@@ -433,6 +446,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       toolbarLayout: () => mergeLayout(this.plugin.settings.toolbarLayout, TOOLBAR_DEFAULT),
       nodeColors: () => parseNodeColors(this.plugin.settings.nodeColors),
       textColors: () => parseColorList(this.plugin.settings.textColors),
+      menuLayout: () => this.plugin.settings.menuLayout,
       highlightColors: () => parseColorList(this.plugin.settings.highlightColors, true),
       colorMemory: this.plugin.colorMemory,
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
@@ -1157,6 +1171,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     if (prev) adoptIds(prev.root, this.doc.root);
     this.applyFrontmatterOptions(this.doc);
     this.canvas?.setDoc(this.doc);
+    // 撤销 / 重做可能把「加入复习」撤回或做回来：复习按钮、小绿点跟着变
+    void this.refreshReview();
   }
 
 }

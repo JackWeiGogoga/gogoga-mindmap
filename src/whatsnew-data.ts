@@ -1,6 +1,12 @@
 // 构建时由 scripts/gen-whatsnew.mjs 从 CHANGELOG 生成，别直接改
 export const WHATS_NEW: { version: string; date: string; zh: string; en: string }[] = [
  {
+  "version": "0.99.0",
+  "date": "2026-11-26",
+  "zh": "### 新增\n- 答案标记可以换（设置 →「编辑与操作」→「答案标记」，群里反馈）：换成别的 emoji、符号，或者 2～3 个英文符号，比如 `::`（节点里写的时候后面空一格）。背诵模式和复习都按它认答案，已经写了 🙈 的节点照样有效。\n- 工具栏的「复习」按钮一直显示了（群友反馈：加入复习要右键 → 更多 → 间隔复习，太深）。还没加入复习时按钮淡一点，点一下就能把整张图、或者只把选中的分支加入复习。空白处右键菜单第一层也有「间隔复习」。\n- 新快捷键：⌘]（Windows 是 Ctrl+]）加 / 去概要，和 XMind 一样；⌘L 加 / 去任务复选框，和 Obsidian 编辑器一样；Home 选中中心主题并移到画面中间。右键菜单里的概要、任务复选框、外框后面标出了快捷键。\n- 右键菜单可以自己摆（设置 →「编辑与操作」→「右键菜单」）：节点右键菜单里每一项都能选放在第一层、收进「更多」，或者不显示。常用的提上来、不常用的收进去，第一层不会越来越长。编辑、添加子节点、添加兄弟节点、删除只能在第一层和「更多」之间选，不能隐藏；顺序和原来一样，不改设置的人什么都不变，随时可以恢复默认。\n\n### 修复\n- 画布放大后，双击展开的备注卡片进编辑，字一下子缩得很小（群友反馈）：卡片跟着画布放大，编辑框却还是原来的备注字号。现在编辑框和卡片上的字一样大，表格也是；画布缩小时还是正常大小，方便编辑。纯文本的备注编辑框也跟着设置里的「备注字号」了。\n- 编辑备注时按 ⌘↵（Windows 是 Ctrl+Enter），不是关掉备注，而是在选中的节点前面插了一个空白的上级节点（群友反馈；0.87.0 备注改成所见即所得后出现）。现在又是关掉备注；焦点在画布上时 ⌘↵ 照旧是插入父节点。",
+  "en": "### Added\n- The answer marker can be changed (Settings → \"Editing and interaction\" → \"Answer marker\", requested in the user group): use another emoji or symbol, or two or three ASCII symbols such as `::` (followed by a space in the node). Recite mode and review treat it as an answer, and nodes already marked with 🙈 keep working.\n- The toolbar's review button is always there now (reported in the user group: adding a map to review was buried under right-click → More → Spaced review). Before the map is in review it's dimmed; click it to add the whole map, or just the selected branch. Right-clicking empty canvas also has \"Spaced review\" on the first level.\n- New shortcuts: ⌘] (Ctrl+] on Windows) adds or removes a summary, like XMind; ⌘L toggles a task checkbox, like Obsidian's editor; Home selects the central topic and moves it to the middle. The right-click menu shows the keys for summary, task checkbox and boundary.\n- The node right-click menu can be rearranged (Settings → \"Editing and interaction\" → \"Right-click menu\"): put each item on the first level, inside More, or hide it. Bring up what you use and tuck away what you don't, so the first level doesn't keep growing. Edit, Add child, Add sibling and Delete can move between the first level and More but can't be hidden. The order stays the same, nothing changes unless you change it, and you can restore the default any time.\n\n### Fixed\n- With the canvas zoomed in, double-clicking an expanded note card to edit it made the text suddenly much smaller (reported in the user group): the card grows with the zoom but the editor stayed at the normal note size. The editor now uses the same size as the card, tables included; when zoomed out it stays at the normal size so it's still easy to edit. The plain-text note editor also follows the \"Note font size\" setting now.\n- Pressing Mod+Enter (Ctrl+Enter on Windows) while editing a note added an empty parent node in front of the selected node instead of closing the note (reported in the user group; since 0.87.0, when notes became WYSIWYG). It closes the note again; with the canvas focused, Mod+Enter still inserts a parent node."
+ },
+ {
   "version": "0.98.0",
   "date": "2026-11-25",
   "zh": "### 新增\n- 诊断记录（只在电脑端，设置 →「诊断」）：笔记突然变空、被大量删减或疑似被拼坏时，自动在本机保存变化前后的副本和最近的读写事件，看起来不是你自己改的会弹提示，可以一键恢复为新笔记。平时只在内存里记事件，不含笔记内容；全部存在库外的 Obsidian 应用数据目录，不上传、不被 git 或网盘同步。另有「详细诊断」和「导出诊断包」，方便把问题发给开发者排查（群友反馈笔记被写坏、清空）。\n- 更新后提示更新内容：插件更新后右下角提示一下更新到了哪个版本，点「查看更新内容」看这次改了什么；隔了几版才打开也只提示一次，列出这期间的全部版本。不想看可以在设置里关掉，命令面板的「查看更新内容」随时能看。\n- 右键菜单「拉成一行」：选中的节点里折了行的一起拉成一行，不用一个个双击宽度手柄（B 站反馈）。全选（⌘A / Ctrl+A）后右键就是整张图。选中的节点里有设过宽度的时候，它和「恢复自动宽度」放在「节点宽度」二级菜单里。一步就能撤销。\n- 选中多个节点时双击其中一个的宽度手柄：有折行的一起拉成一行，都已经是一行时一起恢复自动宽度。\n\n### 修复\n- 查看备注的窗口靠近画布右下角时，右下角会被 Obsidian 的状态栏盖住，拖不动、双击恢复不了；现在会避开状态栏，放不下时这次显示先压矮一点。\n- 选中多个节点时，在宽度手柄上只点一下不拖，会把选中的节点都改成这个节点的宽度。",
@@ -53,11 +59,5 @@ export const WHATS_NEW: { version: string; date: string; zh: string; en: string 
   "date": "2026-11-21",
   "zh": "### 修复\n- 节点表格在 iPhone、iPad 上：菜单点不动、调列宽的把手跑到表格最左边、编辑空格子时长按出不来表格菜单（随 gogoga Table 同步）。",
   "en": "### Fixed\n- Node tables on iPhone and iPad: menus couldn't be tapped, the column-width handle sat at the table's left edge, and long-pressing an empty cell while editing didn't open the table menu (synced from gogoga Table)."
- },
- {
-  "version": "0.91.3",
-  "date": "2026-11-20",
-  "zh": "### 修复\n- 节点表格开着「编辑格子时直接显示格式」时，编辑居中、右对齐的格子，字会往左偏一截（随 gogoga Table 同步）。",
-  "en": "### Fixed\n- Node tables: with \"Show formatting while editing a cell\" on, text in centered and right-aligned cells shifted left while editing (synced from gogoga Table)."
  }
 ];

@@ -221,6 +221,11 @@ When the central topic is the level-1 heading and matches the file name (as in a
 | Shift+Enter (while editing) | Line break inside a node |
 | ⌘K | Link to a note / create a new note |
 | ⌘⇧B | Add a boundary around the selected nodes, or remove it |
+| ⌘] | Add a summary to the selected nodes, or remove it |
+| ⌘⇧M | Add / edit the note |
+| ⌘L | Add or remove a task checkbox (same key as in Obsidian's editor) |
+| ⌘B / ⌘I / ⌘U | Bold / italic / underline the selected nodes' text (the selected text while editing) |
+| Home | Select the central topic (the focused one in focus mode) and move it to the middle of the view |
 | Alt+↑↓ / Alt+←→ | Reorder among siblings / promote or demote |
 | Shift+click / ⌘+click / Shift+drag / ⌘A | Select a run of siblings (adds to the selection on another level) / add or remove / box-select / select all |
 | Drag node | Change parent or reorder |

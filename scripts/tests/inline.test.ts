@@ -247,3 +247,41 @@ test("拖完写回链接：只改指向这张图的那个嵌入，去掉大小�
   assert.equal(setMapSize("![[子图#分支|400]]", "子图#分支", { w: 300, h: 200 }), "![[子图#分支|300x200]]");
   assert.equal(setMapSize("没有嵌入", "子图", { w: 300, h: 200 }), "没有嵌入");
 });
+
+test("答案标记可以换：新的、旧的 🙈 都认，半角符号要后面空一格", async () => {
+  const { parseAnswerMarker, setAnswerMarker, splitMarkers, MARKER_GROUPS, currentAnswerMarker } = await import("../../src/inline");
+  assert.equal(parseAnswerMarker("::"), "::");
+  assert.equal(parseAnswerMarker(" 🐒 "), "🐒");
+  assert.equal(parseAnswerMarker("★"), "★");
+  assert.equal(parseAnswerMarker(""), null);
+  assert.equal(parseAnswerMarker("A"), null);
+  assert.equal(parseAnswerMarker("::::"), null);
+  assert.equal(parseAnswerMarker("#"), null);
+  assert.equal(parseAnswerMarker("🐒🐒"), null);
+  try {
+    setAnswerMarker("::");
+    assert.equal(currentAnswerMarker(), "::");
+    assert.deepEqual(MARKER_GROUPS[MARKER_GROUPS.length - 1].emojis, ["::"]);
+    assert.equal(isAnswer(":: 答案"), true);
+    assert.equal(isAnswer("::"), true);
+    assert.equal(isAnswer("::答案"), false, "后面没空格不算");
+    assert.equal(isAnswer("答案 ::"), false);
+    assert.equal(isAnswer("🙈 旧答案"), true, "🙈 一直认");
+    assert.equal(isAnswer("⭐ :: 解法"), true);
+    assert.deepEqual(splitMarkers(":: [ ] 选项"), { markers: ["::"], rest: "[ ] 选项" });
+    assert.equal(splitMarkers("::答案").rest, "::答案");
+    // 面板里点新标记：节点上已有 🙈 就是去掉，没有就加
+    assert.equal(toggleMarker("🙈 答案", "::"), "答案");
+    assert.equal(toggleMarker("答案", "::"), ":: 答案");
+    assert.equal(toggleMarker(":: 答案", "::"), "答案");
+    setAnswerMarker("🐒");
+    assert.equal(isAnswer("🐒 答案"), true);
+    assert.equal(isAnswer(":: 答案"), false, "换掉以后旧的自定义不再认");
+    assert.equal(isAnswer("🙈 答案"), true);
+  } finally {
+    setAnswerMarker(null);
+  }
+  assert.equal(currentAnswerMarker(), "🙈");
+  assert.deepEqual(MARKER_GROUPS[4].emojis, ["🙈"]);
+  assert.equal(isAnswer("🙈 答案"), true);
+});

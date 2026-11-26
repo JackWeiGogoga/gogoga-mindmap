@@ -4,6 +4,18 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.99.0] - 2026-11-26
+
+### Added
+- The answer marker can be changed (Settings → "Editing and interaction" → "Answer marker", requested in the user group): use another emoji or symbol, or two or three ASCII symbols such as `::` (followed by a space in the node). Recite mode and review treat it as an answer, and nodes already marked with 🙈 keep working.
+- The toolbar's review button is always there now (reported in the user group: adding a map to review was buried under right-click → More → Spaced review). Before the map is in review it's dimmed; click it to add the whole map, or just the selected branch. Right-clicking empty canvas also has "Spaced review" on the first level.
+- New shortcuts: ⌘] (Ctrl+] on Windows) adds or removes a summary, like XMind; ⌘L toggles a task checkbox, like Obsidian's editor; Home selects the central topic and moves it to the middle. The right-click menu shows the keys for summary, task checkbox and boundary.
+- The node right-click menu can be rearranged (Settings → "Editing and interaction" → "Right-click menu"): put each item on the first level, inside More, or hide it. Bring up what you use and tuck away what you don't, so the first level doesn't keep growing. Edit, Add child, Add sibling and Delete can move between the first level and More but can't be hidden. The order stays the same, nothing changes unless you change it, and you can restore the default any time.
+
+### Fixed
+- With the canvas zoomed in, double-clicking an expanded note card to edit it made the text suddenly much smaller (reported in the user group): the card grows with the zoom but the editor stayed at the normal note size. The editor now uses the same size as the card, tables included; when zoomed out it stays at the normal size so it's still easy to edit. The plain-text note editor also follows the "Note font size" setting now.
+- Pressing Mod+Enter (Ctrl+Enter on Windows) while editing a note added an empty parent node in front of the selected node instead of closing the note (reported in the user group; since 0.87.0, when notes became WYSIWYG). It closes the note again; with the canvas focused, Mod+Enter still inserts a parent node.
+
 ## [0.98.0] - 2026-11-25
 
 ### Added
@@ -1286,7 +1298,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...HEAD
+[0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0
 [0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0
 [0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0
 [0.96.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.95.0...0.96.0

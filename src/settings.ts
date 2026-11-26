@@ -17,6 +17,7 @@ import type { RelShape } from "./model";
 import { colorLabel, redrawAllCanvases, refreshAllBars, syncNotesExpandedAll, toolIcon } from "./canvas";
 import { type ColorKind, createPalette, paintColor, THEME_HIGHLIGHT } from "./color-palette";
 import { colorTitle } from "./format-bar";
+import { cleanLayout, MENU_ITEMS, type MenuPlace, placeOf } from "./menu-layout";
 import { type BarItem, EMBED_TOOLBAR_DEFAULT, encodeLayout, isSep, mergeLayout, moveItem, moveTo, nodebarDefault, sameAsDefault, TOOLBAR_DEFAULT } from "./bar-layout";
 
 /** 嵌入的脑图选了「自定义」就用自己那份按钮清单，否则和打开的脑图一样 */
@@ -199,6 +200,10 @@ export interface MindMapSettings {
   /** 自定义标记（设置里原样存用户填的文字，用时再解析） */
   customMarkers: string;
   customMarkersExclusive: boolean;
+  /** 答案标记（背诵模式遮住、复习时当答案），默认 🙈；🙈 一直认 */
+  answerMarker: string;
+  /** 节点右键菜单各项放哪一层：只存和默认不一样的（见 menu-layout.ts） */
+  menuLayout: Record<string, MenuPlace>;
   /** 切换成脑图时往 frontmatter 写 mindmap: true，以后都用脑图打开；关掉则只换当前显示 */
   rememberView: boolean;
   /** 更新后右下角提示「已更新到 x.y.z」，带「查看更新内容」按钮（whatsnew.ts） */
@@ -306,6 +311,8 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   reviewCrumb: true,
   customMarkers: "",
   customMarkersExclusive: false,
+  answerMarker: "🙈",
+  menuLayout: {},
   rememberView: true,
   whatsNew: true,
   newFileTemplate: "",
@@ -454,6 +461,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         return p.applyEmbedToolbar();
       case "customMarkers":
       case "customMarkersExclusive":
+      case "answerMarker":
         return p.applyCustomMarkers();
       case "syncSplit":
         return p.updateSplitSyncButtons();
@@ -595,7 +603,9 @@ export class MindMapSettingTab extends PluginSettingTab {
         group(t("settings.group.markers"), [
           text("customMarkers", t("settings.customMarkers.name"), t("settings.customMarkers.desc"), "🎯 📎 ★ ◆", ["emoji", "icon", "图标"]),
           toggle("customMarkersExclusive", t("settings.customMarkersExclusive.name"), t("settings.customMarkersExclusive.desc")),
+          text("answerMarker", t("settings.answerMarker.name"), t("settings.answerMarker.desc"), "🙈", ["recite", "review", "answer", "背诵", "复习", "答案", "猴子"]),
         ]),
+        this.menuLayoutPage(),
       ]),
       page(
         t("settings.group.toolbar"),
@@ -1031,6 +1041,57 @@ export class MindMapSettingTab extends PluginSettingTab {
       desc: t("bar.embedPageDesc"),
       displayValue: () => (plugin.settings.embedToolbar === "custom" ? `${modes.custom} · ${count()}` : modes[plugin.settings.embedToolbar]),
       items: plugin.settings.embedToolbar === "custom" ? [mode, reset, ...rows] : [mode],
+    };
+  }
+
+  /**
+   * 节点右键菜单：一行一项，下拉选第一层 / 更多里 / 不显示（核心操作没有「不显示」），最上面「恢复默认」。
+   * 菜单每次右键时现取设置，存了就生效，不用重画
+   */
+  private menuLayoutPage(): SettingDefinitionItem {
+    const plugin = this.plugin;
+    const save = async (id: string, place: MenuPlace) => {
+      plugin.settings.menuLayout = cleanLayout({ ...plugin.settings.menuLayout, [id]: place });
+      await plugin.saveSettings();
+    };
+    const label = (key: string) => t(key as Parameters<typeof t>[0]).replace(/…$/, "");
+    const reset: SettingDefinition = {
+      name: t("menuLayout.reset"),
+      desc: t("menuLayout.resetDesc"),
+      render: (setting) => {
+        setting.addButton((b) =>
+          b
+            .setButtonText(t("menuLayout.resetButton"))
+            .onClick(async () => {
+              plugin.settings.menuLayout = {};
+              await plugin.saveSettings();
+              this.refresh();
+            }),
+        );
+      },
+    };
+    const rows: SettingDefinition[] = MENU_ITEMS.map((def) => ({
+      name: label(def.label),
+      desc: [t(def.place === "top" ? "menuLayout.defaultTop" : "menuLayout.defaultMore"), def.locked ? t("menuLayout.locked") : ""].filter(Boolean).join(" · "),
+      aliases: ["menu", "context menu", "右键", "菜单", "更多"],
+      render: (setting) => {
+        setting.addDropdown((d) => {
+          d.addOption("top", t("menuLayout.top")).addOption("more", t("menuLayout.more"));
+          if (!def.locked) d.addOption("hidden", t("menuLayout.hidden"));
+          // 不重画页面：键盘上下切换时焦点还留在这个下拉框里
+          d.setValue(placeOf(def.id, plugin.settings.menuLayout)).onChange((v) => void save(def.id, v as MenuPlace));
+        });
+      },
+    }));
+    return {
+      type: "page",
+      name: t("menuLayout.page"),
+      desc: t("menuLayout.pageDesc"),
+      displayValue: () => {
+        const n = Object.keys(plugin.settings.menuLayout ?? {}).length;
+        return n ? t("menuLayout.count", { changed: n }) : "";
+      },
+      items: [reset, ...rows],
     };
   }
 

@@ -89,7 +89,7 @@ import {
   FRAME_MAX,
   FRAME_MIN,
   IMAGE_MIN_WIDTH,
-  ANSWER_MARKER,
+  isAnswerMarker,
   isAnswer,
   MARKER_GROUPS,
   plainText,
@@ -125,6 +125,7 @@ import { isWebUrl, linkDestination } from "./paste-link";
 import { spotInSource } from "./note-spot";
 import { addTable, noteOnlyTable, noteRest, noteTable, splitNoteTables, tableSource, withoutTable, withTable } from "./node-table";
 import { type CustomSplit, type SplitRule, splitText } from "./split";
+import { arrangeMenu, type MenuPlace, MORE_SLOT, tidySeparators } from "./menu-layout";
 import { calloutFromMarker, calloutToMarker, COLOR_NAMES, setFrontmatterValue, convertLevelKind, MARKER_RE, markerText, newBlockId, normalizeNote, parseClipboard, subtreeToList, unescapeNote } from "./markdown";
 
 export interface CanvasHost {
@@ -215,6 +216,8 @@ export interface MenuEntry {
   separator?: boolean;
   /** 二级菜单；host 拿不到二级菜单时平铺在这一项的位置 */
   submenu?: MenuEntry[];
+  /** 节点右键菜单里能挪位置的项（见 menu-layout.ts） */
+  id?: string;
 }
 
 /** 间隔复习的宿主接口：数字由宿主异步算好，画布同步取 */
@@ -366,6 +369,8 @@ export interface CanvasOptions {
   /** 常用文字颜色、荧光笔颜色（格式栏和「第 N 个颜色」命令用） */
   textColors?: () => string[];
   highlightColors?: () => string[];
+  /** 节点右键菜单各项放哪一层（只有和默认不一样的） */
+  menuLayout?: () => Record<string, MenuPlace>;
   /** 颜色下拉记住的颜色（上次用的、最近使用）；不给就只记在这张图里 */
   colorMemory?: ColorMemory;
   /** 返回 true 时鼠标左键拖空白处是框选，右键 / 中键拖动平移；每次按下时读取 */
@@ -3726,10 +3731,22 @@ export class MindMapCanvas {
     if (!b) return;
     const on = this.reviewState() !== "none";
     const n = on ? (this.opts.review?.due()?.count ?? 0) : 0;
-    b.classList.toggle("is-hidden", !on);
+    // 只读的图没法加入，还没加入时就不显示
+    b.classList.toggle("is-hidden", !on && !this.opts.editable);
+    b.classList.toggle("is-off", !on);
     const c = b.querySelector<HTMLElement>(".mm-tool-count");
     if (c) c.textContent = n ? String(n) : "";
-    this.tip(b, t("canvas.review", { n }), "toolbar");
+    this.tip(b, on ? t("canvas.review", { n }) : t("canvas.reviewJoin"), "toolbar");
+  }
+
+  /** 工具栏的复习按钮（还没加入复习时）：在按钮下面弹出加入复习的菜单；选中了分支节点时多一项「只把这个分支加入复习」 */
+  private showReviewJoinMenu(anchor: HTMLElement): void {
+    const node = this.primary ?? this.doc?.root;
+    if (!node) return;
+    const entries = this.reviewMenu(node);
+    if (!entries.length) return;
+    const r = anchor.getBoundingClientRect();
+    this.showContextMenu(entries, new MouseEvent("contextmenu", { clientX: r.left, clientY: r.bottom + 4 }));
   }
 
   /** 今天有卡片到期的节点：右上角一个小绿点（设置里可以关） */
@@ -4594,10 +4611,11 @@ export class MindMapCanvas {
     // 只在图里有隐藏的节点时出现
     this.hiddenButton = btn("hiddenNodes", t("canvas.showHidden"), () => this.opts.onToggleHidden?.());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
-    // 只在这张图加入了间隔复习时出现，旁边写今天要复习几张
+    // 间隔复习：加入了复习，旁边写今天要复习几张，点了开始复习；还没加入时淡一点，点了弹出「加入复习」（群友反馈入口太深）
     if (this.opts.review) {
       const hooks = this.opts.review;
-      this.reviewButton = btn("review", "", () => hooks.study(null));
+      const b = btn("review", "", () => (this.reviewState() === "none" ? this.showReviewJoinMenu(b) : hooks.study(null)));
+      this.reviewButton = b;
       this.reviewButton.createSpan({ cls: "mm-tool-count" });
       this.updateReviewButton();
     }
@@ -6191,6 +6209,33 @@ export class MindMapCanvas {
       }
       return;
     }
+    // ⌘] 加 / 去概要（和 XMind 一样）
+    if (mod && !ev.altKey && ev.code === "BracketRight") {
+      if (this.opts.editable && this.selected.size) {
+        ev.preventDefault();
+        this.toggleSummaryOnSelected();
+      }
+      return;
+    }
+    // ⌘L 任务复选框：有就去掉、没有就加（和 Obsidian 编辑器里切换待办同一个键）
+    if (mod && !ev.shiftKey && !ev.altKey && ev.key.toLowerCase() === "l") {
+      if (this.opts.editable && this.selected.size) {
+        ev.preventDefault();
+        this.toggleTaskOnSelected();
+      }
+      return;
+    }
+    // Home：选中中心主题（聚焦时是聚焦的那个），移到画面中间，缩放不变
+    if (ev.key === "Home" && !mod && !ev.altKey && !ev.shiftKey) {
+      const root = this.focusRoot ?? this.doc?.root;
+      const c = root ? this.centerOf(root) : null;
+      if (root && c) {
+        ev.preventDefault();
+        this.select(root);
+        this.panTo(this.el.clientWidth / 2 - c.x * this.k, this.el.clientHeight / 2 - c.y * this.k);
+      }
+      return;
+    }
     if (mod && !ev.shiftKey && !ev.altKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
       if (this.opts.editable && this.selected.size) {
         ev.preventDefault();
@@ -7419,10 +7464,27 @@ export class MindMapCanvas {
   }
 
   /** 视图把 ⌘↵ 交到这里：备注框里是关掉备注，搜索框里不管，其他时候插入父节点 */
+  /**
+   * 视图 Scope 截下来的 ⌘L / ⌘]：焦点在画布上（没在编辑、不在输入框里）才处理，返回 false；
+   * 否则返回 true 交回 Obsidian（备注编辑框里的 ⌘L 还是切换待办）
+   */
+  handleScopeKey(ev: KeyboardEvent, cmd: "task" | "summary"): boolean {
+    const target = ev.target as HTMLElement | null;
+    if (this.editing || !target || !this.el.contains(target) || target.closest("input, textarea, [contenteditable='true'], .cm-editor")) return true;
+    if (!this.opts.editable || !this.selected.size) return false;
+    if (this.keysHandled.has(ev)) return false;
+    this.keysHandled.add(ev);
+    if (cmd === "task") this.toggleTaskOnSelected();
+    else this.toggleSummaryOnSelected();
+    return false;
+  }
+
   handleModEnter(ev: KeyboardEvent): void {
     const target = ev.target as HTMLElement;
     if (target.closest?.(".gg-mm-search")) return;
-    if (target.tagName === "TEXTAREA") {
+    // 备注编辑框里的 ⌘↵ 是关掉备注：所见即所得备注是 CodeMirror（contenteditable 的 div，不是 textarea），
+    // 也要认出来，不然会给选中的节点插一个空白父节点（0.87.0 起的回归）
+    if (target.tagName === "TEXTAREA" || (this.popover && this.popover.contains(target))) {
       this.closePopover();
       this.el.focus({ preventScroll: true });
       return;
@@ -8743,10 +8805,11 @@ export class MindMapCanvas {
     const topic = isSummaryTopic(node);
     if (editable) {
       entries.push(
-        { title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
-        { title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
-        { title: node.parent ? `${t("menu.addSibling")}  ${sc("Enter")}` : t("menu.addSibling"), icon: "list-plus", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(false) },
+        { id: "edit", title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
+        { id: "addChild", title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
+        { id: "addSibling", title: node.parent ? `${t("menu.addSibling")}  ${sc("Enter")}` : t("menu.addSibling"), icon: "list-plus", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(false) },
         {
+          id: "insert",
           title: t("menu.insertGroup"),
           icon: "between-horizontal-start",
           // 概要主题跟着括住的范围走，前后插不了，也不放表格
@@ -8768,12 +8831,13 @@ export class MindMapCanvas {
     // 展开全部 / 折叠全部是高频操作，成对放在第一层；一层层收放、聚焦、缩放放进「折叠与视图 ▸」，第一层别太长
     if (!leaf) {
       entries.push(
-        { title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
-        { title: `${t("menu.collapseBranch")}  ${sc("Shift", "0")}`, icon: "chevrons-down-up", run: () => this.collapseBranch(node) },
+        { id: "expandCollapse", title: `${t("menu.expandBranch")}  0`, icon: "chevrons-up-down", run: () => this.setFoldLevel(null, node) },
+        { id: "expandCollapse", title: `${t("menu.collapseBranch")}  ${sc("Shift", "0")}`, icon: "chevrons-down-up", run: () => this.collapseBranch(node) },
       );
     }
     entries.push(
       {
+        id: "fold",
         title: t("menu.foldGroup"),
         icon: node.folded ? "chevron-down" : "chevron-right",
         submenu: [
@@ -8796,21 +8860,22 @@ export class MindMapCanvas {
     if (editable) {
       if (link) {
         entries.push(
-          { title: t("menu.openLink", { target: link.target }), icon: "file-text", run: () => this.opts.host?.openLink?.(link.target, true, new MouseEvent("click")) },
-          { title: t("menu.unlink"), icon: "unlink", run: () => this.unlinkNote(node) },
+          { id: "link", title: t("menu.openLink", { target: link.target }), icon: "file-text", run: () => this.opts.host?.openLink?.(link.target, true, new MouseEvent("click")) },
+          { id: "link", title: t("menu.unlink"), icon: "unlink", run: () => this.unlinkNote(node) },
         );
       } else if (this.opts.host?.pickNote) {
-        entries.push({ title: `${t("menu.linkNote")}  ${sc("Mod")}K`, icon: "link", run: () => void this.linkSelectedToNote() });
+        entries.push({ id: "link", title: `${t("menu.linkNote")}  ${sc("Mod")}K`, icon: "link", run: () => void this.linkSelectedToNote() });
       }
       entries.push(
-        { title: `${node.note ? t("menu.editNote") : t("menu.addNote")}  ${sc("Mod", "Shift", "M")}`, icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
+        { id: "note", title: `${node.note ? t("menu.editNote") : t("menu.addNote")}  ${sc("Mod", "Shift", "M")}`, icon: "sticky-note", run: () => this.toggleNotePopover(node, true) },
       );
-      if (this.noteShown(node)) entries.push({ title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
+      if (this.noteShown(node)) entries.push({ id: "deleteNote", title: t("menu.deleteNote"), icon: "trash-2", run: () => this.deleteNote(node) });
       entries.push(
         // 带标注的节点：编辑、颜色、删除收进「标注」二级菜单（颜色原来只在气泡上右键才有，不好找，蝈蝈）；
         // 第一层项数不变，菜单才放得进窗口
         node.callout !== undefined
           ? {
+              id: "callout",
               title: t("menu.calloutGroup"),
               icon: "message-square",
               submenu: [
@@ -8820,43 +8885,43 @@ export class MindMapCanvas {
                 ...this.calloutColorEntries(node),
               ],
             }
-          : { title: t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
-        { title: t("menu.addRel"), icon: "spline", run: () => this.startRel(node) },
-        { title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
-        { title: t("menu.task"), icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
+          : { id: "callout", title: t("menu.addCallout"), icon: "message-square", run: () => this.editCallout(node) },
+        { id: "rel", title: t("menu.addRel"), icon: "spline", run: () => this.startRel(node) },
+        { id: "markers", title: t("menu.markers"), icon: "star", run: () => this.toggleMarkerPicker(true) },
+        { id: "task", title: `${t("menu.task")}  ${sc("Mod", "L")}`, icon: "check-square", checked: /^\[( |x|X)\]\s/.test(splitMarkers(node.text).rest), run: () => this.toggleTaskOnSelected() },
       );
       if (node.parent && !topic) {
         const on = !!node.parent.numbered;
-        entries.push({ title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
+        entries.push({ id: "numbering", title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
       }
       {
         // 右键的是选中的节点之一：对选中的一起。有折行的可以拉成一行，设过宽度的可以恢复；两样都有时收进「节点宽度」二级菜单，第一层只占一项
         const group = this.selected.size > 1 && this.selected.has(node) ? [...this.selected] : [node];
         const many = group.filter((n) => n.width);
         const wrapped = this.oneLineWidths(group).size > 0;
-        const fit = { title: t("menu.oneLine"), icon: "move-horizontal", run: () => this.fitOneLine(group) };
-        const reset = { title: t("menu.resetWidth"), icon: "rotate-ccw", run: () => this.resetWidths(many) };
-        if (wrapped && many.length) entries.push({ title: t("menu.widthGroup"), icon: "move-horizontal", submenu: [fit, reset] });
+        const fit = { id: "width", title: t("menu.oneLine"), icon: "move-horizontal", run: () => this.fitOneLine(group) };
+        const reset = { id: "width", title: t("menu.resetWidth"), icon: "rotate-ccw", run: () => this.resetWidths(many) };
+        if (wrapped && many.length) entries.push({ id: "width", title: t("menu.widthGroup"), icon: "move-horizontal", submenu: [fit, reset] });
         else if (wrapped) entries.push(fit);
         else if (many.length) entries.push({ ...reset, icon: "move-horizontal" });
       }
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
-      if (box) entries.push({ title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
-      else entries.push({ title: t("menu.addBox"), icon: "square-dashed", disabled: !node.parent || this.isFloating(node) || topic, run: () => this.addBoxToSelected() });
+      if (box) entries.push({ id: "box", title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
+      else entries.push({ id: "box", title: `${t("menu.addBox")}  ${sc("Mod", "Shift", "B")}`, icon: "square-dashed", disabled: !node.parent || this.isFloating(node) || topic, run: () => this.addBoxToSelected() });
       const summary = topic ? node.topicOf! : this.summaryOf(node);
-      if (summary) entries.push({ title: t("menu.summaryGroup"), icon: "brackets", submenu: this.summaryMenuEntries(summary) });
-      else entries.push({ title: t("menu.addSummary"), icon: "brackets", disabled: !node.parent || this.isFloating(node), run: () => this.addSummaryToSelected() });
+      if (summary) entries.push({ id: "summary", title: t("menu.summaryGroup"), icon: "brackets", submenu: this.summaryMenuEntries(summary) });
+      else entries.push({ id: "summary", title: `${t("menu.addSummary")}  ${sc("Mod", "]")}`, icon: "brackets", disabled: !node.parent || this.isFloating(node), run: () => this.addSummaryToSelected() });
       entries.push(sep);
     }
-    entries.push({ title: t("menu.copy"), icon: "copy", run: () => this.copySelection() });
+    entries.push({ id: "copy", title: t("menu.copy"), icon: "copy", run: () => this.copySelection() });
     // 节点里有图片时可以把图片本身复制出去（⌘C 复制的是 Markdown 文字）
     const img = this.els.get(node.id)?.querySelector<HTMLImageElement>(".mm-label img.mm-img");
-    if (img) entries.push({ title: t("menu.copyImage"), icon: "image", run: () => void this.copyImage(img) });
+    if (img) entries.push({ id: "copyImage", title: t("menu.copyImage"), icon: "image", run: () => void this.copyImage(img) });
     if (editable) {
       entries.push(
-        { title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() },
-        { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() },
+        { id: "cut", title: t("menu.cut"), icon: "scissors", run: () => this.cutSelection() },
+        { id: "paste", title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => void this.pasteFromClipboard() },
       );
     }
     entries.push(sep);
@@ -8866,10 +8931,11 @@ export class MindMapCanvas {
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
       more.push(
-        { title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
-        { title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
+        { id: "convert", title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
+        { id: "convert", title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
       );
       more.push({
+        id: "split",
         title: t("menu.splitInto"),
         icon: "split",
         submenu: this.splitRules().map((r) => ({ title: r.label, disabled: !this.splittable(node, r.rule).length, run: () => this.splitIntoChildren(node, r.rule) })),
@@ -8877,30 +8943,31 @@ export class MindMapCanvas {
       if (node.parent && !topic) {
         more.push(
           node.hidden
-            ? { title: t("menu.unhideNode"), icon: "eye", run: () => this.unhideSelected() }
-            : { title: t("menu.hideNode"), icon: "eye-off", run: () => this.hideSelected() },
+            ? { id: "hide", title: t("menu.unhideNode"), icon: "eye", run: () => this.unhideSelected() }
+            : { id: "hide", title: t("menu.hideNode"), icon: "eye-off", run: () => this.hideSelected() },
         );
       }
-      more.push({ title: t("menu.branchLayout"), icon: "network", submenu: this.branchLayoutMenu(node) });
-      if (this.isFloating(node)) more.push({ title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
-      else if (node.parent && !topic && this.canFloat()) more.push({ title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
+      more.push({ id: "branchLayout", title: t("menu.branchLayout"), icon: "network", submenu: this.branchLayoutMenu(node) });
+      if (this.isFloating(node)) more.push({ id: "float", title: t("menu.attachFloat"), icon: "link", run: () => this.attachFloat(node) });
+      else if (node.parent && !topic && this.canFloat()) more.push({ id: "float", title: t("menu.toFloat"), icon: "square-dashed-mouse-pointer", run: () => this.convertToFloat(node) });
       more.push(sep);
     }
     if (editable && this.nodeTable(node)) {
       more.push(
-        { title: t("menu.tableToNote"), icon: "sticky-note", run: () => this.setTableInNode(node, false) },
-        { title: t("menu.deleteTable"), icon: "trash-2", run: () => this.deleteNodeTable(node) },
+        { id: "nodeTable", title: t("menu.tableToNote"), icon: "sticky-note", run: () => this.setTableInNode(node, false) },
+        { id: "nodeTable", title: t("menu.deleteTable"), icon: "trash-2", run: () => this.deleteNodeTable(node) },
         sep,
       );
     }
-    more.push({ title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
+    more.push({ id: "nodeLink", title: t("menu.copyNodeLink"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node) });
     // 带别名：[[笔记#^id|节点的内容]]，粘到别处显示的是内容不是一串 id（zhiqiang 反馈）
-    more.push({ title: t("menu.copyNodeLinkAlias"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node, true) });
-    if (this.opts.onRevealInMarkdown) more.push({ title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() });
+    more.push({ id: "nodeLink", title: t("menu.copyNodeLinkAlias"), icon: "link-2", disabled: !this.opts.host?.fileBasename, run: () => void this.copyNodeLink(node, true) });
+    if (this.opts.onRevealInMarkdown) more.push({ id: "reveal", title: t("menu.revealInMarkdown"), icon: "file-search", run: () => this.opts.onRevealInMarkdown?.() });
     // 整个节点的文字颜色（浮动工具栏上也有）：第一层菜单放不下了，放在「更多」最后（放最前时，鼠标往二级菜单里移会先扫过它、弹出三级菜单挡住别的项）
     if (editable) {
       const now = this.wholeTextColor();
       more.push({
+        id: "textColor",
         title: t("menu.textColor"),
         icon: "baseline",
         submenu: [
@@ -8911,13 +8978,18 @@ export class MindMapCanvas {
     }
     // 间隔复习放在「更多」最前面：第一层菜单不能再长了（矮窗口里放不下）；常用的「复习」在工具栏上
     const review = this.reviewMenu(node);
-    if (review.length) more.unshift({ title: t("menu.reviewGroup"), icon: "layers", submenu: review }, sep);
-    entries.push({ title: t("menu.more"), icon: "more-horizontal", submenu: more });
+    if (review.length) more.unshift({ id: "review", title: t("menu.reviewGroup"), icon: "layers", submenu: review }, sep);
+    entries.push({ id: MORE_SLOT });
     if (editable && node.parent) {
-      entries.push(sep, { title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
-      if (node.children.length && !topic) entries.push({ title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });
+      entries.push(sep, { id: "delete", title: `${t("menu.delete")}  ${isApple() ? "⌫" : "Delete"}`, icon: "trash", run: () => this.deleteSelected() });
+      if (node.children.length && !topic) entries.push({ id: "delete", title: `${t("menu.deleteOnly")}  ${sc("Mod", isApple() ? "⌫" : "Backspace")}`, icon: "eraser", run: () => this.deleteOnlySelected() });
     }
-    return entries;
+    // 按设置把各项放到第一层、「更多」或去掉（设置 → 编辑与操作 → 右键菜单）
+    const placed = arrangeMenu(entries, more, this.opts.menuLayout?.(), () => ({ separator: true }));
+    const moreAt = placed.top.findIndex((e) => e.id === MORE_SLOT);
+    if (placed.more.length) placed.top[moreAt] = { title: t("menu.more"), icon: "more-horizontal", submenu: placed.more };
+    else placed.top.splice(moreAt, 1);
+    return tidySeparators(placed.top);
   }
 
   private backgroundMenuEntries(at?: { x: number; y: number }): MenuEntry[] {
@@ -8935,6 +9007,9 @@ export class MindMapCanvas {
     if (this.opts.onZen) entries.push({ separator: true }, this.zen ? { title: t("canvas.zenExit"), icon: "minimize", run: () => this.setZen(false) } : { title: t("canvas.zen"), icon: "maximize-2", run: () => this.setZen(true) });
     const side = this.opts.onSideBySide;
     if (side) entries.push({ separator: true }, { title: t("command.openPreview"), icon: "columns-2", run: () => side() });
+    // 间隔复习（和右键中心主题「更多」里的一样）：空白处的菜单短，放在第一层好找
+    const review = this.doc ? this.reviewMenu(this.doc.root) : [];
+    if (review.length) entries.push({ separator: true }, { title: t("menu.reviewGroup"), icon: "layers", submenu: review });
     return entries;
   }
 
@@ -8948,7 +9023,7 @@ export class MindMapCanvas {
     this.notify();
   }
 
-  private toggleTaskOnSelected(): void {
+  toggleTaskOnSelected(): void {
     if (!this.opts.editable || !this.selected.size) return;
     const primaryHas = this.primary ? /^\[( |x|X)\]\s/.test(splitMarkers(this.primary.text).rest) : false;
     for (const n of this.selected) {
@@ -9120,7 +9195,7 @@ export class MindMapCanvas {
         b.className = "mm-marker-btn";
         b.dataset.emoji = emoji;
         b.textContent = emoji;
-        if (emoji === ANSWER_MARKER) this.tip(b, t("marker.answerTip"));
+        if (isAnswerMarker(emoji)) this.tip(b, t("marker.answerTip"));
         b.addEventListener("click", (ev) => {
           ev.stopPropagation();
           for (const n of this.selected) n.text = toggleMarker(n.text, emoji);
@@ -10390,7 +10465,10 @@ export class MindMapCanvas {
     const h = Math.min(Math.max(r.height, 140), Math.max(80, host.height - 16));
     const left = Math.max(8, Math.min(r.left - host.left, host.width - w - 8));
     const top = Math.max(8, Math.min(r.top - host.top, host.height - h - 8));
-    this.toggleNotePopover(node, true, { left: `${left}px`, top: `${top}px`, w, h }, spot);
+    // 画布放大时卡片里的字跟着变大，编辑框盖在卡片上也按同样的比例放大，不然一进编辑字就缩小（群友反馈）。
+    // 缩小时不跟：字太小没法编辑，编辑框最小也有 260×140
+    const scale = Math.min(Math.max(this.k, 1), 3);
+    this.toggleNotePopover(node, true, { left: `${left}px`, top: `${top}px`, w, h, scale }, spot);
   }
 
   /** 内容超出卡片、还没滚到底时，底部渐隐提示下面还有 */
@@ -10600,7 +10678,7 @@ export class MindMapCanvas {
    * spot：双击查看中的备注进来时，双击的字在原文里的位置和鼠标的高度。编辑框打开后光标放在那里、那一行留在鼠标原来的高度，
    * 不用在长备注里重新找刚才看到哪
    */
-  private toggleNotePopover(node: MindNode, edit = false, at?: { left: string; top: string; w: number; h: number }, spot?: { at: number; y: number }): void {
+  private toggleNotePopover(node: MindNode, edit = false, at?: { left: string; top: string; w: number; h: number; scale?: number }, spot?: { at: number; y: number }): void {
     const sameNode = this.popover?.dataset.id === node.id;
     const alreadyEditing = !!this.popover?.querySelector("textarea");
     // 再点一次图标就收起；但「编辑」请求要把查看态切成编辑态，不能当成收起
@@ -10617,6 +10695,11 @@ export class MindMapCanvas {
     const pop = createDiv();
     pop.className = "mm-popover";
     pop.dataset.id = node.id;
+    // 从放大了的备注卡片进编辑：备注字号（表格字号跟着它）按画布比例放大，和卡片上看到的一样大
+    if (at?.scale && at.scale !== 1) {
+      const base = parseFloat(this.el.win.getComputedStyle(this.el).getPropertyValue("--mm-note-size")) || 13;
+      pop.setCssProps({ "--mm-note-size": `${Math.round(base * at.scale * 100) / 100}px` });
+    }
     pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
     pop.addEventListener("wheel", (ev) => ev.stopPropagation());
     pop.addEventListener("dragstart", () => (this.dragFromPopover = true));

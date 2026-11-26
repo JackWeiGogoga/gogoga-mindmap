@@ -41,8 +41,34 @@ export interface InlineOptions {
   mapPreview?: (link: string, param: string | undefined) => HTMLElement | null;
 }
 
-/** 答案标记：背诵模式下带它的节点连同子树整个遮住，点一下揭开；截图题、文字题都能用 */
+/** 默认的答案标记：背诵模式下带它的节点连同子树整个遮住，点一下揭开；截图题、文字题都能用 */
 export const ANSWER_MARKER = "🙈";
+/** 现在用的答案标记（设置里可以换）；🙈 不管换没换都一直认，旧笔记不失效 */
+let answerMarker = ANSWER_MARKER;
+export function currentAnswerMarker(): string {
+  return answerMarker;
+}
+/** 是不是答案标记（现在用的，或者默认的 🙈） */
+export function isAnswerMarker(m: string): boolean {
+  return m === answerMarker || m === ANSWER_MARKER;
+}
+/** 半角符号做的标记（「::」这种）：只许这几个字符、2～3 个，而且后面要空一格才算，免得把正文开头当成标记 */
+const ASCII_MARKER_RE = /^[:;?!@%&^]{2,3}$/;
+function isAsciiMarker(m: string): boolean {
+  return ASCII_MARKER_RE.test(m);
+}
+
+/**
+ * 设置里填的答案标记：一个 emoji / 非 ASCII 符号，或者 2～3 个半角符号（「::」「??」）。
+ * 填的不合格（空、字母、太长）返回 null，用默认的 🙈
+ */
+export function parseAnswerMarker(input: string): string | null {
+  const v = input.trim();
+  if (!v) return null;
+  if (isAsciiMarker(v)) return v;
+  const parsed = parseCustomMarkers(v);
+  return parsed.length === 1 && parsed[0] === v ? v : null;
+}
 /** 可加在节点开头的标记（emoji，存在文字里，任何地方都能显示） */
 /** name 是界面上的分组名，用 getter 在用到时才查字典；emoji 本身是数据，不翻译 */
 export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive: boolean }[] = [
@@ -53,7 +79,23 @@ export const MARKER_GROUPS: { readonly name: string; emojis: string[]; exclusive
   { get name() { return t("marker.recite"); }, emojis: [ANSWER_MARKER], exclusive: false },
 ];
 const BUILTIN_GROUPS = MARKER_GROUPS.length;
+const RECITE_GROUP = BUILTIN_GROUPS - 1;
 let ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+
+/** 认得出的标记：面板里的，加上换了答案标记后仍然要认的 🙈 */
+function rebuildMarkers(): void {
+  ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+  if (!ALL_MARKERS.includes(ANSWER_MARKER)) ALL_MARKERS.push(ANSWER_MARKER);
+}
+
+/** 换答案标记：标记面板「背诵」一组显示新的；null 恢复 🙈 */
+export function setAnswerMarker(marker: string | null): void {
+  answerMarker = marker ?? ANSWER_MARKER;
+  MARKER_GROUPS[RECITE_GROUP].emojis = [answerMarker];
+  // 自定义组里有和它一样的，去掉（不然一个标记出现在两组）
+  for (const g of MARKER_GROUPS.slice(BUILTIN_GROUPS)) g.emojis = g.emojis.filter((e) => e !== answerMarker);
+  rebuildMarkers();
+}
 
 /**
  * 设置里填的自定义标记：一个字形一个标记，只认 emoji 和非 ASCII 的符号。
@@ -80,7 +122,7 @@ export function setCustomMarkers(emojis: string[], exclusive: boolean): void {
   const builtin = new Set(MARKER_GROUPS.flatMap((g) => g.emojis));
   const list = emojis.filter((e) => !builtin.has(e));
   if (list.length) MARKER_GROUPS.push({ get name() { return t("marker.custom"); }, emojis: list, exclusive });
-  ALL_MARKERS = MARKER_GROUPS.flatMap((g) => g.emojis);
+  rebuildMarkers();
 }
 
 /** 标签开头连续的标记 emoji 与其余文字 */
@@ -91,7 +133,8 @@ export function splitMarkers(text: string): { markers: string[]; rest: string } 
   const lead = TASK_LEAD.exec(text);
   let rest = lead ? text.slice(lead[0].length) : text;
   for (;;) {
-    const hit = ALL_MARKERS.find((m) => rest.startsWith(m));
+    // 半角符号的标记后面必须是空白或结尾（「::答案」不算，「:: 答案」才算）
+    const hit = ALL_MARKERS.find((m) => rest.startsWith(m) && (!isAsciiMarker(m) || /^(\s|$)/.test(rest.slice(m.length))));
     if (!hit) break;
     markers.push(hit);
     rest = rest.slice(hit.length).replace(/^\s+/, "");
@@ -115,7 +158,9 @@ export function toggleMarker(text: string, emoji: string): string {
   const { markers, rest } = splitMarkers(text);
   const group = MARKER_GROUPS.find((g) => g.emojis.includes(emoji));
   let next: string[];
-  if (markers.includes(emoji)) next = markers.filter((m) => m !== emoji);
+  // 答案标记新旧算一个：节点上是 🙈、点面板里换过的标记，是去掉而不是再加一个
+  if (isAnswerMarker(emoji) && markers.some(isAnswerMarker)) next = markers.filter((m) => !isAnswerMarker(m));
+  else if (markers.includes(emoji)) next = markers.filter((m) => m !== emoji);
   else if (group?.exclusive) next = [...markers.filter((m) => !group.emojis.includes(m)), emoji];
   else next = [...markers, emoji];
   // 组内顺序固定：优先级、进度、旗帜、符号
@@ -125,7 +170,7 @@ export function toggleMarker(text: string, emoji: string): string {
 
 /** 节点开头有没有答案标记 */
 export function isAnswer(text: string): boolean {
-  return splitMarkers(text).markers.includes(ANSWER_MARKER);
+  return splitMarkers(text).markers.some(isAnswerMarker);
 }
 
 const TASK_RE = /^\[( |x|X)\]\s+/;

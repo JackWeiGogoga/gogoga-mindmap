@@ -1,4 +1,5 @@
 import { type CustomSplit, parseCustomSplits } from "./split";
+import { cleanLayout } from "./menu-layout";
 import { dailyNote } from "./daily-note";
 import { confirmBox } from "./confirm";
 import type { SecretBox } from "./table/core/secret-box";
@@ -76,7 +77,7 @@ import { ReviewService } from "./review/service";
 import { ReviewView, VIEW_TYPE_REVIEW } from "./review/view";
 import { DEFAULT_REVIEW_PREFS } from "./review/core/schedule";
 import { REVIEW_KEY } from "./review/mindmap-cards";
-import { mediaKind, parseCustomMarkers, setCustomMarkers, setImageMaxWidth } from "./inline";
+import { mediaKind, parseAnswerMarker, parseCustomMarkers, setAnswerMarker, setCustomMarkers, setImageMaxWidth } from "./inline";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { noteTagsExtension } from "./note-tags";
@@ -576,6 +577,7 @@ export default class MindMapPlugin extends Plugin {
     this.settings.review = { ...DEFAULT_REVIEW_PREFS, ...(raw.review ?? {}) };
     // 嵌套的对象要自己一份，不能和默认值共用（记颜色时会改它）
     this.settings.colorMemory = { last: { ...raw.colorMemory?.last }, recent: { ...raw.colorMemory?.recent } };
+    this.settings.menuLayout = cleanLayout(raw.menuLayout);
     this.fileState = new FileStateStore(this.app.vault.adapter, `${this.manifest.dir}/state.json`);
     await this.fileState.load();
     this.viewports = new ViewportStore(this.app);
@@ -955,6 +957,7 @@ export default class MindMapPlugin extends Plugin {
   /** 设置里的自定义标记 → 标记面板；redraw 时让已打开的脑图按新的标记重新识别、重画 */
   applyCustomMarkers(redraw = true): void {
     setCustomMarkers(parseCustomMarkers(this.settings.customMarkers), this.settings.customMarkersExclusive);
+    setAnswerMarker(parseAnswerMarker(this.settings.answerMarker ?? ""));
     if (!redraw) return;
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       if (leaf.view instanceof MindMapView) leaf.view.redrawAll();
@@ -2512,6 +2515,7 @@ export default class MindMapPlugin extends Plugin {
       nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       nodeColors: () => parseNodeColors(this.settings.nodeColors),
       textColors: () => parseColorList(this.settings.textColors),
+      menuLayout: () => this.settings.menuLayout,
       highlightColors: () => parseColorList(this.settings.highlightColors, true),
       colorMemory: this.colorMemory,
       marqueeDrag: () => this.settings.leftDrag === "select",

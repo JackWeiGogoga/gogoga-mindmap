@@ -1004,7 +1004,7 @@ body { --gg-mm-styles-loaded: 1; }
   outline: none;
   background: transparent;
   color: inherit;
-  font: 13px/1.55 var(--mm-font);
+  font: var(--mm-note-size, 13px)/1.55 var(--mm-font);
   resize: vertical;
 }
 /* 从查看切过来的编辑框：外框沿用查看窗口的大小，文字区铺满，还能继续拖右下角 */
@@ -2463,6 +2463,9 @@ body.mm-strike-done .gg-mm-root:not(.is-recite) .mm-label.has-done-task { text-d
 .mm-tool[data-tool="review"] { width: auto; min-width: 28px; padding: 0 5px; box-sizing: border-box; gap: 2px; }
 .mm-tool .mm-tool-count { font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-green); margin-left: 1px; }
 .mm-tool .mm-tool-count:empty { display: none; }
+/* 还没加入复习的图：复习按钮淡一点，点了弹出「加入复习」 */
+.gg-mm-root .mm-tool[data-tool="review"].is-off { opacity: 0.55; }
+.gg-mm-root .mm-tool[data-tool="review"].is-off:hover { opacity: 1; }
 .gg-mm-node.has-review-due::after { content: ""; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-green); box-shadow: 0 0 0 2px var(--mm-bg, var(--background-primary)); pointer-events: none; }
 
 /* ==== gogoga-table 同步开始（scripts/sync-table.mjs 生成，别直接改） ==== */

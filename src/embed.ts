@@ -145,6 +145,7 @@ export class MindMapEmbed extends Component {
         toolbarLayout: () => embedToolbarLayout(settings),
         nodeColors: () => parseNodeColors(settings.nodeColors),
         textColors: () => parseColorList(settings.textColors),
+        menuLayout: () => settings.menuLayout,
         highlightColors: () => parseColorList(settings.highlightColors, true),
         colorMemory: this.plugin.colorMemory,
         marqueeDrag: () => settings.leftDrag === "select",
