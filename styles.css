@@ -2807,6 +2807,11 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .ggt-menu button.ggt-menu-item.is-icon.is-checked { background: var(--background-modifier-active-hover, var(--background-modifier-hover)); color: var(--interactive-accent); }
 .ggt-menu-icons-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--background-modifier-border); }
 .ggt-menu button.ggt-menu-item:disabled { opacity: 0.4; cursor: default; }
+/* 灰掉但写了原因的项：悬停看原因、点一下弹提示（见 explainDisabled） */
+.ggt-menu button.ggt-menu-item.is-disabled,
+.ggt-menu button.ggt-size-chip.is-disabled { opacity: 0.4; cursor: help; }
+.ggt-menu button.ggt-menu-item.is-disabled:hover,
+.ggt-menu button.ggt-size-chip.is-disabled:hover { background: transparent; }
 .ggt-menu button.ggt-menu-item.is-danger:not(:disabled) { color: var(--text-error); }
 .ggt-menu-icon { display: inline-flex; width: 16px; color: var(--text-muted); }
 .ggt-menu-icon svg { width: 15px; height: 15px; }
@@ -3403,6 +3408,12 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .gg-whatsnew-body ul { margin: 0; padding-inline-start: 1.4em; }
 .gg-whatsnew-body li { margin: 3px 0; line-height: 1.55; }
 .gg-whatsnew-foot { margin-top: 14px; text-align: right; font-size: var(--font-ui-small); }
+.gg-whatsnew-support { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--background-modifier-border); text-align: center; }
+.gg-whatsnew-support-text { color: var(--text-muted); font-size: var(--font-ui-small); margin-bottom: 12px; }
+.gg-whatsnew-support-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.gg-whatsnew-fund { display: inline-flex; align-items: center; gap: 6px; }
+.gg-whatsnew-fund-icon { display: inline-flex; }
+.gg-whatsnew-fund-icon svg { width: 16px; height: 16px; }
 .gg-diag-notice-actions { display: flex; gap: 6px; margin-top: 8px; }
 /* 右上角的更新提示（whatsnew.ts）：图标 + 插件名 + 版本号小标签，一行亮点，两个按钮；外框还是 Obsidian 的提示 */
 .notice.gg-update-notice { min-width: 260px; max-width: 360px; }
@@ -3643,3 +3654,8 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .gg-mm-root.is-printing ~ .mm-inline-title { display: none; }
 /* 设置：查看备注窗口的默认宽、高两个数字框 */
 .mm-setting-size { width: 96px; }
+
+/* 右键菜单里灰掉、但写了原因的项（main.ts showMenu）：看着和不能点的一样，悬停有原因提示、点一下弹提示 */
+.menu .menu-item.mm-menu-why { color: var(--text-faint); cursor: help; }
+.menu .menu-item.mm-menu-why .menu-item-icon { color: var(--text-faint); }
+.menu .menu-item.mm-menu-why:hover, .menu .menu-item.mm-menu-why.selected { background-color: transparent; }

@@ -182,6 +182,8 @@ mindmap-theme: business
 
 ### Markdown 映射
 
+完整规则（所有 frontmatter 键和标记、插件改文件时动哪些东西、哪些数据不在笔记里、兼容承诺）见[文件格式说明](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/format.zh-CN.md)。
+
 ```markdown
 ---
 mindmap: true

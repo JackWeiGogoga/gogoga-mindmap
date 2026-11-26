@@ -30,7 +30,7 @@ export class WhatsNewModal extends Modal {
   private readonly comp = new Component();
   constructor(
     plugin: Plugin,
-    private readonly opts: Pick<WhatsNewOptions, "name" | "changelogUrl">,
+    private readonly opts: Pick<WhatsNewOptions, "name" | "changelogUrl"> & { manifest: Plugin["manifest"] },
     private readonly notes: WhatsNewEntry[],
   ) {
     super(plugin.app);
@@ -50,6 +50,30 @@ export class WhatsNewModal extends Modal {
     const foot = this.contentEl.createDiv({ cls: "gg-whatsnew-foot" });
     const link = foot.createEl("a", { text: L("完整更新日志", "Full changelog"), href: zh() ? this.opts.changelogUrl.zh : this.opts.changelogUrl.en });
     link.setAttr("target", "_blank");
+    // 打赏只放在这个窗口底部：窗口是用户自己点开的，不另外弹、不催。地址用 manifest 里的 fundingUrl，没有就不显示
+    const fund = this.fundingUrl();
+    const support = this.contentEl.createDiv({ cls: "gg-whatsnew-support" });
+    if (fund) {
+      support.createDiv({
+        cls: "gg-whatsnew-support-text",
+        text: L(`gogoga 系列全部免费开源。如果 ${this.opts.name} 帮到了你，欢迎支持一下。`, `gogoga is free and open source. If ${this.opts.name} helps you, consider supporting its development.`),
+      });
+    }
+    const row = support.createDiv({ cls: "gg-whatsnew-support-actions" });
+    if (fund) {
+      const btn = row.createEl("button", { cls: "gg-whatsnew-fund" });
+      setIcon(btn.createSpan({ cls: "gg-whatsnew-fund-icon" }), "coffee");
+      btn.createSpan({ text: L("请我喝杯咖啡", "Buy me a coffee") });
+      btn.addEventListener("click", () => window.open(fund));
+    }
+    const ok = row.createEl("button", { cls: "mod-cta", text: L("好的", "Got it") });
+    ok.addEventListener("click", () => this.close());
+  }
+
+  private fundingUrl(): string | undefined {
+    const f = (this.opts.manifest as { fundingUrl?: string | Record<string, string> }).fundingUrl;
+    if (typeof f === "string") return f || undefined;
+    return f ? Object.values(f)[0] : undefined;
   }
 
   onClose(): void {
@@ -64,7 +88,7 @@ export function initWhatsNew(plugin: Plugin, opts: WhatsNewOptions): void {
   plugin.addCommand({
     id: "show-whats-new",
     name: L("查看更新内容", "Show what's new"),
-    callback: () => new WhatsNewModal(plugin, opts, opts.notes.slice(0, 5)).open(),
+    callback: () => new WhatsNewModal(plugin, { ...opts, manifest: plugin.manifest }, opts.notes.slice(0, 5)).open(),
   });
   plugin.app.workspace.onLayoutReady(() => {
     const timer = window.setTimeout(() => void run(), 3000);
@@ -102,7 +126,7 @@ function showUpdateNotice(plugin: Plugin, opts: WhatsNewOptions, version: string
     open.addEventListener("click", (ev) => {
       ev.stopPropagation();
       notice?.hide();
-      new WhatsNewModal(plugin, opts, notes).open();
+      new WhatsNewModal(plugin, { ...opts, manifest: plugin.manifest }, notes).open();
     });
     const close = row.createEl("button", { text: L("关闭", "Close") });
     close.addEventListener("click", (ev) => {

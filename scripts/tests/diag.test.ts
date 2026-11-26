@@ -49,3 +49,15 @@ test("改了几行：按行计数，顺序不管", () => {
   assert.deepEqual(lineDelta("a\nb\nc", "a\nB\nc\nd"), { add: 2, del: 1 });
   assert.deepEqual(lineDelta("a\nb", "b\na"), { add: 0, del: 0 });
 });
+
+test("诊断：Templater 展开模板不算一次少三成，展开时真删了正文还是算", () => {
+  const before = `---\ntype: diary\n---\n# <% moment(tp.file.title, "YYYY-MM-DD").format("YYYY年MM月DD日 dddd") %>\n\n← [[diary/<% tp.date.now("YYYY/MM/YYYY-MM-DD", -1, tp.file.title, "YYYY-MM-DD") %>|<% tp.date.now("YYYY-MM-DD", -1, tp.file.title, "YYYY-MM-DD") %>]] | [[diary/<% tp.date.now("YYYY/MM/YYYY-MM-DD", 1, tp.file.title, "YYYY-MM-DD") %>|<% tp.date.now("YYYY-MM-DD", 1, tp.file.title, "YYYY-MM-DD") %>]] →\n\n## 今日目标\n\n- [ ] <% tp.file.cursor() %>\n\n## 值得沉淀\n\n- \n`;
+  const after = `---\ntype: diary\n---\n# 2026年11月26日 星期四\n\n← [[diary/2026/11/2026-11-25|2026-11-25]] | [[diary/2026/11/2026-11-27|2026-11-27]] →\n\n## 今日目标\n\n- [ ] <% tp.file.cursor() %>\n\n## 值得沉淀\n\n- \n`;
+  assert.ok(before.length >= 200 && after.length < before.length * 0.7);
+  assert.equal(anomalyOf(before, after), null);
+  // 模板写法之外的正文也大段没了：照样报
+  const body = before + "正文".repeat(200);
+  assert.equal(anomalyOf(body, after), "shrink");
+  // 没有模板写法的删减不受影响
+  assert.equal(anomalyOf("甲".repeat(300), "甲".repeat(100)), "shrink");
+});

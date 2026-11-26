@@ -253,6 +253,14 @@ const zh = {
   blue: "蓝",
   purple: "紫",
   stylesMissing: "gogoga Table 的样式文件 styles.css 没有加载，表格会显示错乱（表格下面多出一排按钮、每行很高）。请看一下插件文件夹 {dir} 里有没有 styles.css，或者在「设置 → 第三方插件」里卸载后重新安装。",
+  whyHeadRowsFew: "表格行数不够：表头设成 {n} 行后就没有数据行了",
+  whyHeadRowsMerge: "有合并的格子跨过表头的边界，表头设不成 {n} 行。先取消这个合并",
+  whyFoldNoRows: "表格只有表头，没有可以折叠的行",
+  whyDupHead: "表头行不能复制",
+  whySortEnc: "加密列不能排序",
+  whySortMerge: "有跨行合并的格子，排序会把它拆乱。先取消合并再排序",
+  whyMergeHead: "选区跨过了表头，表头和数据行不能合并在一起",
+  whyCheckboxMulti: "选中了多个格子，勾选框一次只能加到一个格子",
 };
 
 type Key = keyof typeof zh;
@@ -510,6 +518,14 @@ const en: Record<Key, string> = {
   blue: "Blue",
   purple: "Purple",
   stylesMissing: "gogoga Table's stylesheet (styles.css) didn't load, so tables will look broken (a row of buttons under each table, very tall rows). Check that the plugin folder {dir} contains styles.css, or uninstall and reinstall the plugin in Settings → Community plugins.",
+  whyHeadRowsFew: "Not enough rows: with {n} header rows there would be no data rows left",
+  whyHeadRowsMerge: "A merged cell crosses the header boundary, so the header can't be {n} rows. Unmerge it first",
+  whyFoldNoRows: "The table only has header rows, nothing to fold",
+  whyDupHead: "The header row can't be duplicated",
+  whySortEnc: "Encrypted columns can't be sorted",
+  whySortMerge: "Cells merged across rows would be broken apart by sorting. Unmerge them first",
+  whyMergeHead: "The selection crosses the header; header and data cells can't be merged together",
+  whyCheckboxMulti: "Several cells are selected; a checkbox can only be added to one cell at a time",
 };
 
 let lang: "zh" | "en" = "en";

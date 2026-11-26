@@ -4,6 +4,26 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-26
+
+1.0.0 is the first stable release. Since 0.3.0 on 2026-10-14 there have been more than 160 releases in six weeks, and the plugin has passed 10,000 downloads in the community directory. 1.0 adds no big features. It does two things: the file format is written down in [File format](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/format.md), with the promise that existing syntax keeps its meaning throughout 1.x and old syntax is always read; and the details you reported along the way are tidied up. Thank you to everyone in the user group, on Bilibili and on GitHub who reported problems and made suggestions. Many of the features below came from you.
+
+### 1.0 at a glance
+- **A mind map is Markdown**: headings and lists are the nodes, and styling like colors and folding lives in `%%…%%` comments, so notes still read fine without the plugin. A map can be its own note, a `mindmap` code block inside any note, or embedded elsewhere with `![[Note]]`. Editing in the map changes only the lines you touched and leaves the rest of the file byte for byte; on desktop, diagnostics warn you and keep a copy if a note suddenly loses content.
+- **Structures and themes**: logic chart, mind map, org chart, tree, five timelines and two fishbones, and branches and floating topics can each use their own structure; seven built-in themes, plus custom themes, a color palette and coloring by level.
+- **Edit like XMind**: XMind's shortcuts, drag and drop, multi-select, boundaries, summaries and summary topics, callouts, relationships, floating topics, numbering, task progress and splitting into subtopics; the context menu can be rearranged, and items that can't be used say why.
+- **What a node can hold**: inline formatting such as bold, colors and highlights; images, video, audio, math and links; tables (the same engine as gogoga Table, with calculated and encrypted columns); another mind map embedded in it. Notes are edited WYSIWYG and can be shown expanded on the canvas.
+- **Learning**: recite mode hides the answers, and spaced review schedules them the Anki way (FSRS); PDF region clips and automatic PDF excerpts.
+- **Works with Obsidian**: Markdown and mind map side by side in sync, an outline panel, jumping between the two, Canvas cards, file list icons, export to PNG / SVG / PDF, and opening and converting `.xmind` files.
+- **Everywhere**: edit on desktop, phone and tablet, in English or Simplified Chinese.
+
+### Changed
+- Context menu items that can't be used now say why: hover to see the reason, or click for a notice (works on phones too). For example the central topic can't have a boundary, only children of a heading can become headings, and nothing can be inserted around a summary topic. "Convert level to headings" no longer shows on headings, "Convert level to lists" no longer shows on list items, and "Reset curve" only shows when the line has been bent. Tables in nodes get the same treatment.
+- The "What's new" window now ends with a short note and a "Buy me a coffee" button (opens afdian), next to "Got it" to close it. It only appears in that window, never as a separate popup.
+
+### Fixed
+- Creating a note from a template (Templater, a home dashboard, a daily-notes plugin) could trigger a false diagnostics warning that the note lost over 30% of its content, because `<% … %>` was replaced with shorter dates and links. Template expansion no longer counts as a loss; if real text disappears at the same time it still warns.
+
 ## [0.99.0] - 2026-11-26
 
 ### Added
@@ -1298,7 +1318,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
 [0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0
 [0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0
 [0.97.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.96.0...0.97.0

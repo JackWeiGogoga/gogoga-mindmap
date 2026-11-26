@@ -2947,7 +2947,18 @@ export default class MindMapPlugin extends Plugin {
               item.setTitle(e.title ?? "");
               if (e.icon) item.setIcon(e.icon);
               if (e.checked) item.setChecked(true);
-              item.setDisabled(!!e.disabled);
+              // 灰掉又写了原因的：不用 setDisabled（点了没反应），看着灰、悬停显示原因、点一下弹提示（手机上没有悬停）
+              const why = e.disabled && e.why && !e.submenu ? e.why : null;
+              item.setDisabled(!!e.disabled && !why);
+              if (why) {
+                const dom = (item as unknown as { dom?: HTMLElement }).dom;
+                if (dom) {
+                  dom.addClass("mm-menu-why");
+                  setTooltip(dom, why);
+                }
+                item.onClick(() => new Notice(why));
+                return;
+              }
               if (e.submenu) {
                 const sub = (item as unknown as { setSubmenu: () => Menu }).setSubmenu();
                 fixNestedSubmenu(sub);

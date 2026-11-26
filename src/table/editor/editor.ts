@@ -50,6 +50,8 @@ export interface MenuItem {
   inline?: boolean;
   checked?: boolean;
   disabled?: boolean;
+  /** 灰掉的原因：悬停显示，点一下弹提示（不说原因的灰色项会被当成功能坏了、要付费，B 站 LinJG2023） */
+  why?: string;
   danger?: boolean;
   run?: () => void;
   separator?: boolean;
@@ -4025,6 +4027,7 @@ export class TableEditor {
         title: t("headerRowsN").replace("{n}", String(i + 1)),
         checked: headRows(tb) === i + 1,
         disabled: headRows(tb) !== i + 1 && !canSetHead(tb, i + 1),
+        why: rowCount(tb) - (i + 1) < 1 ? t("whyHeadRowsFew").replace("{n}", String(i + 1)) : t("whyHeadRowsMerge").replace("{n}", String(i + 1)),
         run: () => keep(setTableLook(this.table, { head: i + 1 })),
       })),
       { separator: true },
@@ -4033,6 +4036,7 @@ export class TableEditor {
         icon: "chevrons-down-up",
         checked: tb.meta.fold === 1,
         disabled: tb.meta.fold !== 1 && rowCount(tb) <= headRows(tb),
+        why: t("whyFoldNoRows"),
         run: () => {
           this.localUnfold = false;
           keep(setFolded(this.table, this.table.meta.fold !== 1));
@@ -4044,18 +4048,19 @@ export class TableEditor {
       { separator: true },
       { title: t("distributeCols"), icon: "columns-3", run: () => keep(setWidths(this.table, this.colWidths().map((_, _i, all) => all.reduce((a, b) => a + b, 0) / all.length))) },
       { title: t("fitWidth"), icon: "move-horizontal", run: () => keep(setWide(setWidths(this.table, this.fitWidths()), false)) },
-      { title: t("autoWidthAll"), icon: "move-horizontal", disabled: !tb.meta.w?.some((x) => x != null), run: () => keep(autoWidthAll(this.table)) },
-      { title: t("clearAllBg"), icon: "paintbrush", disabled: !Object.keys(tb.meta.bg ?? {}).length && !Object.keys(tb.meta.fg ?? {}).length, run: () => keep(clearAllBg(this.table)) },
+      // 没拖过列宽、没上过色时不出现（灰着不说原因，会被当成功能坏了）
+      ...(tb.meta.w?.some((x) => x != null) ? [{ title: t("autoWidthAll"), icon: "move-horizontal", run: () => keep(autoWidthAll(this.table)) }] : []),
+      ...(Object.keys(tb.meta.bg ?? {}).length || Object.keys(tb.meta.fg ?? {}).length ? [{ title: t("clearAllBg"), icon: "paintbrush", run: () => keep(clearAllBg(this.table)) }] : []),
       { separator: true },
       { title: t("copyTable"), icon: "copy", run: () => this.copyWhole(false) },
       { title: t("copyMarkdown"), icon: "file-code", run: () => this.copyWhole(true) },
       ...(this.host.indentTable
         ? [
             { separator: true },
-            ...([1, -1] as const).map((dir): MenuItem => ({
+            // 表格上方是列表项才能缩进、本来在列表里才能减少缩进：用不了的不出现
+            ...([1, -1] as const).filter((dir) => this.host.canIndentTable?.(dir)).map((dir): MenuItem => ({
               title: t(dir > 0 ? "indentTable" : "outdentTable"),
               icon: dir > 0 ? "indent-increase" : "indent-decrease",
-              disabled: !this.host.canIndentTable?.(dir),
               run: () => {
                 if (this.editing) this.commit();
                 this.host.indentTable?.(dir);
@@ -4206,12 +4211,30 @@ export class TableEditor {
     return ws.map((w) => (w / sum) * avail);
   }
 
+  /**
+   * 灰掉、又写了原因的项：不用原生 disabled（点了什么事件都没有），改成看着灰、悬停显示原因、
+   * 点一下弹提示（手机上没有悬停）。处理了返回 true，调用方就不再挂执行的点击
+   */
+  private explainDisabled(b: HTMLButtonElement, item: MenuItem): boolean {
+    if (!item.disabled || !item.why) return false;
+    const why = item.why;
+    b.disabled = false;
+    b.classList.add("is-disabled");
+    b.setAttribute("aria-disabled", "true");
+    b.title = why;
+    b.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      this.host.notice?.(why);
+    });
+    return true;
+  }
+
   private rowMenu(p: Pos): MenuItem[] {
     const tb = this.table;
     const head = p.r < headRows(tb);
     return [
       ...this.insertRowItems(p),
-      { title: t("duplicateRow"), icon: "copy-plus", disabled: p.r === 0, run: () => this.apply(duplicateRow(tb, p.r), { r: p.r + 1, c: p.c }) },
+      { title: t("duplicateRow"), icon: "copy-plus", disabled: p.r === 0, why: t("whyDupHead"), run: () => this.apply(duplicateRow(tb, p.r), { r: p.r + 1, c: p.c }) },
       { separator: true },
       { title: t("moveRowUp"), icon: "arrow-up", disabled: head || moveRow(tb, p.r, p.r - 1) === tb, run: () => this.apply(moveRow(tb, p.r, p.r - 1), { r: p.r - 1, c: p.c }) },
       { title: t("moveRowDown"), icon: "arrow-down", disabled: head || moveRow(tb, p.r, p.r + 1) === tb, run: () => this.apply(moveRow(tb, p.r, p.r + 1), { r: p.r + 1, c: p.c }) },
@@ -4239,14 +4262,14 @@ export class TableEditor {
           ]
         : [{ title: t("fxOn"), icon: "calculator", run: () => this.openFormula(p.c) }]),
       { separator: true },
-      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
-      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
+      { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", why: colKindOf(tb, p.c) === "enc" ? t("whySortEnc") : t("whySortMerge"), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
+      { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", why: colKindOf(tb, p.c) === "enc" ? t("whySortEnc") : t("whySortMerge"), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
       { separator: true },
       { title: t("moveColLeft"), icon: "arrow-left", disabled: p.c === 0, run: () => this.apply(moveCol(tb, p.c, p.c - 1), { r: p.r, c: p.c - 1 }) },
       { title: t("moveColRight"), icon: "arrow-right", disabled: p.c >= colCount(tb) - 1, run: () => this.apply(moveCol(tb, p.c, p.c + 1), { r: p.r, c: p.c + 1 }) },
       { separator: true },
       ...this.alignItems(p.c),
-      { title: t("autoWidth"), icon: "move-horizontal", disabled: widthOf(tb, p.c) == null, run: () => this.apply(setWidth(tb, p.c, null), p) },
+      ...(widthOf(tb, p.c) != null ? [{ title: t("autoWidth"), icon: "move-horizontal", run: () => this.apply(setWidth(tb, p.c, null), p) }] : []),
       { separator: true },
       ...this.colorItems(Array.from({ length: rowCount(tb) }, (_, r) => ({ r, c: p.c }))),
       { separator: true },
@@ -4260,7 +4283,7 @@ export class TableEditor {
     const rect = this.rangeRect();
     const merged = mergeAt(tb, p.r, p.c);
     const mergeItems: MenuItem[] = [];
-    if (multi && rect) mergeItems.push({ title: t("mergeCells"), icon: "combine", disabled: crossesHead(tb, rect), run: () => this.apply(mergeCells(tb, rect), { r: rect.r1, c: rect.c1 }) });
+    if (multi && rect) mergeItems.push({ title: t("mergeCells"), icon: "combine", disabled: crossesHead(tb, rect), why: t("whyMergeHead"), run: () => this.apply(mergeCells(tb, rect), { r: rect.r1, c: rect.c1 }) });
     if (merged) mergeItems.push({ title: t("unmergeCells"), icon: "split", run: () => this.apply(unmergeAt(tb, p.r, p.c), { r: merged.r1, c: merged.c1 }) });
     // 触屏上没法拖选、按 Shift：拖右下角的圆点选出一片（iPad 上没法合并格子，小红书 Momo 反馈）。只选着一格时提示一句
     if (this.touched && !multi && !this.host.readonly) mergeItems.push({ title: t("dragToSelect") });
@@ -4284,8 +4307,8 @@ export class TableEditor {
         return this.sizeItems(t("fontSize"), sizes.size === 1 ? [...sizes][0] : undefined, (v) => this.applyKeepRange(setFontSize(this.table, cells, v)));
       })(),
       { separator: true },
-      { title: CHECK_RE.test(tb.cells[p.r][p.c]) ? t("removeCheckbox") : t("addCheckbox"), icon: "square-check", disabled: multi, run: () => this.apply(setCell(tb, p.r, p.c, CHECK_RE.test(tb.cells[p.r][p.c]) ? tb.cells[p.r][p.c].replace(CHECK_RE, "").trimStart() : `[ ] ${tb.cells[p.r][p.c]}`.trimEnd()), p) },
-      { title: t("clearCell"), icon: "eraser", disabled: !cells.some((c) => tb.cells[c.r][c.c]), run: () => this.apply(clearCells(tb, cells), this.sel ?? p) },
+      { title: CHECK_RE.test(tb.cells[p.r][p.c]) ? t("removeCheckbox") : t("addCheckbox"), icon: "square-check", disabled: multi, why: t("whyCheckboxMulti"), run: () => this.apply(setCell(tb, p.r, p.c, CHECK_RE.test(tb.cells[p.r][p.c]) ? tb.cells[p.r][p.c].replace(CHECK_RE, "").trimStart() : `[ ] ${tb.cells[p.r][p.c]}`.trimEnd()), p) },
+      ...(cells.some((c) => tb.cells[c.r][c.c]) ? [{ title: t("clearCell"), icon: "eraser", run: () => this.apply(clearCells(tb, cells), this.sel ?? p) }] : []),
       ...this.cellSecretItems(cells),
       ...this.deleteItems(p),
     ];
@@ -4487,10 +4510,10 @@ export class TableEditor {
     const item = (how: Calc | null): MenuItem => ({
       title: how ? t(`calc_${how}`) : t("calc_none"),
       checked: cur === how,
-      disabled: !how && !cur,
       run: () => this.apply(setCalc(this.table, c, how, { sum: t("totalLabel"), mixed: t("totalLabelMixed") }), this.sel ?? undefined),
     });
-    return [{ title: t("calcTitle") }, ...CALCS.map((x) => item(x)), item(null), { separator: true }];
+    // 「不计算」只在设了合计时出现（没设时灰着没意义）
+    return [{ title: t("calcTitle") }, ...CALCS.map((x) => item(x)), ...(cur ? [item(null)] : []), { separator: true }];
   }
 
   /** 有没有合计行 */
@@ -4608,6 +4631,7 @@ export class TableEditor {
         b.disabled = !!item.disabled;
         b.setAttribute("aria-label", item.title ?? "");
         b.title = item.title ?? "";
+        if (this.explainDisabled(b, item)) continue;
         b.addEventListener("click", () => {
           this.closePopover();
           item.run?.();
@@ -4681,6 +4705,7 @@ export class TableEditor {
         if (this.host.setIcon) this.host.setIcon(ck, "check");
         else ck.textContent = "✓";
       }
+      if (this.explainDisabled(b, item)) continue;
       b.addEventListener("click", () => {
         this.closePopover();
         item.run?.();

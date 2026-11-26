@@ -176,6 +176,8 @@ Since a mind map is plain Markdown, any AI that can write a note can write a map
 
 ### Markdown mapping
 
+The complete rules (every frontmatter key and marker, what the plugin changes when it writes, what's kept outside the note, and the compatibility promise) are in [File format](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/format.md).
+
 ```markdown
 ---
 mindmap: true

@@ -68,11 +68,20 @@ export function damageScore(s: string): number {
   return Math.abs(n(/<span\b/g) - n(/<\/span>/g)) + Math.abs(n(/<mark\b/g) - n(/<\/mark>/g)) + n(/[^\s]\t+- /g);
 }
 
+/** Templater 的 <% … %> 写法（新建笔记时先写进模板原文，Templater 再换成日期、链接） */
+const TEMPLATER_RE = /<%[\s\S]*?%>/g;
+
 /** 这次变化算不算异常：变空、一次少三成以上、拼坏的特征多了 3 处以上 */
 export function anomalyOf(before: string | null, after: string): string | null {
   if (before === null || before === after) return null;
   if (before.trim() !== "" && after.trim() === "") return "empty";
-  if (before.length >= 200 && after.length < before.length * 0.7) return "shrink";
+  if (before.length >= 200 && after.length < before.length * 0.7) {
+    // 模板展开：少掉的是 <% … %> 换成了短得多的结果（首页、日记插件建笔记时常见）。不算模板写法再比一次
+    const tags = before.match(TEMPLATER_RE)?.length ?? 0;
+    const expanded = tags > (after.match(TEMPLATER_RE)?.length ?? 0);
+    const plain = before.replace(TEMPLATER_RE, "").length;
+    if (!expanded || after.length < plain * 0.7) return "shrink";
+  }
   if (damageScore(after) - damageScore(before) >= 3) return "damage";
   return null;
 }

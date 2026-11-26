@@ -5,6 +5,8 @@ description: Write mind maps for the gogoga Mind Map plugin for Obsidian. Use wh
 
 # gogoga Mind Map
 
+The complete format reference is [docs/format.md](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/format.md); this file is the part you need to write maps.
+
 The plugin has no file format of its own: a mind map is a plain Markdown note. Headings and list items are the nodes, and styling lives in Obsidian comments (`%%…%%`) that don't show in Reading view. Write the note, and it opens as a mind map.
 
 ## Where to write it
@@ -45,6 +47,7 @@ A `# comment` after a value is fine (as in YAML), but keep the values themselves
 | `mindmap-edge` | Line shape: `curve`, `elbow`, `straight`. Leave out to follow the theme |
 | `mindmap-edge-dash` | `true` (dashed), `false` (solid). Leave out to follow the theme |
 | `mindmap-edge-corner` | Corners of elbow lines: `sharp`, `round`. Leave out to follow the theme |
+| `mindmap-height` | Code blocks only: fixed height in pixels, e.g. `300` |
 
 Leave structure, theme and the edge keys out unless the user asks or the content clearly calls for one (`org-down` for hierarchies and org charts, `mindmap` for a balanced overview with many main topics, a timeline for events in order, a fishbone for cause analysis). Timelines string the main topics along an arrowed axis in order: `timeline-h` is horizontal with every branch on one side, `timeline-h-alt` alternates above and below, `timeline-v-right` / `timeline-v-left` run vertically with branches to the right / left, and `timeline-v-alt` alternates left and right. A fishbone (`fishbone-right`: head on the right, the classic layout; `fishbone-left`: head on the left) puts the problem in the central topic and the cause categories (for example the 6M: people, machines, materials, methods, measurement, environment) as main topics; their children are the concrete causes, and anything deeper is a sub-cause. Keep it to three levels below the head.
 
@@ -62,6 +65,7 @@ One `%%…%%` comment per node holds all its markers, separated by spaces, for e
 | `num` | Number this node's children (1. 2. 3.). Only needed when the children are headings; list children are numbered by writing them as an ordered list |
 | `w=240` | Fixed node width in pixels (60–1200); the text wraps |
 | `left` / `right` | In the `mindmap` structure, pin a main topic to that side |
+| `layout=org-down` | This branch uses its own structure, different from the map's: `logic-right`, `org-down`, `tree-right`, `timeline-h`, `timeline-h-alt`, `timeline-v-right`, `timeline-v-left`, `timeline-v-alt`, `fishbone`. Use it for a mixed map, such as one main topic laid out as a timeline |
 | `table` | The node shows a table: the first Markdown table in its note (see below) |
 | `box` / `box=3` / `box "Title"` | Dashed frame around this node and its whole branch; `=3` also takes in the next two siblings |
 | `summary "Text"` / `summary=2 "Text"` | Curly brace on the outer side of this node and its whole branch, with the summary text after it; `=2` stretches it over the next sibling too. To summarize several siblings, put it on the first one. `sw=240` after it sets the summary's width |
@@ -69,7 +73,8 @@ One `%%…%%` comment per node holds all its markers, separated by spaces, for e
 | `callout "Text"` | Small always-visible bubble next to the node; `<br>` for a line break, add `cc=yellow` (a color name or hex) to fill it. Colored text inside is `<span style='color:#e03e3e'>text</span>` with **single** quotes |
 | `hide` | Kept in the note but not shown in the map |
 | `float x=320 y=-80` | Floating topic: a child of the central topic drawn unconnected, at that offset in pixels from the central topic |
-| `id=r1` and `rel=r1 "Text"` | Relationship: a dashed arrow from the node with `rel=r1` to the node with `id=r1`. Pick any short id (letters, digits, `-`, `_`); one `id=` per node, several `rel=` allowed. The plugin may add `c=40,-60` or `c1=… c2=…` right after a `rel=` for a curve dragged by hand; keep them if present, don't write them yourself |
+| `id=r1` and `rel=r1 "Text"` | Relationship: a dashed arrow from the node with `rel=r1` to the node with `id=r1`. Pick any short id (letters, digits, `-`, `_`); one `id=` per node, several `rel=` allowed. The plugin may add `c=40,-60` or `c1=… c2=…` right after a `rel=` for a curve dragged by hand; keep them if present, don't write them yourself. `line=curve`, `line=straight` or `line=elbow` after a `rel=` sets that line's shape |
+| `review` / `rv=k3j9x2` | Spaced review, written by the plugin: `review` puts just this branch into review (a whole map uses the `mindmap-review: <id>` frontmatter key), `rv=` is a card's id. Keep them if present; don't write them yourself |
 
 Text inside a marker can't contain straight double quotes `"` or `%%`. A comment with any word the plugin doesn't know is treated as an ordinary comment and none of it applies, so spell markers exactly as above.
 

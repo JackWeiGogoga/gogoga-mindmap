@@ -211,6 +211,8 @@ export interface MenuEntry {
   title?: string;
   icon?: string;
   disabled?: boolean;
+  /** 灰掉的原因：悬停显示，点一下弹提示（灰着不说原因，会被当成功能坏了、要付费） */
+  why?: string;
   checked?: boolean;
   run?: () => void;
   separator?: boolean;
@@ -2813,7 +2815,7 @@ export class MindMapCanvas {
     const dst = this.relTarget(rel);
     return [
       { title: t("menu.relGoSource"), icon: "locate", run: () => this.jumpToNode(src) },
-      { title: t("menu.relGoTarget"), icon: "locate-fixed", disabled: !dst, run: () => dst && this.jumpToNode(dst) },
+      { title: t("menu.relGoTarget"), icon: "locate-fixed", disabled: !dst, why: t("why.relTargetGone"), run: () => dst && this.jumpToNode(dst) },
       { separator: true },
       { title: t("menu.editRelLabel"), icon: "pencil", run: () => this.editRelLabel(rel) },
       { title: t("menu.reverseRel"), icon: "arrow-left-right", run: () => this.reverseRel(src, rel) },
@@ -2822,7 +2824,8 @@ export class MindMapCanvas {
         icon: "waypoints",
         submenu: REL_SHAPES.map((sh) => ({ title: t(`edge.${sh}`), icon: sh === "curve" ? "spline" : sh === "straight" ? "move-up-right" : "corner-down-right", checked: this.relShapeOf(rel) === sh, run: () => this.setRelShape(rel, sh) })),
       },
-      { title: t("menu.resetRelCurve"), icon: "spline", disabled: this.relShapeOf(rel) !== "curve" || (!rel.c && !rel.c1 && !rel.c2), run: () => this.resetRelCurve(rel) },
+      // 没拖过弯度就没有可恢复的：不出现
+      ...(this.relShapeOf(rel) === "curve" && (rel.c || rel.c1 || rel.c2) ? [{ title: t("menu.resetRelCurve"), icon: "spline", run: () => this.resetRelCurve(rel) }] : []),
       { separator: true },
       { title: t("menu.deleteRel"), icon: "trash", run: () => this.deleteRel(src, rel) },
     ];
@@ -3149,8 +3152,8 @@ export class MindMapCanvas {
     const [from, to] = groupRange(start, kind);
     const { hi } = groupLimits(start, kind);
     return [
-      { title: t("menu.extendRange"), icon: "unfold-vertical", disabled: to >= hi, run: () => this.resizeGroup(start, kind, from, to + 1) },
-      { title: t("menu.shrinkRange"), icon: "fold-vertical", disabled: to <= from, run: () => this.resizeGroup(start, kind, from, to - 1) },
+      { title: t("menu.extendRange"), icon: "unfold-vertical", disabled: to >= hi, why: t("why.rangeAtEnd"), run: () => this.resizeGroup(start, kind, from, to + 1) },
+      { title: t("menu.shrinkRange"), icon: "fold-vertical", disabled: to <= from, why: t("why.rangeOne"), run: () => this.resizeGroup(start, kind, from, to - 1) },
     ];
   }
 
@@ -4031,7 +4034,7 @@ export class MindMapCanvas {
         { title: t("menu.addSummaryTopic"), icon: "corner-down-right", run: () => this.addTopicChild(start) },
         { title: t("menu.pasteChild"), icon: "clipboard-paste", run: () => this.pasteIntoSummary(start) },
         ...this.rangeMenuEntries(start, "summary"),
-        { title: t("menu.summaryToText"), icon: "text", disabled: !plain, run: () => this.topicToText(start) },
+        { title: t("menu.summaryToText"), icon: "text", disabled: !plain, why: t("why.summaryNotPlain"), run: () => this.topicToText(start) },
         { title: t("menu.removeSummary"), icon: "x", run: () => this.removeSummary(start) },
       ];
     }
@@ -4861,7 +4864,7 @@ export class MindMapCanvas {
     return [
       { title: t("menu.branchLayoutInherit"), checked: !node.layout, run: () => this.setBranchLayout(undefined) },
       { separator: true },
-      ...BRANCH_LAYOUTS.map((l): MenuEntry => ({ title: label(l), checked: node.layout === l, disabled: leftward && l.startsWith("timeline-h"), run: () => this.setBranchLayout(l) })),
+      ...BRANCH_LAYOUTS.map((l): MenuEntry => ({ title: label(l), checked: node.layout === l, disabled: leftward && l.startsWith("timeline-h"), why: t("why.timelineLeft"), run: () => this.setBranchLayout(l) })),
     ];
   }
 
@@ -8807,16 +8810,17 @@ export class MindMapCanvas {
       entries.push(
         { id: "edit", title: `${t("menu.edit")}  F2`, icon: "pencil", run: () => this.startEdit(node) },
         { id: "addChild", title: `${t("menu.addChild")}  Tab`, icon: "corner-down-right", run: () => this.addChildToSelected() },
-        { id: "addSibling", title: node.parent ? `${t("menu.addSibling")}  ${sc("Enter")}` : t("menu.addSibling"), icon: "list-plus", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(false) },
+        { id: "addSibling", title: node.parent ? `${t("menu.addSibling")}  ${sc("Enter")}` : t("menu.addSibling"), icon: "list-plus", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, why: topic ? t("why.topicSibling") : t("why.rootSibling"), run: () => this.addSiblingToSelected(false) },
         {
           id: "insert",
           title: t("menu.insertGroup"),
           icon: "between-horizontal-start",
           // 概要主题跟着括住的范围走，前后插不了，也不放表格
           disabled: topic,
+          why: t("why.topicSibling"),
           submenu: [
-            { title: node.parent ? `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}` : t("menu.insertBefore"), icon: "list-start", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, run: () => this.addSiblingToSelected(true) },
-            { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent || topic, run: () => this.insertParentForSelected() },
+            { title: node.parent ? `${t("menu.insertBefore")}  ${sc("Shift", "Enter")}` : t("menu.insertBefore"), icon: "list-start", disabled: (!node.parent && !this.canAddRootSibling(node)) || topic, why: topic ? t("why.topicSibling") : t("why.rootSibling"), run: () => this.addSiblingToSelected(true) },
+            { title: `${t("menu.insertParent")}  ${sc("Mod", "Enter")}`, icon: "corner-left-up", disabled: !node.parent || topic, why: topic ? t("why.topicSibling") : t("why.rootParent"), run: () => this.insertParentForSelected() },
             // 节点里的表格：没有就插入一张，备注里有表就放进节点（第一层菜单放不下了，归到「插入」里）
             ...(this.nodeTable(node) ? [] : [this.tableMenuEntry(node)]),
             { title: t("menu.tableChild"), icon: "table", run: () => this.insertTableChild(node) },
@@ -8841,17 +8845,17 @@ export class MindMapCanvas {
         title: t("menu.foldGroup"),
         icon: node.folded ? "chevron-down" : "chevron-right",
         submenu: [
-          { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", disabled: leaf, run: () => this.toggleFold(node) },
-          { title: `${t("menu.expandLevel")}  =`, icon: "chevron-down", disabled: leaf, run: () => this.stepFoldLevel(node, 1) },
-          { title: `${t("menu.collapseLevel")}  -`, icon: "chevron-up", disabled: leaf, run: () => this.stepFoldLevel(node, -1) },
+          { title: `${node.folded ? t("menu.expand") : t("menu.collapse")}  /`, icon: node.folded ? "chevron-down" : "chevron-right", disabled: leaf, why: t("why.leaf"), run: () => this.toggleFold(node) },
+          { title: `${t("menu.expandLevel")}  =`, icon: "chevron-down", disabled: leaf, why: t("why.leaf"), run: () => this.stepFoldLevel(node, 1) },
+          { title: `${t("menu.collapseLevel")}  -`, icon: "chevron-up", disabled: leaf, why: t("why.leaf"), run: () => this.stepFoldLevel(node, -1) },
           // 和数字键一样从这个节点往下算：1 = 只露出下一级
-          { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", disabled: leaf, run: () => this.setFoldLevel(1, node) },
+          { title: `${t("menu.expandNextLevel")}  1`, icon: "chevron-down", disabled: leaf, why: t("why.leaf"), run: () => this.setFoldLevel(1, node) },
           // 整张图里和它同一层的节点都折起来（上面几层展开）：层级多时比工具栏的「显示到第 3 层」管用（B站反馈）
-          { title: t("menu.foldSameLevel"), icon: "chevrons-down-up", disabled: node === (this.focusRoot ?? this.doc?.root), run: () => this.foldSameLevel(node) },
+          { title: t("menu.foldSameLevel"), icon: "chevrons-down-up", disabled: node === (this.focusRoot ?? this.doc?.root), why: t("why.rootSameLevel"), run: () => this.foldSameLevel(node) },
           sep,
           this.focusRoot === node
             ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
-            : { title: t("menu.focusBranch"), icon: "focus", disabled: leaf, run: () => this.focusOn(node) },
+            : { title: t("menu.focusBranch"), icon: "focus", disabled: leaf, why: t("why.leaf"), run: () => this.focusOn(node) },
           { title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) },
         ],
       },
@@ -8892,7 +8896,7 @@ export class MindMapCanvas {
       );
       if (node.parent && !topic) {
         const on = !!node.parent.numbered;
-        entries.push({ id: "numbering", title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), run: () => this.toggleNumbering(!on) });
+        entries.push({ id: "numbering", title: t("menu.numbering"), icon: "list-ordered", checked: on, disabled: !this.canNumber(node.parent), why: t("why.numberHeadings"), run: () => this.toggleNumbering(!on) });
       }
       {
         // 右键的是选中的节点之一：对选中的一起。有折行的可以拉成一行，设过宽度的可以恢复；两样都有时收进「节点宽度」二级菜单，第一层只占一项
@@ -8908,10 +8912,10 @@ export class MindMapCanvas {
       // 外框 / 概要：还没有时只有「添加」一项，直接放第一层；有了以后操作好几项，收进二级菜单
       const box = this.boxOf(node);
       if (box) entries.push({ id: "box", title: t("menu.boxGroup"), icon: "square-dashed", submenu: this.boxMenuEntries(box) });
-      else entries.push({ id: "box", title: `${t("menu.addBox")}  ${sc("Mod", "Shift", "B")}`, icon: "square-dashed", disabled: !node.parent || this.isFloating(node) || topic, run: () => this.addBoxToSelected() });
+      else entries.push({ id: "box", title: `${t("menu.addBox")}  ${sc("Mod", "Shift", "B")}`, icon: "square-dashed", disabled: !node.parent || this.isFloating(node) || topic, why: !node.parent ? t("why.rootBox") : topic ? t("why.topicBox") : t("why.floatBox"), run: () => this.addBoxToSelected() });
       const summary = topic ? node.topicOf! : this.summaryOf(node);
       if (summary) entries.push({ id: "summary", title: t("menu.summaryGroup"), icon: "brackets", submenu: this.summaryMenuEntries(summary) });
-      else entries.push({ id: "summary", title: `${t("menu.addSummary")}  ${sc("Mod", "]")}`, icon: "brackets", disabled: !node.parent || this.isFloating(node), run: () => this.addSummaryToSelected() });
+      else entries.push({ id: "summary", title: `${t("menu.addSummary")}  ${sc("Mod", "]")}`, icon: "brackets", disabled: !node.parent || this.isFloating(node), why: !node.parent ? t("why.rootSummary") : t("why.floatSummary"), run: () => this.addSummaryToSelected() });
       entries.push(sep);
     }
     entries.push({ id: "copy", title: t("menu.copy"), icon: "copy", run: () => this.copySelection() });
@@ -8931,14 +8935,15 @@ export class MindMapCanvas {
       const parent = node.parent;
       const canHeading = !!parent && parent.kind === "heading" && parent.level + 1 <= 6;
       more.push(
-        { id: "convert", title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || node.kind === "heading" || !canHeading, run: () => this.convertLevel(node, "heading") },
-        { id: "convert", title: t("menu.toList"), icon: "list", disabled: !parent || topic || node.kind === "list" || !!this.doc?.style.headingsOnly, run: () => this.convertLevel(node, "list") },
+        // 已经是标题 / 列表的那一项不出现；别的原因转不了的灰着、说原因
+        ...(node.kind === "heading" ? [] : [{ id: "convert", title: t("menu.toHeading"), icon: "heading", disabled: !parent || topic || !canHeading, why: !parent ? t("why.rootConvert") : topic ? t("why.topicConvert") : t("why.toHeading"), run: () => this.convertLevel(node, "heading") }]),
+        ...(node.kind === "list" ? [] : [{ id: "convert", title: t("menu.toList"), icon: "list", disabled: !parent || topic || !!this.doc?.style.headingsOnly, why: !parent ? t("why.rootConvert") : topic ? t("why.topicConvert") : t("why.headingsOnly"), run: () => this.convertLevel(node, "list") }]),
       );
       more.push({
         id: "split",
         title: t("menu.splitInto"),
         icon: "split",
-        submenu: this.splitRules().map((r) => ({ title: r.label, disabled: !this.splittable(node, r.rule).length, run: () => this.splitIntoChildren(node, r.rule) })),
+        submenu: this.splitRules().map((r) => ({ title: r.label, disabled: !this.splittable(node, r.rule).length, why: t("why.splitNone"), run: () => this.splitIntoChildren(node, r.rule) })),
       });
       if (node.parent && !topic) {
         more.push(
@@ -11203,6 +11208,7 @@ export class MindMapCanvas {
           setIcon: host.setIcon,
           openLink: host.openLink ? (href, ev) => host.openLink!(href, true, ev) : undefined,
           hoverLink: host.hoverLink,
+          notice: host.notice,
         });
         this.noteTableEds.add({ el: wrap, ed });
       }
