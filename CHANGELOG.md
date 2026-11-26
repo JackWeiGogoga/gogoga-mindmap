@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+- After editing a note in the Markdown view next to the map (or in another program), pressing ⌘Z in the map also reverted those outside edits, and they were lost once saved. Undo and redo now only revert the map's own step and keep the outside edits; if the outside edit touched the same lines, the step is not undone and a notice explains why. Maps in code blocks work the same way.
+
 ## [1.0.0] - 2026-11-26
 
 1.0.0 is the first stable release. Since 0.3.0 on 2026-10-14 there have been more than 160 releases in six weeks, and the plugin has passed 10,000 downloads in the community directory. 1.0 adds no big features. It does two things: the file format is written down in [File format](https://github.com/JackWeiGogoga/gogoga-mindmap/blob/main/docs/format.md), with the promise that existing syntax keeps its meaning throughout 1.x and old syntax is always read; and the details you reported along the way are tidied up. Thank you to everyone in the user group, on Bilibili and on GitHub who reported problems and made suggestions. Many of the features below came from you.

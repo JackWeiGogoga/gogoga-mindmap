@@ -995,7 +995,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     // 标题的标记从行末挪到下一行后，标题文字变了：别的笔记里指向旧标题（带着 %%标记%%）的链接跟着改
     if (this.file && next !== this.data) this.plugin.fixHeadingLinks(this.file, strippedMarkerRenames(this.data, next));
     if (next === this.data) return;
-    this.history.push(this.data);
+    this.history.push(this.data, next);
     this.data = this.local = next;
     this.imagesChanged();
     // 「Markdown 跟着脑图折叠」：折叠状态变了就马上存，不等 Obsidian 两秒的延迟保存，Markdown 那边才跟得上
@@ -1127,9 +1127,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
   private undo(): void {
     // 锁定编辑时撤销重做也不动文件
     if (this.canvas?.isLocked()) return;
-    const prev = this.history.undo(this.data);
-    if (prev === null) return;
-    this.data = this.local = prev;
+    const r = this.history.undo(this.data);
+    if (!r) return;
+    if ("conflict" in r) return void new Notice(t("notice.undoConflict"));
+    this.data = this.local = r.text;
     this.reparse();
     this.followRootRename();
     this.imagesChanged();
@@ -1138,9 +1139,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   private redo(): void {
     if (this.canvas?.isLocked()) return;
-    const next = this.history.redo(this.data);
-    if (next === null) return;
-    this.data = this.local = next;
+    const r = this.history.redo(this.data);
+    if (!r) return;
+    if ("conflict" in r) return void new Notice(t("notice.redoConflict"));
+    this.data = this.local = r.text;
     this.reparse();
     this.followRootRename();
     this.imagesChanged();

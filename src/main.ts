@@ -2359,7 +2359,7 @@ export default class MindMapPlugin extends Plugin {
       const writeBack = (next: string, pushHistory = true) => {
         next = next.replace(/\n$/, "");
         if (next === current) return;
-        if (pushHistory) state.history.push(current);
+        if (pushHistory) state.history.push(current, next);
         const prev = current;
         current = next;
         state.selected = canvas.getSelectedPath();
@@ -2403,12 +2403,14 @@ export default class MindMapPlugin extends Plugin {
           writeBack(keepFormat(serializeMarkdown(d)));
         },
         onUndo: () => {
-          const prev = state.history.undo(current);
-          if (prev !== null) writeBack(prev, false);
+          const r = state.history.undo(current);
+          if (r && "conflict" in r) new Notice(t("notice.undoConflict"));
+          else if (r) writeBack(r.text, false);
         },
         onRedo: () => {
-          const next = state.history.redo(current);
-          if (next !== null) writeBack(next, false);
+          const r = state.history.redo(current);
+          if (r && "conflict" in r) new Notice(t("notice.redoConflict"));
+          else if (r) writeBack(r.text, false);
         },
         onStructureChange: (s) => {
           const d = canvas.getDoc();
@@ -2552,7 +2554,7 @@ export default class MindMapPlugin extends Plugin {
         const writeBack = (next: string, pushHistory = true) => {
           next = next.replace(/\n$/, "");
           if (next === current) return;
-          if (pushHistory) state.history.push(current);
+          if (pushHistory) state.history.push(current, next);
           const prev = current;
           current = next;
           writing = writing.then(async () => {
@@ -2582,17 +2584,19 @@ export default class MindMapPlugin extends Plugin {
             writeBack(keepFormat(serializeMarkdown(d)));
           },
           onUndo: () => {
-            const prev = state.history.undo(current);
-            if (prev !== null) {
-              writeBack(prev, false);
-              canvas.setDoc(parseMarkdown(prev, { fallbackTitle: "", style }));
+            const r = state.history.undo(current);
+            if (r && "conflict" in r) new Notice(t("notice.undoConflict"));
+            else if (r) {
+              writeBack(r.text, false);
+              canvas.setDoc(parseMarkdown(r.text, { fallbackTitle: "", style }));
             }
           },
           onRedo: () => {
-            const next = state.history.redo(current);
-            if (next !== null) {
-              writeBack(next, false);
-              canvas.setDoc(parseMarkdown(next, { fallbackTitle: "", style }));
+            const r = state.history.redo(current);
+            if (r && "conflict" in r) new Notice(t("notice.redoConflict"));
+            else if (r) {
+              writeBack(r.text, false);
+              canvas.setDoc(parseMarkdown(r.text, { fallbackTitle: "", style }));
             }
           },
           onStructureChange: (s) => {
