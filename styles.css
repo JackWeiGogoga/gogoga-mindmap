@@ -3659,3 +3659,34 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .menu .menu-item.mm-menu-why { color: var(--text-faint); cursor: help; }
 .menu .menu-item.mm-menu-why .menu-item-icon { color: var(--text-faint); }
 .menu .menu-item.mm-menu-why:hover, .menu .menu-item.mm-menu-why.selected { background-color: transparent; }
+
+/* ---------- 演示模式 ---------- */
+/* 讲到的节点、上级、子节点正常显示，其余淡掉；全图时（is-present-all）全部正常 */
+.gg-mm-root.is-presenting .gg-mm-node,
+.gg-mm-root.is-presenting .mm-edge,
+.gg-mm-root.is-presenting .mm-callout,
+.gg-mm-root.is-presenting .mm-note-card { transition: opacity 0.3s ease; }
+.gg-mm-root.is-presenting:not(.is-present-all) .gg-mm-node:not(.is-present-on),
+.gg-mm-root.is-presenting:not(.is-present-all) .mm-callout:not(.is-present-on),
+.gg-mm-root.is-presenting:not(.is-present-all) .mm-note-card:not(.is-present-on) { opacity: 0.14; }
+.gg-mm-root.is-presenting:not(.is-present-all) .mm-edge:not(.is-present-on) { opacity: 0.1; }
+/* 外框、概要括号、关联线、标注和备注的引线：只在全图时显示正常 */
+.gg-mm-root.is-presenting:not(.is-present-all) :is(.mm-boxes, .mm-summaries, .mm-rel, .mm-callout-tails, .mm-note-links, .mm-summary, .mm-box-title) { opacity: 0.12; transition: opacity 0.3s ease; }
+.gg-mm-root.is-presenting .gg-mm-node.is-present-ring { box-shadow: 0 0 0 3px var(--interactive-accent), 0 0 0 8px color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important; }
+.gg-mm-root.is-presenting .gg-mm-node { cursor: pointer; }
+.gg-mm-root.is-presenting .mm-nodebar,
+.gg-mm-root.is-presenting .mm-crumbs,
+.gg-mm-root.is-presenting .mm-toggle { display: none !important; }
+.gg-mm-root .mm-present-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 32px); padding: 4px 6px; border-radius: 999px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); white-space: nowrap; overflow: hidden; box-sizing: border-box; }
+.gg-mm-root .mm-present-crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; padding: 0 6px; color: var(--text-muted); }
+.gg-mm-root .mm-present-crumb { overflow: hidden; text-overflow: ellipsis; max-width: 14em; flex-shrink: 1; min-width: 1.5em; }
+.gg-mm-root .mm-present-crumb.is-current { color: var(--text-normal); font-weight: 600; flex-shrink: 0; max-width: 20em; }
+.gg-mm-root .mm-present-crumb-sep { color: var(--text-faint); flex-shrink: 0; }
+.gg-mm-root .mm-present-count { padding: 0 8px; font-variant-numeric: tabular-nums; color: var(--text-muted); flex-shrink: 0; }
+.gg-mm-root button.mm-present-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 999px; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+.gg-mm-root button.mm-present-btn:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.gg-mm-root button.mm-present-btn.is-active { color: var(--interactive-accent); }
+.gg-mm-root button.mm-present-btn.is-disabled { opacity: 0.35; pointer-events: none; }
+.gg-mm-root .mm-present-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--interactive-accent); transition: width 0.3s ease; }
+.is-mobile .gg-mm-root .mm-present-crumbs .mm-present-crumb:not(.is-current),
+.is-mobile .gg-mm-root .mm-present-crumbs .mm-present-crumb-sep { display: none; }

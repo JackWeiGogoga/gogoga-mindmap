@@ -4,6 +4,7 @@
  */
 
 import { progressLabel, taskProgress, type TaskProgressMode } from "./task-progress";
+import { clickNode, frameView, presentKey, presentLook, presentProgress, presentRoute, presentSwipe, reanchor, startState, step as presentStep, type PresentAction, type PresentState } from "./present-core";
 import { noteCardParts, type NoteCardFilter } from "./note-filter";
 import {
   addChild,
@@ -358,6 +359,8 @@ export interface CanvasOptions {
   split?: () => { keepOriginal: boolean; keepDelims: boolean; custom: CustomSplit[] };
   /** 选中节点时把它平滑移到画布中间（默认关：只在出了视野时带回来） */
   centerOnSelect?: () => boolean;
+  /** 演示模式：叶子也各占一步 */
+  presentLeaves?: () => boolean;
   /** 编辑时光标挨着格式也不露出 ** == 这些标记（默认关） */
   hideSyntax?: () => boolean;
   /** 鼠标移到任意节点的右边缘就能拖动改宽、双击，不用先选中（默认关：只有选中的节点有手柄） */
@@ -562,6 +565,7 @@ const ICONS: Record<string, string> = {
   // 虚线框里一只眼睛：把藏起来的节点显示出来
   review: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="14" rx="2"/><path d="M7 3h11a2 2 0 0 1 2 2v12"/><path d="M7 14l2.5 2.5L13 12"/></svg>',
   hiddenNodes: '<svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M6 12s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z"/><circle cx="12" cy="12" r="1.5"/></svg>',
+  present: '<svg viewBox="0 0 24 24"><path d="M2 3h20M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3M7 21l5-5 5 5"/></svg>',
   recite: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7c2.1 0 3.8.7 5.2 1.7M22 12s-3.5 7-10 7c-2.1 0-3.8-.7-5.2-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
   layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>',
@@ -1607,6 +1611,7 @@ export class MindMapCanvas {
   }
 
   destroy(): void {
+    if (this.present) this.endPresent();
     if (this.mapReview) this.endMapReview();
     if (this.zen) this.setZen(false);
     liveCanvases.delete(this);
@@ -1786,6 +1791,8 @@ export class MindMapCanvas {
     // 背诵模式的「单选 / 多选」标签会改变节点宽度，得在测量之前挂上
     if (this.recite) this.applyRecite();
     this.reflow();
+    // 演示中图变了（别处改了文本）：按新图认回讲到的节点，重新上色；镜头直接到位
+    if (this.present) this.applyPresent(false);
     // 代码块嵌入首次渲染时容器高度还是 0（真正的高度要等 onLayout 下一帧才写上去），
     // 这时 fit 量不出东西。失败就别置 hasView，等 ResizeObserver 拿到高度再适应一次。
     if (!this.hasView && this.initialFit()) this.hasView = true;
@@ -2386,6 +2393,8 @@ export class MindMapCanvas {
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       const depth = String(Math.min(child.node.depth - base.depth, 3));
       if (path.dataset.depth !== depth) path.dataset.depth = depth;
+      // 演示模式按它判断这条线跟着哪个节点淡掉
+      if (path.dataset.child !== child.node.id) path.dataset.child = child.node.id;
       const branch = this.els.get(child.node.id)?.dataset.branch;
       // 按层级着色开着时连线听层级（连到这一层的线用这一层的颜色），盖过「分支各一色」
       const levelStroke = nodeDecor.levelColor?.(child.node.depth) ?? null;
@@ -2415,6 +2424,7 @@ export class MindMapCanvas {
       const d = `M${round2(end.x1)},${round2(end.y1)} L${round2(end.x2)},${round2(end.y2)}` + head;
       if (path.getAttribute("d") !== d) path.setAttribute("d", d);
       if (path.dataset.depth !== "1") path.dataset.depth = "1";
+      if (path.dataset.child) delete path.dataset.child;
       // 鱼骨图的主骨属于整张图，不跟哪个分支的颜色
       const last = sp.plain ? undefined : [...sp.segs.keys()].pop();
       const branch = last ? this.els.get(last)?.dataset.branch : undefined;
@@ -4614,6 +4624,7 @@ export class MindMapCanvas {
     // 只在图里有隐藏的节点时出现
     this.hiddenButton = btn("hiddenNodes", t("canvas.showHidden"), () => this.opts.onToggleHidden?.());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
+    if (!this.opts.embedded) btn("present", t("canvas.present"), () => this.startPresent());
     // 间隔复习：加入了复习，旁边写今天要复习几张，点了开始复习；还没加入时淡一点，点了弹出「加入复习」（群友反馈入口太深）
     if (this.opts.review) {
       const hooks = this.opts.review;
@@ -5237,6 +5248,293 @@ export class MindMapCanvas {
     if (!r.prevRecite) this.setRecite(false);
     else this.coverAll();
     r.driver.finish();
+  }
+
+  // ---------- 演示模式 ----------
+
+  /** 演示进行中（见 present-core.ts）：锁住编辑、进禅模式，退出时把视口、选中、锁定、禅模式都还原 */
+  private present: {
+    route: MindNode[];
+    state: PresentState;
+    /** 讲到的节点从中心主题到它的 id 链：图变了靠它认回来 */
+    path: string[];
+    bar: HTMLElement;
+    prevLocked: boolean;
+    prevZen: boolean;
+    prevView: { k: number; tx: number; ty: number };
+    prevSel: string | null;
+    down: { x: number; y: number; node: string | null; touch: boolean } | null;
+    cleanup: () => void;
+    anim: number;
+  } | null = null;
+
+  isPresenting(): boolean {
+    return !!this.present;
+  }
+
+  private presentRouteNow(): MindNode[] {
+    return this.doc ? presentRoute(this.doc.root, { leaves: this.opts.presentLeaves?.() ?? false }) : [];
+  }
+
+  /** 开始演示；from 是从哪个节点讲起（右键「从这里开始演示」），不给从中心主题讲 */
+  startPresent(from: MindNode | null = null): void {
+    if (!this.doc || this.present || this.opts.embedded) return;
+    if (this.mapReview) this.endMapReview();
+    if (this.editing) this.commitEdit();
+    this.closePopover();
+    this.closeQuickSettings();
+    this.closeFoldMenu();
+    if (this.focusRoot) this.exitFocus();
+    const prevLocked = this.locked;
+    const prevZen = !!this.zen;
+    const prevView = { k: this.k, tx: this.tx, ty: this.ty };
+    const prevSel = this.getSelectedPath();
+    this.setLocked(true);
+    if (!prevZen) this.setZen(true);
+    const bar = this.el.createDiv({ cls: "mm-present-bar" });
+    // 按下按钮不抢焦点，点完接着能用方向键翻页
+    bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    bar.addEventListener("mousedown", (ev) => ev.preventDefault());
+    bar.addEventListener("dblclick", (ev) => ev.stopPropagation());
+    bar.addEventListener("wheel", (ev) => ev.stopPropagation(), { passive: true });
+    // 节点上的按下、双击、右键都截下来：点节点是跳过去，不选中、不拖、不编辑；空白处照常能拖着平移
+    const inBar = (ev: Event) => !!(ev.target as HTMLElement).closest?.(".mm-present-bar, .mm-zen-exit");
+    const onDown = (ev: PointerEvent) => {
+      const p = this.present;
+      if (!p || inBar(ev) || ev.button > 0) return;
+      const nodeEl = (ev.target as HTMLElement).closest?.<HTMLElement>(".gg-mm-node");
+      p.down = { x: ev.clientX, y: ev.clientY, node: nodeEl?.dataset.id ?? null, touch: ev.pointerType === "touch" };
+      if (nodeEl) {
+        ev.stopPropagation();
+        ev.preventDefault();
+      }
+    };
+    const onUp = (ev: PointerEvent) => {
+      const p = this.present;
+      const d = p?.down;
+      if (!p || !d) return;
+      p.down = null;
+      const dx = ev.clientX - d.x;
+      const dy = ev.clientY - d.y;
+      const swipe = d.touch ? presentSwipe(dx, dy) : null;
+      if (swipe) return this.presentAct(swipe);
+      if (!d.node || Math.hypot(dx, dy) > 6) return;
+      ev.stopPropagation();
+      const node = this.nodeById.get(d.node);
+      if (node) this.presentGo(clickNode(p.route, node));
+    };
+    const swallow = (ev: Event) => {
+      if (inBar(ev)) return;
+      ev.stopPropagation();
+      ev.preventDefault();
+    };
+    const swallowNode = (ev: Event) => {
+      if ((ev.target as HTMLElement).closest?.(".gg-mm-node")) swallow(ev);
+    };
+    this.el.addEventListener("pointerdown", onDown, true);
+    this.el.addEventListener("pointerup", onUp, true);
+    this.el.addEventListener("click", swallowNode, true);
+    this.el.addEventListener("dblclick", swallow, true);
+    this.el.addEventListener("contextmenu", swallow, true);
+    this.el.addEventListener("dragstart", swallow, true);
+    const cleanup = () => {
+      this.el.removeEventListener("pointerdown", onDown, true);
+      this.el.removeEventListener("pointerup", onUp, true);
+      this.el.removeEventListener("click", swallowNode, true);
+      this.el.removeEventListener("dblclick", swallow, true);
+      this.el.removeEventListener("contextmenu", swallow, true);
+      this.el.removeEventListener("dragstart", swallow, true);
+    };
+    const route = this.presentRouteNow();
+    this.present = { route, state: startState(route, from), path: [], bar, prevLocked, prevZen, prevView, prevSel, down: null, cleanup, anim: 0 };
+    this.el.classList.add("is-presenting");
+    this.select(null);
+    this.el.focus({ preventScroll: true });
+    this.applyPresent(true);
+  }
+
+  endPresent(): void {
+    const p = this.present;
+    if (!p) return;
+    this.present = null;
+    if (p.anim) this.el.win.cancelAnimationFrame(p.anim);
+    p.cleanup();
+    p.bar.remove();
+    this.el.classList.remove("is-presenting", "is-present-all");
+    for (const el of this.el.querySelectorAll(".is-present-on, .is-present-ring")) el.classList.remove("is-present-on", "is-present-ring");
+    if (!p.prevZen) this.setZen(false);
+    if (!p.prevLocked) this.setLocked(false);
+    this.k = p.prevView.k;
+    this.tx = p.prevView.tx;
+    this.ty = p.prevView.ty;
+    this.applyTransform();
+    if (p.prevSel !== null) this.selectPath(p.prevSel);
+    this.el.focus({ preventScroll: true });
+  }
+
+  presentAct(a: PresentAction): void {
+    const p = this.present;
+    if (!p) return;
+    if (a === "exit") return this.endPresent();
+    this.presentGo(presentStep(p.state, a, p.route.length));
+  }
+
+  private presentGo(s: PresentState): void {
+    const p = this.present;
+    if (!p) return;
+    p.state = s;
+    this.applyPresent(true);
+  }
+
+  private onPresentKey(ev: KeyboardEvent): boolean {
+    if (!this.present) return false;
+    const a = presentKey(ev.key, { meta: ev.metaKey, ctrl: ev.ctrlKey, alt: ev.altKey, shift: ev.shiftKey });
+    if (a) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.presentAct(a);
+      return true;
+    }
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) {
+      // ⌘Z、⌘X 这些会改图：演示时不做；⌘F、⌘+ 这类交给原来的处理
+      if (["z", "x", "v", "y", "d", "b", "i", "u"].includes(ev.key.toLowerCase())) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        return true;
+      }
+      return false;
+    }
+    // 别的键（Tab、Delete、F2、字母……）演示时都不处理，免得改到图
+    ev.preventDefault();
+    ev.stopPropagation();
+    return true;
+  }
+
+  /** 按现在讲到哪给节点、连线、标注、备注卡片上色，更新底部的条，镜头飞过去 */
+  private applyPresent(animate: boolean): void {
+    const p = this.present;
+    if (!p || !this.doc || !this.layout) return;
+    // 图变了：讲解顺序重新算，按 id 链认回原来讲到的节点
+    const route = this.presentRouteNow();
+    const same = route.length === p.route.length && route.every((n, i) => n.id === p.route[i].id);
+    if (!same) p.state = reanchor(route, p.state, p.path, p.route.length);
+    p.route = route;
+    const cur = route[p.state.pos];
+    if (cur) {
+      const chain: string[] = [];
+      for (let n: MindNode | null = cur; n; n = n.parent) chain.unshift(n.id);
+      p.path = chain;
+    }
+    const look = presentLook(route, p.state);
+    const normal = look.normal;
+    if (normal) {
+      // 正常显示的节点挂着的概要主题也正常
+      walkMap(this.doc.root, (n) => {
+        if (n.summary?.topic && normal.has(n.id)) normal.add(n.summary.topic.id);
+      });
+    }
+    const on = (id: string | undefined) => !normal || (!!id && normal.has(id));
+    this.el.classList.toggle("is-present-all", !normal);
+    for (const [id, el] of this.els) {
+      el.classList.toggle("is-present-on", on(id));
+      el.classList.toggle("is-present-ring", look.rings.includes(id));
+    }
+    for (const path of this.edgePaths) path.classList.toggle("is-present-on", on(path.dataset.child));
+    for (const [id, el] of this.calloutEls) el.classList.toggle("is-present-on", on(id));
+    for (const [id, el] of this.noteEls) el.classList.toggle("is-present-on", on(id));
+    this.paintPresentBar(cur ?? null);
+    this.presentCamera(look.frame, animate);
+  }
+
+  private paintPresentBar(cur: MindNode | null): void {
+    const p = this.present;
+    if (!p) return;
+    const bar = p.bar;
+    bar.empty();
+    const prog = presentProgress(p.state, p.route.length);
+    const btn = (name: string, label: string, a: PresentAction, disabled = false) => {
+      const b = bar.createEl("button", { cls: "mm-present-btn", attr: { type: "button", "data-act": a } });
+      b.append(icon(name));
+      this.tip(b, label, "fixed", "top");
+      b.toggleClass("is-disabled", disabled);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.presentAct(a);
+        this.el.focus({ preventScroll: true });
+      });
+      return b;
+    };
+    btn("prev", t("present.prev"), "prev", p.state.pos === 0 && !p.state.peek && !p.state.ring);
+    const crumbs = bar.createDiv({ cls: "mm-present-crumbs" });
+    if (cur && !p.state.peek) {
+      const chain: MindNode[] = [];
+      for (let n: MindNode | null = cur; n; n = n.parent) chain.unshift(n);
+      chain.forEach((n, i) => {
+        if (i > 0) crumbs.createSpan({ cls: "mm-present-crumb-sep", text: "›" });
+        crumbs.createSpan({ cls: "mm-present-crumb" + (i === chain.length - 1 ? " is-current" : ""), text: plainText(n.text) || t("canvas.emptyNode") });
+      });
+    } else crumbs.createSpan({ cls: "mm-present-crumb is-current", text: t("present.overview") });
+    // 全图时面包屑那里已经写着「全图」，不再重复
+    if (prog) bar.createSpan({ cls: "mm-present-count", text: `${prog.at} / ${prog.of}` });
+    btn("next", t("present.next"), "next", p.state.pos >= p.route.length && !p.state.peek);
+    btn("fit", t("present.toggleOverview"), "overview", p.state.pos >= p.route.length).classList.toggle("is-active", p.state.peek || p.state.pos >= p.route.length);
+    btn("close", t("present.exit"), "exit");
+    const line = bar.createDiv({ cls: "mm-present-progress" });
+    const ratio = p.route.length ? Math.min(1, (p.state.pos + (p.state.pos >= p.route.length ? 0 : 1)) / p.route.length) : 1;
+    line.setCssStyles({ width: `${Math.round(ratio * 1000) / 10}%` });
+  }
+
+  /** 镜头：框住这一步要看的节点（null 整张图），平移和缩放一起动 */
+  private presentCamera(frame: string[] | null, animate: boolean): void {
+    const p = this.present;
+    const layout = this.layout;
+    if (!p || !layout) return;
+    let b = layout.bounds;
+    if (frame) {
+      let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+      for (const id of frame) {
+        const q = layout.placed.get(id);
+        if (!q) continue;
+        x1 = Math.min(x1, q.x);
+        y1 = Math.min(y1, q.y);
+        x2 = Math.max(x2, q.x + q.w);
+        y2 = Math.max(y2, q.y + q.h);
+      }
+      if (x1 < Infinity) b = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+    }
+    const barH = p.bar.offsetHeight ? p.bar.offsetHeight + 16 : 0;
+    const to = frameView(b, { w: this.el.clientWidth, h: this.el.clientHeight, bottom: barH }, { pad: FIT_PADDING, minK: MIN_ZOOM, maxK: frame ? 1.6 : 1 });
+    const win = this.el.win;
+    if (p.anim) win.cancelAnimationFrame(p.anim);
+    p.anim = 0;
+    this.stopPanAnim();
+    if (!animate) {
+      this.k = to.k;
+      this.tx = to.tx;
+      this.ty = to.ty;
+      this.applyTransform();
+      return;
+    }
+    const from = { k: this.k, tx: this.tx, ty: this.ty };
+    const start = performance.now();
+    const ms = 360;
+    const tick = (now: number) => {
+      if (this.present !== p) return;
+      const u = Math.min(1, (now - start) / ms);
+      const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      // 缩放按对数插值，放大缩小的快慢看起来一样；平移跟着屏幕中心走，不先偏出去再拐回来
+      const k = from.k * Math.pow(to.k / from.k, e);
+      const cx = this.el.clientWidth / 2;
+      const cy = this.el.clientHeight / 2;
+      const wx = (cx - from.tx) / from.k + ((cx - to.tx) / to.k - (cx - from.tx) / from.k) * e;
+      const wy = (cy - from.ty) / from.k + ((cy - to.ty) / to.k - (cy - from.ty) / from.k) * e;
+      this.k = k;
+      this.tx = cx - wx * k;
+      this.ty = cy - wy * k;
+      this.applyTransform();
+      p.anim = u < 1 ? win.requestAnimationFrame(tick) : 0;
+    };
+    p.anim = win.requestAnimationFrame(tick);
   }
 
   /** 揭开过的都盖回去 */
@@ -6090,6 +6388,8 @@ export class MindMapCanvas {
     // 输入法组字中的回车、Esc、Tab 归输入法（回车上屏英文、Esc 取消组字）；
     // 这时提交编辑会把拼音里的分隔符（自带输入法的空格、搜狗的 '）一起存进去
     if (ev.isComposing || ev.keyCode === 229) return;
+    // 演示：翻页、全图、Esc 归演示，别的会改图的键都不处理
+    if (this.present && this.onPresentKey(ev)) return;
     // 原地复习：空格、1–4、⌘Z、Esc 归复习
     if (this.mapReview && target.tagName !== "TEXTAREA" && this.onMapReviewKey(ev)) return;
     // 聚焦分支时 PageUp / PageDown 切到上一个 / 下一个同级分支（像翻 PPT，#43）
@@ -8857,6 +9157,7 @@ export class MindMapCanvas {
             ? { title: t("menu.exitFocus"), icon: "minimize", run: () => this.exitFocus() }
             : { title: t("menu.focusBranch"), icon: "focus", disabled: leaf, why: t("why.leaf"), run: () => this.focusOn(node) },
           { title: `${t("menu.fitBranch")}  ${sc("Mod", "Shift", "0")}`, icon: "scan", run: () => this.fitBranch(node) },
+          ...(this.opts.embedded ? [] : [{ title: t("menu.presentFromHere"), icon: "presentation", run: () => this.startPresent(node) }]),
         ],
       },
       sep,

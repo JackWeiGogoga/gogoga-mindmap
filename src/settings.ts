@@ -72,6 +72,8 @@ export interface MindMapSettings {
   formatBar: boolean;
   /** 选中节点时把它平滑移到画布中间（默认关） */
   centerOnSelect: boolean;
+  /** 演示模式：叶子也各占一步 */
+  presentLeaves: boolean;
   /** 编辑时始终藏起格式标记（默认关） */
   hideSyntax: boolean;
   /** Markdown 笔记的实时预览里藏起颜色、荧光笔、下划线的 HTML 标签，直接显示效果（默认关） */
@@ -344,6 +346,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   pasteLinkTitle: false,
   cleanAttachments: false,
   centerOnSelect: false,
+  presentLeaves: false,
   hideSyntax: false,
   hideTagsInNotes: false,
   formatBarInNotes: false,
@@ -591,6 +594,7 @@ export class MindMapSettingTab extends PluginSettingTab {
         dropdown("leftDrag", t("settings.leftDrag.name"), t("settings.leftDrag.desc"), { pan: t("settings.leftDrag.pan"), select: t("settings.leftDrag.select") }, ["marquee", "框选", "平移"]),
         toggle("dragToFloat", t("settings.dragToFloat.name"), t("settings.dragToFloat.desc")),
         toggle("centerOnSelect", t("settings.centerOnSelect.name"), t("settings.centerOnSelect.desc"), ["center", "居中", "跟随"]),
+        toggle("presentLeaves", t("settings.presentLeaves.name"), t("settings.presentLeaves.desc"), ["present", "演示", "幻灯片", "slides"]),
         toggle("hideSyntax", t("settings.hideSyntax.name"), t("settings.hideSyntax.desc"), ["markdown", "bold", "加粗", "荧光笔", "源码"]),
         toggle("widthHandleOnHover", t("settings.widthHandleOnHover.name"), t("settings.widthHandleOnHover.desc"), ["width", "宽度", "手柄"]),
         toggle("newNodeName", t("settings.newNodeName.name"), t("settings.newNodeName.desc"), ["new node", "新建", "默认名字", "主题1"]),

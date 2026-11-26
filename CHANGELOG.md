@@ -4,6 +4,9 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- **Presentation mode**: the Present button on the toolbar, the "Start presentation" command, or "Fold & view ▸ Present from here" in a topic's right-click menu. It walks through the map branch by branch in document order: each step shows the current topic, its parents and subtopics and fades the rest, and the view frames that branch. →, Space or PageDown go to the next step, ← or PageUp to the previous one (presentation clickers work), O shows the whole map for a moment, Home and End jump to the start or to the closing whole-map view, and Esc exits. Click any topic to jump to it; on phones, swipe left or right. Editing is locked and zen mode is on while presenting, nothing is written to the file, and the view and selection are restored afterwards. Topics without subtopics appear with their parent; turn on "Leaf topics get their own step when presenting" to stop at each of them. Collapsed branches are not stepped into.
+
 ### Changed
 - In split view, changes made in the map (edits, adding and removing nodes, dragging, undo) now show up in the Markdown editor next to it right away instead of after the roughly 2-second autosave. Only the changed lines are replaced, so the editor's cursor and scroll position stay put, and the editor's own undo only covers what was typed there. A reading view next to the map still refreshes after saving.
 

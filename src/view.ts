@@ -237,6 +237,10 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   private zenUndo: (() => void) | null = null;
 
+  startPresent(): void {
+    this.canvas?.startPresent();
+  }
+
   toggleZen(): void {
     this.canvas?.setZen(!this.canvas.isZen());
   }
@@ -438,6 +442,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       keepEdgeSpaces: () => this.plugin.settings.keepEdgeSpaces,
       quickSettings: () => this.plugin.quickSettings(),
       centerOnSelect: () => this.plugin.settings.centerOnSelect,
+      presentLeaves: () => this.plugin.settings.presentLeaves,
       hideSyntax: () => this.plugin.settings.hideSyntax,
       widthHandleOnHover: () => this.plugin.settings.widthHandleOnHover,
       newNodeName: () => this.plugin.settings.newNodeName,
