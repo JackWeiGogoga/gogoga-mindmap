@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-27
+
 ### 新增
 - 命令「插入脑图（代码块）」：在 Markdown 笔记的光标处插入一个 `mindmap` 代码块，带好中心主题，插完直接显示成脑图（光标所在行有字时另起一行）。打开 Obsidian 的「斜杠命令」核心插件后，在笔记里打 `/插入脑图` 就能调出来（#54）。
 - 设置「编辑与操作 ▸ 自动配对引号、括号」（默认关）：编辑节点时打左引号、左括号、左书名号自动补上右边的，光标停在中间，支持 “” ‘’ "" '' （） () 《》 「」；选中文字时把它包起来；接着打右边那个直接跳过去，在空的一对中间按退格两边一起删。中文输入法打的标点也一样（#55）。
@@ -1341,7 +1343,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...HEAD
+[1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
 [0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0

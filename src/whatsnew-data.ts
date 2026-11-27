@@ -1,6 +1,12 @@
 // 构建时由 scripts/gen-whatsnew.mjs 从 CHANGELOG 生成，别直接改
 export const WHATS_NEW: { version: string; date: string; zh: string; en: string }[] = [
  {
+  "version": "1.1.1",
+  "date": "2026-11-27",
+  "zh": "### 新增\n- 命令「插入脑图（代码块）」：在 Markdown 笔记的光标处插入一个 `mindmap` 代码块，带好中心主题，插完直接显示成脑图（光标所在行有字时另起一行）。打开 Obsidian 的「斜杠命令」核心插件后，在笔记里打 `/插入脑图` 就能调出来（#54）。\n- 设置「编辑与操作 ▸ 自动配对引号、括号」（默认关）：编辑节点时打左引号、左括号、左书名号自动补上右边的，光标停在中间，支持 “” ‘’ \"\" '' （） () 《》 「」；选中文字时把它包起来；接着打右边那个直接跳过去，在空的一对中间按退格两边一起删。中文输入法打的标点也一样（#55）。\n- 工具栏可以加一个「浮动工具栏开 / 关」按钮，一键开关「选中节点时显示浮动工具栏」，亮着是开。默认不显示，在「设置 ▸ 工具栏与颜色 ▸ 主工具栏的按钮」里打开（#56）。\n\n### 改进\n- 跟随当前笔记：开了几个窗口（比如另一块屏幕上单独开了一个窗口）时，脑图只跟同一个窗口里的笔记，两个窗口各开一套笔记和脑图不会再交叉跟随；窗口里没有脑图时，才跟别的窗口里的脑图（#56）。",
+  "en": "### Added\n- \"Insert mind map (code block)\" command: inserts a `mindmap` code block with a central topic at the cursor in a Markdown note, shown as a mind map right away (if the line has text, the block goes on its own line). With Obsidian's Slash commands core plugin on, type `/Insert mind map` in a note (#54).\n- Setting \"Editing and interaction ▸ Auto-pair quotes and brackets\" (off by default): while editing a node, typing an opening quote, bracket or guillemet adds the closing one and puts the cursor in between: “” ‘’ \"\" '' （） () 《》 「」. With text selected, it wraps the text; typing the closing one right after steps over it, and Backspace between an empty pair removes both. Works with punctuation typed through a Chinese input method too (#55).\n- A \"Floating toolbar on / off\" toolbar button turns \"Floating toolbar on selected nodes\" on or off in one click; it's highlighted while on. It's hidden by default: turn it on under Settings ▸ Toolbars and colors ▸ Main toolbar buttons (#56).\n\n### Changed\n- Follow the active note: with more than one window open (say, a separate window on another screen), a map follows only notes in its own window, so two windows that each have a note and a map no longer follow each other's notes. If a window has no map, notes there still drive a map in another window (#56)."
+ },
+ {
   "version": "1.1.0",
   "date": "2026-11-27",
   "zh": "### 新增\n- **演示模式**：工具栏的「演示」按钮、命令「开始演示」，或在节点右键「折叠与视图 ▸ 从这里开始演示」。按原文顺序一支一支地讲：每一步只亮着当前主题、它的上级和子主题，其余淡掉，镜头自动框住这一支；→ / 空格 / PageDown 下一步，← / PageUp 上一步（翻页笔可用），O 看一眼全图，Home / End 回到开头 / 跳到结尾的全图，Esc 退出；点任意主题直接跳过去，手机上左右滑动翻页。演示时锁住编辑、进入禅模式，不改文件，退出后视口、选中都还原。没有子主题的主题跟着上级一起出现，设置「演示时叶子主题也单独占一步」可以让它们各停一步；折起来的分支不往里讲。\n- **认 Enhancing Mindmap 的文件**：frontmatter 里有 `mindmap-plugin: basic` 的笔记也直接用脑图打开（Enhancing Mindmap 插件启用着时不抢，用文件菜单的「以思维导图打开」切过来）。它表示折叠的行尾 `^id` 照它的意思读成折叠、不显示在主题文字里；在这边折叠、展开也照它的写法写回，不加 `mindmap: true`、`%%fold%%`，两个插件来回用不会互相弄乱。\n- **缩略图**：大图（150 个主题以上）的画布左下角显示整张图的缩略图，框出现在看到的那一块；点一下或拖动就跳过去。设置「打开与显示 ▸ 缩略图」可以选自动 / 总是 / 从不；窗格太小、嵌入的脑图、演示和禅模式时不显示。\n\n### 改进\n- 大图更顺：电脑上 5000、10000 个主题的图平移、缩放不再卡顿（以前每帧要卡 0.1 秒左右，现在跟手）；在大图里按 Tab 新建主题快了两到三成，刚建出来的空主题也和有字的主题一样高。\n- 分屏时脑图里的改动（编辑、增删、拖动、撤销）马上出现在旁边的 Markdown 编辑器里，不用再等约 2 秒的自动保存；只改动到的那几行，编辑器的光标和滚动位置不动，Markdown 自己的撤销也只管它自己的输入。旁边是阅读视图时照旧在保存后刷新。\n\n### 修复\n- 分屏时在脑图里改过、紧接着在旁边的 Markdown 里打字或撤销，脑图的自动保存偶尔会把旧文本写回去，刚撤销掉的字又冒出来。现在保存前先把 Markdown 那边还没同步过来的输入合进来。\n- 在旁边的 Markdown 里（或用别的程序）改过笔记后，回到脑图按 ⌘Z 会把外面的改动一起撤掉，存盘后就丢了。现在撤销、重做只退脑图里的那一步，外面的改动留着；外面改的正好是同一处时不撤销，给出提示。代码块里的脑图也一样。",
@@ -53,11 +59,5 @@ export const WHATS_NEW: { version: string; date: string; zh: string; en: string 
   "date": "2026-11-22",
   "zh": "### 修复\n- 节点里的表格：有的主题或 CSS 片段把表格格子统一设成居中，左对齐不生效（和 gogoga Table 同一处修复）。",
   "en": "### Fixed\n- Tables in nodes: left alignment no longer gets overridden by themes or CSS snippets that center all table cells (same fix as gogoga Table)."
- },
- {
-  "version": "0.93.0",
-  "date": "2026-11-22",
-  "zh": "### 新增\n- 搜索时列出所有命中的节点（#50）：搜索框下面列出结果，关键词高亮；只在备注里搜到的，下面一行显示备注里那一段。点一条就跳过去。手机上点完列表会自动收起，不挡脑图，点列表按钮可以再展开。\n- 大纲面板的折叠不再带着脑图一起折（#49）：可以把大纲收到一两层快速定位，脑图保持原样。大纲标题栏新增「显示层级」按钮，可以展开全部，或只显示到第 1、2、3 层。想要原来的效果，在这个菜单里勾上「折叠时脑图跟着折叠」，或者在设置里打开「大纲折叠时脑图跟着折叠」。",
-  "en": "### Added\n- Search lists every matching node (#50): the search bar shows the results below the box, with the match highlighted (and the matching bit of the note when the match is only in a note); click one to jump to it. On phones the list folds away after a tap so it doesn't cover the map, and the list button brings it back.\n- The outline panel folds on its own (#49): folding in the outline no longer folds the map, so you can collapse the outline to one or two levels to find your way around while the map stays as it is. The new Show levels button in the outline header expands all or shows up to level 1, 2 or 3. To get the old behaviour back, turn on \"Folding also folds the map\" in that menu (or \"Outline folding also folds the map\" in settings)."
  }
 ];

@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-27
+
 ### Added
 - "Insert mind map (code block)" command: inserts a `mindmap` code block with a central topic at the cursor in a Markdown note, shown as a mind map right away (if the line has text, the block goes on its own line). With Obsidian's Slash commands core plugin on, type `/Insert mind map` in a note (#54).
 - Setting "Editing and interaction ▸ Auto-pair quotes and brackets" (off by default): while editing a node, typing an opening quote, bracket or guillemet adds the closing one and puts the cursor in between: “” ‘’ "" '' （） () 《》 「」. With text selected, it wraps the text; typing the closing one right after steps over it, and Backspace between an empty pair removes both. Works with punctuation typed through a Chinese input method too (#55).
@@ -1341,7 +1343,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...HEAD
+[1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
 [0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0
