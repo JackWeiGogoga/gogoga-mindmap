@@ -111,7 +111,7 @@ body { --gg-mm-styles-loaded: 1; }
   left: 0;
   top: 0;
   transform-origin: 0 0;
-  /* will-change 由 canvas.ts 在平移/缩放时临时加、停手后摘掉；常驻会让放大后的文字糊 */
+  /* 不常驻 will-change：会让放大后的文字糊。手机上平移时由 canvas.ts holdLayer 临时加；电脑上不加（大图加了反而卡，t_benchpan） */
 }
 
 .mm-edges {
@@ -459,6 +459,8 @@ body { --gg-mm-styles-loaded: 1; }
   /* 连着的几个空格照原样显示：编辑时是 pre-wrap，显示时合成一个，两边长短不一样（群里反馈） */
   white-space: pre-wrap;
 }
+/* 空的主题也占一行字的高度：不然刚建出来只有内边距那么高，一进编辑就撑高，整张图上下各挪一次（大图上要几百毫秒，t_bench） */
+.mm-label:empty::before { content: "\200b"; }
 .gg-mm-node.is-editing .mm-label {
   cursor: text;
   user-select: text;

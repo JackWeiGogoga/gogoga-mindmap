@@ -10,6 +10,7 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 - **Map overview (minimap)**: on large maps (150 topics or more) a small overview of the whole map appears in the lower-left corner, with a frame around the part you're looking at; click or drag in it to move there. Choose Automatic, Always or Never under Settings ▸ Opening and display ▸ Map overview. It's hidden in narrow panes, embedded maps, presentations and zen mode.
 
 ### Changed
+- Large maps are smoother: on desktop, panning and zooming maps with 5,000 or 10,000 topics no longer stutters (each frame used to take about 0.1 s, now it keeps up with the mouse), adding a topic with Tab in a large map is 20–35% faster, and a newly added empty topic is as tall as one with text.
 - In split view, changes made in the map (edits, adding and removing nodes, dragging, undo) now show up in the Markdown editor next to it right away instead of after the roughly 2-second autosave. Only the changed lines are replaced, so the editor's cursor and scroll position stay put, and the editor's own undo only covers what was typed there. A reading view next to the map still refreshes after saving.
 
 ### Fixed

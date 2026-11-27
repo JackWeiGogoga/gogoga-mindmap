@@ -4388,11 +4388,12 @@ export class MindMapCanvas {
   private settleTimer: number | null = null;
 
   /**
-   * 平移/缩放期间把画布提成独立合成层，拖起来才跟手。
-   * 但合成层是按「提层那一刻」的比例栅格化的，一直挂着 will-change 的话，放大后看到的
-   * 就是被 GPU 拉伸的位图 —— 文字发虚。所以手一停就摘掉，让浏览器按当前比例重新栅格化。
+   * 手机上平移/缩放期间把画布提成独立合成层，停手 200ms 后摘掉（一直挂着的话，放大后看到的是按提层那一刻比例栅格化、
+   * 再被 GPU 拉伸的位图，文字发虚）。电脑上不加：大图（5000 节点）加了反而每帧要 90ms 以上，不加满帧（e2e t_benchpan）；
+   * 手机（iOS 是 WebKit）上没量过，先保持原来的做法
    */
   private holdLayer(): void {
+    if (!this.el.ownerDocument.body.classList.contains("is-mobile")) return;
     if (this.viewport.style.willChange !== "transform") this.viewport.setCssStyles({ willChange: "transform" });
     if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
     this.settleTimer = window.setTimeout(() => {
@@ -8082,7 +8083,8 @@ export class MindMapCanvas {
       },
     });
     if (caret && this.nodeEditor) this.nodeEditor.select(caret === "start" ? 0 : this.nodeEditor.text.length);
-    this.reflow();
+    // 只有这个节点换成了编辑框、尺寸可能变了：只重新量它（大图上全部重量、位置全部重写要几百毫秒，见 e2e t_bench）
+    this.reflow(node);
     // 双击进入编辑时文字已经全选：选区是建编辑框时就给好的，不会触发 onSelect，格式栏要自己叫一次（等排好版、拿到焦点）。
     // 新建的节点（默认名字全选着，马上就要打字替换）不弹，免得连续加节点时格式栏一直闪
     if (!isNew) {
