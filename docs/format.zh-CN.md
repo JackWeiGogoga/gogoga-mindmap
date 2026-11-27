@@ -110,6 +110,8 @@ gogoga Mind Map 在 Obsidian 插件市场的下载已经超过一万次。很多
 
 除了 `mindmap: true`，其余都可以不写，不写就用默认或跟着主题。插件只改这些键，frontmatter 里别的属性原样保留。
 
+**Enhancing Mindmap 的文件**：frontmatter 里有 `mindmap-plugin: basic` 的笔记也当脑图打开（Enhancing Mindmap 插件启用着时不自动打开，由它来开；想用这边看，用文件菜单里的「以思维导图打开」）。这种文件里，节点行尾的 `^id`（小写字母、数字和 `-`）表示折叠，和 Enhancing Mindmap 的读法一样；在这边折叠、展开也写成行尾 `^id`，不写 `%%fold%%`，也不加 `mindmap: true`，两个插件来回打开结果一致。
+
 ## 标记 `%%…%%`
 
 节点的样式和关系写在 Obsidian 的注释里，阅读模式看不见。**一个节点只有一个注释**，里面的几个标记用空格隔开：`%%blue fold w=240%%`。

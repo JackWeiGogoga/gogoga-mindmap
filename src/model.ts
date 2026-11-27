@@ -76,6 +76,11 @@ export interface MindNode {
   bullet: string;
   /** Obsidian 块引用 id（列表项末尾的 ^abc123），用于 [[笔记#^id]] */
   blockId?: string;
+  /**
+   * Enhancing Mindmap 文件（frontmatter 有 mindmap-plugin）里表示折叠的行尾 ^id：它那边按「有 ^id 就是折叠」读，
+   * 这里读成 folded 并记下 id，写回时折叠的照样写 ^id（同一个 id），不写 %%fold%%
+   */
+  foldId?: string;
   /** %%hide%%：不在脑图里显示（连同子树），笔记里照旧 */
   hidden?: boolean;
   /**
@@ -181,6 +186,8 @@ export interface DocStyle {
   headingsOnly?: boolean;
   /** 设置「列表项下的备注写成引用块」：列表项的备注每行前加 > 写回，读的时候去掉一层（quoteListNote / unquoteListNote） */
   quoteListNotes?: boolean;
+  /** Enhancing Mindmap 的文件：折叠写成行尾 ^id（见 MindNode.foldId），不写 %%fold%% */
+  foldIds?: boolean;
 }
 
 export interface MindDoc {
@@ -225,6 +232,7 @@ export function createNode(init: Partial<MindNode> & { parent: MindNode | null }
     level: init.level ?? 0,
     bullet: init.bullet ?? "",
     blockId: init.blockId,
+    foldId: init.foldId,
     hidden: init.hidden,
     table: init.table,
     numbered: init.numbered,
@@ -937,6 +945,7 @@ export function cloneTree(node: MindNode, parent: MindNode | null = null): MindN
     level: node.level,
     bullet: node.bullet,
     blockId: node.blockId,
+    foldId: node.foldId,
     hidden: node.hidden,
     table: node.table,
     numbered: node.numbered,

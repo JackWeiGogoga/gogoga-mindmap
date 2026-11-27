@@ -110,6 +110,8 @@ Payment provider review can take up to three weeks.
 
 Apart from `mindmap: true`, everything is optional and falls back to the default or the theme. The plugin only changes these keys and keeps every other property as it is.
 
+**Enhancing Mindmap files**: notes with `mindmap-plugin: basic` in the frontmatter open as mind maps too (not automatically while the Enhancing Mindmap plugin is enabled, which then opens them itself; use "Open as mind map" in the file menu to view one here). In these files a `^id` at the end of a node line (lowercase letters, digits and `-`) means the node is collapsed, as Enhancing Mindmap reads it; collapsing and expanding here also writes a trailing `^id` rather than `%%fold%%`, and `mindmap: true` is not added, so both plugins see the same thing.
+
 ## Markers `%%…%%`
 
 A node's style and relations live in an Obsidian comment, invisible in Reading view. **One comment per node**, with its markers separated by spaces: `%%blue fold w=240%%`.

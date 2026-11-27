@@ -31,6 +31,22 @@ export function splitBlockId(text: string): { text: string; blockId?: string } {
   return { text: text.slice(0, m.index).trimEnd(), blockId: m[1] };
 }
 
+/** Enhancing Mindmap 表示折叠的行尾 ^id（它只认小写字母、数字和 -） */
+const FOLD_ID_RE = /[ \t]+\^([a-z0-9-]+)[ \t]*$/;
+
+/** 摘出行尾表示折叠的 ^id（Enhancing Mindmap 的文件） */
+export function splitFoldId(text: string): { text: string; foldId?: string } {
+  const m = FOLD_ID_RE.exec(text);
+  if (!m || m.index === 0) return { text };
+  return { text: text.slice(0, m.index).trimEnd(), foldId: m[1] };
+}
+
+/** frontmatter 里有 mindmap-plugin（Enhancing Mindmap 的文件） */
+export function isEnhancingFrontmatter(frontmatter: string): boolean {
+  const v = frontmatterValue(frontmatter, "mindmap-plugin");
+  return v !== null && v !== "" && v !== "false";
+}
+
 export function newBlockId(): string {
   return Math.random().toString(36).slice(2, 8);
 }
@@ -634,6 +650,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       start = end + 1;
     }
   }
+  const foldIds = isEnhancingFrontmatter(frontmatter);
 
   const tokens = tokenize(lines.slice(start));
 
@@ -690,9 +707,12 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         if (blankSinceNode) headingGaps++;
         else headingTight++;
       }
-      const split = splitMarker(tok.text);
+      // Enhancing Mindmap 的文件：标题行尾的 ^id 是折叠
+      const fid = foldIds ? splitFoldId(tok.text) : { text: tok.text };
+      const split = splitMarker(fid.text);
       const { text } = split;
       let { marker } = split;
+      if (fid.foldId) marker = { ...marker, folded: true };
       // 标题的标记写在下一行（只有 %%…%% 的一行）：标题行保持干净，[[笔记#标题]] 的链接才对得上。
       // 老写法（标记在标题行末尾）照样认；两处都有时以下一行为准
       // 标题和标记行之间空了行也认（Linter 这类插件会在标题后面自动加空行，以前标记就被当成备注，关联线、颜色都丢了）；
@@ -714,6 +734,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
         root.text = text;
         root.color = marker.color;
         root.folded = marker.folded;
+        root.foldId = fid.foldId;
         root.box = marker.box;
         root.summary = marker.summary;
         root.width = marker.width;
@@ -739,7 +760,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       } else {
         while (headingStack.length > 1 && headingStack[headingStack.length - 1].level >= tok.level) headingStack.pop();
         const parent = headingStack[headingStack.length - 1];
-        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, review: marker.review, reviewId: marker.reviewId, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic });
+        const node = createNode({ parent, kind: "heading", level: tok.level, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, review: marker.review, reviewId: marker.reviewId, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, foldId: fid.foldId });
         if (markerGap) node.markerGap = markerGap;
         parent.children.push(node);
         headingStack.push(node);
@@ -760,9 +781,17 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
       const indent = indentWidth(tok.ws);
       while (listStack.length && listStack[listStack.length - 1].indent >= indent) listStack.pop();
       const parent = listStack.length ? listStack[listStack.length - 1].node : headingStack[headingStack.length - 1];
-      const { text: withoutId, blockId } = splitBlockId(tok.text);
-      const { text, marker } = splitMarker(withoutId);
-      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, review: marker.review, reviewId: marker.reviewId, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId });
+      const split = splitBlockId(tok.text);
+      let { blockId } = split;
+      const { text, marker } = splitMarker(split.text);
+      // Enhancing Mindmap 的文件：小写的 ^id 是折叠，不当块 id
+      let foldId: string | undefined;
+      if (foldIds && blockId && /^[a-z0-9-]+$/.test(blockId)) {
+        foldId = blockId;
+        blockId = undefined;
+        marker.folded = true;
+      }
+      const node = createNode({ parent, kind: "list", level: 0, text, color: marker.color, folded: marker.folded, box: marker.box, summary: marker.summary, width: marker.width, side: marker.side, layout: marker.layout, review: marker.review, reviewId: marker.reviewId, float: marker.float, callout: marker.callout, calloutColor: marker.calloutColor, hidden: marker.hidden, table: marker.table, numbered: marker.num, anchor: marker.anchor, rels: marker.rels, topicSpan: marker.summaryTopic, bullet: tok.bullet, blockId, foldId });
       if (/\S {2,}$/.test(tok.text)) node.hardBreak = true;
       // 父节点的子节点后面先来了一段文字、接着又来列表项：那段文字夹在两个列表项之间，是这一项的前置段落
       const pending = tailBuf.get(parent);
@@ -863,6 +892,7 @@ export function parseMarkdown(src: string, opts: ParseOptions = {}): MindDoc {
     blankBeforeHeading: headingGaps + headingTight ? headingGaps >= headingTight : (opts.style?.blankBeforeHeading ?? DEFAULT_STYLE.blankBeforeHeading),
     headingsOnly: opts.headingsOnly || undefined,
     quoteListNotes: opts.quoteListNotes || undefined,
+    foldIds: foldIds || undefined,
   };
 
   return { root, frontmatter, preamble: joinNote(preamble), rootFromHeading, style };
@@ -904,6 +934,13 @@ export function serializeMarkdown(doc: MindDoc): string {
   }
 
   const { style } = doc;
+  // Enhancing Mindmap 的文件：折叠写成行尾 ^id（沿用读进来的 id，列表项原有块 id 就用它），标记里不写 fold
+  const markerOf = (node: MindNode): MindNode => (style.foldIds && node.folded ? { ...node, folded: false } : node);
+  const foldSuffix = (node: MindNode): string => {
+    if (!style.foldIds || !node.folded) return "";
+    node.foldId ??= node.blockId ?? newBlockId();
+    return ` ^${node.foldId}`;
+  };
   // 最近写出的节点行（标题连同标记行、列表项）是谁、写完时 out 有多长：之后没再写别的，下一个标题就是紧跟着它
   let lastNode: MindNode | null = null;
   let nodeEnd = -1;
@@ -912,9 +949,9 @@ export function serializeMarkdown(doc: MindDoc): string {
     // 原文标题习惯紧挨着写时，紧跟在节点后面的标题不空行；中心主题后面、备注段落后面照样空一行
     const tight = !style.blankBeforeHeading && out.length === nodeEnd && lastNode !== doc.root;
     if (!tight) ensureBlank();
-    out.push(`${"#".repeat(level)} ${node.text}`.trimEnd());
+    out.push(`${"#".repeat(level)} ${node.text}${foldSuffix(node)}`.trimEnd());
     // 标记单独一行写在标题下面，不进标题文字（见解析处的说明）
-    const marker = formatMarker(node).trim();
+    const marker = formatMarker(markerOf(node)).trim();
     if (marker) {
       // 原文标题和标记行之间空了行（Linter 加的）：照样空
       for (let i = 0; i < (node.markerGap ?? 0); i++) out.push("");
@@ -976,9 +1013,9 @@ export function serializeMarkdown(doc: MindDoc): string {
   const emitList = (node: MindNode, depth: number) => {
     if (node.lead) emitBlock(node.lead, depth);
     const bullet = numberedBullet(node) ?? (node.bullet || style.bullet);
-    const blockId = node.blockId ? ` ^${node.blockId}` : "";
+    const blockId = style.foldIds && node.folded ? foldSuffix(node) : node.blockId ? ` ^${node.blockId}` : "";
     // 没有文字的节点（只放了表格）：标记紧跟在项目符号后面，不留两个空格
-    const marker = node.text ? formatMarker(node) : formatMarker(node).trimStart();
+    const marker = node.text ? formatMarker(markerOf(node)) : formatMarker(markerOf(node)).trimStart();
     out.push(`${style.indent.repeat(depth)}${bullet} ${node.text}${marker}${blockId}`.trimEnd() + (node.hardBreak ? "  " : ""));
     lastNode = node;
     nodeEnd = out.length;

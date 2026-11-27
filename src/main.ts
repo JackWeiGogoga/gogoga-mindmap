@@ -94,6 +94,10 @@ import { scrollEditorLineToCenter, scrollParentWithin, scrollWithin } from "./sc
 import { FileStateStore, LEGACY_KEYS, LegacyFileState, NoteCards, ViewportStore } from "./state";
 
 const FRONTMATTER_KEY = "mindmap";
+/** Enhancing Mindmap（obsidian-enhancing-mindmap）的脑图文件标记：mindmap-plugin: basic */
+const ENHANCING_KEY = "mindmap-plugin";
+const ENHANCING_ID = "obsidian-enhancing-mindmap";
+const truthyKey = (v: unknown): boolean => v === true || v === "true" || (typeof v === "string" && v.length > 0 && v !== "false");
 /** 页面预览的来源 id；注册后「页面预览」设置里会出现本插件的开关，默认和 Obsidian 一样按住 ⌘ 才弹 */
 const HOVER_SOURCE = "gogoga-mindmap";
 /** 文件列表插件（Notebook Navigator、Iconize 等）读的图标属性 */
@@ -1049,7 +1053,7 @@ export default class MindMapPlugin extends Plugin {
     }
     const targets = this.app.vault
       .getMarkdownFiles()
-      .filter((f) => this.isMindMapFile(f.path) && !this.app.metadataCache.getCache(f.path)?.frontmatter?.[ICON_KEY]);
+      .filter((f) => this.isMindMapFile(f.path) && !this.isEnhancingFile(f.path) && !this.app.metadataCache.getCache(f.path)?.frontmatter?.[ICON_KEY]);
     if (!targets.length) {
       new Notice(t("notice.allHaveIcons"));
       return;
@@ -1085,10 +1089,23 @@ export default class MindMapPlugin extends Plugin {
 
   // ---------- 视图切换 ----------
 
+  /**
+   * 要用脑图打开的笔记：带 mindmap: true 的；还有 Enhancing Mindmap 的文件（mindmap-plugin: basic），
+   * 但只在那个插件没启用时才算 —— 启用着就让它自己打开，不抢；想用这边看，文件菜单里「以思维导图打开」
+   */
   isMindMapFile(path: string): boolean {
     const fm = this.app.metadataCache.getCache(path)?.frontmatter;
-    const v: unknown = fm?.[FRONTMATTER_KEY];
-    return v === true || v === "true" || (typeof v === "string" && v.length > 0 && v !== "false");
+    return truthyKey(fm?.[FRONTMATTER_KEY]) || (truthyKey(fm?.[ENHANCING_KEY]) && !this.enhancingEnabled());
+  }
+
+  /** Enhancing Mindmap 的文件（frontmatter 有 mindmap-plugin）：不往里写 mindmap: true、icon 这些属性 */
+  isEnhancingFile(path: string): boolean {
+    return truthyKey(this.app.metadataCache.getCache(path)?.frontmatter?.[ENHANCING_KEY]);
+  }
+
+  private enhancingEnabled(): boolean {
+    const plugins = (this.app as unknown as { plugins?: { enabledPlugins?: Set<string> } }).plugins;
+    return !!plugins?.enabledPlugins?.has(ENHANCING_ID);
   }
 
   private patchSetViewState(): void {
@@ -1770,7 +1787,8 @@ export default class MindMapPlugin extends Plugin {
   async openAsMindMap(file: TFile, leaf: WorkspaceLeaf, remember = this.settings.rememberView): Promise<void> {
     const icon = this.settings.listIcon;
     const needsIcon = !!icon && !this.app.metadataCache.getCache(file.path)?.frontmatter?.[ICON_KEY];
-    if (remember && (!this.isMindMapFile(file.path) || needsIcon)) {
+    // Enhancing Mindmap 的文件不写属性：写了 mindmap: true 以后两个插件都要抢着打开它
+    if (remember && !this.isEnhancingFile(file.path) && (!this.isMindMapFile(file.path) || needsIcon)) {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         fm[FRONTMATTER_KEY] = true;
         if (needsIcon) fm[ICON_KEY] = icon;
