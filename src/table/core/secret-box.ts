@@ -7,7 +7,7 @@
  * - 问密码、存设置、钥匙串由宿主给（Obsidian 的弹窗、data.json、app.secretStorage），这里不碰 Obsidian
  */
 
-import { decryptData, deriveKey, encryptData, envelopeOf, ITERATIONS, newSalt, openData, parseSecret, secretParts, toBase64, writeSecret } from "./secret";
+import { decryptData, deriveKey, encryptData, type Envelope, envelopeOf, ITERATIONS, newSalt, openData, parseSecret, secretParts, toBase64, writeSecret } from "./secret";
 
 /** 校验密文里加密的那句话 */
 const CHECK_TEXT = "gogoga-table";
@@ -24,6 +24,11 @@ export interface SecretBoxIO {
     /** unlock 时：钥匙串里有密码，但不是主密码（弹窗里要说出来，不然用户以为钥匙串里的就是主密码） */
     keychainWrong?: boolean,
   ): Promise<{ password: string; hint: string } | null>;
+  /**
+   * 设置里没有校验密文、要解的格子里也没有密文时（新设备、data.json 丢了，又在一张没加密过的表里加密）：
+   * 库里已经有的几段密文。拿它们核对，免得把主密码设成和原来不一样的
+   */
+  findSamples?(): Promise<string[]>;
   /** 设置里存的校验密文（没有返回 null） */
   loadCheck(): string | null;
   saveCheck(check: string): void;
@@ -86,14 +91,19 @@ export class SecretBox {
   private async doUnlock(samples: readonly string[]): Promise<boolean> {
     const check = this.io.loadCheck();
     const checkEnv = check ? envelopeOf(check) : null;
-    const sample = checkEnv ? null : samples.map(envelopeOf).find((e) => e);
-    const target = checkEnv ?? sample ?? null;
-    // 核对：派生出的密钥能解开校验密文（或要解的那格）就对
-    const verify = async (pw: string): Promise<CryptoKey | null> => {
-      if (!target) return null;
-      const key = await deriveKey(pw, target.salt, target.iterations);
-      return (await decryptData(key, target)) !== null ? key : null;
+    // 拿来核对的密文：校验密文；没有就用要解的格子；再没有就用库里已有的（几段，salt 不同的各取一段，最多 8 段）
+    let pool: string[] = check && checkEnv ? [check] : [...samples];
+    let targets = this.targetsOf(pool);
+    if (!targets.length && !checkEnv && this.io.findSamples) {
+      pool = await this.io.findSamples();
+      targets = this.targetsOf(pool);
+    }
+    // 核对：能解开其中任何一段就对
+    const verify = async (pw: string): Promise<boolean> => {
+      for (const t of targets) if ((await decryptData(await deriveKey(pw, t.salt, t.iterations), t)) !== null) return true;
+      return false;
     };
+    const target = targets.length ? targets : null;
     let password: string | null = null;
     let hint = "";
     const kept = this.io.remembered?.();
@@ -105,8 +115,8 @@ export class SecretBox {
       password = r.password;
       hint = r.hint;
     } else {
-      const shownHint = check ? (parseSecret(check)?.hint ?? "") : (samples.map(parseSecret).find((p) => p?.hint)?.hint ?? "");
-      const r = await this.io.ask("unlock", shownHint, async (pw) => (await verify(pw)) !== null, !!kept);
+      const shownHint = check && checkEnv ? (parseSecret(check)?.hint ?? "") : (pool.map(parseSecret).find((p) => p?.hint)?.hint ?? "");
+      const r = await this.io.ask("unlock", shownHint, verify, !!kept);
       if (!r) return false;
       password = r.password;
       hint = shownHint;
@@ -122,6 +132,22 @@ export class SecretBox {
     this.touch();
     this.notify();
     return true;
+  }
+
+  /** 拿来核对的几段：认得出的密文，salt 相同的只留一段（派生一次密钥 35ms 起，手机上更慢），最多 8 段 */
+  private targetsOf(texts: readonly string[]): Envelope[] {
+    const out: Envelope[] = [];
+    const seen = new Set<string>();
+    for (const x of texts) {
+      const e = envelopeOf(x) ?? secretParts(x)?.map((p) => openData(p.data, p.v)).find((v) => v) ?? null;
+      if (!e) continue;
+      const id = `${toBase64(e.salt)}:${e.iterations}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(e);
+      if (out.length >= 8) break;
+    }
+    return out;
   }
 
   /** 锁上：忘掉密码、密钥、明文 */
@@ -240,6 +266,23 @@ export class SecretBox {
         this.notify();
       },
     };
+  }
+
+  /**
+   * 忘了主密码：不用旧密码，直接设一个新的（输两遍 + 提示），换掉校验密文并用新密码解锁。
+   * 笔记里旧密码加密的内容原样不动，新密码解不开（peek 是 null）。取消返回 false，什么都不变
+   */
+  async reset(): Promise<boolean> {
+    const r = await this.io.ask("setup", "", () => Promise.resolve(true));
+    if (!r) return false;
+    this.lock();
+    this.password = r.password;
+    this.salt = newSalt();
+    const key = await this.keyFor(this.salt, ITERATIONS);
+    this.io.saveCheck(writeSecret(await encryptData(key, this.salt, ITERATIONS, CHECK_TEXT), r.hint));
+    this.touch();
+    this.notify();
+    return true;
   }
 
   /** 加密一格（要先解锁）：空的还是空的。顺手记下明文，画的时候不用再解 */
