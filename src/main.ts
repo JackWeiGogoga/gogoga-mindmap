@@ -87,6 +87,8 @@ import { isTableCellEditor, noteFormatBarExtension } from "./note-format-bar";
 import type { FormatBarOptions } from "./format-bar";
 import { noteColorsExtension, paintNoteColors } from "./note-colors";
 import { textIsMindMap } from "./note-colors-core";
+import { mindmapBlockInsert } from "./insert-block-core";
+import { pickFollowTarget } from "./follow-core";
 import { VIEW_TYPE_XMIND, XmindView } from "./xmind-view";
 import { MindMapEmbed, registerMindMapEmbeds } from "./embed";
 import { AttachmentJanitor } from "./attachment-cleanup";
@@ -751,6 +753,13 @@ export default class MindMapPlugin extends Plugin {
     this.reloadMaps();
   }
 
+  /** 工具栏的「浮动工具栏」按钮（#56）：开关「选中节点时显示浮动工具栏」，和设置页、命令是同一项 */
+  async toggleNodebar(): Promise<void> {
+    this.settings.showNodebar = !this.settings.showNodebar;
+    await this.saveSettings();
+    refreshAllBars();
+  }
+
   /** 工具栏「快捷设置」面板里的几项：编辑、拆分这些常调的细节设置；和设置页是同一份 */
   quickSettings(): QuickSetting[] {
     const s = this.settings;
@@ -1353,11 +1362,16 @@ export default class MindMapPlugin extends Plugin {
       if (!view || !file || file.extension !== "md") return false;
       const maps = this.app.workspace
         .getLeavesOfType(VIEW_TYPE_MINDMAP)
-        .filter((l) => l !== view.leaf && l.view instanceof MindMapView && l.view.containerEl.isShown());
-      if (!maps.length || maps.some((l) => (l.view as MindMapView).file?.path === file.path)) return false;
-      const target = maps
-        .filter((l) => !(l as WorkspaceLeaf & { pinned?: boolean }).pinned)
-        .sort((a, b) => ((b as unknown as { activeTime?: number }).activeTime ?? 0) - ((a as unknown as { activeTime?: number }).activeTime ?? 0))[0];
+        .filter((l) => l !== view.leaf && l.view instanceof MindMapView && l.view.containerEl.isShown())
+        .map((l) => ({
+          leaf: l,
+          // 在哪个窗口（主窗口或单独打开的窗口）：同一个窗口里的优先跟（#56）
+          win: l.view.containerEl.win,
+          file: (l.view as MindMapView).file?.path ?? null,
+          pinned: !!(l as WorkspaceLeaf & { pinned?: boolean }).pinned,
+          activeTime: (l as unknown as { activeTime?: number }).activeTime ?? 0,
+        }));
+      const target = pickFollowTarget(maps, view.containerEl.win, file.path)?.leaf;
       if (!target) return false;
       const mapView = target.view as MindMapView;
       mapView.rememberViewportNow();
@@ -2049,6 +2063,20 @@ export default class MindMapPlugin extends Plugin {
         return true;
       },
     });
+    // 在 Markdown 光标处插入脑图代码块（#54）：Obsidian 的「/」菜单列的就是命令，开着「斜杠命令」核心插件就能用 / 调出来
+    this.addCommand({
+      id: "insert-mindmap-block",
+      name: t("command.insertMindmapBlock"),
+      icon: MINDMAP_ICON,
+      editorCallback: (editor) => {
+        const cur = editor.getCursor();
+        const line = editor.getLine(cur.line);
+        const lang = this.settings.claimMindmapBlock ? "mindmap" : "gogoga-mindmap";
+        const r = mindmapBlockInsert(line, cur.ch, lang, t("insert.blockRoot"));
+        editor.replaceRange(r.text, { line: cur.line, ch: 0 }, { line: cur.line, ch: line.length });
+        editor.setCursor({ line: cur.line + r.cursor.line, ch: r.cursor.ch });
+      },
+    });
     // Markdown 里把光标所在的表格设为 / 取消节点表格（给它所属的节点加减 %%table%%）
     this.addCommand({
       id: "toggle-node-table-in-markdown",
@@ -2532,6 +2560,7 @@ export default class MindMapPlugin extends Plugin {
       autoNumber: () => this.settings.numberByTyping,
       copyPlain: () => this.settings.copyPlain,
       showNodebar: () => this.settings.showNodebar,
+      onToggleNodebar: () => void this.toggleNodebar(),
       barPlacement: () => this.settings.barPlacement,
       nodebarLayout: () => mergeLayout(this.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       nodeColors: () => parseNodeColors(this.settings.nodeColors),
@@ -2541,6 +2570,7 @@ export default class MindMapPlugin extends Plugin {
       colorMemory: this.colorMemory,
       marqueeDrag: () => this.settings.leftDrag === "select",
       caretAtEnd: () => this.settings.editCaret === "end",
+      autoPair: () => this.settings.autoPair,
       dragToFloat: () => this.settings.dragToFloat,
       notesExpanded: () => this.settings.notesExpanded,
       noteCardFilter: () => this.settings.noteCardShow,

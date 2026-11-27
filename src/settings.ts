@@ -157,6 +157,8 @@ export interface MindMapSettings {
   leftDrag: "pan" | "select";
   /** 进入编辑节点时：select 全选文字（打字直接替换），end 光标放在末尾 */
   editCaret: "select" | "end";
+  /** 编辑节点时自动配对引号、括号、书名号（#55，默认关） */
+  autoPair: boolean;
   /** 拆成子节点：原来的文字留着（默认）；关掉时整个节点拆分就由拆出来的几段代替，只拆选中的文字就把选中的那段去掉 */
   splitKeepOriginal: boolean;
   /** 多行节点中间的空行留着（默认关：保存时抹掉空行） */
@@ -292,6 +294,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   minimap: "auto",
   leftDrag: "pan",
   editCaret: "select",
+  autoPair: false,
   splitKeepOriginal: true,
   keepBlankLines: false,
   keepEdgeSpaces: false,
@@ -570,6 +573,7 @@ export class MindMapSettingTab extends PluginSettingTab {
       ),
       page(t("settings.group.edit"), t("settings.page.edit"), [
         dropdown("editCaret", t("settings.editCaret.name"), t("settings.editCaret.desc"), { select: t("settings.editCaret.select"), end: t("settings.editCaret.end") }, ["cursor", "光标"]),
+        toggle("autoPair", t("settings.autoPair.name"), t("settings.autoPair.desc"), ["pair", "bracket", "quote", "配对", "括号", "引号", "书名号", "Easy Typing"]),
         toggle("keepBlankLines", t("settings.keepBlankLines.name"), t("settings.keepBlankLines.desc"), ["blank line", "空行", "换行", "多行"]),
         toggle("keepEdgeSpaces", t("settings.keepEdgeSpaces.name"), t("settings.keepEdgeSpaces.desc"), ["space", "空格", "nbsp", "缩进", "开头", "结尾"]),
         toggle("splitKeepOriginal", t("settings.splitKeepOriginal.name"), t("settings.splitKeepOriginal.desc"), ["split", "拆分", "拆成子节点"]),

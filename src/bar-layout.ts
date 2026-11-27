@@ -38,6 +38,8 @@ export const TOOLBAR_DEFAULT = [
   "search",
   "callout",
   "notes",
+  // 「选中节点时显示浮动工具栏」的开关（#56）：默认不显示，要的人在设置的工具栏页打开
+  "!nodebar",
   "hidden",
   "recite",
   "present",
@@ -51,7 +53,7 @@ export const TOOLBAR_DEFAULT = [
  * 默认只留它一个，其余按钮都关着，要哪个自己开
  */
 /** 嵌入的脑图选「自定义」时的按钮：默认只留「打开 / 编辑」；「大窗口编辑」（代码块才有）也在清单里，默认关 */
-export const EMBED_TOOLBAR_DEFAULT = ["embed", "!expand", ...TOOLBAR_DEFAULT.map((id) => `!${id}`)];
+export const EMBED_TOOLBAR_DEFAULT = ["embed", "!expand", ...TOOLBAR_DEFAULT.map((id) => `!${id.replace(/^!/, "")}`)];
 
 const parse = (s: string): BarItem => (s.startsWith("!") ? { id: s.slice(1), on: false } : { id: s, on: true });
 

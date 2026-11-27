@@ -450,6 +450,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       autoNumber: () => this.plugin.settings.numberByTyping,
       copyPlain: () => this.plugin.settings.copyPlain,
       showNodebar: () => this.plugin.settings.showNodebar,
+      onToggleNodebar: () => void this.plugin.toggleNodebar(),
       barPlacement: () => this.plugin.settings.barPlacement,
       nodebarLayout: () => mergeLayout(this.plugin.settings.nodebarLayout, nodebarDefault(Platform.isMobile)),
       toolbarLayout: () => mergeLayout(this.plugin.settings.toolbarLayout, TOOLBAR_DEFAULT),
@@ -460,6 +461,7 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
       colorMemory: this.plugin.colorMemory,
       marqueeDrag: () => this.plugin.settings.leftDrag === "select",
       caretAtEnd: () => this.plugin.settings.editCaret === "end",
+      autoPair: () => this.plugin.settings.autoPair,
       dragToFloat: () => this.plugin.settings.dragToFloat,
       calloutsHidden: () => this.plugin.isCalloutsHidden(this.file?.path ?? ""),
       onCalloutsHiddenChange: (hidden) => {

@@ -12,6 +12,7 @@ import { dropEmptyColors } from "./format";
 import { formatPreview, insertFormatBreak, visibleSelection } from "./cm-format";
 import { isWebUrl, linkDestination, pastedLink } from "./paste-link";
 import { scrollInsideEditor } from "./scroll-inside";
+import { pairBackspace, pairInput } from "./auto-pair-core";
 
 export interface InlineEditorOptions {
   text: string;
@@ -20,6 +21,8 @@ export interface InlineEditorOptions {
   /** Shift+Enter 换行；单行的（概要、关联线文字、外框标题）不开 */
   multiline: boolean;
   placeholder?: string;
+  /** 自动配对引号、括号、书名号（设置 autoPair，#55）；每次输入时问一次，改了设置马上生效 */
+  autoPair?: () => boolean;
   /** 按键先交给宿主：返回 true 表示处理过了，编辑框不再处理 */
   onKey?: (ev: KeyboardEvent) => boolean;
   /** 粘贴先交给宿主：返回 true 表示处理过了（比如图片存成附件），编辑框不再插入任何东西 */
@@ -44,6 +47,8 @@ export interface InlineEditorOptions {
 export class InlineEditor {
   readonly view: EditorView;
   private destroyed = false;
+  /** 上次自动补上的右半边现在在哪（接着打它就跳过去、在一对中间退格两边一起删）；随文档改动映射 */
+  private pairAt: number | null = null;
   private readonly linkTitle: InlineEditorOptions["linkTitle"];
 
   constructor(
@@ -77,7 +82,8 @@ export class InlineEditor {
               },
             }),
           ),
-          EditorView.inputHandler.of((_view, from, to, insert) => !!opts.onInput?.(from, to, insert)),
+          EditorView.inputHandler.of((view, from, to, insert) => !!opts.onInput?.(from, to, insert) || (!!opts.autoPair?.() && this.autoPair(view, from, to, insert))),
+          Prec.high(keymap.of([{ key: "Backspace", run: (view) => !!opts.autoPair?.() && this.pairDelete(view) }])),
           history(),
           // 回车归宿主（提交）；能换行的用 Shift+Enter
           keymap.of([...(opts.multiline ? [{ key: "Shift-Enter", run: insertFormatBreak }] : []), ...historyKeymap, ...defaultKeymap.filter((b) => b.key !== "Enter")]),
@@ -86,6 +92,7 @@ export class InlineEditor {
           ...formatPreview("mm-ed", !!opts.hideSyntax),
           ...(opts.placeholder ? [placeholder(opts.placeholder)] : []),
           EditorView.updateListener.of((update) => {
+            if (update.docChanged && this.pairAt !== null) this.pairAt = update.changes.mapPos(this.pairAt, 1);
             if (update.docChanged) later(opts.onChange);
             if (update.docChanged || update.selectionSet) later(opts.onSelect);
           }),
@@ -127,6 +134,32 @@ export class InlineEditor {
       );
     }
     this.view.focus();
+  }
+
+  /** 打了一个字：要自动配对就改掉并返回 true */
+  private autoPair(view: EditorView, from: number, to: number, typed: string): boolean {
+    const doc = view.state.doc.toString();
+    const sel = view.state.selection.main;
+    // 替换的不是选中的文字（输入法上屏：替换的是组字那一段拼音）：当作在 from 处打字，组字那段一起换掉
+    const selected = from !== to && sel.from === from && sel.to === to;
+    const base = selected || from === to ? doc : doc.slice(0, from) + doc.slice(to);
+    const e = pairInput(base, from, selected ? to : from, typed, this.pairAt);
+    if (!e) return false;
+    if (!selected) e.to = to;
+    view.dispatch({ changes: { from: e.from, to: e.to, insert: e.insert }, selection: EditorSelection.single(e.anchor, e.head), userEvent: "input.type", scrollIntoView: true });
+    this.pairAt = e.closer;
+    return true;
+  }
+
+  /** 退格：光标在刚补上的一对中间，两边一起删 */
+  private pairDelete(view: EditorView): boolean {
+    const sel = view.state.selection.main;
+    if (!sel.empty) return false;
+    const r = pairBackspace(view.state.doc.toString(), sel.head, this.pairAt);
+    if (!r) return false;
+    view.dispatch({ changes: { from: r.from, to: r.to }, selection: EditorSelection.cursor(r.from), userEvent: "delete.backward" });
+    this.pairAt = null;
+    return true;
   }
 
   get text(): string {

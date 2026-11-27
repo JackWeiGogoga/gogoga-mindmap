@@ -341,6 +341,8 @@ export interface CanvasOptions {
   copyPlain?: () => boolean;
   /** 选中节点时显示浮动工具栏（关掉后这些操作在右键菜单里） */
   showNodebar?: () => boolean;
+  /** 工具栏的「浮动工具栏」按钮：开关设置 showNodebar（插件那边改设置、重建各张图的工具栏） */
+  onToggleNodebar?: () => void;
   /** 浮动工具栏、格式栏放在哪：节点（选中的字）上方 / 下方 / 固定在画布顶部（B 站落尘-书生） */
   barPlacement?: () => "above" | "below" | "top";
   /** 浮动工具栏、主工具栏的按钮：显示哪些、什么顺序（见 bar-layout.ts）；每次建工具栏时读 */
@@ -385,6 +387,8 @@ export interface CanvasOptions {
   marqueeDrag?: () => boolean;
   /** 返回 true 时进入编辑把光标放在文字末尾；否则全选（默认，打字直接替换） */
   caretAtEnd?: () => boolean;
+  /** 编辑节点时自动配对引号、括号（设置 autoPair，#55） */
+  autoPair?: () => boolean;
   /** 返回 true 时把节点拖到空白处会变成自由主题（XMind 的习惯）；否则拖到空白处是取消 */
   dragToFloat?: () => boolean;
   /** 首次显示（没有恢复视口时）：fit 适应画布（默认），center 中心主题 100% */
@@ -565,6 +569,7 @@ const ICONS: Record<string, string> = {
   structure: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v4M6 17v-3h12v3"/></svg>',
   mindmap: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M15 12h6M9 12H3M14.5 9.5l4-4M14.5 14.5l4 4M9.5 9.5l-4-4M9.5 14.5l-4 4"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  nodebar: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"/><path d="M7 6.5h.01M12 6.5h.01M17 6.5h.01"/><rect x="7" y="15" width="10" height="6" rx="1.5"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   expand: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
@@ -4635,6 +4640,11 @@ export class MindMapCanvas {
     this.calloutButton = btn("callout", t("canvas.toggleCallouts"), () => this.toggleCallouts());
     // 只在图里有备注时出现
     this.notesButton = btn("note", t("canvas.toggleNotes"), () => this.toggleNotes());
+    // 「选中节点时显示浮动工具栏」开关（#56）：亮着是开（设置里同一项）
+    if (this.opts.onToggleNodebar) {
+      const nb = btn("nodebar", t("canvas.toggleNodebar"), () => this.opts.onToggleNodebar?.());
+      nb.classList.toggle("is-active", this.opts.showNodebar?.() !== false);
+    }
     // 只在图里有隐藏的节点时出现
     this.hiddenButton = btn("hiddenNodes", t("canvas.showHidden"), () => this.opts.onToggleHidden?.());
     this.reciteButton = btn("recite", t("canvas.recite"), () => this.setRecite(!this.recite));
@@ -8039,6 +8049,9 @@ export class MindMapCanvas {
     this.notify();
   }
 
+  /** 编辑节点文字时自动配对引号、括号（大纲面板的编辑框也用它） */
+  readonly autoPairOn = (): boolean => !!this.opts.autoPair?.();
+
   startEdit(node: MindNode, isNew = false, caret?: "start" | "end"): void {
     if (!this.opts.editable) return;
     if (this.editing === node) return;
@@ -8059,6 +8072,7 @@ export class MindMapCanvas {
       text: this.toEdit(node.text),
       // 默认全选，打字直接替换；设置里可以改成光标放在末尾接着写
       selectAll: !caret && (named || !this.opts.caretAtEnd?.()),
+      autoPair: this.autoPairOn,
       multiline: true,
       // 回车提交、Esc、Tab、链接补全的上下键、⌘B 这些走画布的按键处理；画布没处理的（打字、方向键、⌘Z）归编辑框
       onKey: (ev) => {

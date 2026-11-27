@@ -43,3 +43,16 @@ test("分隔线：头尾、连着两条、两边没有看得见的按钮时不�
   assert.deepEqual(visibleSeps(["tool", "sep", "sep", "tool"]), [false, false, true, false]);
   assert.deepEqual(visibleSeps(["tool", "sep", "gone", "sep", "tool"]), [false, false, false, true, false]);
 });
+
+test("主工具栏里默认隐藏的项（!nodebar）：嵌入脑图的默认清单里也是隐藏，不会变成 !!", async () => {
+  const { EMBED_TOOLBAR_DEFAULT, TOOLBAR_DEFAULT, mergeLayout } = await import("../../src/bar-layout");
+  assert.ok(TOOLBAR_DEFAULT.includes("!nodebar"));
+  assert.ok(EMBED_TOOLBAR_DEFAULT.every((id) => !id.startsWith("!!")));
+  const items = mergeLayout([], EMBED_TOOLBAR_DEFAULT);
+  assert.deepEqual(items.find((x) => x.id === "nodebar"), { id: "nodebar", on: false });
+  // 老用户存过的主工具栏清单：新按钮插在「备注」后面、默认不显示
+  const old = ["outline", "notes", "hidden"];
+  const merged = mergeLayout(old, TOOLBAR_DEFAULT);
+  const i = merged.findIndex((x) => x.id === "notes");
+  assert.deepEqual(merged[i + 1], { id: "nodebar", on: false });
+});

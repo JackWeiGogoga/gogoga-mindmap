@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- "Insert mind map (code block)" command: inserts a `mindmap` code block with a central topic at the cursor in a Markdown note, shown as a mind map right away (if the line has text, the block goes on its own line). With Obsidian's Slash commands core plugin on, type `/Insert mind map` in a note (#54).
+- Setting "Editing and interaction ▸ Auto-pair quotes and brackets" (off by default): while editing a node, typing an opening quote, bracket or guillemet adds the closing one and puts the cursor in between: “” ‘’ "" '' （） () 《》 「」. With text selected, it wraps the text; typing the closing one right after steps over it, and Backspace between an empty pair removes both. Works with punctuation typed through a Chinese input method too (#55).
+- A "Floating toolbar on / off" toolbar button turns "Floating toolbar on selected nodes" on or off in one click; it's highlighted while on. It's hidden by default: turn it on under Settings ▸ Toolbars and colors ▸ Main toolbar buttons (#56).
+
+### Changed
+- Follow the active note: with more than one window open (say, a separate window on another screen), a map follows only notes in its own window, so two windows that each have a note and a map no longer follow each other's notes. If a window has no map, notes there still drive a map in another window (#56).
+
 ## [1.1.0] - 2026-11-27
 
 ### Added
