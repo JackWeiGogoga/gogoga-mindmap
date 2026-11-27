@@ -4,6 +4,8 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
 ### Added
 - **Presentation mode**: the Present button on the toolbar, the "Start presentation" command, or "Fold & view ▸ Present from here" in a topic's right-click menu. It walks through the map branch by branch in document order: each step shows the current topic, its parents and subtopics and fades the rest, and the view frames that branch. →, Space or PageDown go to the next step, ← or PageUp to the previous one (presentation clickers work), O shows the whole map for a moment, Home and End jump to the start or to the closing whole-map view, and Esc exits. Click any topic to jump to it; on phones, swipe left or right. Editing is locked and zen mode is on while presenting, nothing is written to the file, and the view and selection are restored afterwards. Topics without subtopics appear with their parent; turn on "Leaf topics get their own step when presenting" to stop at each of them. Collapsed branches are not stepped into.
 - **Enhancing Mindmap files**: notes with `mindmap-plugin: basic` in the frontmatter now open as mind maps (not while the Enhancing Mindmap plugin is enabled; use "Open as mind map" in the file menu to switch). Its trailing `^id` that marks a collapsed node is read as collapsed and no longer shows up in the topic text, and collapsing or expanding here writes it back the same way, without adding `mindmap: true` or `%%fold%%`, so the two plugins don't trip over each other.
@@ -1331,7 +1333,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
 [0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0
 [0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0

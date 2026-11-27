@@ -4,6 +4,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
 ### 新增
 - **演示模式**：工具栏的「演示」按钮、命令「开始演示」，或在节点右键「折叠与视图 ▸ 从这里开始演示」。按原文顺序一支一支地讲：每一步只亮着当前主题、它的上级和子主题，其余淡掉，镜头自动框住这一支；→ / 空格 / PageDown 下一步，← / PageUp 上一步（翻页笔可用），O 看一眼全图，Home / End 回到开头 / 跳到结尾的全图，Esc 退出；点任意主题直接跳过去，手机上左右滑动翻页。演示时锁住编辑、进入禅模式，不改文件，退出后视口、选中都还原。没有子主题的主题跟着上级一起出现，设置「演示时叶子主题也单独占一步」可以让它们各停一步；折起来的分支不往里讲。
 - **认 Enhancing Mindmap 的文件**：frontmatter 里有 `mindmap-plugin: basic` 的笔记也直接用脑图打开（Enhancing Mindmap 插件启用着时不抢，用文件菜单的「以思维导图打开」切过来）。它表示折叠的行尾 `^id` 照它的意思读成折叠、不显示在主题文字里；在这边折叠、展开也照它的写法写回，不加 `mindmap: true`、`%%fold%%`，两个插件来回用不会互相弄乱。
@@ -1331,7 +1333,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
 [0.99.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.98.0...0.99.0
 [0.98.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.97.0...0.98.0
