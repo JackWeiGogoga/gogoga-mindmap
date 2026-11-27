@@ -3681,7 +3681,7 @@ body.gg-mm-zen-app.is-hidden-frameless:not(.is-fullscreen) .workspace-tabs.mod-t
 .gg-mm-root.is-presenting .mm-nodebar,
 .gg-mm-root.is-presenting .mm-crumbs,
 .gg-mm-root.is-presenting .mm-toggle { display: none !important; }
-.gg-mm-root .mm-present-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 32px); padding: 4px 6px; border-radius: 999px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); white-space: nowrap; overflow: hidden; box-sizing: border-box; }
+.gg-mm-root .mm-present-bar { position: absolute; left: 50%; bottom: max(16px, var(--mm-bottom-inset, 16px)); transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 32px); padding: 4px 6px; border-radius: 999px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); font-size: var(--font-ui-small); white-space: nowrap; overflow: hidden; box-sizing: border-box; }
 .gg-mm-root .mm-present-crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; padding: 0 6px; color: var(--text-muted); }
 .gg-mm-root .mm-present-crumb { overflow: hidden; text-overflow: ellipsis; max-width: 14em; flex-shrink: 1; min-width: 1.5em; }
 .gg-mm-root .mm-present-crumb.is-current { color: var(--text-normal); font-weight: 600; flex-shrink: 0; max-width: 20em; }

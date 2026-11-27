@@ -567,6 +567,8 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
 
   /** 卸载前把正在输入的内容提交，Obsidian 随后会 save(true) 写盘 */
   async onUnloadFile(file: TFile): Promise<void> {
+    // 演示中切到别的笔记：先结束演示（视口、选中还原到演示前，再记下来），不把演示带到下一篇
+    if (this.canvas?.isPresenting()) this.canvas.endPresent();
     this.rememberViewportNow();
     this.canvas?.flush();
     this.flushImageSweep();

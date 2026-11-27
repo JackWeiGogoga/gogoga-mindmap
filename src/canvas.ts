@@ -5181,11 +5181,13 @@ export class MindMapCanvas {
       this.closeFoldMenu();
       const exit = this.el.createEl("button", { cls: "mm-zen-exit", attr: { type: "button" } });
       exit.append(icon("minimize"));
-      exit.createSpan({ text: t("canvas.zenExit") });
+      exit.createSpan({ cls: "mm-zen-exit-label", text: t(this.present ? "present.exitShort" : "canvas.zenExit") });
       exit.addEventListener("pointerdown", (ev) => ev.stopPropagation());
       exit.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        this.setZen(false);
+        // 演示中（演示自动进了禅模式）：这个按钮就是退出演示，只退禅模式会剩下淡掉、锁着的半个演示
+        if (this.present) this.endPresent();
+        else this.setZen(false);
       });
       const z = {
         exit,
@@ -5305,6 +5307,7 @@ export class MindMapCanvas {
     const prevSel = this.getSelectedPath();
     this.setLocked(true);
     if (!prevZen) this.setZen(true);
+    this.zenExitLabel(true);
     const bar = this.el.createDiv({ cls: "mm-present-bar" });
     // 按下按钮不抢焦点，点完接着能用方向键翻页
     bar.addEventListener("pointerdown", (ev) => ev.stopPropagation());
@@ -5368,6 +5371,12 @@ export class MindMapCanvas {
     this.applyPresent(true);
   }
 
+  /** 右上角「退出禅模式」按钮：演示中写「退出演示」（点它结束演示） */
+  private zenExitLabel(presenting: boolean): void {
+    const label = this.zen?.exit.querySelector(".mm-zen-exit-label");
+    if (label) label.textContent = t(presenting ? "present.exitShort" : "canvas.zenExit");
+  }
+
   endPresent(): void {
     const p = this.present;
     if (!p) return;
@@ -5379,6 +5388,7 @@ export class MindMapCanvas {
     this.scheduleMinimap();
     for (const el of this.el.querySelectorAll(".is-present-on, .is-present-ring")) el.classList.remove("is-present-on", "is-present-ring");
     if (!p.prevZen) this.setZen(false);
+    else this.zenExitLabel(false);
     if (!p.prevLocked) this.setLocked(false);
     this.k = p.prevView.k;
     this.tx = p.prevView.tx;
@@ -5518,7 +5528,8 @@ export class MindMapCanvas {
       }
       if (x1 < Infinity) b = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
     }
-    const barH = p.bar.offsetHeight ? p.bar.offsetHeight + 16 : 0;
+    // 演示条占掉的底部：手机上它要躲开底栏（--mm-bottom-inset），按它的实际位置算，镜头别把节点放到它后面
+    const barH = p.bar.offsetHeight ? Math.max(0, this.el.getBoundingClientRect().bottom - p.bar.getBoundingClientRect().top) + 8 : 0;
     const to = frameView(b, { w: this.el.clientWidth, h: this.el.clientHeight, bottom: barH }, { pad: FIT_PADDING, minK: MIN_ZOOM, maxK: frame ? 1.6 : 1 });
     const win = this.el.win;
     if (p.anim) win.cancelAnimationFrame(p.anim);
