@@ -1,6 +1,12 @@
 // 构建时由 scripts/gen-whatsnew.mjs 从 CHANGELOG 生成，别直接改
 export const WHATS_NEW: { version: string; date: string; zh: string; en: string }[] = [
  {
+  "version": "1.1.2",
+  "date": "2026-11-27",
+  "zh": "### 修复\n- 编辑外框标题、概要文字时一个字占一行，提交后才恢复成一行（B 站用户反馈）。现在打字时编辑框跟着文字变宽，保持一行。",
+  "en": "### Fixed\n- Editing a boundary title or summary text put one character on each line until you finished editing (reported on Bilibili). The edit box now grows with the text and stays on one line."
+ },
+ {
   "version": "1.1.1",
   "date": "2026-11-27",
   "zh": "### 新增\n- 命令「插入脑图（代码块）」：在 Markdown 笔记的光标处插入一个 `mindmap` 代码块，带好中心主题，插完直接显示成脑图（光标所在行有字时另起一行）。打开 Obsidian 的「斜杠命令」核心插件后，在笔记里打 `/插入脑图` 就能调出来（#54）。\n- 设置「编辑与操作 ▸ 自动配对引号、括号」（默认关）：编辑节点时打左引号、左括号、左书名号自动补上右边的，光标停在中间，支持 “” ‘’ \"\" '' （） () 《》 「」；选中文字时把它包起来；接着打右边那个直接跳过去，在空的一对中间按退格两边一起删。中文输入法打的标点也一样（#55）。\n- 工具栏可以加一个「浮动工具栏开 / 关」按钮，一键开关「选中节点时显示浮动工具栏」，亮着是开。默认不显示，在「设置 ▸ 工具栏与颜色 ▸ 主工具栏的按钮」里打开（#56）。\n\n### 改进\n- 跟随当前笔记：开了几个窗口（比如另一块屏幕上单独开了一个窗口）时，脑图只跟同一个窗口里的笔记，两个窗口各开一套笔记和脑图不会再交叉跟随；窗口里没有脑图时，才跟别的窗口里的脑图（#56）。",
@@ -53,11 +59,5 @@ export const WHATS_NEW: { version: string; date: string; zh: string; en: string 
   "date": "2026-11-23",
   "zh": "### 新增\n- 设置「按 PDF++ 标注颜色画节点外框」（默认关，群友建议）：主题里有 PDF++ 链接的，按链接里的标注颜色（color=…）画一圈外框，颜色取 PDF++ 设置里的配色，中文颜色名也认；外框透明度可调。有多个链接时用第一个认得出的颜色，自己设过颜色的主题不画。\n- 设置「按层级着色」（默认关，群友建议）：每一层的主题背景混一点这一层的颜色，连到这一层的线也用它，文字不变。可以「跟随 Obsidian 标题颜色」——中心主题用 H1 的颜色、主主题用 H2……换主题、改标题配色都跟着变；也可以用自定义的六个颜色循环。自己设过颜色的主题不变；开着时连线听层级。在「打开与显示」设置页里。\n- 添加 / 编辑备注的快捷键 ⌘⇧M（Windows 上 Ctrl+Shift+M），也是命令「添加 / 编辑备注」，可以在 Obsidian 的快捷键设置里改（B 站反馈）。右键菜单和节点工具栏的备注按钮上写着这个快捷键。\n- 编辑节点时，光标在第一行按上、在最后一行按下，直接跳到上一个 / 下一个节点接着编辑，光标放在末尾；往哪走和没在编辑时按方向键一样。整段全选着时按上下也是直接跳（B 站反馈）。\n- 右键「折叠与视图」里加了「折叠同一层的所有主题」：整张图里和这个主题同一层的都收起来，上面几层展开。层级多时比工具栏的「显示到第 3 层」管用（B 站反馈）。\n- 插件的样式文件 styles.css 没加载时（手动安装漏了这个文件、同步盘没同步过来），启动后弹出提示，说明去哪里检查或者重新安装。\n\n### 修复\n- 库的默认编辑模式设成源码模式时，编辑备注（所见即所得）也变成了源码模式：表格、标题全显示成 Markdown 原文（群友反馈）。现在备注编辑框总是实时预览，库的设置不受影响。\n- 变过色的文字再加粗、加斜体，那几个字变回了默认颜色（主题单独设了粗体、斜体的颜色时），看起来像「变色后不能加粗」。现在跟着文字颜色（B 站反馈）。\n- 删除线里只有一部分字变了色时，那部分的横线还是默认颜色。现在横线跟着字的颜色，编辑时也一样（B 站反馈）。",
   "en": "### Added\n- \"Border in the PDF++ highlight color\" setting (off by default, suggested in the user group): topics with a PDF++ link get a border in that link's highlight color (color=…), taken from PDF++'s own color settings (names in any language work), with adjustable transparency. With several links the first recognized color wins; topics you colored yourself are left alone.\n- \"Color by level\" setting (off by default, suggested in the user group): each level's topics get a faint tint of that level's color and the lines leading to them use it, with the text unchanged. Choose \"Follow Obsidian heading colors\" (central topic = H1, main topics = H2…, changing with your theme) or cycle through six custom colors. Topics you colored yourself keep their color; with this on, lines follow the levels. In the \"Opening and display\" settings page.\n- Shortcut for adding or editing a note: ⌘⇧M (Ctrl+Shift+M on Windows), also available as the command \"Add or edit note\" so you can rebind it in Obsidian's hotkey settings (reported on Bilibili). The context menu and the note button in the node toolbar show it.\n- While editing a node, pressing Up on the first line or Down on the last line moves straight to the previous or next node and keeps editing, with the cursor at the end; it goes where the arrow keys go when you're not editing. It also works when the whole text is selected (reported on Bilibili).\n- \"Fold every topic at this level\" in the context menu under Fold and view: folds every topic at this topic's depth across the map and unfolds the levels above. Handy when the map is deeper than the toolbar's three levels (reported on Bilibili).\n- If the plugin's styles.css didn't load (left out of a manual install, or not synced yet), a notice now says where to check or to reinstall.\n\n### Fixed\n- When the vault's default editing mode was Source mode, editing a note (WYSIWYG) also opened in Source mode, showing tables and headings as raw Markdown (reported in the user group). The note editor now always uses Live Preview, without changing the vault setting.\n- Colored text turned back to the default color when made bold or italic in themes that give bold or italic their own color, so it looked as if colored text couldn't be bolded. It now keeps the text color (reported on Bilibili).\n- When only part of a strikethrough was colored, the line over that part stayed in the default color. The line now follows the text color, also while editing (reported on Bilibili)."
- },
- {
-  "version": "0.93.1",
-  "date": "2026-11-22",
-  "zh": "### 修复\n- 节点里的表格：有的主题或 CSS 片段把表格格子统一设成居中，左对齐不生效（和 gogoga Table 同一处修复）。",
-  "en": "### Fixed\n- Tables in nodes: left alignment no longer gets overridden by themes or CSS snippets that center all table cells (same fix as gogoga Table)."
  }
 ];

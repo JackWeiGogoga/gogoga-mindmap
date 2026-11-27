@@ -317,7 +317,9 @@ body { --gg-mm-styles-loaded: 1; }
 .gg-mm-root.is-editable .mm-summary { cursor: pointer; }
 .mm-summary.is-active { border-color: var(--mm-selection); box-shadow: 0 0 0 1px var(--mm-selection); }
 .mm-summary.is-editing .mm-summary-text { overflow: visible; text-overflow: clip; }
+/* 编辑时宽度跟着内容走：绝对定位的框默认按最小内容收缩，CodeMirror 的 break-spaces 会一个字折一行（B 站 11-26） */
 .mm-summary.is-editing {
+  width: max-content;
   max-width: none;
   cursor: text;
   user-select: text;
@@ -362,6 +364,7 @@ body { --gg-mm-styles-loaded: 1; }
 .mm-box-title.is-editing,
 .mm-box-title:hover { opacity: 1; }
 .mm-box-title.is-editing {
+  width: max-content;
   overflow: visible;
   text-overflow: clip;
   max-width: none !important;

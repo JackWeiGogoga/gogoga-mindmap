@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-27
+
+### 修复
+- 编辑外框标题、概要文字时一个字占一行，提交后才恢复成一行（B 站用户反馈）。现在打字时编辑框跟着文字变宽，保持一行。
+
 ## [1.1.1] - 2026-11-27
 
 ### 新增
@@ -1343,7 +1348,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...HEAD
+[1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0

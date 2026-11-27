@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-27
+
+### Fixed
+- Editing a boundary title or summary text put one character on each line until you finished editing (reported on Bilibili). The edit box now grows with the text and stays on one line.
+
 ## [1.1.1] - 2026-11-27
 
 ### Added
@@ -1343,7 +1348,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...HEAD
+[1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/0.99.0...1.0.0
