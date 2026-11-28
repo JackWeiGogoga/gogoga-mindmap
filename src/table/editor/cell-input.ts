@@ -50,6 +50,8 @@ export interface CellInput {
    * 编辑时按方向键到了边上就跳到旁边的格子（B站反馈），和 Obsidian 自己的表格一样
    */
   atEdge(dir: Edge): boolean;
+  /** 屏幕上这一点对着文字里的第几个字（编辑框已经盖在格子上时用）；量不出来返回 null */
+  posAt(x: number, y: number): number | null;
   focus(): void;
   hasFocus(): boolean;
   contains(node: Node | null): boolean;
@@ -129,13 +131,48 @@ export class TextareaInput implements CellInput {
     if (!ta.isConnected) return null;
     const cs = (doc.defaultView ?? window).getComputedStyle(ta);
     const div = doc.body.appendChild(doc.createElement("div"));
-    for (const p of ["box-sizing", "width", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-style", "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "line-height", "text-transform", "word-spacing", "tab-size", "text-indent", "word-break", "overflow-wrap"])
+    for (const p of ["box-sizing", "width", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "border-style", "font-family", "font-size", "font-weight", "font-style", "letter-spacing", "line-height", "text-transform", "word-spacing", "tab-size", "text-indent", "word-break", "overflow-wrap", "direction", "text-align"])
       div.style.setProperty(p, cs.getPropertyValue(p));
     div.className = "ggt-caret-mirror";
     return { div, cs };
   }
   visibleSelection(): { from: number; to: number } {
     return { from: this.el.selectionStart, to: this.el.selectionEnd };
+  }
+  posAt(x: number, y: number): number | null {
+    // textarea 不能按坐标找字：照着它排一份文字，量每个字的位置，先找最近的一行、再找这一行里最近的字
+    const ta = this.el;
+    const text = ta.value;
+    if (!text || text.length > 5000) return null;
+    const mm = this.mirror();
+    if (!mm) return null;
+    const m = mm.div;
+    m.textContent = text;
+    const node = m.firstChild;
+    const tr = ta.getBoundingClientRect();
+    const k = ta.offsetWidth ? tr.width / ta.offsetWidth : 1;
+    const px = (x - tr.left) / k + ta.scrollLeft;
+    const py = (y - tr.top) / k + ta.scrollTop;
+    const mr = m.getBoundingClientRect();
+    const range = ta.ownerDocument.createRange();
+    let best: number | null = null;
+    let bestD = Infinity;
+    if (node) {
+      for (let i = 0; i <= text.length; i++) {
+        range.setStart(node, i);
+        range.setEnd(node, i);
+        const rects = range.getClientRects();
+        const r = rects.length ? rects[rects.length - 1] : range.getBoundingClientRect();
+        if (!r.height) continue;
+        const d = Math.abs((r.top + r.bottom) / 2 - mr.top - py) * 1000 + Math.abs(r.left - mr.left - px);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+    }
+    m.remove();
+    return best;
   }
   atEdge(dir: Edge): boolean {
     const ta = this.el;
@@ -343,6 +380,9 @@ export class CodeMirrorInput implements CellInput {
   }
   visibleSelection(): { from: number; to: number } {
     return visibleSelection(this.view);
+  }
+  posAt(x: number, y: number): number | null {
+    return this._view?.posAtCoords({ x, y }) ?? null;
   }
   atEdge(dir: Edge): boolean {
     const v = this._view;

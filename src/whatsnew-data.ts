@@ -1,6 +1,12 @@
 // 构建时由 scripts/gen-whatsnew.mjs 从 CHANGELOG 生成，别直接改
 export const WHATS_NEW: { version: string; date: string; zh: string; en: string }[] = [
  {
+  "version": "1.1.5",
+  "date": "2026-11-29",
+  "zh": "### 修复\n- 节点里的表格：打开 Obsidian 的「从右到左」后，方向键、拖列宽、行手柄、填充柄、冻结首列、横向滚动、菜单里的左右都按屏幕上的方向来，不再是反的（随 gogoga Table 同步）。",
+  "en": "### Fixed\n- Tables in topics: with Obsidian's \"Right-to-left (RTL)\" setting on, arrow keys, column resizing, the row handle, the fill handle, a frozen first column, sideways scrolling and the left / right menu items now follow the direction on screen instead of being reversed (synced from gogoga Table)."
+ },
+ {
   "version": "1.1.4",
   "date": "2026-11-28",
   "zh": "### 新增\n- 主工具栏可以单独收起（#61）：点工具栏最后的箭头，工具栏收起，原来的角落只留一个小把手，点它展开。所有打开着的脑图一起收起，重新打开也记得。命令「隐藏 / 显示工具栏」可以在「设置 ▸ 快捷键」里绑一个键。不想像禅模式那样把所有东西都藏起来时用它。\n\n### 修复\n- 开着「用文件名作中心主题」时，在库里给别的文件改名或移动别的文件，正打开着的脑图的中心主题会被改成那个文件的名字，接着再编辑，脑图文件也会被改名（#59）。现在只有改这张图自己的文件名时，中心主题才跟着变。",
@@ -53,11 +59,5 @@ export const WHATS_NEW: { version: string; date: string; zh: string; en: string 
   "date": "2026-11-24",
   "zh": "### 新增\n- 设置「备注」页新增「查看备注窗口的默认大小」：填宽和高，查看备注时按这个大小打开；留空就按内容自动。\n- 双击查看备注窗口的右下角，恢复默认大小（群友反馈）。\n\n### 改进\n- 拖查看备注窗口的右下角改大小，现在只记这一条备注的尺寸，不再改掉所有备注（群友反馈）；别的备注还是默认大小。\n\n### 修复\n- 节点里的表格：用 Minimal 主题并关掉「表格样式优先于主题」时，竖着合并格子后后面一列不再错开；点表格外面后右下角的填充小方块不再留着；手机上拖表格把手不会再带出侧栏（和 gogoga Table 一起修的）。",
   "en": "### Added\n- \"Default size of the note window\" setting on the Notes page: set the width and height that viewed notes open at, or leave empty for automatic sizing.\n- Double-click the bottom-right corner of a viewed note to reset it to the default size (feedback from the user group).\n\n### Changed\n- Resizing a viewed note by dragging its corner now remembers the size for that note only, instead of changing it for every note (feedback from the user group). Other notes keep the default size.\n\n### Fixed\n- Node tables: with the Minimal theme and \"Table style over theme\" off, the next column no longer misaligns after merging cells down a column; the small fill handle no longer stays behind after clicking outside the table, and dragging table handles on mobile no longer opens the sidebar (fixed together with gogoga Table)."
- },
- {
-  "version": "0.96.0",
-  "date": "2026-11-24",
-  "zh": "### 新增\n- 设置「在画布左上角显示导图标题」（默认关，B 站反馈）：画布左上角显示文件名，点一下就能改名，回车保存、Esc 取消，不用非得去改中心主题。\n- 设置「浮动工具栏和格式栏的位置」（B 站反馈）：选中主题时的浮动工具栏、选中文字时的格式栏可以放在主题上方（默认）、下方，或固定在画布顶部，不挡住旁边的主题。\n- 设置「新建的思维导图放在」（B 站反馈）：跟随 Obsidian 的新文件位置（默认）、当前文件所在的文件夹，或指定的文件夹。在文件夹上右键新建的照旧放在那个文件夹里。\n- 节点里的表格：手机、平板上长按格子后拖动可以框选多个格子（和 gogoga Table 一起改的）。\n\n### 改进\n- 拖动改宽度的提示改成鼠标停一会儿才出现，路过和直接拖的时候不再挡住旁边的主题（B 站反馈）。\n\n### 修复\n- 节点里的表格：用较早的安装器装的 Obsidian（常见于 Windows）上，拖列宽的触发点和十字高亮错位（和 gogoga Table 一起修的）。",
-  "en": "### Added\n- \"Show the map title on the canvas\" setting (off by default, reported on Bilibili): the file name shows at the top left of the canvas; click it to rename the file, Enter to save, Esc to cancel, instead of having to edit the central topic.\n- \"Floating toolbar and format bar position\" setting (reported on Bilibili): the toolbar for a selected topic and the format bar for selected text can appear above the topic (default), below it, or fixed at the top of the canvas so they don't cover nearby topics.\n- \"Folder for new mind maps\" setting (reported on Bilibili): Obsidian's new file location (default), the current file's folder, or a folder of your choice. Creating one from a folder's context menu still puts it in that folder.\n- Node tables: on phones and tablets, press and hold a cell then drag to select a range (changed together with gogoga Table).\n\n### Changed\n- The \"Drag to set the width\" tooltip now appears only after the pointer rests on the handle, so it no longer covers nearby topics while you pass over or drag it (reported on Bilibili).\n\n### Fixed\n- Node tables: on Obsidian installed with an older installer (common on Windows), the column-resize hit area and crosshair highlight were misplaced (fixed together with gogoga Table)."
  }
 ];

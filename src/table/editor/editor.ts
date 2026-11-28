@@ -39,6 +39,21 @@ const ARROW_EDGE: Record<string, { edge: Edge; dr: number; dc: number } | undefi
   ArrowLeft: { edge: "left", dr: 0, dc: -1 },
   ArrowRight: { edge: "right", dr: 0, dc: 1 },
 };
+
+/**
+ * 屏幕坐标 v 落在第几行（列）上。lines 按下标排；从右到左的表格（#23）列是从右往左排的，rev 为真时 x 越小下标越大。
+ * 超出最后一行 / 列：extend 时按它的大小往外推出虚拟下标（填充用），否则停在最后一个
+ */
+function lineIndexAt(v: number, lines: { a: number; b: number }[], rev: boolean, extend = false): number {
+  const n = lines.length;
+  if (!n) return 0;
+  const w = rev ? -v : v;
+  const L = rev ? lines.map((l) => ({ a: -l.b, b: -l.a })) : lines;
+  for (let i = 0; i < n; i++) if (w < L[i].b) return i;
+  if (!extend) return n - 1;
+  const last = L[n - 1];
+  return n - 1 + Math.ceil((w - last.b) / Math.max(20, last.b - last.a));
+}
 import { t } from "./i18n";
 
 export interface MenuItem {
@@ -284,6 +299,8 @@ export class TableEditor {
   private readonly fillPreview: HTMLElement;
   /** 调列宽的线：鼠标靠近任意两列之间的竖线（哪一行都行）时出现，贯穿整张表 */
   private readonly resizeBar: HTMLElement;
+  /** 表格按从右到左排（Obsidian 设置「从右到左」、笔记或段落 dir=rtl，#23）：横向的计算都翻过来 */
+  private rtl = false;
   private readonly colHandle: HTMLElement;
   private sel: Pos | null = null;
   /** 多格选区的另一头（拖选、Shift）；null 是只选了一格 */
@@ -501,11 +518,11 @@ export class TableEditor {
       case "insert-row-below":
         this.apply(insertRows(tb, r.r2 + 1, rows), { r: r.r2 + 1, c: p.c });
         return true;
+      // 命令名里的左右是屏幕上的方向：从右到左的表格里左边是后面（#23）
       case "insert-col-left":
-        this.apply(insertCols(tb, r.c1, cols), { r: p.r, c: r.c1 });
-        return true;
       case "insert-col-right":
-        this.apply(insertCols(tb, r.c2 + 1, cols), { r: p.r, c: r.c2 + 1 });
+        if ((id === "insert-col-left") !== this.syncDir()) this.apply(insertCols(tb, r.c1, cols), { r: p.r, c: r.c1 });
+        else this.apply(insertCols(tb, r.c2 + 1, cols), { r: p.r, c: r.c2 + 1 });
         return true;
       case "duplicate-row":
         if (p.r === 0) return false;
@@ -640,8 +657,10 @@ export class TableEditor {
       if (this.destroyed) return;
       if (!this.outer) this.findOuter?.();
       const sc = this.scroller;
-      this.root.classList.toggle("can-left", sc.scrollLeft > 1);
-      this.root.classList.toggle("can-right", sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 1);
+      this.syncDir();
+      const offset = this.leftOffset(sc);
+      this.root.classList.toggle("can-left", offset > 1);
+      this.root.classList.toggle("can-right", offset + sc.clientWidth < sc.scrollWidth - 1);
       // 横向滚动条占地方时（Windows、或者 macOS 设成「始终显示滚动条」），底下的「加一行」按钮挪到滚动条下面，
       // 不然按钮正好盖在滚动条上，滚动条拖不动也点不到
       const bar = Math.max(0, sc.offsetHeight - sc.clientHeight);
@@ -752,7 +771,8 @@ export class TableEditor {
             return;
           }
           const b = bar!;
-          sc.scrollLeft = (b.scrollLeft / Math.max(1, b.scrollWidth - b.clientWidth)) * (sc.scrollWidth - sc.clientWidth);
+          // 浮动条一直是从左到右的：按「离最左边多远」换算，从右到左的表格也对得上（#23）
+          this.setLeftOffset(sc, (b.scrollLeft / Math.max(1, b.scrollWidth - b.clientWidth)) * (sc.scrollWidth - sc.clientWidth));
         },
         { passive: true },
       );
@@ -773,7 +793,7 @@ export class TableEditor {
       if (style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0) statusRect = rect;
     }
     bar.style.top = `${Math.round(hbarBottom(left, right, bottom, bar.offsetHeight, statusRect) - bar.offsetHeight)}px`;
-    const target = (sc.scrollLeft / Math.max(1, sc.scrollWidth - sc.clientWidth)) * Math.max(0, bar.scrollWidth - bar.clientWidth);
+    const target = (this.leftOffset(sc) / Math.max(1, sc.scrollWidth - sc.clientWidth)) * Math.max(0, bar.scrollWidth - bar.clientWidth);
     if (Math.abs(bar.scrollLeft - target) > 1) {
       this.hbarSync = true;
       bar.scrollLeft = target;
@@ -907,7 +927,27 @@ export class TableEditor {
 
   // ---------- 渲染 ----------
 
+  /** 看表格实际的文字方向（不读 Obsidian 的设置：整篇、某一段改了方向也算） */
+  private syncDir(): boolean {
+    const rtl = this.root.isConnected && (this.root.ownerDocument.defaultView ?? window).getComputedStyle(this.root).direction === "rtl";
+    if (rtl !== this.rtl) {
+      this.rtl = rtl;
+      this.root.classList.toggle("is-rtl", rtl);
+    }
+    return rtl;
+  }
+
+  /** 横向滚动位置换成「离最左边多远」：从右到左时浏览器的 scrollLeft 是 0（最右）到负数 */
+  private leftOffset(sc: HTMLElement): number {
+    return this.rtl ? sc.scrollWidth - sc.clientWidth + sc.scrollLeft : sc.scrollLeft;
+  }
+
+  private setLeftOffset(sc: HTMLElement, v: number): void {
+    sc.scrollLeft = this.rtl ? v - (sc.scrollWidth - sc.clientWidth) : v;
+  }
+
   private render(): void {
+    this.syncDir();
     const doc = this.root.ownerDocument;
     const hadFocus = this.input.hasFocus();
     const tb = this.table;
@@ -1431,8 +1471,11 @@ export class TableEditor {
     // 按行、列的实际位置算（不按格子拼）：碰到合并格时框的形状也对
     const top = this.lineBox(r.r1, true);
     const bottom = this.lineBox(r.r2, true);
-    const left = this.lineBox(r.c1, false);
-    const right = this.lineBox(r.c2, false);
+    const c1 = this.lineBox(r.c1, false);
+    const c2 = this.lineBox(r.c2, false);
+    // 从右到左的表格第一列在右边：两头按屏幕上的左右取
+    const left = { a: Math.min(c1.a, c2.a) };
+    const right = { b: Math.max(c1.b, c2.b) };
     if (bottom.b > top.a && right.b > left.a) {
       const base = this.scroller.getBoundingClientRect();
       const k = this.scale();
@@ -1460,7 +1503,8 @@ export class TableEditor {
   private placeFill(): void {
     const box = !this.editing && !this.host.readonly && !this.folded() && !this.touched ? this.selBox() : null;
     this.fillHandle.classList.toggle("is-shown", !!box);
-    if (box) this.fillHandle.setAttribute("style", `left:${box.x + box.w - 4}px;top:${box.y + box.h - 4}px`);
+    // 从右到左的表格放在左下角（选区的结尾那个角）
+    if (box) this.fillHandle.setAttribute("style", `left:${this.rtl ? box.x - 4 : box.x + box.w - 4}px;top:${box.y + box.h - 4}px`);
   }
 
   /** 十字高亮：悬停模式下鼠标所在的格子，否则（或鼠标不在表格上）选中的格子 */
@@ -1503,10 +1547,13 @@ export class TableEditor {
     // 竖的色带不伸进冻结列底下
     const frozen = this.root.classList.contains("is-freeze");
     let colLeft = left;
+    let colRight = right;
     if (frozen) {
       const f = this.grid[0]?.[0];
       const fw = f?.classList.contains("is-frozen") ? f.getBoundingClientRect().width / k : 0;
-      colLeft = Math.max(left, this.scroller.scrollLeft + fw);
+      // 从右到左时冻结列贴在右边：竖的色带右端不伸进它底下
+      if (this.rtl) colRight = Math.min(right, x(base.right) - fw);
+      else colLeft = Math.max(left, this.scroller.scrollLeft + fw);
       const own = this.grid[r1]?.[c1];
       const add = (el: HTMLElement | undefined) => {
         if (!el || el === own || !el.classList.contains("is-frozen") || this.crossed.includes(el)) return;
@@ -1520,8 +1567,8 @@ export class TableEditor {
     const rects: [number, number, number, number][] = [
       [tl, top, left - tl, bottom - top],
       [right, top, tr - right, bottom - top],
-      [colLeft, tt, right - colLeft, top - tt],
-      [colLeft, bottom, right - colLeft, tbm - bottom],
+      [colLeft, tt, colRight - colLeft, top - tt],
+      [colLeft, bottom, colRight - colLeft, tbm - bottom],
     ];
     rects.forEach(([bx, by, bw, bh], i) => {
       const band = this.crossBands[i];
@@ -1981,6 +2028,10 @@ export class TableEditor {
       if (!cell || target.closest("a, .tag, input, img, .ggt-secret-btn, .internal-embed")) return;
       if (Number(cell.dataset.r) !== this.sel.r || Number(cell.dataset.c) !== this.sel.c) return;
       this.startEdit(true);
+      // 光标放在点的地方，不放到最后：想改中间的字点一下就行（B 站衣裳IrKeng）
+      if (!this.editing) return;
+      const pos = this.input.posAt(ev.clientX, ev.clientY);
+      if (pos !== null) this.input.setSelectionRange(pos, pos);
     });
     this.on(this.tableEl, "dblclick", (ev) => {
       const target = ev.target as HTMLElement;
@@ -2216,7 +2267,9 @@ export class TableEditor {
         ev.stopPropagation();
         return;
       }
-      const arrow = ARROW_EDGE[ev.key];
+      let arrow = ARROW_EDGE[ev.key];
+      // 从右到左：编辑框的「左 / 右」边是按文字顺序算的（左 = 开头）。← 往屏幕左边走 = 往文字结尾走、到头了跳下一列（#23）
+      if (arrow?.dc && this.syncDir()) arrow = { edge: arrow.edge === "left" ? "right" : "left", dr: 0, dc: -arrow.dc };
       if (arrow && !ev.shiftKey && !ev.altKey && !mod && this.input.atEdge(arrow.edge)) {
         // 光标到了格子边上再按方向键：存好这一格、跳到旁边的格子（B站反馈）；在字中间照常挪光标
         ev.preventDefault();
@@ -2267,12 +2320,13 @@ export class TableEditor {
       case "ArrowDown":
         stop();
         return this.move(1, 0, false, ev.shiftKey);
+      // 从右到左的表格：← 往屏幕左边那一格走，也就是下一列（#23）
       case "ArrowLeft":
         stop();
-        return this.move(0, -1, false, ev.shiftKey);
+        return this.move(0, this.syncDir() ? 1 : -1, false, ev.shiftKey);
       case "ArrowRight":
         stop();
-        return this.move(0, 1, false, ev.shiftKey);
+        return this.move(0, this.syncDir() ? -1 : 1, false, ev.shiftKey);
       case "Tab":
         stop();
         return this.move(0, ev.shiftKey ? -1 : 1, true);
@@ -3092,11 +3146,7 @@ export class TableEditor {
     // 每一行、每一列的屏幕位置（表格外面按最后一行 / 列的大小往外推）
     const rows = Array.from({ length: rowCount(this.table) }, (_, r) => this.lineBox(r, true));
     const cols = Array.from({ length: colCount(this.table) }, (_, c) => this.lineBox(c, false));
-    const indexAt = (v: number, lines: { a: number; b: number }[]) => {
-      for (let i = 0; i < lines.length; i++) if (v < lines[i].b) return i;
-      const last = lines[lines.length - 1];
-      return lines.length - 1 + Math.ceil((v - last.b) / Math.max(20, last.b - last.a));
-    };
+    const indexAt = (v: number, lines: { a: number; b: number }[]) => lineIndexAt(v, lines, lines === cols && this.rtl, true);
     const move = (e: PointerEvent) => {
       state.copy = e.altKey;
       this.root.classList.toggle("is-fill-copy", e.altKey);
@@ -3152,10 +3202,7 @@ export class TableEditor {
     const start = { r: src.r1, c: src.c1 };
     const rows = Array.from({ length: rowCount(this.table) }, (_, r) => this.lineBox(r, true));
     const cols = Array.from({ length: colCount(this.table) }, (_, c) => this.lineBox(c, false));
-    const indexAt = (v: number, lines: { a: number; b: number }[]) => {
-      for (let i = 0; i < lines.length; i++) if (v < lines[i].b) return i;
-      return lines.length - 1;
-    };
+    const indexAt = (v: number, lines: { a: number; b: number }[]) => lineIndexAt(v, lines, lines === cols && this.rtl);
     let last = "";
     const move = (e: PointerEvent) => {
       const to = { r: Math.max(start.r, indexAt(e.clientY, rows)), c: Math.max(start.c, indexAt(e.clientX, cols)) };
@@ -3212,6 +3259,8 @@ export class TableEditor {
       const last = lines[lines.length - 1];
       const size = Math.max(20, last.b - last.a);
       const k = i - (lines.length - 1);
+      // 从右到左的表格：最后一列往左推
+      if (lines === cols && this.rtl) return { a: last.a - k * size, b: last.a - (k - 1) * size };
       return { a: last.b + (k - 1) * size, b: last.b + k * size };
     };
     const r1 = plan.dir === "up" ? src.r1 - plan.count : plan.dir === "down" ? src.r2 + 1 : src.r1;
@@ -3220,8 +3269,10 @@ export class TableEditor {
     const c2 = plan.dir === "right" ? src.c2 + plan.count : plan.dir === "left" ? src.c1 - 1 : src.c2;
     const top = ext(rows, Math.max(0, r1)).a;
     const bottom = ext(rows, r2).b;
-    const left = ext(cols, Math.max(0, c1)).a;
-    const right = ext(cols, c2).b;
+    const ca = ext(cols, Math.max(0, c1));
+    const cb = ext(cols, c2);
+    const left = Math.min(ca.a, cb.a);
+    const right = Math.max(ca.b, cb.b);
     const base = this.scroller.getBoundingClientRect();
     const k = this.scale();
     pv.setAttribute("style", `left:${(left - base.left) / k + this.scroller.scrollLeft}px;top:${(top - base.top) / k + this.scroller.scrollTop}px;width:${(right - left) / k}px;height:${(bottom - top) / k}px`);
@@ -3488,10 +3539,7 @@ export class TableEditor {
     let rows: { a: number; b: number }[] = [];
     let cols: { a: number; b: number }[] = [];
     let last = "";
-    const indexAt = (v: number, lines: { a: number; b: number }[]) => {
-      for (let i = 0; i < lines.length; i++) if (v < lines[i].b) return i;
-      return lines.length - 1;
-    };
+    const indexAt = (v: number, lines: { a: number; b: number }[]) => lineIndexAt(v, lines, lines === cols && this.rtl);
     const timer = window.setTimeout(() => {
       if (moved) return;
       pressed = true;
@@ -3540,8 +3588,9 @@ export class TableEditor {
       const sc = this.scroller;
       if (sc.scrollWidth > sc.clientWidth + 1) {
         const r = sc.getBoundingClientRect();
-        if (lastX > r.right - EDGE && sc.scrollLeft < sc.scrollWidth - sc.clientWidth) dx = speed(lastX - (r.right - EDGE), EDGE);
-        else if (lastX < r.left + EDGE && sc.scrollLeft > 0) dx = -speed(r.left + EDGE - lastX, EDGE);
+        const offset = this.leftOffset(sc);
+        if (lastX > r.right - EDGE && offset < sc.scrollWidth - sc.clientWidth - 0.5) dx = speed(lastX - (r.right - EDGE), EDGE);
+        else if (lastX < r.left + EDGE && offset > 0.5) dx = -speed(r.left + EDGE - lastX, EDGE);
       }
       if (!this.outer) this.findOuter?.();
       const out = this.outer;
@@ -3642,10 +3691,11 @@ export class TableEditor {
       const boxes = this.colBoxes();
       boxes.forEach((box, c) => {
         if (c >= c1 && c < c2) return;
-        const right = box.right;
-        if (hit < 0 && Math.abs(x - right) <= 4) {
+        // 拖的是每列结尾那条边：从左到右是右边线，从右到左是左边线（#23）
+        const end = this.rtl ? box.left : box.right;
+        if (hit < 0 && Math.abs(x - end) <= 4) {
           hit = c;
-          at = right;
+          at = end;
         }
       });
     }
@@ -3678,7 +3728,8 @@ export class TableEditor {
     const t = this.tableEl.getBoundingClientRect();
     const base = this.root.getBoundingClientRect();
     const k = this.scale();
-    const at = this.colBox(c).right;
+    const box = this.colBox(c);
+    const at = this.rtl ? box.left : box.right;
     bar.dataset.c = String(c);
     bar.setAttribute("style", `left:${(at - base.left) / k - 4}px;top:${(t.top - base.top) / k}px;height:${t.height / k}px`);
     // 把手的圆点放在选中那一格的高度上，手指好找
@@ -3711,14 +3762,15 @@ export class TableEditor {
     const move = (e: PointerEvent) => {
       const r = this.resize;
       if (!r) return;
-      const w = Math.max(40, Math.round(r.startW + (e.clientX - r.startX) / k));
+      // 从右到左：往左拖是变宽
+      const w = Math.max(40, Math.round(r.startW + ((e.clientX - r.startX) / k) * (this.rtl ? -1 : 1)));
       r.col.style.width = `${w}px`;
       // 按比例缩着的表（table-layout: fixed、总宽写死）：总宽跟着这一列变，别的列不动
       if (r.fitW) this.tableEl.style.width = `${r.fitW - r.startW + w}px`;
       // 线跟着鼠标走
       const tr = this.tableEl.getBoundingClientRect();
       const base = this.root.getBoundingClientRect();
-      handle.setAttribute("style", `left:${startLeft + (w - r.startW)}px;top:${(tr.top - base.top) / k}px;height:${tr.height / k}px`);
+      handle.setAttribute("style", `left:${startLeft + (w - r.startW) * (this.rtl ? -1 : 1)}px;top:${(tr.top - base.top) / k}px;height:${tr.height / k}px`);
       if (grip) handle.style.setProperty("--ggt-grip-y", grip);
       this.placeHandles();
     };
@@ -3805,12 +3857,24 @@ export class TableEditor {
       let slot = rects.length;
       for (let i = 0; i < rects.length; i++) {
         const mid = row ? rects[i].top + rects[i].height / 2 : rects[i].left + rects[i].width / 2;
-        if ((row ? y : x) < mid) {
+        // 从右到左的表格：列从右往左排，指针在这一列中线右边就插到它前面
+        if (row ? y < mid : this.rtl ? x > mid : x < mid) {
           slot = i;
           break;
         }
       }
-      const edge = slot < rects.length ? (row ? rects[slot].top : rects[slot].left) : row ? rects[rects.length - 1].bottom : rects[rects.length - 1].right;
+      const edge =
+        slot < rects.length
+          ? row
+            ? rects[slot].top
+            : this.rtl
+              ? rects[slot].right
+              : rects[slot].left
+          : row
+            ? rects[rects.length - 1].bottom
+            : this.rtl
+              ? rects[rects.length - 1].left
+              : rects[rects.length - 1].right;
       // 行的下标从 1 开始（第 0 行是表头）
       const fromIdx = row ? from - 1 : from;
       const dest = slot > fromIdx ? slot - 1 : slot;
@@ -3918,7 +3982,9 @@ export class TableEditor {
       const tr = this.tableEl.getBoundingClientRect();
       const k = this.scale();
       // 表格滚动了：左上角按钮贴在看得见的左上角，不跟着滚出去
-      const x = Math.max(tr.left, vis.left);
+      // 从右到左的表格：按钮在右上角（表格开头那个角）
+      this.syncDir();
+      const x = this.rtl ? Math.min(tr.right, vis.right) : Math.max(tr.left, vis.left);
       const y = Math.max(tr.top, vis.top);
       this.cornerBtn.setAttribute("style", `left:${(x - base.left) / k}px;top:${(y - base.top) / k}px`);
     }
@@ -3943,7 +4009,9 @@ export class TableEditor {
       for (let c = 0; c < q.c && covered; c++) covered = isCovered(this.table, q.r, c);
       if (covered) return true;
       const el = this.cellEl(q);
-      return !!el && el.getBoundingClientRect().left <= vis.left + 1;
+      if (!el) return false;
+      const b = el.getBoundingClientRect();
+      return this.rtl ? b.right >= vis.right - 1 : b.left <= vis.left + 1;
     };
     // 折着时没有行手柄（藏着的行挪不了，表头行也不让在折着时挪）
     const rowP = this.folded() ? null : ((h && atRowStart(h) ? h : null) ?? lineRow ?? touchSel);
@@ -3961,7 +4029,8 @@ export class TableEditor {
         const rowMid = fr.top + fr.height / 2;
         if (rowMid < vis.top || rowMid > vis.bottom) this.rowHandle.classList.remove("is-shown");
         this.rowHandle.style.top = `${(rowMid - base.top) / k}px`;
-        this.rowHandle.style.left = `${(Math.max(fr.left, vis.left) - base.left) / k}px`;
+        // 从右到左：贴在看得见的右边
+        this.rowHandle.style.left = `${((this.rtl ? Math.min(fr.right, vis.right) : Math.max(fr.left, vis.left)) - base.left) / k}px`;
         this.rowHandle.dataset.r = String(rowP.r);
         this.rowHandle.classList.toggle("is-fixed", rowP.r < headRows(this.table));
         this.rowHandle.dataset.c = String(rowP.c);
@@ -4160,12 +4229,14 @@ export class TableEditor {
       if (!want(c0) && !want(c1)) continue;
       const r = el.getBoundingClientRect();
       if (!r.width) continue;
-      if (want(c0) && Number.isNaN(left[c0])) {
-        left[c0] = r.left;
+      // 合并格只知道它两头那一列的一条边：开头那列的起边、结尾那列的止边（从右到左时开头在右）
+      const [startArr, endArr, startX, endX] = this.rtl ? [right, left, r.right, r.left] : [left, right, r.left, r.right];
+      if (want(c0) && Number.isNaN(startArr[c0])) {
+        startArr[c0] = startX;
         missing--;
       }
-      if (c1 < n && want(c1) && Number.isNaN(right[c1])) {
-        right[c1] = r.right;
+      if (c1 < n && want(c1) && Number.isNaN(endArr[c1])) {
+        endArr[c1] = endX;
         missing--;
       }
       if (missing <= 0) break;
@@ -4288,8 +4359,16 @@ export class TableEditor {
       { title: t("sortAsc"), icon: "arrow-down-a-z", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", why: colKindOf(tb, p.c) === "enc" ? t("whySortEnc") : t("whySortMerge"), run: () => this.apply(sortRows(tb, p.c, false, this.hasTotalRow(), this.dateParser()), p) },
       { title: t("sortDesc"), icon: "arrow-up-z-a", disabled: !canSortRows(tb) || colKindOf(tb, p.c) === "enc", why: colKindOf(tb, p.c) === "enc" ? t("whySortEnc") : t("whySortMerge"), run: () => this.apply(sortRows(tb, p.c, true, this.hasTotalRow(), this.dateParser()), p) },
       { separator: true },
-      { title: t("moveColLeft"), icon: "arrow-left", disabled: p.c === 0, run: () => this.apply(moveCol(tb, p.c, p.c - 1), { r: p.r, c: p.c - 1 }) },
-      { title: t("moveColRight"), icon: "arrow-right", disabled: p.c >= colCount(tb) - 1, run: () => this.apply(moveCol(tb, p.c, p.c + 1), { r: p.r, c: p.c + 1 }) },
+      // 菜单写的「左 / 右」是屏幕上的方向：从右到左的表格里左边是下一列（#23）
+      ...((): MenuItem[] => {
+        const step = (dir: -1 | 1): MenuItem["run"] => () => this.apply(moveCol(tb, p.c, p.c + dir), { r: p.r, c: p.c + dir });
+        const [l, r] = this.rtl ? ([1, -1] as const) : ([-1, 1] as const);
+        const off = (dir: -1 | 1) => (dir < 0 ? p.c === 0 : p.c >= colCount(tb) - 1);
+        return [
+          { title: t("moveColLeft"), icon: "arrow-left", disabled: off(l), run: step(l) },
+          { title: t("moveColRight"), icon: "arrow-right", disabled: off(r), run: step(r) },
+        ];
+      })(),
       { separator: true },
       ...this.alignItems(p.c),
       ...(widthOf(tb, p.c) != null ? [{ title: t("autoWidth"), icon: "move-horizontal", run: () => this.apply(setWidth(tb, p.c, null), p) }] : []),
@@ -4444,9 +4523,12 @@ export class TableEditor {
     const left = this.isMulti() && r ? r.c1 : p.c;
     const rr = this.isMulti() && r ? r.c2 : right;
     const n = (key: "insertColLeft" | "insertColRight" | "insertColsLeft" | "insertColsRight") => t(key).replace("{n}", String(k));
+    const before = () => this.apply(insertCols(tb, left, k), { r: p.r, c: left });
+    const after = () => this.apply(insertCols(tb, rr + 1, k), { r: p.r, c: rr + 1 });
+    // 「左侧 / 右侧」是屏幕上的方向：从右到左的表格里左侧是这一列后面（#23）
     return [
-      { title: n(k > 1 ? "insertColsLeft" : "insertColLeft"), icon: "arrow-left-to-line", run: () => this.apply(insertCols(tb, left, k), { r: p.r, c: left }) },
-      { title: n(k > 1 ? "insertColsRight" : "insertColRight"), icon: "arrow-right-to-line", run: () => this.apply(insertCols(tb, rr + 1, k), { r: p.r, c: rr + 1 }) },
+      { title: n(k > 1 ? "insertColsLeft" : "insertColLeft"), icon: "arrow-left-to-line", run: this.rtl ? after : before },
+      { title: n(k > 1 ? "insertColsRight" : "insertColRight"), icon: "arrow-right-to-line", run: this.rtl ? before : after },
     ];
   }
 

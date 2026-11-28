@@ -4,6 +4,11 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-29
+
+### Fixed
+- Tables in topics: with Obsidian's "Right-to-left (RTL)" setting on, arrow keys, column resizing, the row handle, the fill handle, a frozen first column, sideways scrolling and the left / right menu items now follow the direction on screen instead of being reversed (synced from gogoga Table).
+
 ## [1.1.4] - 2026-11-28
 
 ### Added
@@ -1367,7 +1372,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.5...HEAD
+[1.1.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...1.1.5
 [1.1.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2

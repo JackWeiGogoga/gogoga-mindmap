@@ -2919,6 +2919,23 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .ggt.can-left.can-right:not(.is-freeze) .ggt-scroll { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade), #000 calc(100% - var(--ggt-fade)), transparent); mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade), #000 calc(100% - var(--ggt-fade)), transparent); }
 .ggt button.ggt-handle { touch-action: none; }
 
+/* ---------- 从右到左（Obsidian 设置「从右到左」、笔记或段落 dir=rtl，#23）：左右对调 ---------- */
+/* 外框：行手柄那 14px 留在右边，加号那 26px 留在左边 */
+.ggt.is-rtl { padding: 10px 14px calc(26px + var(--ggt-sb, 0px)) 26px; margin-left: 0; margin-right: -14px; }
+.ggt-center-host > .ggt.is-rtl:not(.is-full) { margin-right: -14px; margin-left: -26px; }
+/* 填充柄在选区左下角：左边、下边留出位置 */
+.ggt.is-rtl .ggt-scroll { padding: 0 0 12px 12px; margin: 0 0 -12px -12px; }
+.ggt.is-rtl .ggt-add-col { right: auto; left: 4px; }
+.ggt.is-rtl .ggt-add-col-first { left: auto; right: -12px; }
+.ggt.is-rtl .ggt-add-row, .ggt.is-rtl .ggt-add-row-first { left: 26px; right: 14px; }
+/* 冻结的第一列贴右边；往左滚开以后（can-right）右边那道阴影、左边的渐隐 */
+.ggt.is-rtl.is-freeze .ggt-table .ggt-cell.is-frozen { left: auto; right: 0; }
+.ggt.is-rtl.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected), .theme-dark .ggt.is-rtl.is-freeze.can-left .ggt-cell.is-frozen:not(.is-selected) { box-shadow: none; }
+.ggt.is-rtl.is-freeze.can-right .ggt-cell.is-frozen:not(.is-selected) { box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.18); }
+.theme-dark .ggt.is-rtl.is-freeze.can-right .ggt-cell.is-frozen:not(.is-selected) { box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.5); }
+.ggt.is-rtl.is-freeze.can-right .ggt-scroll { -webkit-mask-image: none; mask-image: none; }
+.ggt.is-rtl.is-freeze.can-left .ggt-scroll { -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade)); mask-image: linear-gradient(to right, transparent, #000 var(--ggt-fade)); }
+
 /* 实时预览里包表格的那层默认带 contain: paint，会把伸到表格外面的行手柄、加号裁掉一半 */
 /* Obsidian 的规则是 .markdown-source-view.mod-cm6 .cm-content > [contenteditable="false"] { contain: paint !important }，要比它更具体才盖得住 */
 .markdown-source-view.mod-cm6 .cm-content > .ggt-lp[contenteditable="false"] { contain: none !important; }

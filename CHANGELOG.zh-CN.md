@@ -4,6 +4,11 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-29
+
+### 修复
+- 节点里的表格：打开 Obsidian 的「从右到左」后，方向键、拖列宽、行手柄、填充柄、冻结首列、横向滚动、菜单里的左右都按屏幕上的方向来，不再是反的（随 gogoga Table 同步）。
+
 ## [1.1.4] - 2026-11-28
 
 ### 新增
@@ -1367,7 +1372,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.5...HEAD
+[1.1.5]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...1.1.5
 [1.1.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
