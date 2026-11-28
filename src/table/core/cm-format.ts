@@ -63,6 +63,13 @@ function marksFor(prefix: string) {
   return m;
 }
 
+const linkMarks = new Map<string, Decoration>();
+function linkMark(prefix: string): Decoration {
+  let d = linkMarks.get(prefix);
+  if (!d) linkMarks.set(prefix, (d = Decoration.mark({ class: `${prefix}-link` })));
+  return d;
+}
+
 /** 颜色值来自 COLOR_OPEN_SRC 的匹配（十六进制、颜色名、rgba(数字)），放进 style 是安全的 */
 function contentMark(span: FormatSpan, prefix: string): Decoration {
   if (span.kind === "color") return Decoration.mark({ attributes: { style: `color: ${span.color}` } });
@@ -71,13 +78,66 @@ function contentMark(span: FormatSpan, prefix: string): Decoration {
   return marksFor(prefix).kinds[span.kind];
 }
 
+/** 编辑框里的一个链接：[a, b) 是方括号、圆括号这些记号（变淡），[textFrom, textTo) 是链接文字（链接色） */
+export interface LinkRange {
+  syntax: [number, number][];
+  textFrom: number;
+  textTo: number;
+}
+
+/**
+ * 编辑框里的链接，和 Obsidian 编辑器一样显示成链接色（B 站 FORMORE：输入 [[ 后打的字是白的，官方是紫的）：
+ * [[笔记]]、[[笔记|别名]]、![[图片]]、[文字](网址)；还有光标前没写完的 [[…（正在打、补全列表开着的那段）。
+ * 行内代码里的不算
+ */
+export function linkRanges(text: string, caret: number | null, code: readonly { from: number; to: number }[] = []): LinkRange[] {
+  const out: LinkRange[] = [];
+  const inCode = (p: number) => code.some((c) => p >= c.from && p < c.to);
+  const re = /!?\[\[([^[\]\n]*)\]\]|\[([^[\]\n]+)\]\(([^()\s]+)\)/g;
+  let lastEnd = 0;
+  for (let m: RegExpExecArray | null; (m = re.exec(text)); ) {
+    const a = m.index;
+    const b = a + m[0].length;
+    if (inCode(a)) continue;
+    lastEnd = Math.max(lastEnd, b);
+    if (m[1] !== undefined) {
+      const open = m[0].startsWith("!") ? 3 : 2;
+      out.push({ syntax: [[a, a + open], [b - 2, b]], textFrom: a + open, textTo: b - 2 });
+    } else {
+      const labelEnd = a + 1 + m[2].length;
+      out.push({ syntax: [[a, a + 1], [labelEnd, b]], textFrom: a + 1, textTo: labelEnd });
+    }
+  }
+  if (caret !== null) {
+    // 没写完的 [[：光标前最后一个 [[ 后面到光标之间没有 ]]、不换行，也不在已经认出来的链接里
+    const before = text.slice(0, caret);
+    const open = before.lastIndexOf("[[");
+    if (open >= lastEnd && open >= 0 && !inCode(open)) {
+      const q = before.slice(open + 2);
+      if (!q.includes("]]") && !q.includes("\n") && !out.some((l) => open >= l.syntax[0][0] && open < l.syntax[l.syntax.length - 1][1])) {
+        const from = open > 0 && text[open - 1] === "!" ? open - 1 : open;
+        out.push({ syntax: [[from, open + 2]], textFrom: open + 2, textTo: caret });
+      }
+    }
+  }
+  return out;
+}
+
 function build(state: EditorState): { deco: DecorationSet; atomic: DecorationSet } {
   const deco: Range<Decoration>[] = [];
   const atomic: Range<Decoration>[] = [];
   const all = state.facet(hideAll);
   const prefix = state.facet(prefixFacet);
   const SYNTAX = marksFor(prefix).syntax;
-  for (const span of formatSpans(state.doc.toString())) {
+  const text = state.doc.toString();
+  const spans = formatSpans(text);
+  const sel = state.selection.main;
+  const LINK = linkMark(prefix);
+  for (const l of linkRanges(text, sel.empty ? sel.head : null, spans.filter((x) => x.kind === "code"))) {
+    for (const [a, b] of l.syntax) if (b > a) deco.push(SYNTAX.range(a, b));
+    if (l.textTo > l.textFrom) deco.push(LINK.range(l.textFrom, l.textTo));
+  }
+  for (const span of spans) {
     deco.push(contentMark(span, prefix).range(span.innerFrom, span.innerTo));
     if (!all && revealed(span, state.selection.ranges)) {
       deco.push(SYNTAX.range(span.from, span.innerFrom), SYNTAX.range(span.innerTo, span.to));

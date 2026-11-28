@@ -3,6 +3,7 @@
  * 内联编辑、备注编辑、键盘操作。不依赖 obsidian 模块，浏览器调试页和代码块渲染器共用。
  */
 
+import { rankLinkTargets } from "./link-rank";
 import { progressLabel, taskProgress, type TaskProgressMode } from "./task-progress";
 import { centerAt, minimapScale, minimapShown, toMini, viewRect, type MinimapMode } from "./minimap-core";
 import { clickNode, frameView, presentKey, presentLook, presentProgress, presentRoute, presentSwipe, reanchor, startState, step as presentStep, type PresentAction, type PresentState } from "./present-core";
@@ -71,6 +72,7 @@ import {
   relGeometry,
   Segment,
   PlacedCallout,
+  PlacedNote,
   PlacedSummary,
   Size,
   Structure,
@@ -489,7 +491,6 @@ export interface ViewState {
 
 /** 链接补全最多列多少条；超出一屏的滚动查看 */
 const LINK_SUGGEST_MAX = 50;
-const NAME_COLLATOR = new Intl.Collator("zh-Hans-u-co-pinyin", { numeric: true, sensitivity: "base" });
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3;
@@ -7273,18 +7274,20 @@ export class MindMapCanvas {
         : kids.findIndex((k) => target.parent.children.indexOf(k.node) >= target.index);
     const across = side === "down" || side === "up";
     ind.classList.toggle("is-vertical", across);
+    // 展开的备注挂在节点下面：横线画在备注框外面，不压在备注上（B 站晓兔）
+    const box = (k: Placed) => this.dropBox(k);
     if (across) {
       let x: number;
-      if (pos === -1) x = kids[kids.length - 1].x + kids[kids.length - 1].w + gap;
+      if (pos === -1) x = box(kids[kids.length - 1]).x + box(kids[kids.length - 1]).w + gap;
       else if (pos === 0) x = kids[0].x - gap;
-      else x = (kids[pos - 1].x + kids[pos - 1].w + kids[pos].x) / 2;
+      else x = (box(kids[pos - 1]).x + box(kids[pos - 1]).w + kids[pos].x) / 2;
       ind.setCssStyles({ display: "block", left: `${x - 2}px`, top: `${kids[0].y}px` });
       return;
     }
     let y: number;
-    if (pos === -1) y = kids[kids.length - 1].y + kids[kids.length - 1].h + gap / 2;
+    if (pos === -1) y = box(kids[kids.length - 1]).y + box(kids[kids.length - 1]).h + gap / 2;
     else if (pos === 0) y = kids[0].y - gap / 2;
-    else y = (kids[pos - 1].y + kids[pos - 1].h + kids[pos].y) / 2;
+    else y = (box(kids[pos - 1]).y + box(kids[pos - 1]).h + kids[pos].y) / 2;
     const x = side === "left" ? kids[0].x + kids[0].w - 48 : kids[0].x;
     ind.setCssStyles({ display: "block", left: `${x}px`, top: `${y - 2}px` });
   }
@@ -7340,7 +7343,7 @@ export class MindMapCanvas {
         wx >= Math.min(...col.map((k) => k.x)) - 12 &&
         wx <= Math.max(...col.map((k) => k.x + k.w)) + 12 &&
         wy >= Math.min(...col.map((k) => k.y)) - pad &&
-        wy <= Math.max(...col.map((k) => k.y + k.h)) + pad;
+        wy <= Math.max(...col.map((k) => this.dropBox(k).y + this.dropBox(k).h)) + pad;
       const nearRoot = rp && !col.length && Math.abs(wy - (rp.y + rp.h / 2)) < 80 && (side === "left" ? wx < rp.x : wx > rp.x + rp.w);
       if (rp && (inCol || nearRoot)) return this.sideDropTarget(rp, kids, wx, wy);
     }
@@ -7359,19 +7362,20 @@ export class MindMapCanvas {
       for (let i = 0; i <= kids.length; i++) {
         const a = kids[i - 1];
         const b = kids[i];
-        const two = [a, b].filter((k): k is Placed => !!k);
+        // 展开的备注算进节点的范围：备注框上和备注框下面那一段都算这两个兄弟之间（B 站晓兔）
+        const two = [a, b].filter((k): k is Placed => !!k).map((k) => this.dropBox(k));
         let inBand: boolean;
         let size: number;
         if (!across) {
           const top = a ? a.y + a.h : b.y - edgeGap;
-          const bottom = b ? b.y : a.y + a.h + edgeGap;
+          const bottom = b ? b.y : this.dropBox(a).y + this.dropBox(a).h + edgeGap;
           const left = Math.min(...two.map((k) => k.x)) - 12;
           const right = Math.max(...two.map((k) => k.x + k.w)) + 12;
           inBand = wy >= top && wy <= bottom && wx >= left && wx <= right;
           size = bottom - top;
         } else {
           const left = a ? a.x + a.w : b.x - edgeGap;
-          const right = b ? b.x : a.x + a.w + edgeGap;
+          const right = b ? b.x : this.dropBox(a).x + this.dropBox(a).w + edgeGap;
           const top = Math.min(...two.map((k) => k.y)) - 12;
           const bottom = Math.max(...two.map((k) => k.y + k.h)) + 12;
           inBand = wx >= left && wx <= right && wy >= top && wy <= bottom;
@@ -7448,6 +7452,19 @@ export class MindMapCanvas {
    * 思维导图结构里中心主题两侧的落点：按鼠标在中心主题哪边决定 side，只在那一侧的主主题之间找位置。
    * 左侧是倒序排的（文档里靠后的在上面），所以插入下标要反过来算。
    */
+  private dropBoxes: { layout: LayoutResult; notes: Map<MindNode, PlacedNote> } | null = null;
+  /** 节点连同它下面展开的备注框占的范围（拖放时兄弟之间的空隙、插入横线都从这个范围外面算） */
+  private dropBox(k: Placed): Bounds {
+    const layout = this.layout;
+    if (!layout) return k;
+    if (this.dropBoxes?.layout !== layout) this.dropBoxes = { layout, notes: new Map(layout.notes.map((n) => [n.node, n])) };
+    const n = this.dropBoxes.notes.get(k.node);
+    if (!n) return k;
+    const x = Math.min(k.x, n.x);
+    const y = Math.min(k.y, n.y);
+    return { x, y, w: Math.max(k.x + k.w, n.x + n.w) - x, h: Math.max(k.y + k.h, n.y + n.h) - y };
+  }
+
   private sideDropTarget(p: Placed, kids: Placed[], wx: number, wy: number): DropTarget {
     const side: "left" | "right" = wx < p.x + p.w / 2 ? "left" : "right";
     const list = kids.filter((k) => k.side === side).sort((a, b) => a.y - b.y);
@@ -8264,20 +8281,7 @@ export class MindMapCanvas {
     const open = before.lastIndexOf("[[");
     const query = open < 0 ? "" : before.slice(open + 2);
     if (open < 0 || query.includes("]]") || /[\n|#^]/.test(query)) return this.closeLinkSuggest();
-    const q = query.trim().toLowerCase();
-    const scored: { t: LinkTarget; s: number }[] = [];
-    for (const t of host.listLinkTargets()) {
-      const name = t.name.toLowerCase();
-      // 完全同名 → 以输入开头 → 包含输入 → 路径里包含；附件排在同档笔记后面
-      const m = !q ? 0 : name === q ? 0 : name.startsWith(q) ? 1 : name.includes(q) ? 2 : `${t.folder}/${name}`.toLowerCase().includes(q) ? 3 : -1;
-      if (m >= 0) scored.push({ t, s: m + (t.isNote ? 0 : 0.5) });
-      if (!q && scored.length >= LINK_SUGGEST_MAX) break;
-    }
-    // 没输入时按最近修改（listLinkTargets 已排好，sort 稳定）；有输入时同档按名称，中文按拼音
-    const items = scored
-      .sort((a, b) => a.s - b.s || (q ? NAME_COLLATOR.compare(a.t.name, b.t.name) : 0))
-      .slice(0, LINK_SUGGEST_MAX)
-      .map((x) => x.t);
+    const items = rankLinkTargets(host.listLinkTargets(), query, LINK_SUGGEST_MAX);
     if (!items.length) return this.closeLinkSuggest();
     if (!this.linkSuggest) {
       const el = createDiv();
@@ -10639,10 +10643,7 @@ export class MindMapCanvas {
       },
       suggestLinks: host?.listLinkTargets
         ? (query) => {
-            const q = query.toLowerCase();
-            const all = host.listLinkTargets!().filter((x) => x.name.toLowerCase().includes(q));
-            all.sort((a, b) => Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)));
-            return all.slice(0, 12).map((x) => x.linktext);
+            return rankLinkTargets(host.listLinkTargets!(), query, 12).map((x) => x.linktext);
           }
         : undefined,
       suggestTags: host?.listTags

@@ -4,6 +4,17 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-28
+
+### 改进
+- 编辑节点时，`[[笔记]]`、`[文字](网址)` 这些链接显示成链接色，`[[`、`]]` 变淡，和 Obsidian 编辑器里一样；正在打的 `[[…` 也是链接色（B 站反馈）。中心主题这种深色底的节点保持原来的字色、加下划线。
+- 输入 `[[` 的补全里，名字差不多时笔记排在图片等附件前面；节点里的表格也一样（B 站反馈）。
+
+### 修复
+- 安卓平板上连线和节点对不上，越往外错得越多（华为、小米平板，B 站反馈，#62）。屏幕缩放倍率是小数（比如 1.75、2.25）的设备上，连线整层被缩放了，现在和节点对齐。
+- 开着「备注展开显示」时拖动节点：插入位置的提示线画在了上一个节点的备注框中间，拖到带备注的最后一个节点下方也放不下去（B 站反馈）。现在提示线画在备注框下面，备注框下方也能放。
+- 节点里的表格：编辑格子时选中文字再粘贴网址，会变成 `[文字](网址)`（随 gogoga Table 同步）。
+
 ## [1.1.2] - 2026-11-27
 
 ### 修复
@@ -1348,7 +1359,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...HEAD
+[1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0

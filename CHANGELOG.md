@@ -4,6 +4,17 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-28
+
+### Changed
+- While editing a topic, links such as `[[note]]` and `[text](url)` are shown in the link color with faded `[[` and `]]`, like in Obsidian's editor, including a `[[…` you're still typing (reported on Bilibili). On dark topics such as the central topic they keep the text color and get an underline.
+- In the `[[` suggestions, notes now come before images and other attachments with similar names, in tables inside topics too (reported on Bilibili).
+
+### Fixed
+- On Android tablets, branch lines didn't line up with topics and drifted further apart away from the center (Huawei and Xiaomi tablets, reported on Bilibili, #62). On screens with a fractional scale factor such as 1.75 or 2.25 the whole line layer was scaled; lines now line up with topics.
+- With "Expand notes" on, dragging a topic drew the insertion line through the middle of the previous topic's note, and you couldn't drop below the last topic when it had a note (reported on Bilibili). The line is now drawn below the note, and you can drop below it.
+- Tables in topics: selecting text in a cell and pasting a URL now turns it into `[text](url)` (synced from gogoga Table).
+
 ## [1.1.2] - 2026-11-27
 
 ### Fixed
@@ -1348,7 +1359,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...HEAD
+[1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.0.0...1.1.0

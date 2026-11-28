@@ -118,8 +118,10 @@ body { --gg-mm-styles-loaded: 1; }
   position: absolute;
   left: 0;
   top: 0;
-  width: 1px;
-  height: 1px;
+  /* 不能用 1px：屏幕倍率是小数（安卓平板常见 1.75、2.25）时 1px 不是整数个设备像素，安卓 WebView 会把整层连线按取整后的尺寸缩放，
+     线和节点越往外错得越多（B 站、GitHub #62）。安卓的倍率都是 dpi/160，160px 乘上去一定是整数 */
+  width: 160px;
+  height: 160px;
   overflow: visible;
   pointer-events: none;
 }
@@ -493,6 +495,10 @@ body { --gg-mm-styles-loaded: 1; }
 .mm-has-editor .mm-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
 .mm-has-editor .mm-ed-mark { background: rgba(255, 210, 0, 0.45); border-radius: 2px; }
 .mm-has-editor .mm-ed-syntax { opacity: 0.45; }
+/* 链接（[[笔记]]、[文字](网址)、正在打的 [[…）和渲染出来的链接同色；深色底的节点和渲染时一样改用下划线 */
+.mm-has-editor .mm-ed-link { color: var(--link-color, var(--mm-selection)); }
+.gg-mm-node[data-depth="0"] .mm-has-editor .mm-ed-link,
+.theme-dark .gg-mm-root[data-theme="rainbow"] .gg-mm-node[data-depth="1"] .mm-ed-link { color: inherit; text-decoration: underline; }
 /* 藏起来的标记两边 CodeMirror 会垫一个空图片，它会打断中文标点挤压（「）：」相邻时压掉半个字），编辑时比显示宽一截；去掉它 */
 .mm-has-editor img.cm-widgetBuffer { display: none; }
 .mm-label strong { font-weight: 700; }
@@ -3186,6 +3192,7 @@ body.is-mobile .ggt-menu { z-index: 2147483000; backdrop-filter: none; -webkit-b
 .ggt .ggt-input-cm .ggt-ed-code { padding: 0 0.3em; border-radius: 3px; background: rgba(127, 127, 127, 0.18); font-family: var(--font-monospace, monospace); }
 .ggt .ggt-input-cm .ggt-ed-mark { background: var(--text-highlight-bg, rgba(255, 210, 0, 0.45)); border-radius: 2px; color: inherit; }
 .ggt .ggt-input-cm .ggt-ed-syntax { opacity: 0.45; }
+.ggt .ggt-input-cm .ggt-ed-link { color: var(--link-color, var(--text-accent)); }
 .ggt .ggt-input-cm .ggt-ed-mark[data-highlight="red"] { background: var(--highlight-background-red, rgba(var(--color-red-rgb, 233, 49, 71), 0.3)); }
 .ggt .ggt-input-cm .ggt-ed-mark[data-highlight="orange"] { background: var(--highlight-background-orange, rgba(var(--color-orange-rgb, 236, 117, 0), 0.3)); }
 .ggt .ggt-input-cm .ggt-ed-mark[data-highlight="yellow"] { background: var(--highlight-background-yellow, rgba(var(--color-yellow-rgb, 224, 172, 0), 0.3)); }
