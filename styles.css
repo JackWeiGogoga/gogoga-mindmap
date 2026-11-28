@@ -1601,6 +1601,11 @@ body.gg-mm-outline-wrap .mm-outline-row > :not(.mm-outline-text) { margin-top: 0
 .mm-toolbar[data-pos="left"],
 .mm-toolbar[data-pos="right"] { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; }
 .mm-toolbar::-webkit-scrollbar { display: none; }
+/* 收起工具栏（#61）：整条藏起来，同一个角落只留一个小把手，点它展开 */
+.mm-toolbar-handle { display: none; padding: 2px; }
+.gg-mm-root.is-toolbar-hidden > .mm-toolbar:not(.mm-toolbar-handle) { display: none; }
+.gg-mm-root.is-toolbar-hidden > .mm-toolbar-handle { display: flex; }
+.mm-toolbar-handle .mm-tool { width: 22px; height: 22px; }
 .mm-toolbar > * { flex-shrink: 0; }
 .mm-toolbar[data-pos="top"] { top: 12px; bottom: auto; }
 .mm-toolbar[data-pos="left"],

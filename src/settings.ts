@@ -134,6 +134,8 @@ export interface MindMapSettings {
   listIcon: string;
   /** 工具栏位置：上下为水平条，左右为垂直条 */
   toolbarPosition: ToolbarPosition;
+  /** 主工具栏收起着（#61），所有脑图一起 */
+  toolbarHidden: boolean;
   /** 画布左上角显示导图标题（文件名），点一下就能改名（默认关，B 站落尘-书生） */
   inlineTitle: boolean;
   /** 选中节点时显示浮动工具栏 */
@@ -282,6 +284,7 @@ export const DEFAULT_SETTINGS: MindMapSettings = {
   outlineWrap: false,
   outlineFoldSync: false,
   toolbarPosition: "bottom",
+  toolbarHidden: false,
   inlineTitle: false,
   showNodebar: true,
   barPlacement: "above",

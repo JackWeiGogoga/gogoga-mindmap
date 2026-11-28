@@ -111,6 +111,16 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     return this.canvas?.linkSelectedToNote() ?? Promise.resolve();
   }
 
+  setToolbarHidden(hidden: boolean): void {
+    this.canvas?.setToolbarHidden(hidden);
+  }
+
+  /** 命令「隐藏 / 显示工具栏」（#61） */
+  toggleToolbar(): void {
+    const c = this.canvas;
+    if (c) c.setToolbarHidden(!c.isToolbarHidden(), true);
+  }
+
   setToolbarPosition(pos: ToolbarPosition): void {
     this.canvas?.setToolbarPosition(pos);
   }
@@ -433,6 +443,12 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
         toggle: () => void this.plugin.setSyncSplit(!this.plugin.settings.syncSplit),
       },
       toolbarPosition: this.plugin.settings.toolbarPosition,
+      toolbarHidden: () => this.plugin.settings.toolbarHidden,
+      onToolbarHiddenChange: (hidden) => {
+        this.plugin.settings.toolbarHidden = hidden;
+        void this.plugin.saveSettings();
+        this.plugin.applyToolbarHidden(this);
+      },
       wheelZoom: () => this.plugin.settings.wheelAction === "zoom",
       notePreview: () => this.plugin.settings.notePreview,
       noteLiveEdit: () => this.plugin.settings.noteLiveEdit,
@@ -1184,9 +1200,13 @@ export class MindMapView extends TextFileView implements ExcerptTarget {
     reset();
   }
 
-  /** 笔记改名了（在哪改的都算）：中心主题是文件名时跟着变 */
+  /**
+   * 笔记改名了（在哪改的都算）：中心主题是文件名时跟着变。
+   * Obsidian 库里任何文件改名、移动都会调每个视图的 onRename，由视图自己看是不是自己的文件（#59：改别的文件名，中心主题被改成那个名字）
+   */
   async onRename(file: TFile): Promise<void> {
     await super.onRename(file);
+    if (file !== this.file) return;
     this.updateInlineTitle();
     if (this.doc && !this.doc.rootFromHeading && this.doc.root.text !== file.basename) {
       this.doc.root.text = file.basename;

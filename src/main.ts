@@ -1089,6 +1089,14 @@ export default class MindMapPlugin extends Plugin {
     }
   }
 
+  /** 工具栏收起 / 展开（#61）：所有打开着的脑图一起 */
+  applyToolbarHidden(except?: MindMapView): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
+      const view = leaf.view;
+      if (view instanceof MindMapView && view !== except) view.setToolbarHidden(this.settings.toolbarHidden);
+    }
+  }
+
   applyToolbarPosition(except?: MindMapView): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_MINDMAP)) {
       const view = leaf.view;
@@ -2170,6 +2178,7 @@ export default class MindMapPlugin extends Plugin {
     exportCommand("toggle-numbering", t("command.toggleNumbering"), async (v) => v.toggleNumberingOnSelected());
     exportCommand("toggle-recite", t("command.toggleRecite"), async (v) => v.toggleRecite());
     exportCommand("toggle-zen", t("command.toggleZen"), async (v) => v.toggleZen());
+    exportCommand("toggle-toolbar", t("command.toggleToolbar"), async (v) => v.toggleToolbar());
     exportCommand("start-present", t("command.startPresent"), async (v) => v.startPresent());
     exportCommand("toggle-pdf-excerpt", t("command.togglePdfExcerpt"), async (v) => this.pdfExcerpt.toggle(v));
     exportCommand("toggle-callouts", t("command.toggleCallouts"), async (v) => v.toggleCallouts());

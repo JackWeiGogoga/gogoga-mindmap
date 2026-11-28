@@ -4,6 +4,14 @@ All notable changes to gogoga Mind Map are listed here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-28
+
+### Added
+- The main toolbar can be collapsed on its own (#61): click the arrow at the end of the toolbar and it folds away, leaving a small handle in its corner that brings it back. It applies to every open map and is remembered. The command "Hide / show toolbar" can be given a hotkey under Settings ▸ Hotkeys. Use it when you don't want zen mode to hide everything.
+
+### Fixed
+- With "Use the file name as the central topic" on, renaming or moving another file in the vault changed the open map's central topic to that file's name, and editing the map afterwards renamed the map file too (#59). The central topic now only follows renames of the map's own file.
+
 ## [1.1.3] - 2026-11-28
 
 ### Changed
@@ -1359,7 +1367,8 @@ First public release.
 - Export as PNG or SVG, with math and images embedded.
 - Configurable toolbar position; file list icon with an icon picker; "New mind map" in the folder menu and Notebook Navigator.
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...HEAD
+[1.1.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1

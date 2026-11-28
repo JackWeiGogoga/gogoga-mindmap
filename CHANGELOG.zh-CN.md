@@ -4,6 +4,14 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-28
+
+### 新增
+- 主工具栏可以单独收起（#61）：点工具栏最后的箭头，工具栏收起，原来的角落只留一个小把手，点它展开。所有打开着的脑图一起收起，重新打开也记得。命令「隐藏 / 显示工具栏」可以在「设置 ▸ 快捷键」里绑一个键。不想像禅模式那样把所有东西都藏起来时用它。
+
+### 修复
+- 开着「用文件名作中心主题」时，在库里给别的文件改名或移动别的文件，正打开着的脑图的中心主题会被改成那个文件的名字，接着再编辑，脑图文件也会被改名（#59）。现在只有改这张图自己的文件名时，中心主题才跟着变。
+
 ## [1.1.3] - 2026-11-28
 
 ### 改进
@@ -1359,7 +1367,8 @@ gogoga Mind Map 每个版本的主要变化都记在这里。格式参照 [Keep 
 - 导出 PNG / SVG，公式和图片一起嵌入。
 - 工具栏位置可选；文件列表图标和图标选择器；文件夹右键和 Notebook Navigator 里可以新建思维导图。
 
-[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...HEAD
+[Unreleased]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.4...HEAD
+[1.1.4]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.3...1.1.4
 [1.1.3]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/JackWeiGogoga/gogoga-mindmap/compare/1.1.0...1.1.1

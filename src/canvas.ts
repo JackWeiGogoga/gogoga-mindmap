@@ -332,6 +332,10 @@ export interface CanvasOptions {
   onToggleHidden?: () => void;
   /** 工具栏位置；提供 onToolbarPositionChange 后工具栏上右键可以切换 */
   toolbarPosition?: ToolbarPosition;
+  /** 主工具栏收起着（#61）：只留一个小把手，点它或用命令「隐藏 / 显示工具栏」再展开。不给 onToolbarHiddenChange 就没有收起按钮（嵌入的图） */
+  toolbarHidden?: () => boolean;
+  /** 用户点了收起 / 展开：宿主记进设置，别的打开着的图跟着变 */
+  onToolbarHiddenChange?: (hidden: boolean) => void;
   onToolbarPositionChange?: (pos: ToolbarPosition) => void;
   /** 返回 true 时滚轮直接缩放、Shift+滚轮平移；每次滚动时读取，改设置立即生效 */
   wheelZoom?: () => boolean;
@@ -739,6 +743,9 @@ export class MindMapCanvas {
   private zoomLabel!: HTMLButtonElement;
   private toolbar!: HTMLElement;
   private toolbarPos: ToolbarPosition = "bottom";
+  /** 工具栏收起后留在原处的小把手（点它展开） */
+  private toolbarHandle: HTMLElement | null = null;
+  private toolbarHidden = false;
   /** 记住每个按钮的提示文案；节点上的图标会随渲染反复重建，用 WeakMap 免得越积越多 */
   private tips = new WeakMap<HTMLElement, { text: string; zone: "toolbar" | "fixed"; placement?: TooltipPlacement; delay?: number }>();
   /** 工具栏按钮单独留一份引用，换位置时要重新按新方向应用 */
@@ -1005,6 +1012,7 @@ export class MindMapCanvas {
     this.viewport.append(this.svg, this.nodesEl, this.overlay);
     this.el.append(this.viewport);
     this.buildToolbar();
+    this.setToolbarHidden(!!opts.toolbarHidden?.());
     this.bindEvents();
     // 临时浮出的标注：点到别处就收起（捕获阶段，别的处理拦下事件也照样收）
     this.el.addEventListener(
@@ -1440,6 +1448,8 @@ export class MindMapCanvas {
 
   refreshBars(): void {
     this.toolbar?.remove();
+    this.toolbarHandle?.remove();
+    this.toolbarHandle = null;
     this.positionMenu?.remove();
     this.positionMenu = null;
     this.buildToolbar();
@@ -1501,6 +1511,7 @@ export class MindMapCanvas {
     this.toolbarPos = pos;
     this.el.dataset.toolbar = pos;
     if (this.toolbar) this.toolbar.dataset.pos = pos;
+    this.updateToolbarHideIcons();
     // 弹出方向变了，工具栏上的提示要重新应用
     for (const el of this.toolbarTips) this.applyTip(el);
   }
@@ -4689,6 +4700,30 @@ export class MindMapCanvas {
       if (edit?.parentElement === bar) edit.after(big);
       else bar.prepend(big);
     }
+    // 收起按钮（#61）：固定在最后，不进按钮清单；收起后在同一个角落留一个小把手
+    if (this.opts.onToolbarHiddenChange) {
+      const sep = createSpan();
+      sep.className = "mm-tool-sep";
+      bar.append(sep);
+      const hide = btn("down", t("canvas.hideToolbar"), () => this.setToolbarHidden(true, true));
+      hide.dataset.tool = "hideToolbar";
+      bar.append(hide);
+      const handle = createDiv();
+      handle.className = "mm-toolbar mm-toolbar-handle";
+      handle.dataset.pos = this.toolbarPos;
+      const show = createEl("button");
+      show.type = "button";
+      show.className = "mm-tool";
+      show.dataset.tool = "showToolbar";
+      this.tip(show, t("canvas.showToolbar"), "toolbar");
+      show.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      show.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.setToolbarHidden(false, true);
+      });
+      handle.append(show);
+      this.toolbarHandle = handle;
+    }
     // 分隔线：前后没有看得见的按钮就藏起来。按钮会随情况显示 / 隐藏（有标注才出现标注按钮这类），类名一变就重新整理
     const tidy = () => {
       const kids = [...bar.children] as HTMLElement[];
@@ -4703,7 +4738,39 @@ export class MindMapCanvas {
     tidy();
     new MutationObserver(tidy).observe(bar, { subtree: true, attributes: true, attributeFilter: ["class"] });
     this.el.append(bar);
+    if (this.toolbarHandle) this.el.append(this.toolbarHandle);
+    this.updateToolbarHideIcons();
     this.updateZoomLabel();
+  }
+
+  /** 收起 / 展开按钮的箭头朝工具栏贴着的那条边：在底部时收起朝下、把手朝上 */
+  private updateToolbarHideIcons(): void {
+    const dir = { bottom: ["down", "up"], top: ["up", "down"], left: ["prev", "next"], right: ["next", "prev"] }[this.toolbarPos];
+    const hide = this.toolbar?.querySelector<HTMLElement>('[data-tool="hideToolbar"]');
+    const show = this.toolbarHandle?.querySelector<HTMLElement>('[data-tool="showToolbar"]');
+    if (this.toolbarHandle) this.toolbarHandle.dataset.pos = this.toolbarPos;
+    if (hide && hide.dataset.dir !== dir[0]) {
+      hide.dataset.dir = dir[0];
+      hide.replaceChildren(icon(dir[0]));
+    }
+    if (show && show.dataset.dir !== dir[1]) {
+      show.dataset.dir = dir[1];
+      show.replaceChildren(icon(dir[1]));
+    }
+  }
+
+  isToolbarHidden(): boolean {
+    return this.toolbarHidden;
+  }
+
+  /** 收起 / 展开主工具栏（#61）。fromUser：用户点的、用的命令，告诉宿主记下来 */
+  setToolbarHidden(hidden: boolean, fromUser = false): void {
+    if (!this.toolbarHandle) hidden = false;
+    if (hidden === this.toolbarHidden) return;
+    this.toolbarHidden = hidden;
+    this.el.classList.toggle("is-toolbar-hidden", hidden);
+    this.closePopover();
+    if (fromUser) this.opts.onToolbarHiddenChange?.(hidden);
   }
 
   // ---------- 背诵模式 ----------
